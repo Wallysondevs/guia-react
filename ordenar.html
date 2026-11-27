@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ordenar | Guia React</title>
+<meta name="description" content="Ordenar listas no React: o comparador do sort, números contra texto, localeCompare, ordenar sem estragar o array e como alternar crescente e decrescente.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Ordenar</span></h1>
+<p class="intro">A Ana tem uma lista de pães com o preço de cada um, e a lista está na ordem em que ela
+digitou — o que não quer dizer nada para ninguém. O cliente quer ver do mais barato ao mais caro; ela
+quer ver os campeões de venda primeiro. Toda vez que muda a pergunta, muda a ordem, e a Ana não vai
+reescrever a lista à mão em cada uma delas. Nesta aula ela aprende a ordenar no React: quem compara o
+quê, como inverter, e por que o <code>sort</code> tem uma armadilha que estraga a lista original.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que <code>sort</code> sem função de comparação ordena errado.</li>
+  <li>Como escrever o comparador <code>(a, b) =&gt; a.preco - b.preco</code> e o que ele devolve.</li>
+  <li>Como ordenar texto com <code>localeCompare</code>, respeitando acentos.</li>
+  <li>Que o <code>sort</code> mexe no array original — e os dois jeitos de evitar isso.</li>
+  <li>Quando a ordem é um estado e quando ela é só uma conta feita na hora de desenhar.</li>
+  <li>Como alternar crescente e decrescente com um botão.</li>
+  <li>O que fazer quando dois itens empatam.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a lista que só sabe chegar</h2>
+
+<p>Na padaria, a lista dos pães nasce sempre na mesma ordem: a ordem em que a Ana digitou. Pão francês,
+sonho, brioche, croissant. Funciona até o primeiro cliente perguntar “qual é o mais barato?”. Aí ela
+percorre a lista com o dedo, compara preço por preço e responde. No dia seguinte, a pergunta é “quais
+vendem mais?” e o trabalho é o mesmo, com outro critério.</p>
+
+<p>Ordenar é uma operação de dado, não de tela. A lista de pães continua sendo a mesma; o que muda é a
+sequência em que os itens aparecem. No React, isso significa duas coisas separadas: o array de dados, que
+não deve ser estragado, e a lista que aparece na tela, que é consequência de uma escolha — “por preço”,
+“por nome”, “do maior para o menor”.</p>
+
+<p>O JavaScript já tem essa ferramenta pronta: o método <code>sort</code>, que existe em todo array. Ele
+recebe uma função que decide quem vem antes de quem e devolve o array ordenado. Parece simples, e é — mas
+tem três detalhes que derrubam quase todo mundo na primeira tentativa: sem função, ele compara texto;
+com função, ela precisa devolver número; e ele ordena <strong>no lugar</strong>, mexendo no array
+original.</p>
+
+<p>Esses três detalhes são o roteiro da aula. Cada um aparece na tela de um jeito diferente, e o painel
+das caixas mostra o resultado exato para você conferir. Vamos começar pelo mais traiçoeiro, porque ele não
+dá erro: só devolve a ordem errada.</p>
+
+<h2>2. O sort sem comparador ordena como texto</h2>
+
+<p>Quem vem primeiro: 10 ou 2? Para uma pessoa, 2. Para o <code>sort</code> sem argumento, 10 — porque ele
+converte cada item em texto e compara letra por letra. “10” começa com “1”, que vem antes de “2”. O
+resultado é uma lista que parece ordenada e não está:</p>
+
+<pre class="file" data-file="sem-react.js">const precos = [10, 2, 1, 30];
+console.log(precos.sort());
+console.log(precos.sort((a, b) =&gt; a - b));</pre>
+
+<pre class="term">> [10, 2, 1].sort()
+[1, 10, 2]
+> [10, 2, 1].sort((a, b) => a - b)
+[1, 2, 10]</pre>
+
+<p>A primeira linha imprime <code>[1, 10, 2]</code>. A segunda imprime <code>[1, 2, 10]</code>.
+A diferença é a função que você entrega. E note uma coisa importante: as duas chamadas mexeram no array
+<code>precos</code>. Depois da primeira, o array já estava na ordem errada; a segunda ordenou o que
+sobrou. Guarde essa observação, ela volta na seção 6.</p>
+
+<p>O comportamento padrão do <code>sort</code> é, portanto, alfabético. Para textos ele até serve: nomes
+de pães ficam em ordem alfabética sem você escrever nada. Para números, ele é uma armadilha silenciosa —
+nenhuma mensagem, nenhum aviso, só a ordem trocada. E como o React desenha o que você mandar, a tela vai
+mostrar a lista errada com toda a confiança do mundo.</p>
+
+<p>Uma dica de leitura para o resto da aula: quando o resultado de um <code>sort</code> parece “quase
+certo”, desconfie do comparador. Listas de número em que 1, 10 e 100 aparecem juntos quase sempre são
+texto comparado como texto.</p>
+
+<h2>3. O comparador: uma função que devolve número</h2>
+
+<p>A função que o <code>sort</code> recebe se chama <strong>comparador</strong>. Ela recebe dois itens —
+convencionalmente chamados de <code>a</code> e <code>b</code> — e devolve um número. O sinal desse número é
+a instrução:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O comparador devolve</th><th>O que o sort entende</th><th>Exemplo</th></tr>
+<tr><td>número negativo</td><td><code>a</code> vem antes de <code>b</code></td><td><code>a - b</code> com 2 e 8 devolve -6</td></tr>
+<tr><td>zero</td><td>empate: a ordem entre os dois tanto faz</td><td><code>a - b</code> com 5 e 5 devolve 0</td></tr>
+<tr><td>número positivo</td><td><code>b</code> vem antes de <code>a</code></td><td><code>a - b</code> com 8 e 2 devolve 6</td></tr>
+<tr><td>texto qualquer</td><td>o navegador tenta converter; o resultado não é confiável</td><td><code>a.nome &lt; b.nome</code> não serve</td></tr>
+</table>
+</div>
+
+<p>Por isso <code>(a, b) =&gt; a - b</code> ordena do menor para o maior: quando <code>a</code> é menor, a
+subtração dá negativo e ele fica na frente. E <code>(a, b) =&gt; b - a</code> faz o contrário, do maior
+para o menor, porque agora é o maior que produz o negativo. Não precisa decorar: pense em “número menor
+primeiro” para <code>a - b</code>.</p>
+
+<p>Com objetos, você escolhe o campo antes de subtrair: <code>(a, b) =&gt; a.preco - b.preco</code>. O
+comparador não recebe o array inteiro, recebe dois itens por vez — e o <code>sort</code> decide quantas
+vezes chamar. Você só responde à pergunta “entre estes dois, quem vem antes?”.</p>
+
+<p>Uma observação sobre o JavaScript: comparar texto com <code>&lt;</code> e <code>&gt;</code> parece
+funcionar e devolve <code>true</code> ou <code>false</code>. O <code>sort</code> espera número, e
+<code>true</code> vira 1, <code>false</code> vira 0 — um comparador que nunca devolve negativo. A
+consequência é uma lista que ignora metade das comparações. A seção 4 mostra o jeito certo de comparar
+texto.</p>
+
+<p>A caixa abaixo é o teste do que acabamos de ler. O ranking está na ordem em que os pães entraram no
+cadastro, e a posição aparece na frente de cada item para você ver a mudança acontecer:</p>
+
+<div class="tryreact" data-goal="texto:1º Sonho — 40;;texto:3º Pão francês — 12">
+  <p class="try-task">O ranking mostra os pães na ordem de chegada. Ordene do mais vendido para o menos
+  vendido, com um comparador que subtraia as quantidades na direção certa.</p>
+  <pre class="jsx">const paes = [
+  { nome: "Pão francês", quantidade: 12 },
+  { nome: "Sonho", quantidade: 40 },
+  { nome: "Brioche", quantidade: 25 }
+];
+
+function App() {
+  const lista = paes;
+  return (
+    &lt;ul className="ranking"&gt;
+      {lista.map((pao, i) =&gt; (
+        &lt;li key={pao.nome}&gt;{i + 1}º {pao.nome} — {pao.quantidade}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul class="ranking"&gt;
+  &lt;li&gt;1 º Pão francês — 12&lt;/li&gt;
+  &lt;li&gt;2 º Sonho — 40&lt;/li&gt;
+  &lt;li&gt;3 º Brioche — 25&lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">const paes = [
+  { nome: "Pão francês", quantidade: 12 },
+  { nome: "Sonho", quantidade: 40 },
+  { nome: "Brioche", quantidade: 25 }
+];
+
+function App() {
+  const lista = [...paes].sort((a, b) =&gt; b.quantidade - a.quantidade);
+  return (
+    &lt;ul className="ranking"&gt;
+      {lista.map((pao, i) =&gt; (
+        &lt;li key={pao.nome}&gt;{i + 1}º {pao.nome} — {pao.quantidade}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p>Quando acertar, o painel mostra o Sonho em primeiro e o pão francês em último. Se você escrever
+<code>a.quantidade - b.quantidade</code>, o ranking sai invertido — a lista continua ordenada, só que de
+trás para a frente. Esse é o erro mais comum da seção inteira, e ele não dá aviso: o sinal do comparador é
+a única pista.</p>
+
+<h2>4. Comparar texto com localeCompare</h2>
+
+<p>Para nomes, o comparador certo é o método <code>localeCompare</code>, que toda string tem. Ele compara
+duas strings com as regras do idioma e devolve exatamente o que o <code>sort</code> quer: negativo, zero
+ou positivo.</p>
+
+<pre class="file" data-file="App.jsx">const paes = ["Sonho", "Água na boca", "Brioche"];
+
+const emOrdem = [...paes].sort((a, b) =&gt; a.localeCompare(b, "pt-BR"));</pre>
+
+<p>O segundo argumento, <code>"pt-BR"</code>, pede as regras do português do Brasil. Sem ele, o resultado
+costuma ser parecido, mas com ele os acentos e o ç entram no lugar esperado: “Água” fica antes de
+“Brioche”, porque a comparação considera a letra sem o acento na hora de decidir a posição. É esse detalhe
+que faz a lista parecer ordenada para quem lê, e não só correta para o computador.</p>
+
+<p>Também é o <code>localeCompare</code> que resolve maiúsculas e minúsculas sem susto. Comparar
+<code>"brioche"</code> com <code>"Brioche"</code> usando <code>&lt;</code> dá um resultado estranho,
+porque o código da letra maiúscula é menor. O <code>localeCompare</code> trata as duas formas como a mesma
+letra e devolve zero — empate —, que é o que uma pessoa espera.</p>
+
+<p>Com objetos, a diferença é só o campo: <code>(a, b) =&gt; a.nome.localeCompare(b.nome, "pt-BR")</code>.
+E o mesmo raciocínio vale para ordenar por bairro, por cidade ou por qualquer texto que venha do banco de
+dados. Números usam subtração; textos usam <code>localeCompare</code>. Duas receitas, o resto é
+combinação.</p>
+
+<h2>5. Ordenar por um campo — e desempatar pelo outro</h2>
+
+<p>Na lista da Ana, cada pão tem nome e preço. Ordenar por preço é uma linha; o problema aparece quando
+dois pães custam o mesmo. Aí a ordem entre eles fica indefinida, e a lista pode mudar de aparência entre
+uma renderização e outra, o que assusta. A solução é um segundo critério, aplicado só no empate:</p>
+
+<pre class="file" data-file="App.jsx">const lista = [...paes].sort((a, b) =&gt; {
+  const pelaOrdem = a.preco - b.preco;
+  if (pelaOrdem !== 0) return pelaOrdem;
+  return a.nome.localeCompare(b.nome, "pt-BR");
+});</pre>
+
+<p>Leia em voz alta: “compare pelo preço; se der diferente de zero, pronto; se empatar, compare pelo
+nome”. Essa estrutura — primeiro critério, empate, segundo critério — é a base de qualquer ordenação de
+tabela. Você pode acrescentar um terceiro nível se precisar, mas raramente vale a pena: dois critérios
+resolvem quase tudo e continuam legíveis.</p>
+
+<p>Uma versão mais curta usa o operador <code>||</code>, que devolve o primeiro valor “verdadeiro”. Como
+zero é falso em JavaScript, <code>a.preco - b.preco || a.nome.localeCompare(b.nome)</code> funciona: se a
+subtração der zero, cai no nome. É esperto e é difícil de ler. Em código de estudo, prefira a versão com
+<code>if</code>, que qualquer pessoa entende em cinco segundos.</p>
+
+<p>E o que é “estável”? O <code>sort</code> do JavaScript é estável: itens que empatam mantêm a ordem
+relativa que tinham no array original. Isso significa que, se você já ordenou por nome e depois ordena por
+preço, os empates de preço continuam em ordem alfabética. É um recurso elegante, e é o que permite ordenar
+duas vezes em vez de escrever um comparador gigante.</p>
+
+<dl class="anatomy">
+<dt>sort</dt>
+<dd>Método de array que ordena os itens segundo um comparador e devolve o mesmo array, já mexido.</dd>
+<dt>comparador</dt>
+<dd>A função <code>(a, b) =&gt; …</code> que o <code>sort</code> chama para decidir quem vem antes. Devolve
+negativo, zero ou positivo.</dd>
+<dt>no lugar</dt>
+<dd>Quando o método altera o array original em vez de criar outro. <code>sort</code>, <code>reverse</code>,
+<code>push</code> e <code>splice</code> trabalham no lugar.</dd>
+<dt>localeCompare</dt>
+<dd>Comparação de texto com as regras de um idioma: <code>a.localeCompare(b, "pt-BR")</code>. Resolve
+acentos e maiúsculas.</dd>
+<dt>estável</dt>
+<dd>Ordenação que preserva a ordem anterior dos itens empatados. O <code>sort</code> do JavaScript é
+estável.</dd>
+<dt>derivado</dt>
+<dd>Valor calculado a partir de outro na hora de desenhar, em vez de guardado. A lista ordenada é o
+exemplo clássico.</dd>
+</dl>
+
+<h2>6. O sort estraga o array — e como evitar</h2>
+
+<p>Agora o tropeço que não dá erro e aparece longe. O <code>sort</code> ordena <strong>no lugar</strong>:
+ele embaralha o próprio array e devolve uma referência para ele. Se aquele array é o estado do componente,
+ou uma constante que outra parte da tela usa, o estrago já aconteceu. No React isso é pior do que em
+JavaScript comum, porque o React compara referências para decidir se redesenha: você mudou o conteúdo sem
+trocar o array, então ele pode nem perceber.</p>
+
+<p>A caixa abaixo mostra o sintoma de um jeito direto. O componente imprime duas linhas: a ordem de
+chegada e a ordem de venda. Elas deveriam ser diferentes. Rode do jeito que está e veja as duas iguais:</p>
+
+<div class="tryreact" data-goal="texto:chegada: Pão francês, Brioche, Sonho;;texto:ordem: Brioche, Sonho, Pão francês">
+  <p class="try-task">A linha <code>chegada</code> deveria manter a ordem original e está saindo ordenada,
+  porque o <code>sort</code> mexeu no array. Ordene uma <strong>cópia</strong> — <code>[...paes]</code> — e
+  deixe o original em paz.</p>
+  <pre class="jsx">const paes = [
+  { nome: "Pão francês", preco: 2 },
+  { nome: "Brioche", preco: 8 },
+  { nome: "Sonho", preco: 5 }
+];
+
+function App() {
+  const ordenados = paes.sort((a, b) =&gt; b.preco - a.preco);
+  return (
+    &lt;div&gt;
+      &lt;p&gt;chegada: {paes.map((p) =&gt; p.nome).join(", ")}&lt;/p&gt;
+      &lt;p&gt;ordem: {ordenados.map((p) =&gt; p.nome).join(", ")}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;chegada: Brioche, Sonho, Pão francês&lt;/p&gt;
+  &lt;p&gt;ordem: Brioche, Sonho, Pão francês&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const paes = [
+  { nome: "Pão francês", preco: 2 },
+  { nome: "Brioche", preco: 8 },
+  { nome: "Sonho", preco: 5 }
+];
+
+function App() {
+  const ordenados = [...paes].sort((a, b) =&gt; b.preco - a.preco);
+  return (
+    &lt;div&gt;
+      &lt;p&gt;chegada: {paes.map((p) =&gt; p.nome).join(", ")}&lt;/p&gt;
+      &lt;p&gt;ordem: {ordenados.map((p) =&gt; p.nome).join(", ")}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O spread <code>[...paes]</code> cria um array novo, com os mesmos itens. O <code>sort</code> trabalha
+nessa cópia e o <code>paes</code> original continua na ordem em que a Ana digitou. É uma linha a mais e o
+fim de uma classe inteira de bugs.</p>
+
+<pre class="term">antes:  ["Pão francês", "Brioche", "Sonho"]
+ordem:  ["Brioche", "Pão francês", "Sonho"]
+antes:  ["Brioche", "Pão francês", "Sonho"]   (o sort mexeu no original)</pre>
+
+<p>Leia a última linha com atenção: depois de imprimir a lista ordenada, o array <code>antes</code> não é
+mais o de antes. Esse é o tipo de efeito colateral que aparece três telas depois, num lugar onde ninguém
+suspeita. O spread elimina o problema na origem.</p>
+
+<p>Existe um segundo jeito, mais curto: <code>paes.toSorted((a, b) =&gt; …)</code>. O <code>toSorted</code>
+faz a mesma coisa que o <code>sort</code>, mas devolve um array novo e não encosta no original. É a
+preferência quando o navegador é recente — e os navegadores atuais são. O primeiro jeito funciona em
+qualquer lugar, o segundo é mais legível. Os dois estão certos.</p>
+
+<p>Vale conhecer também o <code>reverse</code>, que inverte no lugar e tem o mesmo problema, e o
+<code>slice()</code> sem argumentos, que copia o array inteiro e serve como “spread com outro nome”. O
+importante é criar o hábito: antes de chamar um método de array dentro de um componente, pergunte se ele
+altera a lista. Se altera, copie primeiro.</p>
+
+<h2>7. A ordem é estado ou é conta?</h2>
+
+<p>Aqui está a decisão de projeto da aula. A Ana quer dois botões: “por nome” e “por preço”. Ela tem duas
+formas de fazer isso. A primeira é guardar no estado a lista já ordenada e trocá-la quando o botão é
+clicado. A segunda é guardar apenas <em>qual</em> ordem foi escolhida e ordenar dentro do render, a cada
+desenho.</p>
+
+<p>A segunda costuma ser melhor. O estado fica pequeno — uma string <code>"nome"</code> ou
+<code>"preco"</code> — e a lista ordenada é sempre calculada a partir da lista original. Você não corre o
+risco de ter duas versões da verdade: uma lista guardada em ordem alfabética e outra guardada em ordem de
+preço, que se contradizem depois de um item novo. Quem manda continua sendo o array de dados.</p>
+
+<p>Esse é o padrão de <strong>estado derivado</strong>: guarde o mínimo e calcule o resto. O guia tem uma
+aula inteira sobre isso em <a href="estado-derivado.html">Estado Derivado</a>, e a regra prática cabe em
+uma frase: se o valor pode ser calculado a partir de outro estado ou das props, ele não precisa de
+<code>useState</code>.</p>
+
+<p>Há exceções. Se ordenar for caro — uma lista de dez mil itens, com comparação complicada —, calcular a
+cada tecla digitada pode pesar. Aí entram <code>useMemo</code> ou uma lista já ordenada no estado. Para a
+padaria, com sete pães, o cálculo é instantâneo e a simplicidade ganha de longe.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde fica a ordem</th><th>Como fica o código</th><th>O que costuma dar errado</th></tr>
+<tr><td>no estado, lista inteira ordenada</td><td><code>setLista([...lista].sort(...))</code></td><td>duas listas desatualizadas; item novo entra fora de ordem</td></tr>
+<tr><td>no estado, só o critério</td><td><code>const [ordem, setOrdem] = useState("nome")</code></td><td>quase nada: a lista é recalculada a partir da fonte</td></tr>
+<tr><td>no estado, critério e direção</td><td><code>useState("preco")</code> + <code>useState(true)</code></td><td>dois cliques para mudar de critério, se a interface não ajudar</td></tr>
+<tr><td>calculada no render</td><td><code>[...paes].sort(comparador)</code> dentro do componente</td><td>cálculo repetido a cada desenho, se a lista for enorme</td></tr>
+</table>
+</div>
+
+<p>Repare que as três primeiras linhas guardam coisas diferentes: uma lista, uma escolha, duas escolhas. A
+última não guarda nada — e é justamente a mais simples de manter. Se a lista de dados é grande ou vem de
+uma API, o cálculo repetido pode ser otimizado depois; comece pela versão que não tem como ficar
+inconsistente.</p>
+
+<h2>8. Alternar crescente e decrescente</h2>
+
+<p>“Do mais barato ao mais caro” e “do mais caro ao mais barato” não são duas listas: são a mesma lista com
+a comparação invertida. Então o estado natural é um booleano, <code>crescente</code>, e o comparador muda
+de sinal conforme ele:</p>
+
+<div class="tryreact" data-goal="clique:button.inverter;;texto:1º Brioche — R$ 8">
+  <p class="try-task">O botão “Inverter a ordem” já troca o estado <code>crescente</code>, mas a lista
+  ignora esse estado e mostra sempre a mesma coisa. Faça o comparador respeitar <code>crescente</code>:
+  quando ele for falso, o mais caro vem primeiro.</p>
+  <pre class="jsx">const paes = [
+  { nome: "Pão francês", preco: 2 },
+  { nome: "Brioche", preco: 8 },
+  { nome: "Sonho", preco: 5 }
+];
+
+function App() {
+  const [crescente, setCrescente] = useState(true);
+  const lista = [...paes].sort((a, b) =&gt; a.preco - b.preco);
+  return (
+    &lt;div&gt;
+      &lt;button className="inverter" onClick={() =&gt; setCrescente(!crescente)}&gt;
+        Inverter a ordem
+      &lt;/button&gt;
+      &lt;ul&gt;
+        {lista.map((pao, i) =&gt; (
+          &lt;li key={pao.nome}&gt;{i + 1}º {pao.nome} — R$ {pao.preco}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button class="inverter"&gt;Inverter a ordem&lt;/button&gt;
+  &lt;ul&gt;
+    &lt;li&gt;1 º Pão francês — R$ 2&lt;/li&gt;
+    &lt;li&gt;2 º Sonho — R$ 5&lt;/li&gt;
+    &lt;li&gt;3 º Brioche — R$ 8&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const paes = [
+  { nome: "Pão francês", preco: 2 },
+  { nome: "Brioche", preco: 8 },
+  { nome: "Sonho", preco: 5 }
+];
+
+function App() {
+  const [crescente, setCrescente] = useState(true);
+  const lista = [...paes].sort((a, b) =&gt;
+    crescente ? a.preco - b.preco : b.preco - a.preco
+  );
+  return (
+    &lt;div&gt;
+      &lt;button className="inverter" onClick={() =&gt; setCrescente(!crescente)}&gt;
+        Inverter a ordem
+      &lt;/button&gt;
+      &lt;ul&gt;
+        {lista.map((pao, i) =&gt; (
+          &lt;li key={pao.nome}&gt;{i + 1}º {pao.nome} — R$ {pao.preco}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O número na frente de cada item — “1º”, “2º”, “3º” — não é enfeite: é o que torna a ordem visível para
+quem olha e conferível para quem testa. Se você só desenhar nomes, a lista invertida continua parecendo
+“uma lista”; com a posição na frente, a mudança fica óbvia. Em produção, use a posição quando ela é
+informação (um ranking) e deixe o navegador numerar quando for só uma lista comum, com
+<code>&lt;ol&gt;</code>.</p>
+
+<p>Três detalhes que evitam confusão. Primeiro, o texto do botão deve dizer o que ele faz: “Inverter a
+ordem” é melhor do que “Ordenar”, que não diz nada. Segundo, o estado inicial precisa ser explícito —
+comece em <code>true</code> e comente por quê. Terceiro, não crie dois arrays no estado; um booleano
+resolve.</p>
+
+<p>Se preferir evitar o ternário dentro do comparador, dá para multiplicar por <code>-1</code>:
+<code>(a.preco - b.preco) * (crescente ? 1 : -1)</code>. Funciona igual e é mais fácil de ler quando o
+comparador já é comprido. Escolha um estilo e mantenha: consistência vale mais do que esperteza.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a lista ordenada na hora mostra itens fora de ordem</h3>
+<p>A Ana ordenou por preço, mas dois pães de mesmo preço aparecem trocados cada vez que ela recarrega a
+página. É o empate: sem segundo critério, a ordem entre iguais fica indefinida. A solução é o comparador
+de dois níveis da seção 5 — preço e, no empate, nome. Depois disso, a lista é sempre a mesma para os
+mesmos dados.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: ordenar “funcionou” no console, mas a tela não mudou</h3>
+<p>Ela chamou <code>pedidos.sort(...)</code> dentro do estado e nada foi redesenhado. O React compara
+referências: o array é o mesmo objeto, então ele conclui que nada mudou. O conserto é criar um array novo
+com <code>[...pedidos]</code> e passar esse para o setter. A tela obedece à referência, não ao
+conteúdo.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: a ordem “volta” depois de digitar no filtro</h3>
+<p>A Ana guardou a lista ordenada num estado e a lista filtrada em outro. Ao digitar, o filtro recria a
+lista a partir da original, na ordem de chegada — e a tela “desordena”. Não é bug do filtro: são duas
+verdades concorrentes. Guardando só o critério e ordenando no fim do render, filtro e ordem passam a
+conviver sem briga.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<p>Este é o resumo em forma de pergunta. Se você acertar as três sem olhar, o assunto está firme. Se
+errar, volte só na seção indicada — é mais rápido do que reler a aula inteira.</p>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que o comparador precisa devolver?</p>
+<label><input type="radio" name="q1"> <code>true</code> ou <code>false</code></label>
+<label><input type="radio" name="q1"> um número: negativo, zero ou positivo</label>
+<label><input type="radio" name="q1"> o item que vem primeiro, já separado</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que <code>[...paes].sort(...)</code> é mais seguro que <code>paes.sort(...)</code>?</p>
+<label><input type="radio" name="q2"> porque o spread deixa a ordenação mais rápida</label>
+<label><input type="radio" name="q2"> porque o sort não funciona em constantes</label>
+<label><input type="radio" name="q2"> porque o sort mexe no array original, e a cópia preserva a ordem de chegada</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Para que serve o <code>localeCompare</code>?</p>
+<label><input type="radio" name="q3"> comparar textos com as regras do idioma, incluindo acentos</label>
+<label><input type="radio" name="q3"> comparar números grandes sem perder precisão</label>
+<label><input type="radio" name="q3"> ordenar a lista sem criar cópia</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o ranking dos mais vendidos</h2>
+<p>Complete o comparador que coloca o pão mais vendido no topo da lista. Considere que cada pão tem o campo
+<code>vendidos</code>.</p>
+<div class="ex-code">const ranking = [...paes].sort((a, b) =&gt; <input aria-label="resposta 1" data-answer="b.vendidos - a.vendidos" placeholder="...">);</div>
+<p class="ex-dica">Dica: o mais vendido precisa produzir número negativo, então o maior valor entra na
+frente. A subtração começa pelo item <code>b</code>.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Ordenar no React é ordenar um array antes de desenhar. O <code>sort</code> recebe um comparador e chama
+esse comparador para cada par de itens; o sinal do número decide quem vem antes. Para números, subtraia:
+<code>a - b</code> crescente, <code>b - a</code> decrescente. Para textos, use
+<code>localeCompare</code>. Para empates, um segundo critério resolve e a ordenação estável cuida do
+resto.</p>
+
+<p>O <code>sort</code> trabalha no lugar. Isso significa que ele altera o array original — o que quase
+nunca é o que você quer. Copie antes com <code>[...lista]</code> ou use <code>toSorted</code>. E lembre
+que o React decide redesenhar por referência: trocar o conteúdo de um array sem trocar o array pode
+significar uma tela que não atualiza.</p>
+
+<p>Sobre onde guardar a ordem: prefira guardar a escolha — <code>"nome"</code>, <code>"preco"</code>,
+<code>crescente</code> — e calcular a lista no render. Estado pequeno, uma fonte da verdade, nenhuma
+sincronização manual. Quando o cálculo ficar caro de verdade, aí sim <code>useMemo</code> ou uma cópia
+ordenada no estado.</p>
+
+<p>E o teste que sempre vale: ordene, inverta, digite no filtro e recarregue. Se a lista continuar fazendo
+sentido em todas as combinações, você acertou o desenho. Se em alguma delas a ordem “voltar sozinha”, há
+duas verdades concorrentes no seu estado — e a solução é tirar uma delas.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>sort</code> sem argumento compara texto: 10 vem antes de 2.</li>
+<li>O comparador devolve negativo, zero ou positivo; <code>a - b</code> é crescente.</li>
+<li>Texto se compara com <code>a.localeCompare(b, "pt-BR")</code>.</li>
+<li><code>sort</code> e <code>reverse</code> alteram o array original.</li>
+<li><code>[...lista].sort(...)</code> ou <code>lista.toSorted(...)</code> deixam o original intacto.</li>
+<li>Empate se resolve com um segundo critério, não com sorte.</li>
+<li>Guarde o critério da ordenação no estado e calcule a lista no render.</li>
+<li>O React compara referência: array novo, tela nova.</li>
+<li>Ordene antes do <code>map</code>; a <code>key</code> de cada item não muda com a ordem.</li>
+<li>Posição na frente do item (“1º”) deixa a ordem visível e testável.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

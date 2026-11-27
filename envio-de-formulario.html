@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Envio de Formulário | Guia React</title>
+<meta name="description" content="Envio de formulário no React: onSubmit, preventDefault, o objeto do pedido, o envio assíncrono simulado com Promise, o botão que espera e o erro tratado.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Envio de <span class="hl">Formulário</span></h1>
+<p class="intro">A Ana passou a semana arrumando o formulário de encomenda: o nome tinha regra, o telefone
+tinha regra, a mensagem de erro aparecia no lugar certo. Na segunda-feira uma cliente ligou dizendo que
+mandou o pedido três vezes e não recebeu confirmação nenhuma. A Ana abriu o site, digitou o nome e clicou
+em Encomendar: a página piscou, os campos esvaziaram e a mensagem sumiu. O formulário estava validando
+direito — o que faltava era o envio: impedir o navegador de recarregar a página, montar o pedido e
+conversar com o servidor. É o que ela faz nesta aula.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que um botão dentro de um <code>form</code> recarrega a página.</li>
+  <li>O par que resolve isso: <code>onSubmit</code> e <code>e.preventDefault()</code>.</li>
+  <li>Como ler os campos na hora do envio, com estado ou com <code>FormData</code>.</li>
+  <li>Como montar o objeto do pedido e o que o servidor espera receber.</li>
+  <li>Como é um envio assíncrono — e por que a caixa simula a rede.</li>
+  <li>Como mostrar "Enviando..." e impedir o pedido duplicado.</li>
+  <li>O que fazer quando o envio falha, sem perder o que a pessoa digitou.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o pedido que a página apagou</h2>
+
+<p>O formulário da Ana tinha tudo: campos controlados, validação, mensagem de sucesso. Só que a mensagem
+aparecia por um instante e desaparecia. Não era bug do React: era o navegador fazendo o que faz com
+qualquer formulário desde 1995 — enviar os dados para o servidor e trocar a página inteira pelo resultado.
+Como o formulário não dizia para onde enviar, ele enviou para a própria página. A página recarregou, o
+componente nasceu de novo (com os campos vazios) e a mensagem que estava no estado foi junto.</p>
+
+<p>O detalhe cruel é que a cliente viu "Encomenda registrada" antes do piscar. Para ela, o pedido tinha
+sido feito. Para o site, nada tinha acontecido. A Ana passou a tarde procurando o erro na validação, onde
+não estava: o problema era o comportamento padrão do formulário, que ninguém tinha desligado.</p>
+
+<p>Enviar um formulário, no React, tem três partes e sempre as mesmas três: <strong>cancelar</strong> a
+navegação do navegador, <strong>ler</strong> os valores e <strong>conversar</strong> com o servidor. A
+primeira parte é uma linha de código e é onde quase todo mundo tropeça. A segunda já é conhecida, porque
+os campos são controlados. A terceira tem espera, resposta e erro — e é o que separa um formulário de
+brinquedo de um de verdade.</p>
+
+<h2>2. O que o navegador faz com um form</h2>
+
+<p>Uma tag <code>form</code> é o único lugar do HTML onde o navegador tem opinião formada. Ele observa os
+campos, espera o clique num botão de envio e, quando isso acontece, faz uma requisição com os dados. Sem
+atributo <code>action</code>, o destino é a própria página; sem <code>method</code>, o método é
+<code>GET</code>, que coloca os valores na barra de endereços. O resultado é a piscada que a Ana viu:</p>
+
+<pre class="term">GET http://localhost:5173/?nome=Maria&amp;telefone=999998888
+200 OK — a página inteira de novo</pre>
+
+<p>Repare no que aconteceu: o nome e o telefone foram parar na URL. Isso não é um recurso do React, é o
+formulário do HTML funcionando como sempre funcionou. Em 1995 era assim que se mandava um pedido para o
+servidor, e o servidor devolvia uma página nova já com a resposta. O navegador não sabe que existe um
+componente com estado do outro lado; ele só conhece a URL para onde ir.</p>
+
+<p>Por isso o estado se perde. Recarregar a página não é "atualizar os dados": é destruir a árvore de
+componentes e montar outra do zero. Todo <code>useState</code> volta ao valor inicial, toda mensagem
+some, todo trabalho feito no navegador é descartado. Se o pedido não foi para lugar nenhum antes disso,
+ele deixou de existir.</p>
+
+<p>Existe uma coisa boa nesse comportamento, e ela explica por que continuamos usando
+<code>form</code>: apertar Enter dentro de um campo de texto envia o formulário. É de graça, funciona no
+celular e é o que qualquer pessoa espera. Quem troca o <code>form</code> por uma <code>div</code> com
+botões perde isso e precisa reimplementar teclado, foco e leitor de tela. A solução não é fugir do
+formulário: é assumir o comando do envio.</p>
+
+<h2>3. onSubmit: a função que roda no envio</h2>
+
+<p>O React escuta o evento <code>submit</code> do formulário, e o jeito de escutar é a prop
+<code>onSubmit</code>. Quando o navegador decide enviar — clique no botão ou Enter num campo —, ele chama
+a sua função <em>antes</em> de navegar. E aí está a chave: se a função chamar
+<code>e.preventDefault()</code>, a navegação é cancelada e a página fica onde está.</p>
+
+<pre class="file" data-file="Encomenda.jsx">function Encomenda() {
+  const [nome, setNome] = useState("");
+
+  function enviar(e) {
+    e.preventDefault();          // cancela a navegação do navegador
+    console.log("pedido de " + nome);
+  }
+
+  return (
+    &lt;form onSubmit={enviar}&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;button type="submit"&gt;Encomendar&lt;/button&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+
+<p>O <code>e</code> que chega no <code>onSubmit</code> não é o mesmo <code>e</code> do
+<code>onChange</code>. No <code>onChange</code>, ele é um evento de mudança de campo, com
+<code>e.target.value</code>. No <code>onSubmit</code>, ele é o evento de envio do formulário, com
+<code>e.target</code> apontando para o <code>form</code> inteiro. O método <code>preventDefault</code>
+existe nos dois, e é o mesmo em qualquer evento: "não faça o que você faria sem mim".</p>
+
+<dl class="anatomy">
+<dt>envio (submit)</dt>
+<dd>O momento em que o navegador pega os campos do formulário e monta uma requisição. No React, quem
+escuta esse momento é <code>onSubmit</code>.</dd>
+<dt><code>preventDefault</code></dt>
+<dd>Método do evento que cancela a ação padrão do navegador. No envio, cancela a navegação; no clique,
+cancela o clique.</dd>
+<dt>pedido</dt>
+<dd>O objeto com os dados que vão para o servidor: <code>{ nome, telefone, itens }</code>.</dd>
+<dt>Promise</dt>
+<dd>Um valor que ainda não chegou. O <code>fetch</code> devolve uma; o <code>then</code> diz o que fazer
+quando ela resolver.</dd>
+<dt>estado do envio</dt>
+<dd>A variável que diz em que ponto a conversa está: ocioso, enviando, deu certo, deu erro.</dd>
+</dl>
+
+<p>A ordem importa. <code>preventDefault</code> precisa ser a primeira linha, porque o navegador navega
+assim que a sua função termina. Se você colocar um <code>return</code> antes, ou deixar a chamada dentro
+de um <code>if</code> que não rodou, a navegação acontece. Também não adianta chamar
+<code>preventDefault</code> dentro do <code>onClick</code> do botão: ali você cancela o clique, não o
+envio — e o formulário continua sendo enviado por outro caminho.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Peça</th><th>O que faz</th><th>Sem ela</th></tr>
+<tr><td><code>&lt;form&gt;</code></td><td>agrupa os campos e escuta o Enter</td><td>Enter não envia nada e o leitor de tela não anuncia um formulário</td></tr>
+<tr><td><code>onSubmit</code></td><td>a função que roda no envio</td><td>o navegador navega e a página recarrega</td></tr>
+<tr><td><code>e.preventDefault()</code></td><td>cancela a navegação</td><td>a função roda, mas a página sai da tela logo depois</td></tr>
+<tr><td><code>type="submit"</code></td><td>o botão que dispara o envio</td><td>é o padrão do botão dentro do form: sem <code>type</code>, ele já envia</td></tr>
+<tr><td><code>type="button"</code></td><td>um botão que só roda o <code>onClick</code></td><td>usar num botão "Cancelar" evita enviar sem querer</td></tr>
+</table>
+</div>
+
+<p>Uma armadilha de leitura: dentro de um <code>form</code>, o valor padrão de <code>type</code> num
+<code>button</code> é <code>"submit"</code>. Ou seja, um botão "Limpar" sem <code>type</code> envia o
+formulário em vez de limpar. Sempre que o botão não for de envio, escreva
+<code>type="button"</code>.</p>
+
+<p>Agora a primeira missão. O formulário abaixo tem os dois campos e o botão, mas nenhum
+<code>onSubmit</code>: clicar em Encomendar recarrega a prévia e o pedido se perde.</p>
+
+<div class="tryreact" data-goal="digite:#nome=Maria;;clique:#enviar;;texto:Pedido de Maria registrado">
+  <p class="try-task">Escreva um <code>onSubmit</code> que chama <code>e.preventDefault()</code> e mostra
+  <strong>Pedido de Maria registrado</strong> com o nome que estiver no campo. Digite "Maria", clique em
+  Encomendar e confira que a prévia não recarrega.</p>
+  <pre class="jsx">function App() {
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+
+  return (
+    &lt;form&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;label htmlFor="telefone"&gt;Telefone&lt;/label&gt;
+      &lt;input
+        id="telefone"
+        value={telefone}
+        onChange={(e) =&gt; setTelefone(e.target.value)}
+      /&gt;
+      &lt;button id="enviar" type="submit"&gt;Encomendar&lt;/button&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;form&gt;
+  &lt;label for="nome"&gt;Nome&lt;/label&gt;
+  &lt;input id="nome" value=""&gt;
+  &lt;label for="telefone"&gt;Telefone&lt;/label&gt;
+  &lt;input id="telefone" value=""&gt;
+  &lt;button id="enviar" type="submit"&gt;Encomendar&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [aviso, setAviso] = useState("");
+
+  function enviar(e) {
+    e.preventDefault();
+    setAviso("Pedido de " + nome + " registrado");
+  }
+
+  return (
+    &lt;form onSubmit={enviar}&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;label htmlFor="telefone"&gt;Telefone&lt;/label&gt;
+      &lt;input
+        id="telefone"
+        value={telefone}
+        onChange={(e) =&gt; setTelefone(e.target.value)}
+      /&gt;
+      &lt;button id="enviar" type="submit"&gt;Encomendar&lt;/button&gt;
+      {aviso &amp;&amp; &lt;p&gt;{aviso}&lt;/p&gt;}
+    &lt;/form&gt;
+  );
+}</pre>
+</div>
+
+<p>Compare os dois comportamentos. No código inicial, a prévia pisca e volta ao começo: é a navegação
+acontecendo. Na solução, o formulário continua na tela, o campo continua com "Maria" e a mensagem aparece
+embaixo. A diferença entre os dois mundos é uma chamada de uma linha, mas o efeito é grande: a partir daí
+quem decide o que acontece é o seu componente, não o navegador.</p>
+
+<h2>4. Ler os campos na hora do envio</h2>
+
+<p>Com campos controlados, você já tem os valores: eles estão no estado, atualizados a cada tecla. O
+<code>onSubmit</code> só precisa usá-los. Mas existe um segundo caminho, útil quando o formulário é
+grande ou quando os campos não são controlados: pedir os valores ao próprio formulário com
+<code>FormData</code>.</p>
+
+<pre class="file" data-file="Newsletter.jsx">function Newsletter() {
+  function enviar(e) {
+    e.preventDefault();
+    const dados = new FormData(e.target);   // e.target é o &lt;form&gt;
+    const email = dados.get("email");       // o name do campo
+    console.log("assinar: " + email);
+  }
+
+  return (
+    &lt;form onSubmit={enviar}&gt;
+      &lt;label htmlFor="email"&gt;E-mail&lt;/label&gt;
+      &lt;input id="email" name="email" type="email" /&gt;
+      &lt;button type="submit"&gt;Assinar&lt;/button&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+
+<p><code>FormData</code> lê os campos pelo atributo <code>name</code>, não pelo <code>id</code>. Se o
+campo não tem <code>name</code>, <code>dados.get("email")</code> devolve <code>null</code> e o envio vai
+com o campo em branco — um dos bugs mais silenciosos que existem. A vantagem é que um formulário de vinte
+campos vira uma linha; a desvantagem é que os valores só existem no momento do envio, então não dá para
+usar a mesma fonte para validar enquanto a pessoa digita.</p>
+
+<p>Nesta aula a Ana fica com o estado, por um motivo prático: o mesmo valor serve para validar, para o
+resumo do pedido e para o envio. Um dono só para o dado, como você viu na aula de
+<a href="entrada-controlada.html">entrada controlada</a>. O <code>FormData</code> entra quando o
+formulário é grande demais para valer a pena controlar cada campo, ou quando você recebe um formulário
+que já existia em HTML.</p>
+
+<p>Um cuidado ao ler pelo estado: o clique acontece no instante em que o estado tem o valor da última
+tecla processada. Se a pessoa digitar e clicar muito rápido, o React já processou a digitação antes do
+clique — a ordem dos eventos é a ordem das coisas. Você não precisa se preocupar com isso; precisa se
+preocupar com o valor estar limpo antes de mandar (o <code>trim()</code> da aula de
+<a href="validacao.html">validação</a>).</p>
+
+<h2>5. O objeto do pedido</h2>
+
+<p>O servidor não recebe "nome" e "telefone" soltos. Ele recebe um pedido, com uma forma combinada. Antes
+de enviar, monte esse objeto no seu código: é mais fácil de ler no console, de testar e de mandar como
+JSON.</p>
+
+<pre class="file" data-file="Encomenda.jsx">function enviar(e) {
+  e.preventDefault();
+
+  const pedido = {
+    nome: nome.trim(),
+    telefone: telefone.trim(),
+    itens: ["pão de queijo"],
+    retirada: "6h"
+  };
+
+  console.log("pedido: " + JSON.stringify(pedido));
+}</pre>
+
+<p>O <code>JSON.stringify</code> transforma o objeto em texto, que é o formato que atravessa a rede. No
+console do navegador, você vê o resultado:</p>
+
+<pre class="term">pedido: {"nome":"Maria","telefone":"999998888","itens":["pão de queijo"],"retirada":"6h"}</pre>
+
+<p>Repare que o objeto tem só o que o servidor precisa. Não mande o estado inteiro, nem valores que ele
+pode calcular (como o total, que ele vai conferir com os preços dele), nem dados que não são da pessoa.
+Cada campo a mais é uma decisão de segurança que alguém vai ter que revisar depois.</p>
+
+<p>E repare também no que o objeto <em>não</em> tem: a mensagem de sucesso. A frase "Pedido registrado"
+não vai para o servidor; ela é a resposta que a tela mostra depois. Misturar as duas coisas é comum e
+cria problema: o servidor passa a receber texto de interface, que muda a cada semana.</p>
+
+<p>Com o objeto pronto, o envio de verdade é uma chamada de rede. E aqui a caixa deste guia tem uma
+limitação que vale explicar, em vez de esconder.</p>
+
+<h2>6. O envio assíncrono: a resposta não vem na hora</h2>
+
+<p>A conversa com o servidor não é instantânea. Você manda o pedido, o servidor pensa, responde — e entre
+uma coisa e outra passa um tempo que ninguém controla. No JavaScript, esse "depois" tem nome:
+<strong>Promise</strong>, uma promessa de que um valor vai chegar. O <code>fetch</code> devolve uma
+Promise, e <code>await</code> espera por ela sem travar a página.</p>
+
+<p>Só que a prévia desta página roda num quadro isolado, sem servidor: um <code>fetch</code> ali não
+encontra ninguém do outro lado e falha. Por isso os exemplos da caixa simulam a rede com
+<code>new Promise((ok) =&gt; setTimeout(ok, 400))</code> — a mesma espera, o mesmo "depois", sem fio
+nenhum. Quando você passar para o projeto de verdade, troca essa linha pelo <code>fetch</code> e o resto
+do componente continua igual.</p>
+
+<div class="tryreact" data-goal="digite:#nome=Maria;;clique:#enviar;;texto:Enviando...">
+  <p class="try-task">O envio é instantâneo, o que não acontece na vida real. Faça <code>enviar</code>
+  mostrar <strong>Enviando...</strong> e só trocar por <strong>Pedido de Maria registrado</strong>
+  depois de uma Promise com <code>setTimeout</code> de 400 ms.</p>
+  <pre class="jsx">function App() {
+  const [nome, setNome] = useState("");
+  const [aviso, setAviso] = useState("");
+
+  function enviar(e) {
+    e.preventDefault();
+    setAviso("Pedido de " + nome + " registrado");
+  }
+
+  return (
+    &lt;form onSubmit={enviar}&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;button id="enviar" type="submit"&gt;Encomendar&lt;/button&gt;
+      {aviso &amp;&amp; &lt;p&gt;{aviso}&lt;/p&gt;}
+    &lt;/form&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;form&gt;
+  &lt;label for="nome"&gt;Nome&lt;/label&gt;
+  &lt;input id="nome" value=""&gt;
+  &lt;button id="enviar" type="submit"&gt;Encomendar&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nome, setNome] = useState("");
+  const [aviso, setAviso] = useState("");
+
+  function enviar(e) {
+    e.preventDefault();
+    setAviso("Enviando...");
+    new Promise((ok) =&gt; setTimeout(ok, 400)).then(() =&gt; {
+      setAviso("Pedido de " + nome + " registrado");
+    });
+  }
+
+  return (
+    &lt;form onSubmit={enviar}&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;button id="enviar" type="submit"&gt;Encomendar&lt;/button&gt;
+      {aviso &amp;&amp; &lt;p&gt;{aviso}&lt;/p&gt;}
+    &lt;/form&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em Verificar com o nome preenchido: o painel pega a tela no instante em que ela mostra
+"Enviando...". Na prévia ao vivo dá para ver o resto: a frase muda sozinha 400 ms depois, sem clique
+nenhum. É o desenho de qualquer envio: uma função que começa, uma espera e um <code>then</code> que
+termina o serviço.</p>
+
+<p>Se você já viu <code>async</code> e <code>await</code> por aí, a versão equivalente é esta:</p>
+
+<pre class="file" data-file="Encomenda.jsx">async function enviar(e) {
+  e.preventDefault();
+  setAviso("Enviando...");
+
+  await new Promise((ok) =&gt; setTimeout(ok, 400));
+
+  setAviso("Pedido de " + nome + " registrado");
+}</pre>
+
+<p>O <code>await</code> pausa a função naquela linha e devolve o controle para o navegador — a página
+continua respondendo, o botão continua clicável, e é justamente por isso que a próxima seção existe. Com
+a função pausada, nada impede a pessoa de clicar de novo.</p>
+
+<h2>7. Enquanto o servidor não responde</h2>
+
+<p>Todo envio passa por quatro situações, e a tela precisa dizer em qual delas está. Se ela não disser, a
+pessoa clica de novo. E clicar de novo, num envio de verdade, é um segundo pedido na cozinha.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>O que a tela mostra</th><th>O botão</th><th>O que guardar</th></tr>
+<tr><td>ocioso</td><td>o formulário, sem aviso</td><td>ativo</td><td>os valores digitados</td></tr>
+<tr><td>enviando</td><td>"Enviando..."</td><td>desabilitado, com o texto "Enviando..."</td><td>um booleano <code>enviando</code></td></tr>
+<tr><td>deu certo</td><td>"Pedido registrado" e o resumo</td><td>volta a ativo, ou some</td><td>a resposta do servidor</td></tr>
+<tr><td>deu erro</td><td>"Não deu para enviar" e o botão de tentar</td><td>ativo de novo</td><td>o formulário preenchido</td></tr>
+</table>
+</div>
+
+<p>O jeito mais curto de garantir um envio por vez é uma guarda no começo da função:</p>
+
+<pre class="file" data-file="Encomenda.jsx">const [enviando, setEnviando] = useState(false);
+
+async function enviar(e) {
+  e.preventDefault();
+  if (enviando) return;          // já tem um envio em andamento
+  setEnviando(true);
+  try {
+    await mandarPedido({ nome, telefone });
+    setAviso("Pedido registrado");
+  } finally {
+    setEnviando(false);          // em qualquer caso, libera o botão
+  }
+}</pre>
+
+<p>O <code>finally</code> é o detalhe que muita gente esquece. Sem ele, um erro deixa
+<code>enviando</code> como <code>true</code> para sempre: o botão fica desabilitado, a tela fica em
+"Enviando..." e a única saída é recarregar a página. O <code>finally</code> roda tanto no sucesso quanto
+no erro, e é o lugar certo para devolver o controle à pessoa.</p>
+
+<p><code>mandarPedido</code>, ali no meio, é só o nome que a Ana deu à função que faz o
+<code>fetch</code> — podia ser <code>enviarParaOServidor</code>. O React não conhece esse nome; quem
+conhece é o código dela. Separar assim deixa o envio legível e permite trocar o transporte depois, sem
+mexer no componente.</p>
+
+<p>O <code>disabled</code> no botão é o reforço visual da mesma ideia. Note que ele não substitui a
+guarda: um clique muito rápido, antes de o React redesenhar, ainda pode chamar a função duas vezes. A
+guarda está na função, que é onde a decisão acontece.</p>
+
+<h2>8. Quando o envio dá errado</h2>
+
+<p>Rede cai, servidor reinicia, o banco fica fora do ar por dez segundos. Isso não é exceção: é rotina.
+Um envio sem tratamento de erro deixa a tela em "Enviando..." eternamente e a pessoa sem saber o que
+fazer.</p>
+
+<p>Se a função usa <code>await</code> ou <code>then</code>, o erro chega por dois caminhos. O primeiro é
+a própria chamada falhar (sem rede, servidor fora). O segundo é a chamada dar certo e a resposta ser um
+erro do servidor — <code>fetch</code> não considera 500 um erro, ele entrega a resposta e você é quem
+confere o status. Os dois caminhos precisam de mensagem:</p>
+
+<pre class="file" data-file="Encomenda.jsx">try {
+  const resposta = await fetch("/api/pedidos", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(pedido)
+  });
+
+  if (!resposta.ok) throw new Error("o servidor respondeu " + resposta.status);
+
+  const dados = await resposta.json();
+  setAviso("Pedido " + dados.numero + " registrado");
+} catch (erro) {
+  setAviso("Não deu para enviar. Tente de novo.");
+  console.log("falhou: " + erro.message);
+}</pre>
+
+<p>No console do navegador, esse <code>console.log</code> aparece assim:</p>
+
+<pre class="term">falhou: o servidor respondeu 500</pre>
+
+<p>Duas regras para a mensagem de erro. A primeira: diga o que aconteceu e o que fazer, não o nome
+técnico. "Não deu para enviar. Tente de novo." resolve; "TypeError: Failed to fetch" não resolve nada
+para a cliente da padaria — essa frase é para o console, não para a tela. A segunda: não apague o que a
+pessoa digitou. Perder o formulário preenchido é o pior desfecho possível de um erro de rede; mantenha os
+campos e ofereça o botão de tentar de novo.</p>
+
+<p>Agora a missão. O envio abaixo tem a espera e o sucesso, mas nenhum tratamento de erro: se a promessa
+falhar, a tela fica em "Enviando..." e ninguém fica sabendo.</p>
+
+<div class="tryreact" data-goal="digite:#nome=Maria;;clique:#enviar;;texto:Não deu para enviar">
+  <p class="try-task">A promessa falha de propósito. Acrescente um <code>.catch</code> que troca o aviso
+  por <strong>Não deu para enviar. Tente de novo.</strong> quando a falha chegar, e clique em
+  Encomendar.</p>
+  <pre class="jsx">function App() {
+  const [nome, setNome] = useState("");
+  const [aviso, setAviso] = useState("");
+
+  function enviar(e) {
+    e.preventDefault();
+    setAviso("Enviando...");
+    new Promise((ok, falhou) =&gt; {
+      setTimeout(() =&gt; falhou(new Error("sem conexão")), 30);
+    }).then(() =&gt; {
+      setAviso("Pedido de " + nome + " registrado");
+    });
+  }
+
+  return (
+    &lt;form onSubmit={enviar}&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;button id="enviar" type="submit"&gt;Encomendar&lt;/button&gt;
+      {aviso &amp;&amp; &lt;p&gt;{aviso}&lt;/p&gt;}
+    &lt;/form&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;form&gt;
+  &lt;label for="nome"&gt;Nome&lt;/label&gt;
+  &lt;input id="nome" value=""&gt;
+  &lt;button id="enviar" type="submit"&gt;Encomendar&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nome, setNome] = useState("");
+  const [aviso, setAviso] = useState("");
+
+  function enviar(e) {
+    e.preventDefault();
+    setAviso("Enviando...");
+    new Promise((ok, falhou) =&gt; {
+      setTimeout(() =&gt; falhou(new Error("sem conexão")), 30);
+    })
+      .then(() =&gt; {
+        setAviso("Pedido de " + nome + " registrado");
+      })
+      .catch(() =&gt; {
+        setAviso("Não deu para enviar. Tente de novo.");
+      });
+  }
+
+  return (
+    &lt;form onSubmit={enviar}&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;button id="enviar" type="submit"&gt;Encomendar&lt;/button&gt;
+      {aviso &amp;&amp; &lt;p&gt;{aviso}&lt;/p&gt;}
+    &lt;/form&gt;
+  );
+}</pre>
+</div>
+
+<p>Sem o <code>catch</code>, o console do navegador mostra um aviso de promessa rejeitada que ninguém
+tratou e a tela fica parada em "Enviando...". Com ele, a mensagem aparece e os campos continuam lá. Note
+que o <code>catch</code> vem depois do <code>then</code>, na mesma corrente: é uma sequência — tenta,
+deu certo faz isso, deu errado faz aquilo.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a página piscou e o pedido sumiu</h3>
+<p>A Ana esqueceu o <code>preventDefault</code>. A função do <code>onSubmit</code> rodou, mas o navegador
+navegou logo depois: a prévia recarregou, o componente voltou do zero e o estado foi embora. O sintoma é
+sempre o mesmo — campos vazios, mensagem que não fica. A conferência é rápida: a primeira linha do
+<code>onSubmit</code> chama <code>e.preventDefault()</code>?</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: dois pedidos iguais na cozinha</h3>
+<p>A cliente clicou três vezes porque o botão não dava sinal de vida. O servidor recebeu três pedidos
+iguais e a cozinha assou três bolos. O conserto tem duas partes: mostrar "Enviando..." na hora e guardar
+a função com um <code>if (enviando) return</code>. O aviso na tela é o que impede o clique repetido; a
+guarda é o que impede o envio repetido.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o sucesso que nunca chegou</h3>
+<p>O servidor respondeu 500, mas o código só olhava o <code>then</code>, nunca o status da resposta. A
+tela mostrou "Pedido registrado" para um pedido que não existia no banco. <code>fetch</code> não reclama
+de 500: ele entrega a resposta. Quem decide se deu certo é o <code>resposta.ok</code>, e quem avisa a
+pessoa é você.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que <code>e.preventDefault()</code> faz no
+<code>onSubmit</code>?</p>
+<label><input type="radio" name="q1"> limpa os campos do formulário</label>
+<label><input type="radio" name="q1"> cancela a navegação que o navegador faria, mantendo a página</label>
+<label><input type="radio" name="q1"> envia os dados para o servidor</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que o envio precisa de um estado
+<code>enviando</code>?</p>
+<label><input type="radio" name="q2"> porque o React não deixa chamar duas funções ao mesmo tempo</label>
+<label><input type="radio" name="q2"> para o formulário ficar mais bonito enquanto espera</label>
+<label><input type="radio" name="q2"> para avisar a pessoa e impedir um segundo pedido igual</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que fazer quando o envio falha?</p>
+<label><input type="radio" name="q3"> mostrar uma mensagem clara, manter os campos preenchidos e liberar o botão</label>
+<label><input type="radio" name="q3"> limpar o formulário e pedir para a pessoa digitar tudo de novo</label>
+<label><input type="radio" name="q3"> deixar a tela em "Enviando..." até alguém recarregar a página</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a linha que segura a página</h2>
+<p>A função abaixo precisa impedir que o navegador recarregue a página antes de montar o pedido. Complete
+a chamada que cancela esse comportamento:</p>
+<div class="ex-code">function enviar(e) { <input aria-label="resposta 1" data-answer="e.preventDefault()|preventDefault()" placeholder="...">; const pedido = { nome: nome }; }</div>
+<p class="ex-dica">Dica: é um método do evento, não do formulário. O evento chega como primeiro parâmetro
+da função — no exemplo ele se chama <code>e</code>.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Um botão dentro de um <code>form</code> dispara o envio nativo do navegador: ele monta uma requisição,
+navega e recarrega a página, levando junto o estado dos componentes. No React, o envio é seu: a prop
+<code>onSubmit</code> recebe uma função, e a primeira linha dela é <code>e.preventDefault()</code>. Só
+depois disso os valores são lidos — do estado, quando os campos são controlados, ou do
+<code>FormData</code>, quando não são.</p>
+
+<p>O pedido vai como um objeto com a forma que o servidor combinou, e o envio é assíncrono: uma Promise
+que resolve depois. Enquanto ela não resolve, a tela mostra "Enviando..." e o botão fica bloqueado, para
+não virar dois pedidos. Quando resolve, a mensagem de sucesso aparece e o formulário é limpo ou mantido,
+conforme a decisão da loja. Quando falha, uma mensagem clara aparece, os dados continuam na tela e a
+pessoa pode tentar de novo — o <code>finally</code> garante que o botão volte.</p>
+
+<p>A prévia deste guia não tem rede, então as caixas simulam a resposta com <code>setTimeout</code>. É a
+mesma estrutura do <code>fetch</code> de verdade: a diferença está só no miolo da função. E a validação
+do navegador continua valendo o que sempre valeu — conveniência para quem preenche. O servidor confere
+tudo de novo.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Botão de envio dentro de <code>form</code> navega: a página recarrega e o estado se perde.</li>
+<li><code>onSubmit</code> recebe a função do envio; <code>e.preventDefault()</code> vem primeiro.</li>
+<li>Dentro de um form, <code>button</code> sem <code>type</code> já é <code>type="submit"</code>.</li>
+<li>Campos controlados: os valores já estão no estado na hora do envio.</li>
+<li><code>FormData</code> lê pelo atributo <code>name</code>; sem <code>name</code>, vem <code>null</code>.</li>
+<li>Monte um objeto com o que o servidor precisa e mande como JSON.</li>
+<li>O envio é assíncrono: mostre "Enviando..." e bloqueie o botão.</li>
+<li><code>if (enviando) return</code> é a guarda que evita o pedido duplicado.</li>
+<li><code>fetch</code> não reclama de 500: confira <code>resposta.ok</code>.</li>
+<li>No erro, mantenha os campos e libere o botão no <code>finally</code>.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

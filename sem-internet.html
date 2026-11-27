@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sem Internet | Guia React</title>
+<meta name="description" content="Sem internet no React: navigator.onLine, os eventos online e offline, aviso na tela, últimos dados salvos e o que bloquear quando a conexão cai.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Sem <span class="hl">internet</span></h1>
+<p class="intro">No sábado da feira, a Ana levou o notebook e o 4G do celular. O sinal oscilava a cada
+minuto: a vitrine carregava, o cadastro de pão novo falhava, a tela dizia “erro” sem explicar nada e ela
+descobriu tarde que metade dos cadastros não tinha ido. O site não estava errado — estava despreparado. Nesta
+aula a tela aprende a perceber que a conexão caiu, avisa em vez de fingir, mostra o último dado que tinha e
+bloqueia o que não pode funcionar offline.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como o navegador informa que está sem conexão, e onde essa informação falha.</li>
+  <li>Os eventos <code>online</code> e <code>offline</code>, e como ouvi-los do jeito certo.</li>
+  <li>Um aviso fixo na tela que aparece e desaparece sozinho.</li>
+  <li>Como manter o último dado bom em vez de apagar a tela.</li>
+  <li>Como bloquear a ação que precisa de rede, sem deixar a pessoa clicando à toa.</li>
+  <li>O que fazer quando a conexão volta: atualizar, reenviar, avisar.</li>
+  <li>Os tropeços de quem trata conexão como se fosse sempre boa.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a feira com sinal oscilando</h2>
+
+<p>O site da padaria foi feito em casa, com internet boa, e nunca apresentou problema. Na feira, cada
+segundo com sinal ruim virava uma tela diferente: às vezes a lista aparecia, às vezes ficava vazia, às vezes
+o botão de cadastrar simplesmente não fazia nada. Para a Ana, tudo isso era “o site quebrou”.</p>
+
+<p>Do ponto de vista do código, o que acontecia era simples: as chamadas de rede falhavam. O
+<code>fetch</code> rejeita quando não consegue completar o pedido, e o código dela não tinha
+<code>catch</code> em metade dos lugares. Quando tinha, mostrava um erro técnico. E nada na tela dizia o mais
+importante: “a internet caiu, o que você já tinha continua aqui”.</p>
+
+<p>Tratar conexão é, antes de tudo, tratar expectativa. Quem está usando precisa saber três coisas: que a
+conexão caiu, o que continua funcionando e o que vai acontecer com o que ela tentou fazer. As três cabem na
+tela, e é o que esta aula monta.</p>
+
+<h2>2. O que o navegador sabe sobre a conexão</h2>
+
+<p>O navegador oferece duas coisas: uma propriedade, <code>navigator.onLine</code>, e dois eventos,
+<code>online</code> e <code>offline</code>. A propriedade diz “estou conectado a alguma rede” — e é uma
+verdade bem frouxa. Ela responde <code>false</code> quando o cabo ou o wi-fi caiu, e continua
+<code>true</code> quando a rede existe mas o servidor está fora do ar, quando o wi-fi do café pede senha ou
+quando o 4G tem sinal e nenhum dado passa.</p>
+
+<p>Por isso a regra é: use os eventos para saber que algo mudou, e use a falha da chamada para saber que o
+servidor não respondeu. As duas informações são diferentes e as duas importam. Quem confia só em
+<code>navigator.onLine</code> faz uma tela que diz “conectado” enquanto nada funciona — o pior tipo de
+aviso.</p>
+
+<p>Para testar de verdade, o caminho é o painel de rede do próprio navegador: nas ferramentas de
+desenvolvedor, a aba <em>Network</em> tem uma opção <em>Offline</em>. Com ela ligada, as chamadas falham como
+falhariam na feira, e os eventos de conexão disparam de verdade. É muito melhor do que desligar o wi-fi,
+porque você continua com o resto da internet funcionando e pode ler a documentação enquanto testa.</p>
+
+<dl class="anatomy">
+<dt>navigator.onLine</dt>
+<dd><code>true</code> ou <code>false</code>, diz se o navegador tem alguma rede. Não garante que o servidor
+esteja acessível.</dd>
+<dt>offline</dt>
+<dd>Evento disparado no <code>window</code> quando o navegador perde a rede. É o gancho para avisar na
+tela.</dd>
+<dt>online</dt>
+<dd>Evento disparado quando a rede volta. É o gancho para atualizar os dados e reenviar o que ficou
+pendente.</dd>
+<dt>degradar</dt>
+<dd>Continuar funcionando com menos recursos: mostrar o dado salvo, desabilitar o que precisa de rede,
+explicar o que está faltando.</dd>
+<dt>fila</dt>
+<dd>Lista de ações que ficaram para depois, para serem reenviadas quando a conexão voltar.</dd>
+</dl>
+
+<h2>3. O aviso que aparece sozinho</h2>
+
+<p>A primeira peça é a mais barata: um aviso na tela. Ele nasce de um estado e é atualizado por um ouvinte
+de eventos registrado dentro de um efeito — o mesmo padrão de qualquer evento do navegador, com a limpeza
+que a aula de <a href="cleanup.html">cleanup</a> já explicou.</p>
+
+<div class="tryreact" data-goal="clique:#simular-queda;;texto:Você está sem internet;;clique:#simular-volta;;texto:conexão de volta">
+  <p class="try-task">O componente lê <code>navigator.onLine</code> uma vez e nunca mais. Escute os eventos
+  <code>offline</code> e <code>online</code> no <code>window</code>, atualizando o estado: ao simular a queda
+  aparece <strong>Você está sem internet</strong>, e ao simular a volta, <strong>conexão de volta</strong>.</p>
+  <pre class="jsx">function App() {
+  const [offline, setOffline] = useState(!navigator.onLine);
+
+  return (
+    &lt;div&gt;
+      &lt;button id="simular-queda" onClick={() =&gt; window.dispatchEvent(new Event("offline"))}&gt;
+        simular queda
+      &lt;/button&gt;
+      &lt;button id="simular-volta" onClick={() =&gt; window.dispatchEvent(new Event("online"))}&gt;
+        simular volta
+      &lt;/button&gt;
+      &lt;p className="aviso"&gt;{offline ? "Você está sem internet" : ""}&lt;/p&gt;
+      &lt;p className="volta"&gt;{offline ? "" : "conexão de volta"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="simular-queda"&gt;simular queda&lt;/button&gt;
+  &lt;button id="simular-volta"&gt;simular volta&lt;/button&gt;
+  &lt;p class="aviso"&gt;&lt;/p&gt;
+  &lt;p class="volta"&gt;conexão de volta&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [offline, setOffline] = useState(!navigator.onLine);
+
+  useEffect(() =&gt; {
+    const caiu = () =&gt; setOffline(true);
+    const voltou = () =&gt; setOffline(false);
+    window.addEventListener("offline", caiu);
+    window.addEventListener("online", voltou);
+    return () =&gt; {
+      window.removeEventListener("offline", caiu);
+      window.removeEventListener("online", voltou);
+    };
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;button id="simular-queda" onClick={() =&gt; window.dispatchEvent(new Event("offline"))}&gt;
+        simular queda
+      &lt;/button&gt;
+      &lt;button id="simular-volta" onClick={() =&gt; window.dispatchEvent(new Event("online"))}&gt;
+        simular volta
+      &lt;/button&gt;
+      &lt;p className="aviso"&gt;{offline ? "Você está sem internet" : ""}&lt;/p&gt;
+      &lt;p className="volta"&gt;{offline ? "" : "conexão de volta"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O estado inicial é <code>!navigator.onLine</code> — ou seja, a tela já nasce avisando se a pessoa abriu o
+site sem rede. Dali em diante, quem manda são os eventos. E repare na limpeza: sem
+<code>removeEventListener</code>, cada montagem deixa um ouvinte pendurado, e depois de navegar três vezes
+existem três ouvintes chamando <code>setOffline</code>.</p>
+
+<p>No seu projeto, o aviso ganha forma de faixa no topo da página. Um detalhe que faz diferença: use
+<code>role="status"</code> no elemento do aviso. Assim quem usa leitor de tela ouve “Você está sem
+internet” na hora em que acontece, sem precisar procurar na página.</p>
+
+<h2>4. Três jeitos de reagir à queda</h2>
+
+<p>Nem toda tela precisa da mesma reação. A escolha depende da pergunta “o que essa pessoa está fazendo
+aqui?”. A tabela resume as três posturas, da mais simples à mais trabalhosa:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Postura</th><th>O que a tela faz</th><th>Quando serve</th></tr>
+<tr><td>avisar e parar</td><td>mostra o aviso e bloqueia as ações de rede</td><td>cadastro, pagamento, qualquer coisa que não pode ficar pela metade</td></tr>
+<tr><td>mostrar o último dado</td><td>mantém o que já estava na tela e diz que é antigo</td><td>consulta, vitrine, painel de leitura</td></tr>
+<tr><td>fila para depois</td><td>aceita a ação e reenvia quando a conexão volta</td><td>recado, marcação, coisa pequena e repetível</td></tr>
+</table>
+</div>
+
+<p>A primeira é a mínima que todo site deveria ter: não fingir que está tudo bem. A segunda é a que mais
+rende para a Ana, porque a vitrine já tem os pães carregados e não há motivo para apagar tudo só porque a
+rede caiu. A terceira é a mais poderosa e a mais perigosa: guardar ação para depois exige lidar com
+duplicação, ordem e o caso de a pessoa fechar a aba antes de a conexão voltar.</p>
+
+<h2>5. Mostrar o último dado bom</h2>
+
+<p>Quando a busca falha, existem duas reações possíveis para o estado: apagar a lista ou deixar como estava.
+Apagar é o que o código costuma fazer por descuido, e o resultado é a tela vazia no exato momento em que a
+pessoa mais precisa da informação — “quais pães eu cadastrei?”.</p>
+
+<div class="tryreact" data-goal="clique:#simular-queda;;conta:.paes li=2;;texto:mostrando dados salvos">
+  <p class="try-task">Ao simular a queda, a lista é apagada e a tela fica vazia. Mantenha os pães que já
+  estavam na tela e mostre o aviso <strong>mostrando dados salvos</strong> no lugar do conteúdo novo.</p>
+  <pre class="jsx">const salvos = ["pão francês", "brioche"];
+
+function buscarPaes() {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok(salvos), 0));
+}
+
+function App() {
+  const [paes, setPaes] = useState([]);
+  const [offline, setOffline] = useState(false);
+
+  useEffect(() =&gt; {
+    buscarPaes().then((lista) =&gt; setPaes(lista));
+    const caiu = () =&gt; { setOffline(true); setPaes([]); };
+    const voltou = () =&gt; setOffline(false);
+    window.addEventListener("offline", caiu);
+    window.addEventListener("online", voltou);
+    return () =&gt; {
+      window.removeEventListener("offline", caiu);
+      window.removeEventListener("online", voltou);
+    };
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;button id="simular-queda" onClick={() =&gt; window.dispatchEvent(new Event("offline"))}&gt;
+        simular queda
+      &lt;/button&gt;
+      &lt;p&gt;{offline ? "sem conexão: nada para mostrar" : ""}&lt;/p&gt;
+      &lt;ul className="paes"&gt;{paes.map((p) =&gt; &lt;li key={p}&gt;{p}&lt;/li&gt;)}&lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="simular-queda"&gt;simular queda&lt;/button&gt;
+  &lt;p&gt;&lt;/p&gt;
+  &lt;ul class="paes"&gt;
+    &lt;li&gt;pão francês&lt;/li&gt;
+    &lt;li&gt;brioche&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const salvos = ["pão francês", "brioche"];
+
+function buscarPaes() {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok(salvos), 0));
+}
+
+function App() {
+  const [paes, setPaes] = useState([]);
+  const [offline, setOffline] = useState(false);
+
+  useEffect(() =&gt; {
+    buscarPaes().then((lista) =&gt; setPaes(lista));
+    const caiu = () =&gt; setOffline(true);
+    const voltou = () =&gt; { setOffline(false); buscarPaes().then((lista) =&gt; setPaes(lista)); };
+    window.addEventListener("offline", caiu);
+    window.addEventListener("online", voltou);
+    return () =&gt; {
+      window.removeEventListener("offline", caiu);
+      window.removeEventListener("online", voltou);
+    };
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;button id="simular-queda" onClick={() =&gt; window.dispatchEvent(new Event("offline"))}&gt;
+        simular queda
+      &lt;/button&gt;
+      &lt;p&gt;{offline ? "mostrando dados salvos" : ""}&lt;/p&gt;
+      &lt;ul className="paes"&gt;{paes.map((p) =&gt; &lt;li key={p}&gt;{p}&lt;/li&gt;)}&lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A diferença entre as duas versões é uma linha que não existe: <code>setPaes([])</code> saiu. Isso é o
+coração da degradação elegante — o dado que já veio continua valendo, e a tela diz que ele é antigo em vez de
+sumir com ele. Se quiser deixar mais explícito, mostre a data da última atualização: “dados de 10h32” é
+melhor que “dados salvos”, porque informa o tamanho do atraso.</p>
+
+<p>Esse “último dado bom” costuma vir de um cache — o mesmo <a href="cache-simples.html">cache simples</a>
+das consultas, aproveitado aqui com outro propósito: quando a rede cai, é de lá que a tela tira o conteúdo
+para continuar mostrando.</p>
+
+<h2>6. Bloquear o que precisa de rede</h2>
+
+<p>Salvar precisa de servidor. Não há como cadastrar um pão com a conexão caída e fingir que deu certo, a não
+ser que você esteja fazendo a fila da seção 7. Enquanto a fila não existe, o certo é bloquear: o botão fica
+desligado, com um texto que explica por quê.</p>
+
+<div class="tryreact" data-goal="clique:#simular-queda;;attr:#enviar|data-ligado=nao;;texto:aguardando conexão">
+  <p class="try-task">O botão de cadastrar continua clicável sem internet. Faça-o acompanhar a conexão:
+  quando a queda for simulada, ele precisa ficar marcado com <code>data-ligado="nao"</code>, desabilitado, e
+  a tela mostrar <strong>aguardando conexão</strong>.</p>
+  <pre class="jsx">function App() {
+  const [offline, setOffline] = useState(false);
+
+  useEffect(() =&gt; {
+    const caiu = () =&gt; setOffline(true);
+    const voltou = () =&gt; setOffline(false);
+    window.addEventListener("offline", caiu);
+    window.addEventListener("online", voltou);
+    return () =&gt; {
+      window.removeEventListener("offline", caiu);
+      window.removeEventListener("online", voltou);
+    };
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;button id="simular-queda" onClick={() =&gt; window.dispatchEvent(new Event("offline"))}&gt;
+        simular queda
+      &lt;/button&gt;
+      &lt;button id="enviar" data-ligado="sim"&gt;cadastrar pão&lt;/button&gt;
+      &lt;p&gt;{offline ? "" : "tudo pronto para enviar"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="simular-queda"&gt;simular queda&lt;/button&gt;
+  &lt;button id="enviar" data-ligado="sim"&gt;cadastrar pão&lt;/button&gt;
+  &lt;p&gt;tudo pronto para enviar&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [offline, setOffline] = useState(false);
+
+  useEffect(() =&gt; {
+    const caiu = () =&gt; setOffline(true);
+    const voltou = () =&gt; setOffline(false);
+    window.addEventListener("offline", caiu);
+    window.addEventListener("online", voltou);
+    return () =&gt; {
+      window.removeEventListener("offline", caiu);
+      window.removeEventListener("online", voltou);
+    };
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;button id="simular-queda" onClick={() =&gt; window.dispatchEvent(new Event("offline"))}&gt;
+        simular queda
+      &lt;/button&gt;
+      &lt;button id="enviar" data-ligado={offline ? "nao" : "sim"} disabled={offline}&gt;
+        cadastrar pão
+      &lt;/button&gt;
+      &lt;p&gt;{offline ? "aguardando conexão" : "tudo pronto para enviar"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O atributo <code>data-ligado</code> não é enfeite: ele é a forma de o componente declarar em voz alta o
+próprio estado, e de quem testa conseguir conferir sem depender de estilo. O <code>disabled</code> faz o
+trabalho de verdade — botão desabilitado não recebe clique e não dispara <code>onClick</code>. E o texto
+explica, porque botão que não responde sem explicação é pior que botão ausente.</p>
+
+<p>Vale desabilitar também durante o envio, e não só quando a conexão caiu. A razão é a mesma da aula de
+<a href="atualizacao-otimista.html">atualização otimista</a>: clique repetido em botão que ainda está
+esperando vira pedido duplicado.</p>
+
+<h2>7. Quando a conexão volta</h2>
+
+<p>Voltar é quase sempre mais importante que cair, e quase sempre é esquecido. Quando o evento
+<code>online</code> chega, três coisas fazem sentido: refazer a busca que falhou, reenviar o que ficou na
+fila e apagar o aviso da tela. A caixa da seção 5 já mostra a primeira; a fila é o passo seguinte.</p>
+
+<p>Uma fila simples é um array de ações pendentes no estado. Cada item é o que precisa ser enviado — o nome
+do pão, o texto do recado. No evento <code>online</code>, você percorre a fila chamando a mesma função de
+envio e vai removendo o que deu certo. Se uma falhar, o item fica para a próxima tentativa.</p>
+
+<pre class="file" data-file="App.jsx">const [fila, setFila] = useState([]);
+
+async function enviarTudo() {
+  for (const acao of fila) {
+    try {
+      await criarPao(acao.nome);
+      setFila((atual) =&gt; atual.filter((a) =&gt; a.id !== acao.id));
+    } catch (e) {
+      return;
+    }
+  }
+}</pre>
+
+<p>Três cuidados que separam a fila que funciona da que cria problema. Primeiro: cada ação precisa de
+identificador próprio, senão remover um item remove o irmão gêmeo. Segundo: a fila precisa sobreviver ao
+recarregamento se você promete “não perde nada” — e para isso ela vai para o
+<code>localStorage</code>, com todo o cuidado de dado guardado no navegador. Terceiro: reenvio pode duplicar,
+porque o pedido pode ter chegado ao servidor antes de a rede cair; a defesa do lado do servidor é aceitar
+identificador repetido sem criar duas linhas.</p>
+
+<p>Um detalhe que a prática ensina: a fila precisa ser visível. Uma lista de “1 recado aguardando” na
+tela vale mais que qualquer explicação, porque mostra o que está pendente e o que já saiu. E, quando tudo for
+enviado, mostre “tudo enviado” por alguns segundos — a pessoa precisa saber que o estado mudou, senão vai
+ficar olhando a tela procurando o recado que sumiu.</p>
+
+<h2>8. Os tropeços de quem trata conexão</h2>
+
+<p>O primeiro tropeço é confiar em <code>navigator.onLine</code> como se fosse a verdade sobre o servidor.
+Ela diz que existe rede, não que existe servidor. O sintoma é a tela “conectado” com todos os pedidos
+falhando. A cura é combinar: evento para o aviso, falha do <code>fetch</code> para o estado real.</p>
+
+<p>O segundo é registrar o ouvinte fora do efeito — no corpo do componente, no topo do arquivo. Cada desenho
+registra outro, e o resultado é uma tela que pisca entre “online” e “offline”. O terceiro é esquecer o
+<code>removeEventListener</code>: o ouvinte sobrevive ao componente e chama <code>setState</code> em algo que
+já saiu da tela.</p>
+
+<pre class="term">console: conexão caiu — usando os últimos dados</pre>
+
+<p>Um log como esse, escrito no ouvinte de <code>offline</code>, deixa claro qual caminho a tela seguiu. O par
+dele marca a volta:</p>
+
+<pre class="term">console: conexão voltou — atualizando a lista</pre>
+
+<p>Com essas duas linhas no console, você sabe se o problema está na detecção (não aparece nada ao derrubar a
+rede) ou no desenho (aparece, mas a tela não muda). Sem elas, os dois casos parecem iguais.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você vê</th><th>Causa provável</th><th>Conserto</th></tr>
+<tr><td>aviso diz “conectado” e nada carrega</td><td><code>navigator.onLine</code> sem conferir a falha do pedido</td><td>tratar o erro do <code>fetch</code> e mostrar estado real</td></tr>
+<tr><td>aviso pisca sem parar</td><td>ouvinte registrado no corpo do componente</td><td>registrar dentro do efeito, com <code>[]</code></td></tr>
+<tr><td>erro de <code>setState</code> após desmontar</td><td>ouvinte sem <code>removeEventListener</code></td><td>devolver a limpeza no efeito</td></tr>
+<tr><td>lista some quando a rede cai</td><td><code>setPaes([])</code> no ouvinte</td><td>manter o último dado e avisar que é antigo</td></tr>
+<tr><td>pedido enviado duas vezes</td><td>fila reenviando o que já chegou</td><td>identificador único por ação, conferido no servidor</td></tr>
+</table>
+</div>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a feira de sábado, segunda tentativa</h3>
+<p>Depois da aula, a Ana voltou para a feira com o aviso no topo, a lista mantida e o botão de cadastrar
+desabilitado sem conexão. O sinal caiu quatro vezes. Em todas, a tela disse o que estava acontecendo e
+voltou sozinha quando o 4G reagiu. Nenhum cadastro ficou pela metade.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o recado guardado para depois</h3>
+<p>O formulário de recado passou a aceitar envio sem conexão, com o item entrando numa fila visível: “2
+recados aguardando”. Quando o sinal voltou, os dois saíram em ordem e a fila zerou. A Ana gostou mais dessa
+tela do que da versão que só recusava: ela vê o que está pendente e sabe que não perdeu nada.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o wi-fi do café</h3>
+<p>Numa tarde, o notebook estava conectado ao wi-fi do café — <code>navigator.onLine</code> dizia
+<code>true</code> —, mas a página de login do café bloqueava tudo. A tela mostrava “conectado” e falhava em
+cada pedido. Depois da correção, o aviso passou a considerar a falha da chamada: “não conseguimos falar com
+o servidor” apareceu, e a Ana entendeu na hora.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. <code>navigator.onLine</code> devolve
+<code>true</code>. Isso garante que o servidor responde?</p>
+<label><input type="radio" name="q1"> sim: é a informação oficial do navegador</label>
+<label><input type="radio" name="q1"> não: significa apenas que existe alguma rede conectada</label>
+<label><input type="radio" name="q1"> sim, desde que o site use HTTPS</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. A busca falha e a lista já tinha dados. O melhor
+comportamento é:</p>
+<label><input type="radio" name="q2"> apagar a lista para não mostrar dado velho</label>
+<label><input type="radio" name="q2"> recarregar a página automaticamente até funcionar</label>
+<label><input type="radio" name="q2"> manter os dados e avisar que são antigos</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Onde registrar o ouvinte dos eventos de conexão?</p>
+<label><input type="radio" name="q3"> dentro de um <code>useEffect</code>, devolvendo a remoção no <code>return</code></label>
+<label><input type="radio" name="q3"> no corpo do componente, para valer em todo desenho</label>
+<label><input type="radio" name="q3"> dentro do <code>onClick</code> de um botão</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o evento da queda</h2>
+
+<p>O ouvinte precisa do nome exato do evento que o navegador dispara quando a conexão cai. Complete:</p>
+
+<div class="ex-code">useEffect(() =&gt; {
+  const caiu = () =&gt; setSemRede(true);
+  window.addEventListener("<input aria-label="resposta 1" data-answer="offline" placeholder="...">", caiu);
+  return () =&gt; window.removeEventListener("offline", caiu);
+}, []);</div>
+
+<p class="ex-dica">Dica: é o contrário de <code>online</code>, em inglês mesmo — o mesmo nome que aparece na
+propriedade <code>navigator.onLine</code>, com o “off” na frente.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Sem internet é um estado normal, não uma exceção rara. O navegador avisa com os eventos
+<code>online</code> e <code>offline</code>, e a propriedade <code>navigator.onLine</code> ajuda no primeiro
+desenho — mas só a falha da chamada diz se o servidor respondeu. O ouvinte vive dentro de um efeito, com
+limpeza no <code>return</code>.</p>
+
+<p>A tela deve avisar, manter o último dado bom em vez de apagar tudo, e bloquear o que depende de rede com
+um texto que explique. Quando a conexão volta, refaça a busca, apague o aviso e reenvie a fila — com
+identificador por ação para não duplicar. E nunca prometa sucesso antes da confirmação: quem está no 4G
+oscilando já sabe que as coisas falham, o que ela não perdoa é a tela fingir que não falhou.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>navigator.onLine</code> é sobre a rede, não sobre o servidor.</li>
+<li>Eventos <code>online</code> e <code>offline</code> no <code>window</code>, dentro do efeito.</li>
+<li>Sempre <code>removeEventListener</code> na limpeza.</li>
+<li>Não apague a lista quando a busca falha: mantenha e avise que é antiga.</li>
+<li>Desabilite o que precisa de rede e diga por quê.</li>
+<li>Na volta: buscar de novo, limpar o aviso, reenviar a fila.</li>
+<li>Fila com identificador por ação, para o reenvio não duplicar.</li>
+<li>Log de “caiu” e “voltou” economiza meia hora de investigação.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estados de Carregamento | Guia React</title>
+<meta name="description" content="Estados de carregamento bem feitos: quatro estados, atualizar sem apagar a tela, botão que avisa que está salvando, esqueleto no lugar do texto e o carregando que sempre termina.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Estados de <span class="hl">Carregamento</span></h1>
+
+<p class="intro">A Ana reparou numa coisa no site da padaria: quando a busca demora, a tela fica igual à
+tela de "nada encontrado". A cliente digita "brioche", espera, e o silêncio da página diz a ela que não
+existe brioche. Algumas aulas atrás o carregando apareceu pela primeira vez, colado no erro. Hoje o assunto é
+a forma dele: quantos estados a tela tem de verdade, o que fazer na segunda busca (quando já existe
+resultado na tela), como um botão avisa que está trabalhando e por que três retângulos cinzas comunicam
+mais do que a palavra "Carregando".</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Os quatro estados de uma tela que busca dados.</li>
+  <li>Por que uma variável de status vale mais do que três booleanos.</li>
+  <li>Como atualizar sem apagar o que já está na tela.</li>
+  <li>O botão que se desabilita e troca o rótulo enquanto salva.</li>
+  <li>Esqueleto, spinner ou texto: quando cada um serve.</li>
+  <li>Como garantir que o carregando sempre termine.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o silêncio que parece resposta</h2>
+
+<p>Existe uma diferença enorme entre "não achei nada" e "ainda estou procurando", e a tela em branco
+comunica a primeira quando deveria comunicar a segunda. A Ana levou um tempo para perceber que o problema
+não era a busca estar lenta: era a página não dizer que estava ocupada. Quem não sabe que o site está
+trabalhando clica de novo, ou pior, vai embora achando que a padaria não tem o produto.</p>
+
+<p>Resolver isso é menos sobre spinner e mais sobre contar a verdade em cada momento. Uma tela que busca
+dados tem quatro situações possíveis, e cada uma pede um desenho diferente: ainda não pedi nada, estou
+pedindo, chegaram os dados, deu erro. Quatro, não dois. Quando o código guarda só "carregando" e "dados",
+os outros dois viram improviso — e é aí que nascem as telas confusas.</p>
+
+<p>Esta aula é sobre a forma do carregamento, não sobre a busca em si. O <code>fetch</code>, o
+<code>await</code> e o <code>try</code>/<code>catch</code> já foram vistos; aqui eles entram prontos, como
+pano de fundo.</p>
+
+<h2>2. Quatro estados, uma variável</h2>
+
+<p>A tentação de quem começa é criar um booleano para cada coisa: <code>carregando</code>,
+<code>temErro</code>, <code>temDados</code>. Funciona até o dia em que dois deles ficam verdadeiros ao
+mesmo tempo — a tela mostra "Carregando" e a mensagem de erro juntas, ou a lista e o aviso de vazio. Três
+booleanos têm oito combinações; só quatro fazem sentido.</p>
+
+<p>O jeito que não mente é uma única variável de texto, com os quatro valores possíveis. Ela só pode estar
+num estado por vez, e é isso que se quer:</p>
+
+<pre class="file" data-file="vitrine.js">const [estado, setEstado] = useState("ocioso"); // "ocioso" | "carregando" | "pronto" | "erro"</pre>
+
+<p>Com um estado só, o desenho fica direto: um <code>if</code> para cada caso, e nunca dois pedaços de tela
+contraditórios. As transições também ficam explícitas — pedir é <code>setEstado("carregando")</code>,
+chegar é <code>setEstado("pronto")</code>, falhar é <code>setEstado("erro")</code>. Quando você lê o
+código, sabe exatamente quais são os caminhos.</p>
+
+<p>Quem tem o hábito de derivar em vez de guardar ganha um atalho: dá para calcular o estado a partir dos
+dados que já existem, sem criar mais nenhum. Se você guarda a lista e o erro, o carregando pode ser
+deduzido — "lista vazia e sem erro" é a primeira busca em andamento. O risco é justamente quando a dedução
+mente: uma busca que legitimamente voltou vazia fica idêntica a uma busca que ainda não terminou. Por isso
+o estado explícito costuma compensar.</p>
+
+<dl class="anatomy">
+<dt>ocioso</dt>
+<dd>Nada foi pedido ainda. A tela mostra o convite: "digite o nome do pão".</dd>
+<dt>carregando</dt>
+<dd>O pedido está no ar. A tela mostra que está trabalhando — esqueleto, texto ou botão em espera.</dd>
+<dt>pronto</dt>
+<dd>Os dados chegaram. A tela mostra a lista, mesmo que ela esteja vazia.</dd>
+<dt>erro</dt>
+<dd>A busca falhou. A tela mostra o que aconteceu e o caminho de volta.</dd>
+<dt>atualizando</dt>
+<dd>Variante do carregando em que já existe conteúdo na tela: mantém o conteúdo e avisa por cima.</dd>
+<dt><code>aria-busy</code></dt>
+<dd>Atributo que avisa leitores de tela que a região está carregando.</dd>
+</dl>
+
+<h2>3. A segunda busca: atualizar sem apagar</h2>
+
+<p>A primeira carga pode mostrar esqueleto. A segunda não: se a lista já está na tela e a pessoa clica em
+"Atualizar", apagar tudo e mostrar "Carregando" é um piscar que assusta. O conteúdo antigo é melhor que o
+vazio, e o aviso de atualização pode conviver com ele.</p>
+
+<p>Na caixa abaixo, a função de carregar limpa a lista antes de pedir. O resultado você já sabe: a vitrine
+some por um instante. A missão é parar de limpar e deixar o aviso aparecer junto da lista.</p>
+
+<div class="tryreact" data-goal="clique:button;;conta:li=3">
+  <p class="try-task">Ao clicar em Atualizar, a lista desaparece e volta. Tire o <code>setPaes([])</code> e
+  mostre o aviso de atualização sem esconder a lista: use <code>{carregando &amp;&amp; ...}</code> e mantenha
+  o <code>&lt;ul&gt;</code> sempre renderizado.</p>
+  <pre class="jsx">function buscarPaes(espera) {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok(["Pão francês", "Croissant", "Brioche"]), espera);
+  });
+}
+
+function App() {
+  const [paes, setPaes] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+
+  function carregar(espera) {
+    setPaes([]);
+    setCarregando(true);
+    buscarPaes(espera).then((lista) =&gt; {
+      setPaes(lista);
+      setCarregando(false);
+    });
+  }
+
+  useEffect(() =&gt; {
+    carregar(10);
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Vitrine&lt;/h1&gt;
+      {carregando ? (
+        &lt;p className="aviso"&gt;Carregando...&lt;/p&gt;
+      ) : (
+        &lt;ul&gt;
+          {paes.map((p) =&gt; (
+            &lt;li key={p}&gt;{p}&lt;/li&gt;
+          ))}
+        &lt;/ul&gt;
+      )}
+      &lt;button onClick={() =&gt; carregar(400)}&gt;Atualizar&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Vitrine&lt;/h1&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Pão francês&lt;/li&gt;
+    &lt;li&gt;Croissant&lt;/li&gt;
+    &lt;li&gt;Brioche&lt;/li&gt;
+  &lt;/ul&gt;
+  &lt;button&gt;Atualizar&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscarPaes(espera) {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok(["Pão francês", "Croissant", "Brioche"]), espera);
+  });
+}
+
+function App() {
+  const [paes, setPaes] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+
+  function carregar(espera) {
+    setCarregando(true);
+    buscarPaes(espera).then((lista) =&gt; {
+      setPaes(lista);
+      setCarregando(false);
+    });
+  }
+
+  useEffect(() =&gt; {
+    carregar(10);
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Vitrine&lt;/h1&gt;
+      {carregando &amp;&amp; &lt;p className="aviso"&gt;Atualizando...&lt;/p&gt;}
+      &lt;ul&gt;
+        {paes.map((p) =&gt; (
+          &lt;li key={p}&gt;{p}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+      &lt;button onClick={() =&gt; carregar(400)}&gt;Atualizar&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois do clique, a lista continua com os três pães e o aviso "Atualizando..." aparece em cima. Quando a
+resposta chega, a lista troca e o aviso sai. Nada pisca. O pedido aqui demora de propósito, para que você
+veja o estado intermediário; no dia a dia, é essa diferença que separa um site que parece sólido de um que
+parece nervoso.</p>
+
+<p>O nome desse padrão, se você encontrar em texto em inglês, é <em>stale-while-revalidate</em>: mostrar o
+dado velho enquanto o novo chega. Bibliotecas de dados fazem isso por padrão, e o motivo é o de sempre —
+o usuário prefere informação de um segundo atrás a uma tela vazia.</p>
+
+<h2>4. O botão que avisa que está trabalhando</h2>
+
+<p>Carregamento não é só lista. Toda ação que demora — salvar, enviar, apagar — precisa do mesmo cuidado, e
+o alvo é o próprio botão. Ele deve ficar desabilitado, para não receber dois cliques, e trocar o rótulo,
+para dizer o que está acontecendo.</p>
+
+<div class="tryreact" data-goal="clique:button;;conta:button[disabled]=1">
+  <p class="try-task">Ao clicar em Salvar, o botão continua igual e aceita mais cliques. Use
+  <code>disabled={salvando}</code> e troque o texto para "Salvando..." enquanto o pedido está no ar.</p>
+  <pre class="jsx">function salvarPedido() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok({ id: 7 }), 400);
+  });
+}
+
+function App() {
+  const [salvando, setSalvando] = useState(false);
+  const [recado, setRecado] = useState("");
+
+  function salvar() {
+    setSalvando(true);
+    salvarPedido().then((r) =&gt; {
+      setRecado("Pedido " + r.id + " salvo");
+      setSalvando(false);
+    });
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Encomenda&lt;/h1&gt;
+      &lt;button onClick={salvar}&gt;Salvar&lt;/button&gt;
+      {recado &amp;&amp; &lt;p&gt;{recado}&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Encomenda&lt;/h1&gt;
+  &lt;button&gt;Salvar&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function salvarPedido() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok({ id: 7 }), 400);
+  });
+}
+
+function App() {
+  const [salvando, setSalvando] = useState(false);
+  const [recado, setRecado] = useState("");
+
+  function salvar() {
+    setSalvando(true);
+    salvarPedido().then((r) =&gt; {
+      setRecado("Pedido " + r.id + " salvo");
+      setSalvando(false);
+    });
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Encomenda&lt;/h1&gt;
+      &lt;button onClick={salvar} disabled={salvando}&gt;
+        {salvando ? "Salvando..." : "Salvar"}
+      &lt;/button&gt;
+      {recado &amp;&amp; &lt;p&gt;{recado}&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra o botão com o atributo <code>disabled</code> e o texto novo. São duas informações
+diferentes: o <code>disabled</code> protege o servidor de receber o mesmo pedido duas vezes; o rótulo
+explica, para quem está olhando, por que o clique não respondeu. Um sem o outro gera dúvida — botão mudo
+que não reage parece defeito.</p>
+
+<p>Uma armadilha clássica: desabilitar o botão e esquecer de reabilitar quando o pedido falha. O
+<code>setSalvando(false)</code> tem de estar em todos os caminhos — no sucesso e no erro. É o mesmo
+raciocínio do <code>finally</code> que a aula de carregando mostrou: o estado de carregamento é uma promessa que
+você faz ao usuário, e precisa ser cumprida mesmo quando dá errado.</p>
+
+<h2>5. Esqueleto, spinner ou texto</h2>
+
+<p>Existem três desenhos para o mesmo aviso, e a escolha depende do que está chegando. Texto é o mais
+simples e o mais honesto: "Carregando os pães...". Spinner é um círculo girando, que diz "estou ocupado"
+sem dizer o quê. Esqueleto são retângulos cinzas com o formato do conteúdo, que dizem "vem uma lista de
+três itens aqui".</p>
+
+<div class="tryreact" data-goal="conta:.esqueleto=3">
+  <p class="try-task">A primeira carga mostra só o texto "Carregando...". Troque por três esqueletos: três
+  <code>&lt;div className="esqueleto"&gt;&lt;/div&gt;</code> no lugar do parágrafo.</p>
+  <pre class="jsx">function buscarCardapio() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok(["Pão francês", "Croissant"]), 400);
+  });
+}
+
+function App() {
+  const [itens, setItens] = useState([]);
+
+  useEffect(() =&gt; {
+    buscarCardapio().then((lista) =&gt; setItens(lista));
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Cardápio&lt;/h1&gt;
+      {itens.length === 0 &amp;&amp; &lt;p&gt;Carregando...&lt;/p&gt;}
+      &lt;ul&gt;
+        {itens.map((i) =&gt; (
+          &lt;li key={i}&gt;{i}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Cardápio&lt;/h1&gt;
+  &lt;p&gt;Carregando...&lt;/p&gt;
+  &lt;ul&gt;&lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscarCardapio() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok(["Pão francês", "Croissant"]), 400);
+  });
+}
+
+function App() {
+  const [itens, setItens] = useState([]);
+
+  useEffect(() =&gt; {
+    buscarCardapio().then((lista) =&gt; setItens(lista));
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Cardápio&lt;/h1&gt;
+      {itens.length === 0 &amp;&amp; (
+        &lt;div&gt;
+          &lt;div className="esqueleto"&gt;&lt;/div&gt;
+          &lt;div className="esqueleto"&gt;&lt;/div&gt;
+          &lt;div className="esqueleto"&gt;&lt;/div&gt;
+        &lt;/div&gt;
+      )}
+      &lt;ul&gt;
+        {itens.map((i) =&gt; (
+          &lt;li key={i}&gt;{i}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O esqueleto precisa ter a forma do que vem: três blocos para três pães, um bloco largo para um parágrafo,
+um círculo para um avatar. Esqueleto genérico é pior que texto, porque promete um formato que não chega. E
+ele é branco e cinza no CSS, de propósito: quem desenha o esqueleto é a folha de estilo, não o JSX.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Recurso</th><th>Quando usar</th><th>Cuidado</th></tr>
+<tr><td>texto</td><td>esperas curtas, ou quando você sabe descrever o que está vindo</td><td>frase longa demais vira ruído</td></tr>
+<tr><td>spinner</td><td>ação pontual, como salvar ou enviar</td><td>esconder a tela inteira atrás de um spinner</td></tr>
+<tr><td>esqueleto</td><td>primeira carga de conteúdo com forma previsível</td><td>formato diferente do conteúdo real</td></tr>
+<tr><td>barra de progresso</td><td>quando dá para saber quanto falta (upload)</td><td>progresso falso, que enche e volta</td></tr>
+<tr><td>nada</td><td>esperas abaixo de 100 milissegundos</td><td>nada mesmo por segundos, sem aviso</td></tr>
+</table>
+</div>
+
+<p>A última linha é séria: mostrar carregando por 30 milissegundos produz um piscar pior que a espera. Se a
+resposta é rápida, o melhor é não anunciar nada. Quando a resposta é imprevisível, vale a pena atrasar o
+aviso — mostrar o esqueleto só depois de uns 200 milissegundos —, e há até um hook do React para adiar
+atualizações que não são urgentes, o <code>useTransition</code>, para casos em que a tela precisa continuar
+respondendo enquanto os dados chegam.</p>
+
+<h2>6. O carregando que sempre termina</h2>
+
+<p>A regra de ouro: para cada <code>setCarregando(true)</code> existe um caminho de volta. Se o pedido pode
+falhar, o <code>catch</code> também desliga; se pode ser cancelado, o cancelamento desliga; se a tela pode
+ser desmontada, tanto faz — o estado morre junto. O que não pode é o caminho do erro esquecer o
+desligamento.</p>
+
+<pre class="file" data-file="carregar.js">async function carregar() {
+  setCarregando(true);
+  try {
+    const lista = await buscarPaes();
+    setPaes(lista);
+  } catch (e) {
+    setErro(e.message);
+  } finally {
+    setCarregando(false);
+  }
+}</pre>
+
+<p>O <code>finally</code> é o que garante o desligamento nos dois desfechos. Sem ele, cada
+<code>catch</code> teria de lembrar de desligar, e um esquecimento deixa a tela girando para sempre. É um
+dos poucos lugares em que o <code>finally</code> é obrigatório na prática.</p>
+
+<p>Para enxergar o que acontece de verdade, um <code>console.log</code> no topo do componente mostra a
+ordem dos estados. É o jeito mais rápido de descobrir um piscar:</p>
+
+<pre class="term">&gt; render: carregando=true
+&gt; render: carregando=false, itens=3
+&gt; render: carregando=true
+&gt; render: carregando=false, itens=3</pre>
+
+<p>Cada par dessas linhas é uma busca: acende e apaga. Se aparecer <code>carregando=false, itens=0</code>
+entre eles, é sinal de que a lista foi limpa no meio do caminho — exatamente o piscar da seção 3. E se o
+segundo <code>false</code> nunca chegar, você encontrou o carregando eterno.</p>
+
+<h2>7. Carregando por pedaço</h2>
+
+<p>Em uma tela grande, um único "carregando" para tudo é ruim: a página inteira espera o pedaço mais lento.
+O melhor é cada região cuidar do seu estado, com o seu próprio booleano ou status. O cabeçalho aparece na
+hora, as promoções aparecem quando chegam, o horário idem.</p>
+
+<p>Isso também evita o efeito colateral mais chato de um carregando global: desmontar o formulário. Se a
+pessoa está digitando o endereço e um pedido de outra parte da tela termina, você não pode redesenhar o
+campo — ela perde o que digitou. Estados separados resolvem; um estado só para a página inteira, não.</p>
+
+<p>Um exemplo concreto do que evitar: a tela de encomenda tem o formulário de endereço e, do lado, a
+lista de sugestões que carrega enquanto a pessoa digita. Se o carregando das sugestões controlar a tela
+inteira, cada letra digitada pode redesenhar o formulário — e o cursor pula, o texto some, a pessoa
+desiste. Com estados separados, as sugestões acendem e apagam sozinhas e o formulário fica quieto.</p>
+
+<p>E vale marcar a região com <code>aria-busy</code>. É um atributo que leitores de tela entendem e que não
+muda nada visualmente: ele avisa que aquela parte está em movimento. É o tipo de detalhe que ninguém nota
+quando existe e todo mundo nota quando falta.</p>
+
+<pre class="term">&gt; document.querySelector("main").getAttribute("aria-busy")
+'true'</pre>
+
+<h2>8. Três decisões que dão o tom</h2>
+
+<p>Primeira: onde o carregando aparece. No topo da lista, no meio dela, no botão, ou numa tarja fixa? O
+lugar deve ser onde o olho já está — quem clicou em Atualizar olha para a lista; quem clicou em Salvar olha
+para o botão. Aviso longe do ponto de ação passa despercebido.</p>
+
+<p>Segunda: por quanto tempo. Um carregando breve é melhor nem aparecer; um carregando longo precisa de
+mais do que três pontinhos, precisa de contexto — "buscando os pães de hoje". Se a espera passa de alguns
+segundos, diga o que está acontecendo e dê uma saída: cancelar, tentar de novo, falar no WhatsApp.</p>
+
+<p>Terceira: o que fica na tela. Se há conteúdo antigo, mantenha (seção 3). Se não há, mostre a forma do que
+vem (esqueleto) ou um texto curto. O que nunca serve é o vazio sem explicação, que o usuário interpreta como
+resposta negativa.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>O que mostrar</th><th>O que evitar</th></tr>
+<tr><td>primeira carga da lista</td><td>esqueleto com a forma dos itens</td><td>tela vazia</td></tr>
+<tr><td>atualização com dados na tela</td><td>lista antiga + aviso discreto</td><td>apagar a lista</td></tr>
+<tr><td>salvar ou enviar</td><td>botão desabilitado com rótulo novo</td><td>botão mudo que não reage</td></tr>
+<tr><td>busca por digitação</td><td>aviso só se demorar</td><td>piscar a cada letra</td></tr>
+<tr><td>falha na busca</td><td>mensagem + tentar de novo</td><td>deixar "Carregando..." para sempre</td></tr>
+</table>
+</div>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a lista que piscava a cada filtro</h3>
+<p>A Ana tinha um filtro por categoria e, a cada clique, a lista era zerada e o esqueleto reaparecia. Em
+conexão rápida, era um piscar de olhos; no celular, meio segundo de nada. A correção foi manter a lista
+anterior enquanto a nova chega e mostrar um aviso pequeno. O mesmo padrão da seção 3, aplicado a um filtro
+em vez do botão de atualizar.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: dois pedidos, um pedido de desculpas</h3>
+<p>O botão de salvar não desabilitava, e a cliente tocou duas vezes. O servidor recebeu dois pedidos e a
+padaria assou dois bolos. O conserto foi <code>disabled={salvando}</code> mais o rótulo "Salvando...". Se o
+pedido falhar, o botão precisa voltar a funcionar com uma mensagem honesta: "não deu para salvar, tente de
+novo".</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o esqueleto com forma errada</h3>
+<p>Ela colocou um esqueleto de três linhas e o conteúdo real era uma tabela de cinco colunas. Quando os
+dados chegavam, o layout saltava e o texto se reorganizava. O esqueleto precisa ter a mesma forma do
+conteúdo; se o formato é imprevisível, um texto curto é mais honesto do que uma promessa que não se
+cumpre.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Por que uma variável de status é melhor que três
+booleanos?</p>
+<label><input type="radio" name="q1"> porque ocupa menos memória</label>
+<label><input type="radio" name="q1"> porque só pode estar num estado por vez, sem contradição</label>
+<label><input type="radio" name="q1"> porque o React recusa três booleanos</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que fazer quando a segunda busca começa e a lista já
+está na tela?</p>
+<label><input type="radio" name="q2"> apagar a lista para mostrar que está buscando</label>
+<label><input type="radio" name="q2"> esconder a página inteira atrás de um spinner</label>
+<label><input type="radio" name="q2"> manter a lista e mostrar um aviso de atualização</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Enquanto um pedido de salvar está no ar, o botão deve:</p>
+<label><input type="radio" name="q3"> ficar desabilitado e mudar o rótulo</label>
+<label><input type="radio" name="q3"> continuar igual, para o usuário poder tentar de novo</label>
+<label><input type="radio" name="q3"> desaparecer da tela</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o botão em espera</h2>
+<p>Complete o atributo que impede o segundo clique enquanto o pedido está no ar:</p>
+<div class="ex-code">&lt;button onClick={salvar} <input aria-label="resposta 1" data-answer="disabled" placeholder="...">={salvando}&gt;Salvar&lt;/button&gt;</div>
+<p class="ex-dica">Dica: é o atributo do HTML que desliga o botão, escrito com chaves porque o valor é uma
+variável — o mesmo que a caixa 2 usa.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Uma tela que busca dados tem quatro estados — ocioso, carregando, pronto e erro —, e uma única variável
+de status evita as contradições de três booleanos. Cada estado pede um desenho: convite, aviso, conteúdo ou
+mensagem com saída. O importante é nunca deixar o usuário no escuro nem no vazio.</p>
+
+<p>Na segunda busca, mantenha o conteúdo antigo e avise por cima; apagar para mostrar "Carregando" produz o
+piscar que passa impressão de instabilidade. Em ações pontuais, o alvo é o botão: desabilitar para não
+receber dois cliques e trocar o rótulo para explicar a espera — sempre com um caminho de volta, inclusive no
+erro.</p>
+
+<p>Esqueleto quando a forma do conteúdo é previsível, spinner em ação pontual, texto quando a espera é curta
+ou o formato é incerto, e nada quando a resposta é rápida. Cada região cuida do seu carregando, e a
+<code>aria-busy</code> avisa quem não vê a tela. Na próxima aula, o outro lado: o que a tela mostra quando a
+busca dá errado, e como escolher a mensagem certa para cada tipo de falha.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Quatro estados: ocioso, carregando, pronto, erro.</li>
+<li>Um status de texto vale mais que três booleanos.</li>
+<li>Atualizar não apaga: mantenha a lista e avise.</li>
+<li>Botão que salva fica desabilitado e muda o rótulo.</li>
+<li><code>finally</code> garante que o carregando desliga.</li>
+<li>Esqueleto com a forma do conteúdo que vem.</li>
+<li>Espera curta não precisa de aviso.</li>
+<li>Cada região tem o seu próprio carregando.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

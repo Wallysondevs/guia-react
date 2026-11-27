@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chaves Estáveis | Guia React</title>
+<meta name="description" content="Chaves estáveis em listas React: por que a key precisa sobreviver entre desenhos, o que remonta quando ela muda, o teste de três perguntas e quando querer uma chave nova.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Chaves <span class="hl">Estáveis</span></h1>
+<p class="intro">A fila de encomendas da Ana muda de ordem todo dia: quem chega primeiro, quem pediu
+urgente, quem desistiu. E tem um bug estranho — o "pronto" marcado em um pedido aparece em outro. Nesta
+aula ela descobre que a <strong>key</strong> não é um detalhe para calar o console: é a identidade do
+item, e quando ela muda sem o item mudar, o estado do React fica na linha errada.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que o React faz quando a lista muda de um desenho para o outro.</li>
+  <li>Por que a key precisa ser a mesma entre desenhos — o que "estável" quer dizer.</li>
+  <li>O que acontece quando a chave é sorteada: remontagem e estado perdido.</li>
+  <li>Por que o índice costuma falhar quando a lista muda de ordem, tamanho ou filtro.</li>
+  <li>O teste de três perguntas para escolher uma chave.</li>
+  <li>Quando você quer uma chave nova de propósito, para recomeçar um componente.</li>
+  <li>Por que no build de produção o aviso some e só o comportamento denuncia.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o pedido que troca de lugar</h2>
+
+<p>O painel da Ana tem uma fila de encomendas com três botões: cada linha mostra o nome do pão e marca
+se está pronto. O botão "Inverter a fila" põe quem chegou por último na frente — e é aí que aparece o
+problema. Ela marca o pão francês como pronto, inverte a fila, e o "pronto" está no croissant.</p>
+
+<p>Na aula de <a href="a-key.html">A key</a>, você viu o básico: toda lista feita com <code>map</code>
+precisa de uma key em cada item, e a key vai no elemento mais externo que o <code>map</code> devolve.
+Agora o assunto é o outro lado da palavra: a chave precisa ser <strong>estável</strong>. Mesma chave,
+mesmo item, entre dois desenhos da tela. Se a chave muda sem o item mudar, o React acha que é outra coisa
+naquele lugar — e trata como outra coisa.</p>
+
+<p>A confusão inicial é achar que a key serve para o React "saber a ordem". Não é isso. A ordem está no
+array; o React percorre na ordem que veio. A key serve para o React reconhecer <em>o mesmo item</em>
+quando o array é reordenado, filtrado ou acrescentado. É identidade, não posição.</p>
+
+<p>Pense em uma ficha de padaria: cada pedido tem um número de comanda. Se a comanda 12 sai da terceira
+posição da fila e vai para a primeira, o pedido continua sendo o 12. Se você identificasse os pedidos
+pela posição — "o terceiro da fila" —, ao mudar a ordem o "terceiro" seria outro pedido. É exatamente
+esse o papel da key.</p>
+
+<h2>2. O que o React faz com a lista: identidade</h2>
+
+<p>Quando o React redesenha uma lista, ele precisa decidir, item por item, entre três coisas: reaproveitar
+o elemento que já está na tela, mover o elemento de lugar ou destruir e criar do zero. A key é o critério
+dessa decisão. Com a mesma key, ele reaproveita o componente — e o estado que mora dentro dele — e só
+atualiza as props. Com a key diferente, ele descarta o antigo e monta um novo, com estado zerado.</p>
+
+<p>Esse "estado que mora dentro" é a parte que pega. Um <code>&lt;li&gt;</code> com um botão é só
+aparência; mas o componente que envolve a linha pode ter o seu <code>useState</code> — o "pronto", o
+texto digitado, o aberto e fechado. Esse estado pertence à <em>instância</em> do componente, e a
+instância é identificada pela key. Chave trocada, estado novo.</p>
+
+<dl class="anatomy">
+<dt>key</dt>
+<dd>Um atributo especial que o React usa para identificar um item entre irmãos. Não vai para o HTML e
+não chega ao componente como prop.</dd>
+<dt>identidade</dt>
+<dd>O que faz o React reconhecer "é o mesmo item de antes". Vem da key, não do conteúdo nem da
+posição.</dd>
+<dt>remontar</dt>
+<dd>Destruir o componente e criar outro no lugar. Acontece quando a key muda. Todo estado interno
+volta ao inicial e os efeitos rodam de novo.</dd>
+<dt>estável</dt>
+<dd>Que não muda entre dois desenhos enquanto o item for o mesmo. <code>p.id</code> é estável;
+<code>Math.random()</code> não é; o índice só é enquanto a lista não muda.</dd>
+<dt>irmãos</dt>
+<dd>Os elementos que estão no mesmo nível, dentro do mesmo array ou do mesmo pai. A unicidade da key
+vale entre eles.</dd>
+</dl>
+
+<p>Com isso, a regra fica fácil de lembrar: a key é o <em>nome próprio</em> do item, não o número da
+cadeira. Duas pessoas não podem ter o mesmo nome na mesma lista, e o nome não muda quando a pessoa troca
+de cadeira.</p>
+
+<h2>3. A chave que vem do dado</h2>
+
+<p>A melhor key é a que já existe no dado: o <code>id</code> que veio do banco, o código da comanda, o
+slug da página. Ela é única por construção, não muda quando a lista é reordenada e sobrevive a um
+recarregamento — o que importa quando o estado do item é salvo em algum lugar.</p>
+
+<pre class="file" data-file="Fila.jsx">function Fila({ pedidos }) {
+  return (
+    &lt;ul&gt;
+      {pedidos.map((p) =&gt; (
+        &lt;li key={p.id}&gt;{p.nome}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+
+<p>Quando o dado não tem id, a primeira providência é criar um. Uma lista de pães cadastrados no sistema
+deve ter identificador, nem que seja um número sequencial guardado junto. Criar o id na hora de desenhar
+— <code>key={indice}</code> ou <code>key={nome}</code> — é remendo, e remendo tem prazo de validade.</p>
+
+<p>O nome pode servir de key em uma lista que nunca muda de ordem e nunca tem nomes repetidos, como os
+itens fixos de um menu. É frágil: no dia em que dois itens tiverem o mesmo nome, a lista quebra; no dia
+em que o nome for editável, cada letra digitada vira uma identidade nova. Se há edição, não use o texto
+como chave.</p>
+
+<p>E há um caso em que a chave não vem de um id: listas de tamanho fixo, geradas por um laço, como as
+doze casinhas de um calendário. Ali não existe "o item 3" com identidade própria — a posição <em>é</em> a
+identidade. Nesse caso, índice é uma escolha legítima, porque a lista nunca reordena. O problema não é o
+índice em si; é o índice em lista que muda.</p>
+
+<h2>4. Chave instável: o que remonta e o que se perde</h2>
+
+<p>Agora o primeiro dos dois erros clássicos. Sortear a chave parece resolver o aviso do console e é o
+pior conserto possível: a cada desenho, todas as chaves são diferentes, então o React desmonta e monta a
+lista inteira de novo. O estado de cada linha volta ao inicial — e o usuário vê o que marcou desaparecer.</p>
+
+<div class="tryreact" data-goal="clique:li button;;clique:button;;texto:Pão francês — pago">
+  <p class="try-task">Marque o pão francês como pago e vire o dia: o pagamento some, porque
+  <code>Math.random()</code> troca a chave a cada desenho. Troque a chave por algo que venha do dado e
+  não mude.</p>
+  <pre class="jsx">function Item({ nome }) {
+  const [pago, setPago] = useState(false);
+  return (
+    &lt;li&gt;
+      &lt;button onClick={() =&gt; setPago(!pago)}&gt;{nome}&lt;/button&gt;
+      {pago ? " — pago" : " — em aberto"}
+    &lt;/li&gt;
+  );
+}
+
+function App() {
+  const [dia, setDia] = useState(1);
+  const encomendas = [
+    { id: 1, nome: "Pão francês" },
+    { id: 2, nome: "Broa de milho" }
+  ];
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Dia {dia}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setDia(dia + 1)}&gt;Virar o dia&lt;/button&gt;
+      &lt;ul&gt;
+        {encomendas.map((e) =&gt; (
+          &lt;Item key={Math.random()} nome={e.nome} /&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Dia 1&lt;/p&gt;
+  &lt;button&gt;Virar o dia&lt;/button&gt;
+  &lt;ul&gt;
+    &lt;li&gt;
+      &lt;button&gt;Pão francês&lt;/button&gt;
+      — em aberto
+    &lt;/li&gt;
+    &lt;li&gt;
+      &lt;button&gt;Broa de milho&lt;/button&gt;
+      — em aberto
+    &lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Item({ nome }) {
+  const [pago, setPago] = useState(false);
+  return (
+    &lt;li&gt;
+      &lt;button onClick={() =&gt; setPago(!pago)}&gt;{nome}&lt;/button&gt;
+      {pago ? " — pago" : " — em aberto"}
+    &lt;/li&gt;
+  );
+}
+
+function App() {
+  const [dia, setDia] = useState(1);
+  const encomendas = [
+    { id: 1, nome: "Pão francês" },
+    { id: 2, nome: "Broa de milho" }
+  ];
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Dia {dia}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setDia(dia + 1)}&gt;Virar o dia&lt;/button&gt;
+      &lt;ul&gt;
+        {encomendas.map((e) =&gt; (
+          &lt;Item key={e.id} nome={e.nome} /&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Na versão com <code>Math.random()</code>, depois de marcar e virar o dia a tela mostra "Dia 2" e o pão
+francês volta a "em aberto". O dado não mudou — só o dia —, mas a identidade das linhas mudou, e com ela o estado. Na
+solução, <code>key={e.id}</code> mantém a identidade e o pagamento sobrevive ao clique.</p>
+
+<p>Para enxergar a remontagem acontecendo, há um truque simples: um <code>useEffect</code> com array de
+dependências vazio roda uma vez por montagem. Se você registra uma linha a cada montagem, a linha aparece
+de novo sempre que o componente é recriado:</p>
+
+<pre class="file" data-file="Item.jsx">function Item({ nome }) {
+  useEffect(() =&gt; {
+    console.log("montei: " + nome);
+  }, []);
+  return &lt;li&gt;{nome}&lt;/li&gt;;
+}</pre>
+
+<p>Com duas encomendas e uma chave estável, o console mostra duas linhas na primeira montagem:</p>
+
+<pre class="term">console: montei: Pão francês
+console: montei: Broa de milho</pre>
+
+<p>Com a chave sorteada, as mesmas duas linhas voltam a aparecer a cada redesenho da lista — no console
+do navegador, aberto com <code>F12</code>. O painel da caixa mostra apenas o desenho inicial, então ali
+as linhas não se repetem: é um dos lugares em que o DevTools do navegador conta mais que a prévia.</p>
+
+<h2>5. Índice como chave: a posição não é identidade</h2>
+
+<p>O segundo erro é mais sutil, porque às vezes funciona. Usar o índice do <code>map</code> como chave
+parece natural: é único dentro da lista, é fácil. O problema é que o índice descreve a <em>posição</em>,
+e a posição muda quando a lista é ordenada, filtrada ou quando um item é removido. Aí o React faz o que
+prometemos a ele: mantém o estado naquela posição, mesmo que o item que está ali agora seja outro.</p>
+
+<div class="tryreact" data-goal="clique:li button;;clique:.inverter;;texto:Pão francês: pronto">
+  <p class="try-task">Marque o primeiro pedido como pronto e inverta a fila: o "pronto" fica na posição,
+  não no pedido. Troque a chave do índice pelo id do pedido.</p>
+  <pre class="jsx">function Pedido({ nome }) {
+  const [pronto, setPronto] = useState(false);
+  return (
+    &lt;li&gt;
+      &lt;button onClick={() =&gt; setPronto(!pronto)}&gt;
+        {nome + ": " + (pronto ? "pronto" : "na fila")}
+      &lt;/button&gt;
+    &lt;/li&gt;
+  );
+}
+
+function App() {
+  const [pedidos, setPedidos] = useState([
+    { id: 1, nome: "Pão francês" },
+    { id: 2, nome: "Broa de milho" },
+    { id: 3, nome: "Croissant" }
+  ]);
+
+  return (
+    &lt;div&gt;
+      &lt;button className="inverter" onClick={() =&gt; setPedidos([...pedidos].reverse())}&gt;
+        Inverter a fila
+      &lt;/button&gt;
+      &lt;ul&gt;
+        {pedidos.map((p, i) =&gt; (
+          &lt;Pedido key={i} nome={p.nome} /&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button class="inverter"&gt;Inverter a fila&lt;/button&gt;
+  &lt;ul&gt;
+    &lt;li&gt;
+      &lt;button&gt;Pão francês: na fila&lt;/button&gt;
+    &lt;/li&gt;
+    &lt;li&gt;
+      &lt;button&gt;Broa de milho: na fila&lt;/button&gt;
+    &lt;/li&gt;
+    &lt;li&gt;
+      &lt;button&gt;Croissant: na fila&lt;/button&gt;
+    &lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Pedido({ nome }) {
+  const [pronto, setPronto] = useState(false);
+  return (
+    &lt;li&gt;
+      &lt;button onClick={() =&gt; setPronto(!pronto)}&gt;
+        {nome + ": " + (pronto ? "pronto" : "na fila")}
+      &lt;/button&gt;
+    &lt;/li&gt;
+  );
+}
+
+function App() {
+  const [pedidos, setPedidos] = useState([
+    { id: 1, nome: "Pão francês" },
+    { id: 2, nome: "Broa de milho" },
+    { id: 3, nome: "Croissant" }
+  ]);
+
+  return (
+    &lt;div&gt;
+      &lt;button className="inverter" onClick={() =&gt; setPedidos([...pedidos].reverse())}&gt;
+        Inverter a fila
+      &lt;/button&gt;
+      &lt;ul&gt;
+        {pedidos.map((p) =&gt; (
+          &lt;Pedido key={p.id} nome={p.nome} /&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Com <code>key={i}</code>, depois de inverter, o "pronto" aparece no croissant — a posição que era do
+pão francês. Com <code>key={p.id}</code>, o estado viaja junto com o pedido e o pão francês continua
+pronto, agora no fim da fila. A estrutura do painel é a mesma nos dois casos; o que muda é o texto de
+cada botão.</p>
+
+<p>Vale ver a ordem dos dados separada da ordem do estado. Um log da fila mostra o array na ordem nova,
+enquanto o estado continua preso à posição antiga:</p>
+
+<pre class="term">antes:  Pão francês, Broa de milho, Croissant
+depois: Croissant, Broa de milho, Pão francês</pre>
+
+<p>Se a lista é filtrada, o mesmo estrago acontece: ao remover o primeiro item, todos os índices
+escorregam uma posição e o estado passa a pertencer ao vizinho. É por isso que a aula de
+<a href="filtrar.html">Filtrar</a> insiste em manter o array original intacto e derivar a lista visível:
+com o id como chave, filtrar não embaralha identidade nenhuma.</p>
+
+<h2>6. O teste de três perguntas</h2>
+
+<p>Antes de escolher a chave de uma lista, faça três perguntas ao candidato. Ele é único entre os irmãos?
+Ele continua o mesmo entre dois desenhos? Ele vem do dado, e não da posição ou do acaso? Três "sim" e
+pode usar; qualquer "não" e você está comprando um bug futuro.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Candidato</th><th>Único?</th><th>Estável?</th><th>Veredito</th></tr>
+<tr><td><code>p.id</code> do banco</td><td>sim, por construção</td><td>sim, não muda ao reordenar</td><td>a melhor escolha</td></tr>
+<tr><td>índice do <code>map</code></td><td>sim, no momento</td><td>não, se a lista muda de ordem ou tamanho</td><td>só em lista fixa</td></tr>
+<tr><td>nome ou texto editável</td><td>até o dia da repetição</td><td>não, muda quando o texto muda</td><td>evite em item editável</td></tr>
+<tr><td><code>Math.random()</code></td><td>sim</td><td>nunca</td><td>quebra tudo a cada desenho</td></tr>
+</table>
+</div>
+
+<p>Repare que a coluna "único" é a mais fácil de cumprir e a "estável" é a que decide. Sortear garante
+unicidade e destrói estabilidade. O índice garante unicidade e perde estabilidade assim que a lista se
+mexe. O id cumpre as duas porque foi feito para identificar a coisa, não o lugar.</p>
+
+<p>Há um caso intermediário que vale reconhecer: a lista de tamanho fixo, em que o índice é a identidade
+real. Doze meses, sete dias da semana, três abas na mesma ordem. Ali, <code>key={i}</code> não causa
+problema porque nada reordena nem sai da lista. A diferença entre o uso certo e o errado não está no
+índice: está na promessa de que a lista não muda.</p>
+
+<h2>7. Quando você quer uma chave nova</h2>
+
+<p>Tudo o que foi dito até aqui trata chave trocada como acidente. Existe um caso em que trocar a chave
+é exatamente o que se quer: quando o componente precisa <strong>recomeçar do zero</strong>. Mudar a key
+de um componente é o jeito mais direto de dizer ao React "esqueça o que estava aí e monte outro".</p>
+
+<div class="tryreact" data-goal="clique:.cortar;;clique:.trocar;;texto:Broa de milho: 0 de 8 fatias">
+  <p class="try-task">Corte uma fatia e troque de pão: a ficha continua mostrando a contagem do pão
+  anterior, porque o estado é o mesmo componente. Use a chave para recomeçar a ficha quando o pão mudar.</p>
+  <pre class="jsx">function Ficha({ pao }) {
+  const [fatias, setFatias] = useState(0);
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{pao.nome + ": " + fatias + " de 8 fatias"}&lt;/p&gt;
+      &lt;button className="cortar" onClick={() =&gt; setFatias(fatias + 1)}&gt;Cortar uma fatia&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const [indice, setIndice] = useState(0);
+  const paes = [
+    { id: 1, nome: "Pão francês" },
+    { id: 2, nome: "Broa de milho" }
+  ];
+  const pao = paes[indice];
+
+  return (
+    &lt;div&gt;
+      &lt;Ficha pao={pao} /&gt;
+      &lt;button className="trocar" onClick={() =&gt; setIndice(1)}&gt;Trocar para a broa&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;div&gt;
+    &lt;p&gt;Pão francês: 0 de 8 fatias&lt;/p&gt;
+    &lt;button class="cortar"&gt;Cortar uma fatia&lt;/button&gt;
+  &lt;/div&gt;
+  &lt;button class="trocar"&gt;Trocar para a broa&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Ficha({ pao }) {
+  const [fatias, setFatias] = useState(0);
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{pao.nome + ": " + fatias + " de 8 fatias"}&lt;/p&gt;
+      &lt;button className="cortar" onClick={() =&gt; setFatias(fatias + 1)}&gt;Cortar uma fatia&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const [indice, setIndice] = useState(0);
+  const paes = [
+    { id: 1, nome: "Pão francês" },
+    { id: 2, nome: "Broa de milho" }
+  ];
+  const pao = paes[indice];
+
+  return (
+    &lt;div&gt;
+      &lt;Ficha key={pao.id} pao={pao} /&gt;
+      &lt;button className="trocar" onClick={() =&gt; setIndice(1)}&gt;Trocar para a broa&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Sem a chave, a ficha é o mesmo componente e guarda as fatias do pão anterior: "Broa de milho: 1
+de 8 fatias". Com <code>key={pao.id}</code>, trocar de pão monta uma ficha nova, com zero fatias — que é o
+comportamento correto, porque a broa ainda não foi cortada. A key aqui não é identidade de lista: é um
+pedido explícito de recomeço.</p>
+
+<p>Esse recurso substitui um monte de código de sincronização. Sem ele, você teria de observar a mudança
+do pão com um efeito e zerar o estado à mão — mais linhas, mais chance de errar. Com a key, a intenção
+fica escrita no JSX.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Eu quero…</th><th>Ferramenta</th><th>Cuidado</th></tr>
+<tr><td>manter o estado quando a lista reordena</td><td>key que vem do dado</td><td>a chave não pode ser sorteada nem o índice</td></tr>
+<tr><td>recomeçar o componente quando o dado muda</td><td>key = id do dado novo</td><td>é proposital: o estado antigo é descartado</td></tr>
+<tr><td>recomeçar por um clique</td><td>estado que muda a key</td><td>um contador no estado funciona como "geração"</td></tr>
+</table>
+</div>
+
+<p>Nas três linhas, a pergunta é sempre a mesma: o estado atual ainda faz sentido para o dado novo? Se
+faz, mantenha a chave; se não faz, troque. Chave estável e chave nova são ferramentas diferentes, e o
+erro é usar uma achando que está usando a outra.</p>
+
+<h2>8. Os erros silenciosos do build de produção</h2>
+
+<p>No modo de desenvolvimento, o React reclama: "Each child in a list should have a unique key prop". Esse
+aviso é útil e é o primeiro lugar onde o problema aparece em um projeto de verdade. Só que ele
+<strong>não existe</strong> no build de produção — e é produção que roda quando você publica o site.</p>
+
+<p>As caixas deste guia rodam o build de produção do React 19. Isso significa que nenhum aviso de key
+aparece no painel: nem chave faltando, nem chave repetida, nem chave sorteada. O que aparece é o
+comportamento — a tela com o texto certo, o estado na linha errada, ou um item que pisca. Aprender a ler
+o sintoma, e não o aviso, é o que salva o dia.</p>
+
+<p>Três sintomas que denunciam chave ruim, todos visíveis sem console. Primeiro: o estado de uma linha
+aparece em outra depois de reordenar ou filtrar. Segundo: o texto digitado em um campo some, e o campo
+perde o foco a cada letra — sinal de remontagem a cada desenho. Terceiro: a animação de entrada
+recomeça sozinha sempre que outro pedaço da página muda.</p>
+
+<p>Há também um erro de lugar, que a aula de <a href="a-key.html">A key</a> detalha: a key precisa estar
+no elemento que o <code>map</code> devolve, não em um filho interno. Se o item é um
+<code>&lt;Fragment&gt;</code> com dois irmãos, a key vai no <code>&lt;Fragment key={...}&gt;</code>, e
+não em um dos irmãos. E lembre que a key não chega ao componente como prop: se o componente precisa do
+id por dentro, passe também <code>id={p.id}</code>.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o campo perde o foco a cada letra</h3>
+<p>A Ana digitava a observação de um pedido e o cursor pulava fora do campo a cada tecla. A key era o
+próprio texto da observação, então cada letra criava uma identidade nova, o campo era remontado e o foco
+morria. Trocar a chave para <code>pedido.id</code> resolveu. Regra prática: chave nunca é um valor que o
+usuário edita.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a lista filtrada embaralha os checks</h3>
+<p>Ela filtrava "só os pães doces" e os quadradinhos marcados mudavam de lugar. A chave era o índice do
+array filtrado: ao esconder itens, cada posição passava a apontar para outro pão. Com o id como chave, o
+check segue o pão — e a aula de <a href="filtrar.html">Filtrar</a> mostra como filtrar sem destruir o
+array original.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: dois itens com a mesma chave</h3>
+<p>Ela usou o nome do pão como chave e cadastrou dois "Pão de queijo" — um doce e um salgado. O React
+ficou sem saber qual é qual: um dos dois sumiu da tela e o outro apareceu com o estado misturado. Chave
+repetida entre irmãos é sempre erro, mesmo quando parece que "funciona". A saída é o id; quando não
+existe, crie um na origem dos dados.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que a key representa para o React?</p>
+<label><input type="radio" name="ch1"> a posição do item na tela</label>
+<label><input type="radio" name="ch1"> a identidade do item entre irmãos</label>
+<label><input type="radio" name="ch1"> o estilo aplicado ao item</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que <code>key={Math.random()}</code> é ruim?</p>
+<label><input type="radio" name="ch2"> porque o React não aceita números como chave</label>
+<label><input type="radio" name="ch2"> porque deixa a lista mais lenta para ordenar</label>
+<label><input type="radio" name="ch2"> porque a chave muda a cada desenho e tudo é remontado</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. A lista é reordenada pelo usuário. Qual chave usar?</p>
+<label><input type="radio" name="ch3"> o id que vem do dado</label>
+<label><input type="radio" name="ch3"> o índice do <code>map</code></label>
+<label><input type="radio" name="ch3"> o texto do item, mesmo que editável</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a chave do pedido</h2>
+<p>Complete a chave para que o estado de cada pedido acompanhe o pedido quando a fila for invertida.
+Depois responda: o que acontece com o estado quando a chave muda?</p>
+<div class="ex-code">&lt;Pedido key={p.<input aria-label="resposta 1" data-answer="id" placeholder="...">} nome={p.nome} /&gt;</div>
+<p class="ex-dica">Dica: é o campo do dado que identifica o pedido — não a posição e não o nome do
+pão.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>A key é a identidade do item entre irmãos. Com a mesma chave, o React reaproveita o componente e o
+estado dele; com chave diferente, remonta do zero. Por isso "estável" não é adjetivo decorativo: é a
+propriedade que faz o estado ficar no item certo quando a lista muda de ordem, de tamanho ou de
+filtro.</p>
+
+<p>A melhor chave vem do dado — o <code>id</code>. O índice serve só quando a posição é a identidade de
+verdade, como em uma lista fixa que nunca reordena. Sortear a chave é sempre errado: garante unicidade e
+destrói estabilidade. E chave repetida entre irmãos é erro mesmo quando a tela parece funcionar.</p>
+
+<p>Do outro lado, trocar a chave de propósito é uma técnica legítima: quando o componente precisa
+recomeçar com um dado novo, <code>key={dado.id}</code> descarta o estado antigo sem uma linha de efeito.
+A pergunta que decide é se o estado atual ainda faz sentido para o dado novo.</p>
+
+<p>Por fim, a lição de ambiente: no build de produção o aviso de key não aparece. Quem escreve para
+produção aprende a reconhecer o sintoma — estado na linha errada, campo perdendo o foco, animação
+reiniciando — porque o console não vai ajudar. É o mesmo raciocínio do encanador que ouve o barulho em
+vez de esperar o vazamento.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Key é identidade entre irmãos; a ordem continua vindo do array.</li>
+<li>Mesma key: reaproveita o componente e o estado. Key nova: remonta e zera.</li>
+<li>Chave boa: única, estável e vinda do dado — <code>key={p.id}</code>.</li>
+<li>Índice só em lista que nunca reordena, cresce ou é filtrada.</li>
+<li><code>Math.random()</code> e <code>Date.now()</code> remontam tudo a cada desenho.</li>
+<li>Nunca use como chave um valor que o usuário edita: o campo perde o foco.</li>
+<li>A key vai no elemento que o <code>map</code> devolve, ou no <code>Fragment</code> que os envolve.</li>
+<li>Key não chega ao componente como prop: passe o id também, se precisar.</li>
+<li>Trocar a chave de propósito é o jeito mais curto de recomeçar um componente.</li>
+<li>No build de produção não há aviso de key: o sintoma é o único sinal.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

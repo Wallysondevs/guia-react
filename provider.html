@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O Provider | Guia React</title>
+<meta name="description" content="O provider em React: escrever o seu ClienteProvider com children e estado, o provider mais próximo que vence, o value comparado por identidade e a composição de canais.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O <span class="hl">Provider</span></h1>
+<p class="intro">A Ana copiou o mesmo <code>&lt;ClienteContexto.Provider&gt;</code> em três telas do site,
+cada uma com a sua cópia do <code>useState</code> do cliente e a sua lista de funções. Quando ela mudou o
+formato do valor — de texto para objeto —, precisou editar três arquivos e ainda esqueceu um. Nesta aula ela
+transforma o provider numa peça só dela: um componente chamado <code>ClienteProvider</code> que guarda o
+estado, publica o canal e recebe o resto da página como <code>children</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que um provider faz na árvore e o que ele <em>não</em> faz.</li>
+  <li>Por que o provider mais próximo é o que vale, e como usar isso a favor.</li>
+  <li>Como escrever um provider próprio, com estado e <code>children</code>.</li>
+  <li>Por que o <code>value</code> é comparado por identidade e o que isso custa.</li>
+  <li>Como <code>useMemo</code> segura o objeto do valor entre desenhos.</li>
+  <li>Como empilhar dois providers e por que a ordem entre eles não importa.</li>
+  <li>Onde montar o provider num projeto de verdade.</li>
+  <li>Os tropeços: <code>createContext</code> no lugar errado, valor novo a cada render, provider sem <code>children</code>.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o mesmo provider em três arquivos</h2>
+
+<p>O site da Ana tem três telas que precisam saber quem é o cliente: a loja, o carrinho e o acompanhamento
+do pedido. Em cada uma, o mesmo bloco: um <code>useState</code> para o nome, uma função para entrar, outra
+para sair, e o <code>&lt;ClienteContexto.Provider value={...}&gt;</code> em volta do conteúdo. Três cópias do
+mesmo desenho, três lugares para esquecer de atualizar.</p>
+
+<p>O problema não é o contexto — é que o <strong>fornecimento</strong> não foi extraído. A criação do canal
+está num arquivo, a leitura está nos componentes, mas o pedaço do meio, que guarda o estado e abastece o
+canal, ficou solto em cada tela. Extrair esse pedaço num componente é o assunto desta aula, e o resultado é o
+que a maioria dos projetos chama de <code>ClienteProvider</code>.</p>
+
+<p>Antes de escrever, vale fixar o que um provider é e o que ele não é. Ele é um componente que coloca um
+valor à disposição de tudo que está abaixo dele, e só disso. Não guarda o valor — quem guarda é o estado de
+alguém, normalmente o do próprio provider. Não aparece no HTML gerado. Não altera o que os filhos recebem por
+prop. E não é global: vale só no ramo da árvore em que está montado.</p>
+
+<h2>2. O canal, o valor e o escopo</h2>
+
+<p>Três nomes se confundem no começo, e separá-los resolve metade das dúvidas. O <strong>contexto</strong> é
+o canal, criado uma vez com <code>createContext</code>. O <strong>provider</strong> é o componente que
+abastece esse canal com um <strong>valor</strong> para um pedaço da árvore. O <strong>consumidor</strong> é
+quem lê, com <code>useContext</code>. Nesta aula o foco é o do meio.</p>
+
+<dl class="anatomy">
+<dt>provider</dt>
+<dd>O componente que publica um valor: <code>&lt;ClienteContexto.Provider value={...}&gt;</code>. Em React 19,
+o próprio canal também serve: <code>&lt;ClienteContexto value={...}&gt;</code>.</dd>
+<dt>value</dt>
+<dd>O que é publicado. Pode ser texto, número, objeto com dados, objeto com funções. É comparado por
+identidade, não por conteúdo.</dd>
+<dt>children</dt>
+<dd>O que fica entre as tags do provider. Tudo que está aí dentro pode ler o canal; o que está fora, não.</dd>
+<dt>escopo</dt>
+<dd>A região da árvore coberta por aquele provider. Dois providers do mesmo canal criam dois escopos.</dd>
+<dt>provider próprio</dt>
+<dd>Um componente seu que junta estado, canal e <code>children</code>: <code>ClienteProvider</code>,
+<code>TemaProvider</code>.</dd>
+<dt>identidade</dt>
+<dd>O que o React compara para decidir se o valor mudou. Objeto novo é valor novo, mesmo com os mesmos
+campos.</dd>
+</dl>
+
+<p>A última linha é a que causa os bugs mais difíceis de achar. O React não olha dentro do objeto para ver se
+os campos são iguais; ele compara a referência. Um objeto criado no JSX é sempre uma referência nova, e
+referência nova significa "o valor mudou" para todos os consumidores. Guarde essa frase, porque a quinta
+seção é sobre ela.</p>
+
+<h2>3. O provider mais próximo vence</h2>
+
+<p>Dois cartões, dois clientes. O primeiro é da Ana e está dentro de um provider com <code>Ana</code>. O
+segundo é uma encomenda para a Bruna, e ficou fora do provider: ele recebe o valor padrão do canal,
+"visitante". A missão é envolver o segundo cartão num provider próprio com <code>Bruna</code> — e aprender que
+o mais próximo é o que vale.</p>
+
+<div class="tryreact" data-goal="texto:Cliente: Ana;;texto:Cliente: Bruna">
+  <p class="try-task">O cartão do pão de queijo está fora do provider e mostra "visitante". Envolva-o num
+  <code>&lt;ClienteContexto.Provider value={{ cliente: "Bruna" }}&gt;</code> e confira os dois selos.</p>
+  <pre class="jsx">const ClienteContexto = createContext({ cliente: "visitante" });
+
+function Selo() {
+  const { cliente } = useContext(ClienteContexto);
+  return &lt;p&gt;Cliente: {cliente}&lt;/p&gt;;
+}
+
+function Cartao({ titulo }) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{titulo}&lt;/h2&gt;
+      &lt;Selo /&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;ClienteContexto.Provider value={{ cliente: "Ana" }}&gt;
+        &lt;Cartao titulo="Baguete" /&gt;
+      &lt;/ClienteContexto.Provider&gt;
+      &lt;Cartao titulo="Pão de queijo" /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;div class="cartao"&gt;
+    &lt;h2&gt;Baguete&lt;/h2&gt;
+    &lt;p&gt;Cliente: Ana&lt;/p&gt;
+  &lt;/div&gt;
+  &lt;div class="cartao"&gt;
+    &lt;h2&gt;Pão de queijo&lt;/h2&gt;
+    &lt;p&gt;Cliente: visitante&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const ClienteContexto = createContext({ cliente: "visitante" });
+
+function Selo() {
+  const { cliente } = useContext(ClienteContexto);
+  return &lt;p&gt;Cliente: {cliente}&lt;/p&gt;;
+}
+
+function Cartao({ titulo }) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{titulo}&lt;/h2&gt;
+      &lt;Selo /&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;ClienteContexto.Provider value={{ cliente: "Ana" }}&gt;
+        &lt;Cartao titulo="Baguete" /&gt;
+      &lt;/ClienteContexto.Provider&gt;
+      &lt;ClienteContexto.Provider value={{ cliente: "Bruna" }}&gt;
+        &lt;Cartao titulo="Pão de queijo" /&gt;
+      &lt;/ClienteContexto.Provider&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Nada mudou no <code>Selo</code>: ele continua lendo o mesmo canal. O que mudou foi qual provider está
+acima dele. O React não guarda "o valor do contexto" num lugar global — cada provider é uma camada, e o
+consumidor pega a camada mais próxima. Essa é a mecânica que permite ter duas seções da mesma página com
+clientes diferentes, ou uma parte da tela em modo escuro sem escurecer o resto.</p>
+
+<p>E se o provider mais próximo não tiver a chave que você procura? Ele não completa com o de cima: o valor
+publicado é o objeto inteiro, e ponto. Se o provider de cima publica <code>{ cliente, entrar }</code> e o de
+baixo publica só <code>{ cliente }</code>, quem lê por baixo recebe só <code>cliente</code> — e
+<code>entrar</code> fica <code>undefined</code>. Por isso a recomendação é publicar sempre a mesma forma de
+objeto em todos os providers do mesmo canal.</p>
+
+<h2>4. Um provider do seu próprio punho</h2>
+
+<p>Agora o ganho de verdade. Em vez de repetir o <code>useState</code> e o <code>.Provider</code> em cada
+tela, escreva um componente que faz isso uma vez. Ele recebe <code>children</code>, guarda o estado e publica
+o valor. Quem usa escreve <code>&lt;ClienteProvider&gt;</code> e não sabe que existe um contexto por baixo.</p>
+
+<pre class="file" data-file="ClienteProvider.jsx">import { createContext, useContext, useState } from "react";
+
+const ClienteContexto = createContext(null);
+
+export function useCliente() {
+  const valor = useContext(ClienteContexto);
+  if (!valor) throw new Error("useCliente precisa estar dentro de ClienteProvider");
+  return valor;
+}
+
+export function ClienteProvider({ children }) {
+  const [cliente, setCliente] = useState("visitante");
+
+  const valor = {
+    cliente,
+    entrar: (nome) =&gt; setCliente(nome),
+    sair: () =&gt; setCliente("visitante"),
+  };
+
+  return &lt;ClienteContexto.Provider value={valor}&gt;{children}&lt;/ClienteContexto.Provider&gt;;
+}</pre>
+
+<p>Quatro decisões estão embutidas nesse arquivo, e cada uma tem motivo. Primeira: o
+<code>createContext</code> fica no topo do módulo, fora de qualquer componente, para o canal existir uma vez
+só. Segunda: o estado mora dentro do provider, e não em quem usa — assim não existe provider sem estado nem
+estado sem provider. Terceira: as funções <code>entrar</code> e <code>sair</code> vão no mesmo objeto do
+valor, para quem consome ter tudo num lugar. Quarta: o contexto não é exportado; o que se exporta é o
+provider e o hook <code>useCliente</code>.</p>
+
+<p>O hook é o detalhe que faz diferença no dia a dia. Sem ele, cada consumidor precisa importar o canal e
+escrever <code>useContext(ClienteContexto)</code>; com ele, escreve <code>useCliente()</code> e pronto. O
+ganho não é só de digitação: o hook é o lugar onde você documenta o formato do valor e onde decide o que
+acontece quando alguém usa fora do provider. No exemplo, ele lança um erro com uma mensagem que diz o que
+fazer — melhor do que um <code>undefined</code> que estoura três componentes adiante.</p>
+
+<p>Em quem usa, a diferença é visível:</p>
+
+<pre class="file" data-file="Carrinho.jsx">import { useCliente } from "./ClienteProvider";
+
+export default function Carrinho() {
+  const { cliente, sair } = useCliente();
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Carrinho de {cliente}&lt;/p&gt;
+      &lt;button onClick={sair}&gt;Sair&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Nenhuma menção a contexto, nenhum <code>useContext</code>, nenhum canal importado. O componente depende de
+um serviço chamado <code>useCliente</code>. Se um dia o valor deixar de vir de contexto e passar a vir de uma
+consulta ao servidor, o consumidor não muda — só o provider muda. É a mesma vantagem de esconder o
+<code>fetch</code> atrás de uma função: quem chama não precisa saber como o dado é obtido.</p>
+
+<h2>5. O value é comparado por identidade</h2>
+
+<p>O provider publica e o React compara. A comparação é <code>Object.is</code>, ou seja, quase igual a
+<code>===</code>: dois objetos com os mesmos campos são diferentes se não forem o mesmo objeto. Isso significa
+que um <code>value={{ cliente }}</code> escrito no JSX é um valor novo a cada desenho do provider — e todo
+consumidor é redesenhado junto, mesmo que o cliente seja o mesmo.</p>
+
+<p>Na caixa, o provider tem um segundo estado, o aviso, que não tem nada a ver com o cliente. Um consumidor
+conta quantas vezes o canal entregou um valor diferente. Clique em "Mostrar aviso": o aviso aparece, e a
+contagem sobe de um para dois, porque o objeto do valor foi recriado por causa de um estado que nem está
+nele. A missão é segurar o objeto com <code>useMemo</code>.</p>
+
+<div class="tryreact" data-goal="clique:#aviso;;texto:Leituras do canal: 1;;texto:Hoje o pão sai quentinho">
+  <p class="try-task">O objeto do <code>value</code> é recriado em todo desenho e o consumidor recebe um valor
+  novo à toa. Envolva-o em <code>useMemo(() =&gt; ({ cliente, entrar }), [cliente])</code> e clique em
+  "Mostrar aviso": a contagem tem de ficar em 1.</p>
+  <pre class="jsx">const ClienteContexto = createContext(null);
+
+function ClienteProvider({ children }) {
+  const [cliente, setCliente] = useState("Ana");
+  const [aviso, setAviso] = useState(false);
+
+  const valor = { cliente, entrar: (nome) =&gt; setCliente(nome) };
+
+  return (
+    &lt;ClienteContexto.Provider value={valor}&gt;
+      &lt;button id="aviso" onClick={() =&gt; setAviso(!aviso)}&gt;Mostrar aviso&lt;/button&gt;
+      {aviso &amp;&amp; &lt;p&gt;Hoje o pão sai quentinho!&lt;/p&gt;}
+      {children}
+    &lt;/ClienteContexto.Provider&gt;
+  );
+}
+
+function ContadorDeLeituras() {
+  const valor = useContext(ClienteContexto);
+  const [leituras, setLeituras] = useState(0);
+
+  useEffect(() =&gt; {
+    setLeituras((n) =&gt; n + 1);
+  }, [valor]);
+
+  return &lt;p&gt;Leituras do canal: {leituras}&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;ClienteProvider&gt;
+      &lt;ContadorDeLeituras /&gt;
+    &lt;/ClienteProvider&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;button id="aviso"&gt;Mostrar aviso&lt;/button&gt;
+&lt;p&gt;Leituras do canal: 1&lt;/p&gt;
+</pre>
+  <pre class="solucao">const ClienteContexto = createContext(null);
+
+function ClienteProvider({ children }) {
+  const [cliente, setCliente] = useState("Ana");
+  const [aviso, setAviso] = useState(false);
+
+  const valor = useMemo(() =&gt; ({ cliente, entrar: (nome) =&gt; setCliente(nome) }), [cliente]);
+
+  return (
+    &lt;ClienteContexto.Provider value={valor}&gt;
+      &lt;button id="aviso" onClick={() =&gt; setAviso(!aviso)}&gt;Mostrar aviso&lt;/button&gt;
+      {aviso &amp;&amp; &lt;p&gt;Hoje o pão sai quentinho!&lt;/p&gt;}
+      {children}
+    &lt;/ClienteContexto.Provider&gt;
+  );
+}
+
+function ContadorDeLeituras() {
+  const valor = useContext(ClienteContexto);
+  const [leituras, setLeituras] = useState(0);
+
+  useEffect(() =&gt; {
+    setLeituras((n) =&gt; n + 1);
+  }, [valor]);
+
+  return &lt;p&gt;Leituras do canal: {leituras}&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;ClienteProvider&gt;
+      &lt;ContadorDeLeituras /&gt;
+    &lt;/ClienteProvider&gt;
+  );
+}</pre>
+</div>
+
+<p>O <code>useMemo</code> aqui faz uma coisa só: guardar o resultado da função enquanto as dependências não
+mudarem. O objeto é criado no primeiro desenho e reaproveitado nos seguintes; quando <code>cliente</code> muda,
+o objeto é recriado com o valor novo, e aí sim todos os consumidores são redesenhados — que é exatamente o que
+deve acontecer. Sem o <code>useMemo</code>, o aviso abrindo e fechando já seria motivo de redesenho geral.</p>
+
+<p>Atenção às dependências: elas listam o que o objeto usa. <code>cliente</code> está lá; <code>entrar</code>
+é uma função criada dentro do <code>useMemo</code>, então não precisa; <code>setCliente</code> é estável por
+definição do React. Se o seu valor incluir uma função declarada no corpo do componente, essa função muda em
+todo desenho e precisa entrar nas dependências — ou ser envolvida em <code>useCallback</code>. Quando o
+objeto do valor muda com muita frequência, vale considerar dividir o canal em dois: um para os dados, que
+mudam pouco, e outro para as ações, que não mudam nunca.</p>
+
+<h2>6. Providers compõem</h2>
+
+<p>Uma tela grande costuma precisar de mais de um canal: cliente, tema, notificações. Nada impede empilhar
+providers — cada um publica o seu valor, e os consumidores leem de quantos precisarem. A caixa tem o
+<code>ClienteProvider</code> pronto e um <code>TemaProvider</code> escrito mas não usado; quem lê o tema cai
+no valor padrão e mostra "sem tema".</p>
+
+<div class="tryreact" data-goal="clique:#escuro;;texto:Ana — tema escuro">
+  <p class="try-task">Envolva o <code>BotaoTema</code> e o <code>Cartao</code> com
+  <code>&lt;TemaProvider&gt;</code>, por dentro do <code>ClienteProvider</code>. Clique em "Ficar escuro": o
+  cartão tem de mostrar o tema escuro.</p>
+  <pre class="jsx">const ClienteContexto = createContext({ cliente: "visitante" });
+const TemaContexto = createContext({ tema: "sem tema", escurecer: () =&gt; {} });
+
+function ClienteProvider({ children }) {
+  return (
+    &lt;ClienteContexto.Provider value={{ cliente: "Ana" }}&gt;
+      {children}
+    &lt;/ClienteContexto.Provider&gt;
+  );
+}
+
+function TemaProvider({ children }) {
+  const [tema, setTema] = useState("claro");
+  return (
+    &lt;TemaContexto.Provider value={{ tema, escurecer: () =&gt; setTema("escuro") }}&gt;
+      {children}
+    &lt;/TemaContexto.Provider&gt;
+  );
+}
+
+function BotaoTema() {
+  const { escurecer } = useContext(TemaContexto);
+  return &lt;button id="escuro" onClick={escurecer}&gt;Ficar escuro&lt;/button&gt;;
+}
+
+function Cartao() {
+  const { cliente } = useContext(ClienteContexto);
+  const { tema } = useContext(TemaContexto);
+  return &lt;p&gt;{cliente} — tema {tema}&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;ClienteProvider&gt;
+      &lt;BotaoTema /&gt;
+      &lt;Cartao /&gt;
+    &lt;/ClienteProvider&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;button id="escuro"&gt;Ficar escuro&lt;/button&gt;
+&lt;p&gt;Ana — tema sem tema&lt;/p&gt;
+</pre>
+  <pre class="solucao">const ClienteContexto = createContext({ cliente: "visitante" });
+const TemaContexto = createContext({ tema: "sem tema", escurecer: () =&gt; {} });
+
+function ClienteProvider({ children }) {
+  return (
+    &lt;ClienteContexto.Provider value={{ cliente: "Ana" }}&gt;
+      {children}
+    &lt;/ClienteContexto.Provider&gt;
+  );
+}
+
+function TemaProvider({ children }) {
+  const [tema, setTema] = useState("claro");
+  return (
+    &lt;TemaContexto.Provider value={{ tema, escurecer: () =&gt; setTema("escuro") }}&gt;
+      {children}
+    &lt;/TemaContexto.Provider&gt;
+  );
+}
+
+function BotaoTema() {
+  const { escurecer } = useContext(TemaContexto);
+  return &lt;button id="escuro" onClick={escurecer}&gt;Ficar escuro&lt;/button&gt;;
+}
+
+function Cartao() {
+  const { cliente } = useContext(ClienteContexto);
+  const { tema } = useContext(TemaContexto);
+  return &lt;p&gt;{cliente} — tema {tema}&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;ClienteProvider&gt;
+      &lt;TemaProvider&gt;
+        &lt;BotaoTema /&gt;
+        &lt;Cartao /&gt;
+      &lt;/TemaProvider&gt;
+    &lt;/ClienteProvider&gt;
+  );
+}</pre>
+</div>
+
+<p>Repare que a ordem entre os dois não importa para o resultado: <code>TemaProvider</code> dentro de
+<code>ClienteProvider</code> ou o contrário dá o mesmo desenho, porque cada canal é independente. O que importa
+é que <strong>todos os consumidores</strong> de um canal estejam dentro do provider daquele canal. O botão
+precisa do tema para chamar <code>escurecer</code>; o cartão precisa dos dois. Se o botão ficasse fora do
+<code>TemaProvider</code>, ele leria o padrão e não escureceria nada.</p>
+
+<p>Quando os providers se acumulam, vale extrair um <code>Provedores</code> que junta todos:</p>
+
+<pre class="file" data-file="Provedores.jsx">export default function Provedores({ children }) {
+  return (
+    &lt;ClienteProvider&gt;
+      &lt;TemaProvider&gt;
+        &lt;NotificacoesProvider&gt;{children}&lt;/NotificacoesProvider&gt;
+      &lt;/TemaProvider&gt;
+    &lt;/ClienteProvider&gt;
+  );
+}</pre>
+
+<p>Quem monta a aplicação envolve tudo uma vez com <code>&lt;Provedores&gt;</code> e as telas não sabem da
+ordem. É uma conveniência de organização: quando aparecer um quarto canal, ele entra no arquivo e nenhuma tela
+muda. Só tome cuidado com o que fica <em>dentro</em> do provider: cada nível cria um escopo, e mover um
+componente para fora sem querer é o tropeço da próxima seção.</p>
+
+<h2>7. Onde montar o provider</h2>
+
+<p>Num projeto de verdade, o provider fica no ponto mais alto que ainda está sob o seu controle — em geral no
+arquivo que monta a aplicação, envolvendo o <code>App</code>:</p>
+
+<pre class="file" data-file="main.jsx">import { createRoot } from "react-dom/client";
+import { ClienteProvider } from "./ClienteProvider";
+import App from "./App";
+
+createRoot(document.getElementById("raiz")).render(
+  &lt;ClienteProvider&gt;
+    &lt;App /&gt;
+  &lt;/ClienteProvider&gt;
+);</pre>
+
+<p>Montar acima do <code>App</code> tem uma consequência boa: o estado do cliente sobrevive à troca de telas,
+porque o provider não é desmontado quando uma rota muda. Se o provider ficasse dentro de cada página, o valor
+seria recriado a cada navegação — e o carrinho esvaziaria ao trocar de aba. Nas caixas deste guia o motor monta
+o <code>App</code> sozinho, então o provider aparece dentro dele; o efeito é o mesmo, o que muda é só quem
+envolve quem.</p>
+
+<p>Há um limite para subir: nada de colocar no provider o que é de uma tela só. Filtro de busca, aba ativa,
+página da listagem — esses valores pertencem ao componente que os usa, e promover tudo a canal transforma a
+aplicação num balcão único onde todo mundo pega tudo. A pergunta é sempre a mesma: esse valor é lido em pontos
+distantes, por componentes que não compartilham um pai próximo? Se a resposta é não, é prop.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que vai no value</th><th>Exemplo</th><th>Cuidado</th></tr>
+<tr><td>dado que muda</td><td><code>cliente</code>, <code>itens</code>, <code>tema</code></td><td>entra nas dependências do <code>useMemo</code></td></tr>
+<tr><td>ação para mudar o dado</td><td><code>entrar</code>, <code>sair</code>, <code>adicionar</code></td><td>declare com <code>useCallback</code> ou dentro do <code>useMemo</code></td></tr>
+<tr><td>valor derivado</td><td><code>total</code>, <code>quantidade</code></td><td>calcule no corpo do provider, não em outro estado</td></tr>
+<tr><td>configuração fixa</td><td>nome da loja, moeda</td><td>pode ser constante importada, sem canal</td></tr>
+<tr><td>função que muda de tela</td><td><code>onSalvar</code> passado por prop</td><td>não é papel do provider</td></tr>
+</table>
+</div>
+
+<p>Uma observação sobre o formato: publique sempre um objeto, mesmo quando há um valor só. Objeto permite
+acrescentar campos sem quebrar as leituras, e combina com o <code>useMemo</code>. Publicar um texto solto
+(<code>value={cliente}</code>) funciona e é o que a introdução ao contexto mostra; a partir do momento em que
+existe um provider próprio, o objeto é o formato que envelhece melhor.</p>
+
+<h2>8. Os tropeços</h2>
+
+<p>O primeiro é criar o canal dentro do componente. <code>const C = createContext(null)</code> dentro da
+função do provider cria um canal novo a cada desenho; os consumidores passam a olhar para outro canal e caem no
+valor padrão. O canal é do módulo, não do componente. O segundo é esquecer o <code>{children}</code>: o
+provider publica o valor e não desenha nada dentro, então a tela some sem erro.</p>
+
+<p>O terceiro é o valor recriado a cada desenho, que a quinta seção mostrou. O sintoma é uma tela que
+"repinta sem motivo": você mexe num canto e o outro pisca. O quarto é publicar um objeto incompleto num
+provider aninhado, como já foi dito: o de baixo não herda as chaves do de cima. O quinto é usar o contexto
+como depósito: nome do cliente, filtro, aba, formulário inteiro. Quanto mais campos no valor, mais
+consumidores redesenhados e mais difícil saber quem mudou o quê.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você vê</th><th>Causa provável</th><th>Conserto</th></tr>
+<tr><td>o consumidor mostra o padrão mesmo com provider</td><td>o consumidor está fora do escopo, ou o canal foi criado dentro do componente</td><td>subir o provider; criar o canal no topo do módulo</td></tr>
+<tr><td>a tela fica vazia depois de envolver com o provider</td><td>faltou <code>{children}</code> no retorno</td><td>renderizar <code>{children}</code> dentro do <code>.Provider</code></td></tr>
+<tr><td>tudo redesenha quando um estado alheio muda</td><td>objeto do <code>value</code> recriado a cada render</td><td><code>useMemo</code> com as dependências certas</td></tr>
+<tr><td><code>entrar is not a function</code> num provider aninhado</td><td>o provider de baixo publica um objeto incompleto</td><td>publicar a mesma forma nos dois</td></tr>
+<tr><td>o carrinho esvazia ao trocar de tela</td><td>o provider está dentro da página</td><td>montar o provider acima das telas</td></tr>
+</table>
+</div>
+
+<p>Sobre o hook, uma mensagem que vale reconhecer no console do navegador:</p>
+
+<pre class="term">Uncaught Error: useCliente precisa estar dentro de ClienteProvider</pre>
+
+<p>Ela sai do <code>if (!valor) throw</code> do <code>useCliente</code> e é muito melhor do que a alternativa:
+sem a checagem, o erro seria <code>Cannot destructure property 'cliente' of 'Object(...)(...)' as it is
+null</code> — uma mensagem que fala do objeto e não do problema. Se você vir essa mensagem, o componente que
+chamou o hook está fora do provider: mova o provider para cima ou mova o componente para dentro.</p>
+
+<p>Um último conselho de leitura: quando dois consumidores mostram valores diferentes do mesmo canal, a causa
+é sempre a mesma — existem dois providers no caminho, ou um deles está fora. Um <code>console.log</code> no
+provider, antes do <code>return</code>, mostra qual valor cada instância publicou:</p>
+
+<pre class="term">ClienteProvider publicou: {"cliente":"Ana"}
+ClienteProvider publicou: {"cliente":"Bruna"}</pre>
+
+<p>Duas linhas, dois providers. Se o seu caso tem uma linha só e dois comportamentos, o problema não é o
+provider: é o consumidor estar lendo outro canal.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o tema que vale só na vitrine</h3>
+<p>A vitrine de Natal tem fundo escuro e o resto do site continua claro. A solução não é um estado global de
+tema: é um <code>&lt;TemaProvider tema="escuro"&gt;</code> em volta apenas da vitrine. Como o provider mais
+próximo vence, os botões e cartões de dentro ficam escuros e o cabeçalho da loja, que está fora, não muda. No
+dia seguinte, é só remover o wrapper.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o provider que também busca dados</h3>
+<p>O <code>PedidoProvider</code> da Ana guarda o pedido atual, expõe <code>atualizar</code> e
+<code>cancelar</code>, e usa um <code>useEffect</code> para buscar o pedido quando o número muda. Quem consome
+continua vendo um objeto com dados e funções, sem saber que existe uma chamada de rede no meio. É a mesma ideia
+do <a href="buscando-dados.html">buscando dados</a>, empacotada num provider: a tela não fica sabendo de
+detalhes.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: dois canais em vez de um</h3>
+<p>Quando o valor do canal passou a ter sete campos, a Ana separou: um <code>ClienteProvider</code> para o
+dado e um <code>AcoesProvider</code> para as funções. As funções não mudam nunca, então os consumidores que só
+querem <code>adicionar</code> não redesenham quando o nome do cliente muda. Dividir por assunto é a otimização
+mais barata que existe em contexto, e a mais fácil de explicar para quem chega depois.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que um provider faz?</p>
+<label><input type="radio" name="q1"> guarda o valor do contexto para a aplicação inteira, mesmo fora da árvore</label>
+<label><input type="radio" name="q1"> publica um valor para os componentes que estão dentro dele</label>
+<label><input type="radio" name="q1"> cria um elemento invisível no HTML gerado</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Dois providers do mesmo canal, um dentro do outro: qual valor o consumidor recebe?</p>
+<label><input type="radio" name="q2"> os dois valores somados</label>
+<label><input type="radio" name="q2"> o do provider de cima, porque ele foi criado primeiro</label>
+<label><input type="radio" name="q2"> o do provider mais próximo na árvore</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Por que envolver o objeto do <code>value</code> em <code>useMemo</code>?</p>
+<label><input type="radio" name="q3"> porque o React compara identidade: objeto novo a cada desenho é valor novo para todos</label>
+<label><input type="radio" name="q3"> porque o contexto não aceita objetos sem <code>useMemo</code></label>
+<label><input type="radio" name="q3"> porque assim o valor fica disponível fora do provider</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o provider recebe o resto da página</h2>
+<p>Complete o provider para que tudo que estiver entre as tags dele seja desenhado dentro do canal:</p>
+<div class="ex-code">function ClienteProvider({ <input aria-label="resposta 1" data-answer="children" placeholder="..."> }) {<br>
+&nbsp;&nbsp;return &lt;ClienteContexto.Provider value={valor}&gt;{children}&lt;/ClienteContexto.Provider&gt;;<br>
+}</div>
+<p class="ex-dica">Dica: é a prop que o React preenche sozinho com o conteúdo entre as tags. Sem ela, o
+provider publica o valor e não desenha nada.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Um provider é uma camada: ele publica um valor para tudo que está abaixo dele e nada mais. O mais próximo
+vence, o objeto publicado não é completado pelo de cima, e o escopo termina onde o provider termina. Extrair o
+fornecimento num componente seu — <code>ClienteProvider</code>, com estado e <code>children</code> — resolve a
+duplicação e cria um lugar óbvio para o estado morar.</p>
+
+<p>O detalhe que separa um provider que funciona de um que repinta a página inteira é a identidade do valor.
+Objeto novo a cada desenho é valor novo para todos os consumidores; <code>useMemo</code> com as dependências
+certas mantém o objeto estável até que algo relevante mude. E quando o valor fica grande demais, divida o canal
+por assunto em vez de otimizar o objeto único.</p>
+
+<p>Por fim, o par provider + hook é o que dá acabamento ao padrão: quem consome chama <code>useCliente()</code>
+e não sabe que existe contexto; o hook documenta o formato, dá a mensagem de erro quando falta o provider e
+permite trocar a implementação sem tocar nos consumidores. Providers empilham, compõem e se aninham — e a
+pergunta para decidir se algo merece um deles continua sendo a mesma da introdução ao contexto: esse valor é
+lido longe, por gente que não tem um pai próximo em comum?</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Provider publica; quem lê é o consumidor; o canal é criado uma vez, no módulo.</li>
+<li>O provider mais próximo vence, e o de baixo não herda chaves do de cima.</li>
+<li>Provider próprio = estado + <code>.Provider</code> + <code>{children}</code>.</li>
+<li>Exporte o provider e o hook; mantenha o canal privado.</li>
+<li>O <code>value</code> é comparado por identidade, não por conteúdo.</li>
+<li><code>useMemo</code> segura o objeto; dependências são os campos usados.</li>
+<li>Empilhe providers por assunto; a ordem entre eles não altera o resultado.</li>
+<li>Monte o provider acima das telas, para o estado sobreviver à navegação.</li>
+<li>Não transforme a aplicação inteira em canal: dado de uma tela é prop.</li>
+<li>Hook com mensagem de erro é melhor do que <code>null</code> estourando longe.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

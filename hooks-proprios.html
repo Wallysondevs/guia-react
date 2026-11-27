@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hooks Próprios | Guia React</title>
+<meta name="description" content="Hooks próprios no React: como extrair lógica repetida para uma função useAlgumaCoisa, o que devolver, por que cada chamada tem o próprio estado e as armadilhas.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Hooks <span class="hl">Próprios</span></h1>
+<p class="intro">A Ana tem três balcões no site: pães, cafés e encomendas. Cada balcão tem um contador com
+botão de somar e botão de zerar, e cada um repete as mesmas cinco linhas de <code>useState</code>. Quando
+ela quis que o contador parasse em dez, precisou mudar três lugares — e esqueceu um. Nesta aula a Ana
+escreve o primeiro hook dela: uma função com nome de <code>use</code> que guarda o estado e devolve o que
+os componentes precisam, do mesmo jeito que o <code>useState</code> faz.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um hook próprio e por que o nome começa com <code>use</code>.</li>
+  <li>Como extrair um contador repetido para <code>useContador</code>.</li>
+  <li>Por que cada componente que chama o hook ganha o seu próprio estado.</li>
+  <li>Como um hook recebe dados por parâmetro e devolve um objeto pronto para usar.</li>
+  <li>Por que o estado precisa morar dentro do hook, com <code>useState</code>.</li>
+  <li>O que devolver: tupla, objeto ou valor simples.</li>
+  <li>Como um hook próprio chama outro, e onde guardar o arquivo.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a mesma contagem em três balcões</h2>
+
+<p>O painel da padaria mostra quantos pedidos cada balcão atendeu no dia. São três blocos iguais, com um
+número e dois botões: somar e zerar. A Ana escreveu o primeiro com <code>useState</code>, copiou para o
+segundo e copiou para o terceiro. Funciona. O problema não é o código estar errado — é ele estar
+<strong>três vezes</strong>.</p>
+
+<p>Repetição cobra caro de um jeito silencioso. Semana que vem ela quer que o número não passe de dez. Vai
+mexer nos três. Depois quer que o zerar peça confirmação. Nos três de novo. Na terceira vez, um dos blocos
+fica para trás e ninguém percebe, porque os três parecem iguais na tela.</p>
+
+<p>A solução é a mesma que ela já usou para componentes: dar um nome à repetição. Só que, em vez de extrair
+um componente, a Ana vai extrair a <strong>lógica</strong>. O componente já existe e cada balcão tem o seu
+título. O que se repete é o par “valor + ações”. Em React, esse tipo de extração tem nome: hook próprio.</p>
+
+<h2>2. O que é um hook próprio</h2>
+
+<p>Um hook próprio é uma função JavaScript comum, com duas obrigações: o nome começa com <code>use</code> e,
+lá dentro, ela pode chamar outros hooks. É isso. Não existe API para registrar um hook, não existe arquivo
+especial, não existe classe. Você escreve uma função e o React a trata como parte do componente que a
+chamou.</p>
+
+<dl class="anatomy">
+<dt>hook próprio</dt>
+<dd>Uma função cujo nome começa com <code>use</code> e que chama outros hooks por dentro.
+<code>useContador</code>, <code>useCampo</code>, <code>useCliente</code>.</dd>
+<dt>prefixo use</dt>
+<dd>A combinação que o React e o ESLint usam para saber que aquilo é um hook: <code>useAlgumaCoisa</code>.
+Sem o prefixo, as regras dos hooks não são verificadas e você perde o aviso.</dd>
+<dt>chamada</dt>
+<dd>O componente chama o hook uma vez, no topo, e recebe de volta o que ele devolveu:
+<code>const contador = useContador()</code>.</dd>
+<dt>parâmetros</dt>
+<dd>O que o hook precisa de fora: um valor inicial, uma URL, um cliente. Chegam como argumentos, iguais aos
+de qualquer função.</dd>
+<dt>retorno</dt>
+<dd>O que o componente precisa para desenhar: um valor, uma tupla como a do <code>useState</code> ou um
+objeto com valores e funções.</dd>
+<dt>estado por cópia</dt>
+<dd>Cada chamada do hook dentro de um componente tem o seu próprio <code>useState</code>. Dois componentes
+que chamam <code>useContador</code> não compartilham número nenhum.</dd>
+</dl>
+
+<p>A comparação mais útil é com o próprio <code>useState</code>. Ele é uma função com nome de
+<code>use</code> que guarda um valor entre desenhos e devolve o valor e a função de troca. O seu
+<code>useContador</code> vai ser a mesma coisa, com uma camada a mais: por dentro ele usa
+<code>useState</code> e por fora devolve o que o seu componente precisa. Hook próprio é composição de hooks,
+não uma tecnologia nova.</p>
+
+<p>Uma consequência importante desse desenho: o hook <strong>não é um lugar onde o estado mora</strong>. O
+estado mora na posição do componente que chamou o hook. O hook é o nome que você dá ao acesso. Guarde essa
+frase, porque é ela que explica o comportamento da caixa seguinte.</p>
+
+<h2>3. A caixa: nasce o useContador</h2>
+
+<p>O painel tem dois balcões, cada um com o seu <code>useState</code>, o botão de somar funcionando e um
+botão “Zerar” que não faz nada — porque ninguém escreveu o que ele faz. A missão é criar
+<code>useContador</code>, devolver <code>valor</code>, <code>somar</code> e <code>zerar</code>, e usar o
+hook nos dois balcões.</p>
+
+<div class="tryreact" data-goal="clique:#paes .mais;;clique:#paes .mais;;clique:#cafes .mais;;texto:Pães: 2;;texto:Cafés: 1;;clique:#paes .zerar;;texto:Pães: 0;;texto:Cafés: 1">
+  <p class="try-task">Crie <code>function useContador()</code> com um <code>useState(0)</code> dentro,
+  devolvendo <code>{ valor, somar, zerar }</code>. Depois troque o <code>useState</code> do
+  <code>Balcao</code> por <code>const { valor, somar, zerar } = useContador()</code>.</p>
+  <pre class="jsx">function Balcao({ id, nome }) {
+  const [valor, setValor] = useState(0);
+
+  return (
+    &lt;section id={id}&gt;
+      &lt;h2&gt;{nome}&lt;/h2&gt;
+      &lt;p&gt;{nome}: {valor}&lt;/p&gt;
+      &lt;button className="mais" onClick={() =&gt; setValor(valor + 1)}&gt;+1&lt;/button&gt;
+      &lt;button className="zerar"&gt;Zerar&lt;/button&gt;
+    &lt;/section&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Balcao id="paes" nome="Pães" /&gt;
+      &lt;Balcao id="cafes" nome="Cafés" /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;section id="paes"&gt;
+    &lt;h2&gt;Pães&lt;/h2&gt;
+    &lt;p&gt;Pães : 0&lt;/p&gt;
+    &lt;button class="mais"&gt;+1&lt;/button&gt;
+    &lt;button class="zerar"&gt;Zerar&lt;/button&gt;
+  &lt;/section&gt;
+  &lt;section id="cafes"&gt;
+    &lt;h2&gt;Cafés&lt;/h2&gt;
+    &lt;p&gt;Cafés : 0&lt;/p&gt;
+    &lt;button class="mais"&gt;+1&lt;/button&gt;
+    &lt;button class="zerar"&gt;Zerar&lt;/button&gt;
+  &lt;/section&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function useContador() {
+  const [valor, setValor] = useState(0);
+  return {
+    valor,
+    somar: () =&gt; setValor(valor + 1),
+    zerar: () =&gt; setValor(0),
+  };
+}
+
+function Balcao({ id, nome }) {
+  const { valor, somar, zerar } = useContador();
+
+  return (
+    &lt;section id={id}&gt;
+      &lt;h2&gt;{nome}&lt;/h2&gt;
+      &lt;p&gt;{nome}: {valor}&lt;/p&gt;
+      &lt;button className="mais" onClick={somar}&gt;+1&lt;/button&gt;
+      &lt;button className="zerar" onClick={zerar}&gt;Zerar&lt;/button&gt;
+    &lt;/section&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Balcao id="paes" nome="Pães" /&gt;
+      &lt;Balcao id="cafes" nome="Cafés" /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em “+1” duas vezes no balcão dos pães e uma no dos cafés: os números ficam 2 e 1, cada um no seu
+lugar. Depois clique em “Zerar” nos pães e repare: os pães voltam a zero e os cafés continuam em 1. Duas
+chamadas do mesmo hook, dois estados independentes. É a prova de que o hook não guarda nada sozinho — ele
+guarda <em>por componente</em>.</p>
+
+<p>Repare também no que o componente ficou: quatro linhas de leitura no lugar de um <code>useState</code>,
+uma função e um cálculo. Se amanhã o contador precisar parar em dez, o limite entra em um lugar só, dentro
+do hook. E os três balcões continuam ganhando a mudança de graça, porque os três chamam a mesma
+função.</p>
+
+<h2>4. Por que cada cópia tem o próprio estado</h2>
+
+<p>Essa é a dúvida que aparece no dia seguinte: se o <code>useContador</code> é uma função só, por que os
+dois balcões não mostram o mesmo número? A resposta está em como o React guarda o estado. Ele não guarda no
+hook nem em uma variável global: guarda em uma posição ligada ao componente que está sendo desenhado, na
+ordem das chamadas de hook daquele componente.</p>
+
+<p>Quando o <code>Balcao</code> dos pães desenha, o React abre uma ficha para aquela instância e anota: “o
+primeiro hook desta ficha é um <code>useState</code>”. O <code>useContador</code> não tem ficha própria — o
+que ele chama cai na ficha de quem o chamou. É por isso que duas instâncias de <code>Balcao</code> têm duas
+fichas, dois números e dois conjuntos de funções.</p>
+
+<p>Essa mecânica tem um efeito colateral que vale decorar: hooks são contados por <strong>ordem</strong>. Se
+o seu hook próprio chamar <code>useState</code> em um desenho e não chamar no seguinte, as posições
+escorregam e o React perde a conta. É a regra dos hooks, que tem aula própria em
+<a href="regras-dos-hooks.html">As Regras dos Hooks</a>: nada de hook dentro de <code>if</code>, de laço ou
+depois de um <code>return</code> antecipado.</p>
+
+<p>Outra consequência: o hook próprio não compartilha estado entre componentes. Se a Ana quisesse que os
+três balcões somassem no mesmo número, o contador teria de subir para o <code>App</code> e descer por prop,
+ou ir para um contexto — é o assunto de <a href="contexto-introducao.html">Introdução ao Contexto</a>.
+Hook próprio é sobre reaproveitar <strong>lógica</strong>, não sobre compartilhar dado.</p>
+
+<h2>5. Um hook que recebe e devolve dados</h2>
+
+<p>O segundo hook da Ana é o de campo de formulário. Todo campo controlado repete o mesmo par:
+<code>value</code> mais <code>onChange</code>, mais um <code>useState</code>. Ela escreveu <code>useCampo</code>
+para receber o valor inicial e devolver o estado e um objeto pronto para espalhar no <code>&lt;input&gt;</code>.</p>
+
+<div class="tryreact" data-goal="texto:Bem-vindo, Ana;;digite:input=Bento;;texto:Bem-vindo, Bento">
+  <p class="try-task">O hook recebe <code>inicial</code>, mas o <code>useState</code> começa sempre vazio: o
+  campo nasce em branco e a saudação mostra reticências. Troque por <code>useState(inicial)</code>.</p>
+  <pre class="jsx">function useCampo(inicial) {
+  const [valor, setValor] = useState("");
+  return {
+    valor,
+    campo: {
+      value: valor,
+      onChange: (e) =&gt; setValor(e.target.value),
+    },
+  };
+}
+
+function App() {
+  const nome = useCampo("Ana");
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input id="nome" {...nome.campo} /&gt;
+      &lt;p&gt;Bem-vindo, {nome.valor || "..."}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="nome"&gt;Nome&lt;/label&gt;
+  &lt;input id="nome" value=""&gt;
+  &lt;p&gt;Bem-vindo, ...&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function useCampo(inicial) {
+  const [valor, setValor] = useState(inicial);
+  return {
+    valor,
+    campo: {
+      value: valor,
+      onChange: (e) =&gt; setValor(e.target.value),
+    },
+  };
+}
+
+function App() {
+  const nome = useCampo("Ana");
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input id="nome" {...nome.campo} /&gt;
+      &lt;p&gt;Bem-vindo, {nome.valor || "..."}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois do conserto, o campo já nasce com “Ana” e a saudação acompanha. Digite outra coisa e veja o texto
+mudar: o hook devolve o valor atual e o objeto que alimenta o campo. O <code>{...nome.campo}</code> é o
+espalhamento que você já viu nas props — ele põe <code>value</code> e <code>onChange</code> no
+<code>&lt;input&gt;</code> sem escrever cada um.</p>
+
+<p>Há um detalhe de projeto aqui. O parâmetro <code>inicial</code> só é usado na primeira vez, porque o
+argumento do <code>useState</code> só vale no primeiro desenho. Se a Ana chamar
+<code>useCampo("Ana")</code> e depois <code>useCampo("Bento")</code>, o valor não troca — para trocar o
+conteúdo depois, o caminho é o componente receber uma prop e chamar a função de troca dentro de um efeito,
+ou remontar o componente com uma <code>key</code> diferente. É a mesma regra do <code>useState</code>,
+agora vista por dentro do hook.</p>
+
+<p>Uma decisão de gosto: devolver <code>{ valor, campo }</code> deixa o componente legível, mas obriga
+quem chama a saber que <code>campo</code> é um objeto de props. A alternativa é devolver
+<code>{ valor, definir }</code> e deixar o componente montar o <code>onChange</code>. As duas
+funcionam; a primeira tem menos código na tela, a segunda esconde menos.</p>
+
+<h2>6. O estado tem de morar no hook (com useState)</h2>
+
+<p>Quando a ideia de hook próprio chega, aparece a tentação de guardar o valor “no hook”, em uma variável
+fora da função. Parece mais simples: uma variável, uma função que soma. Só que uma variável fora do
+componente não avisa o React de nada, e ainda é uma só para todos os balcões.</p>
+
+<div class="tryreact" data-goal="clique:#a button;;clique:#a button;;clique:#b button;;texto:Balcão A: 2;;texto:Balcão B: 1">
+  <p class="try-task">O botão não muda nada na tela: o contador soma em uma variável de fora, que o React
+  não acompanha. Ponha um <code>useState(0)</code> dentro do hook e devolva <code>valor</code> e
+  <code>somar</code> a partir dele.</p>
+  <pre class="jsx">let total = 0;
+
+function useContador() {
+  function somar() {
+    total = total + 1;
+  }
+  return { valor: total, somar };
+}
+
+function Balcao({ id, nome }) {
+  const { valor, somar } = useContador();
+  return (
+    &lt;section id={id}&gt;
+      &lt;p&gt;{nome}: {valor}&lt;/p&gt;
+      &lt;button onClick={somar}&gt;+1&lt;/button&gt;
+    &lt;/section&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Balcao id="a" nome="Balcão A" /&gt;
+      &lt;Balcao id="b" nome="Balcão B" /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;section id="a"&gt;
+    &lt;p&gt;Balcão A : 0&lt;/p&gt;
+    &lt;button&gt;+1&lt;/button&gt;
+  &lt;/section&gt;
+  &lt;section id="b"&gt;
+    &lt;p&gt;Balcão B : 0&lt;/p&gt;
+    &lt;button&gt;+1&lt;/button&gt;
+  &lt;/section&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function useContador() {
+  const [valor, setValor] = useState(0);
+  return { valor, somar: () =&gt; setValor(valor + 1) };
+}
+
+function Balcao({ id, nome }) {
+  const { valor, somar } = useContador();
+  return (
+    &lt;section id={id}&gt;
+      &lt;p&gt;{nome}: {valor}&lt;/p&gt;
+      &lt;button onClick={somar}&gt;+1&lt;/button&gt;
+    &lt;/section&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Balcao id="a" nome="Balcão A" /&gt;
+      &lt;Balcao id="b" nome="Balcão B" /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Com o <code>useState</code> dentro do hook, clicar duas vezes no A e uma no B dá 2 e 1. Sem ele, o painel
+fica parado em zero para sempre: a variável até muda, mas o React não sabe que precisa desenhar de novo, e
+quem lê o valor é a função de desenho, que não foi chamada. É o mesmo motivo pelo qual você nunca altera
+estado “na mão” em React.</p>
+
+<p>Existe uma exceção legítima para variáveis fora do componente: constantes que nunca mudam, como a tabela
+de preços ou a lista de bairros atendidos. Isso não é estado, é configuração. A regra prática é simples: se
+o valor aparece na tela e pode mudar com o uso, ele precisa de <code>useState</code> (ou
+<code>useReducer</code>) em algum lugar.</p>
+
+<p>E há um terceiro caso, mais sutil: o hook pode guardar um valor entre desenhos sem disparar desenho
+novo, com <code>useRef</code>. Serve para coisas como “quantas vezes já busquei”, que não aparecem na tela.
+Se o número aparece, é estado; se é só um caderninho interno, é ref. A aula de
+<a href="timers.html">Timers</a> usa essa ideia na prática.</p>
+
+<h2>7. O que devolver, e o que um hook pode chamar</h2>
+
+<p>Não existe formato obrigatório de retorno. O que existe é convenção, e a convenção segue o que o
+componente precisa fazer com o resultado.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Formato</th><th>Exemplo</th><th>Quando usar</th></tr>
+<tr><td>tupla</td><td><code>const [valor, somar] = useContador()</code></td><td>dois ou três itens posicionais, como o <code>useState</code></td></tr>
+<tr><td>objeto</td><td><code>const { valor, somar, zerar } = useContador()</code></td><td>várias coisas, com nomes que se explicam</td></tr>
+<tr><td>valor simples</td><td><code>const cliente = useCliente()</code></td><td>uma coisa só, sem ação nenhuma</td></tr>
+<tr><td>função</td><td><code>const validar = useValidacao()</code></td><td>o hook só prepara uma ação</td></tr>
+</table>
+</div>
+
+<p>Objeto é o formato mais comum quando o hook cresce, porque a ordem não importa e o nome aparece na hora de
+usar. Tupla é melhor quando o hook imita o <code>useState</code> e o leitor já conhece a posição. O que
+ninguém recomenda é devolver coisas demais: um hook que devolve quinze campos é um componente disfarçado, e
+provavelmente deveria ser dividido em dois.</p>
+
+<p>Sobre o que um hook pode chamar: qualquer hook. Inclusive os seus. Um <code>useEncomenda</code> pode
+chamar <code>useCampo</code> para o nome do cliente e <code>useTotal</code> para o preço. Essa composição é
+o motivo de o prefixo <code>use</code> existir: ele avisa ao React (e ao ESLint) que aquela função pode
+conter hooks, então as regras precisam ser verificadas também lá dentro.</p>
+
+<pre class="file" data-file="useEncomenda.js">import { useState } from "react";
+import { useCampo } from "./useCampo";
+
+export function useEncomenda() {
+  const cliente = useCampo("");
+  const [pago, setPago] = useState(false);
+  const total = 6 * 12;
+
+  return {
+    cliente,
+    pago,
+    total,
+    marcarPago: () =&gt; setPago(true),
+  };
+}</pre>
+
+<p>Em um projeto de verdade, cada hook mora no seu arquivo, com <code>export</code>, e quem usa importa. Nas
+caixas deste guia não há import: as linhas de <code>import</code> são removidas pelo motor, e o que importa é
+a função. Se você levar o código daqui para um projeto, a primeira linha do arquivo passa a ser
+<code>import { useState } from "react"</code> — veja
+<a href="criar-projeto.html">Criar o Projeto</a> para o arquivo completo.</p>
+
+<h2>8. As armadilhas dos hooks próprios</h2>
+
+<p>Quatro problemas concentram quase tudo o que dá errado com hooks próprios. Dois deles aparecem no
+console; dois aparecem só como comportamento estranho.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O sintoma</th><th>A causa</th><th>O conserto</th></tr>
+<tr><td>o valor não muda na tela</td><td>o hook guarda o valor em variável de fora, sem <code>useState</code></td><td>mover o estado para dentro do hook</td></tr>
+<tr><td>dois componentes mostram o mesmo número</td><td>o estado está em uma variável do módulo</td><td>um <code>useState</code> por chamada do hook</td></tr>
+<tr><td>o hook funciona em um lugar e quebra em outro</td><td>ele é chamado dentro de um <code>if</code> ou de um laço</td><td>chamar sempre no topo do componente</td></tr>
+<tr><td>o ESLint reclama de “ordem dos hooks”</td><td>há um <code>return</code> antes de algum hook</td><td>todos os hooks antes de qualquer condição</td></tr>
+</table>
+</div>
+
+<p>O terceiro caso é o mais chato de diagnosticar, porque o hook está certo e o <em>uso</em> está errado. Um
+hook chamado dentro de um <code>if</code> roda em alguns desenhos e não em outros; as posições escorregam e o
+React passa a entregar o estado de um hook para outro. O ESLint avisa antes de rodar, com uma mensagem
+comprida que vale reconhecer:</p>
+
+<pre class="term">React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render.</pre>
+
+<p>A tradução é direta: “o <code>useState</code> está sendo chamado condicionalmente; hooks precisam ser
+chamados na mesma ordem em todo desenho do componente”. O conserto quase sempre é subir a chamada para o
+topo e usar o valor condicionalmente depois, no JSX.</p>
+
+<p>O quarto caso aparece quando alguém chama o hook fora de um componente — dentro de um
+<code>onClick</code>, de um <code>setTimeout</code> ou de uma função auxiliar comum. No navegador, em modo
+de desenvolvimento, a mensagem é esta:</p>
+
+<pre class="term">Uncaught Error: Invalid hook call. Hooks can only be called inside of the body of a function component.</pre>
+
+<p>“Chamada de hook inválida: hooks só podem ser chamados no corpo de um componente de função.” Se você
+vir essa mensagem, procure onde o hook foi chamado: quase sempre é um <code>onClick</code> que tentou usar
+<code>useState</code> para guardar um resultado. O caminho é declarar o estado no corpo e usá-lo no
+manipulador.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o limite que entrou em um lugar só</h3>
+<p>A Ana decidiu que nenhum balcão passa de dez pedidos. Antes, isso seria três <code>if</code> em três
+componentes. Com o <code>useContador</code>, ela mudou a função <code>somar</code> para
+<code>setValor(Math.min(valor + 1, 10))</code> e os três balcões passaram a respeitar o limite. Nenhum
+componente soube que a regra mudou.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o contador que compartilhava número</h3>
+<p>Na primeira versão, o <code>total</code> ficava fora do hook, e os dois balcões mostravam o mesmo
+número — e nenhum dos dois atualizava ao clicar. O sintoma parecia “o React não está funcionando”. A causa
+era uma variável de módulo onde deveria haver <code>useState</code>. Duas linhas de conserto, uma tarde de
+investigação.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o hook que virou componente</h3>
+<p>O <code>usePainel</code> da Ana começou pequeno e terminou devolvendo doze coisas, incluindo o JSX de
+três blocos. Quando isso acontece, o nome está errado: aquilo é um componente que devolve tela. Ela dividiu
+em <code>useContador</code>, <code>useCampo</code> e um componente <code>Painel</code> que usa os dois. O
+código ficou maior em número de arquivos e bem menor em sustos.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que um hook próprio precisa ter para ser um hook?</p>
+<label><input type="radio" name="q1"> uma classe que estende <code>React.Hook</code></label>
+<label><input type="radio" name="q1"> nome começando com <code>use</code> e, por dentro, chamadas de hooks</label>
+<label><input type="radio" name="q1"> um arquivo separado com <code>export default</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Dois componentes chamam <code>useContador()</code>. O que
+acontece com o estado?</p>
+<label><input type="radio" name="q2"> os dois compartilham o mesmo número</label>
+<label><input type="radio" name="q2"> só o primeiro funciona; o segundo recebe zero</label>
+<label><input type="radio" name="q2"> cada um tem o seu número, porque o estado mora na instância do componente</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Por que uma variável declarada fora do hook não substitui
+o <code>useState</code>?</p>
+<label><input type="radio" name="q3"> porque o React não é avisado da mudança e não redesenha — e todos os
+componentes dividem a mesma variável</label>
+<label><input type="radio" name="q3"> porque o JavaScript apaga variáveis fora de funções</label>
+<label><input type="radio" name="q3"> porque o hook não aceita variáveis, só parâmetros</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o contador da cozinha</h2>
+<p>Complete o hook que a cozinha vai usar para contar as fornadas:</p>
+<div class="ex-code">function <input aria-label="resposta 1" data-answer="useFornada" placeholder="...">() {
+  const [fornadas, setFornadas] = useState(0);
+  return { fornadas, assar: () =&gt; setFornadas(fornadas + 1) };
+}</div>
+<p class="ex-dica">Dica: o nome começa com <code>use</code> e continua com maiúscula, do mesmo jeito que
+<code>useState</code> e <code>useContador</code>.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Hook próprio é uma função com nome de <code>use</code> que chama outros hooks e devolve o que o componente
+precisa. Ele não guarda estado: quem guarda é a instância do componente que o chamou, na ordem das chamadas.
+Por isso duas chamadas dão dois estados independentes, e por isso a regra “hooks sempre no topo” vale também
+dentro do seu hook.</p>
+
+<p>A extração compensa quando a mesma lógica aparece em dois lugares e você já se pegou copiando as mesmas
+linhas. Comece pelo formato mais simples — um <code>useState</code> e duas funções — e devolva um objeto com
+nomes claros. Se o hook crescer a ponto de devolver tela ou doze campos, provavelmente é hora de dividir.</p>
+
+<p>Um hook pode chamar outro hook, inclusive os seus, e é aí que a composição aparece: um
+<code>useEncomenda</code> junta <code>useCampo</code> e <code>useTotal</code> para entregar ao componente
+uma coisa só. Em projeto de verdade, cada hook mora no seu arquivo e é importado; nas caixas, o import é
+removido e a função fica no mesmo lugar.</p>
+
+<p>E fica a advertência que vale mais que a sintaxe: se o valor aparece na tela e pode mudar, ele precisa de
+<code>useState</code> em algum lugar. Variável de módulo é a origem dos bugs mais silenciosos desta aula —
+não porque o JavaScript esteja errado, mas porque o React nunca fica sabendo que algo mudou.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Hook próprio: função com nome <code>use...</code> que pode chamar hooks.</li>
+<li>O estado mora na instância do componente, não no hook.</li>
+<li>Duas chamadas do mesmo hook: dois estados independentes.</li>
+<li>Parâmetros chegam como argumentos; o valor inicial do <code>useState</code> só vale no primeiro desenho.</li>
+<li>Devolva objeto quando há vários itens; tupla quando imita o <code>useState</code>.</li>
+<li>Nada de hook dentro de <code>if</code>, laço ou <code>onClick</code>.</li>
+<li>Variável fora do componente não redesenha e é compartilhada por todos.</li>
+<li>Hook pode chamar hook: <code>useEncomenda</code> usa <code>useCampo</code> e <code>useTotal</code>.</li>
+<li>No projeto, cada hook mora no seu arquivo e é importado.</li>
+<li>Hook que devolve JSX é componente disfarçado: divida.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

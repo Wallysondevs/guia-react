@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Componentes Polimórficos | Guia React</title>
+<meta name="description" content="Componentes polimórficos: a prop as que escolhe a tag desenhada, o padrão com as: Tag, o repasse de props para link e botão, e a semântica de cada elemento.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Componentes <span class="hl">Polimórficos</span></h1>
+<p class="intro">O botão do site da Ana tem o mesmo visual em todo lugar, mas às vezes precisa ser um
+link — para abrir a vitrine — e às vezes precisa ser um botão de verdade, que envia a encomenda. Ela
+quer um componente só, que escolha a tag na hora do uso. Nesta aula ela aprende a prop
+<strong><code>as</code></strong>, o truque de renomear na desestruturação e o cuidado de não perder o
+<code>href</code> no caminho.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um componente polimórfico: um componente que escolhe a tag que vai desenhar.</li>
+  <li>Como criar a prop <code>as</code> e dar a ela um valor padrão.</li>
+  <li>Por que <code>as: Tag</code> precisa ser renomeado na desestruturação, e por que a maiúscula importa.</li>
+  <li>Como repassar as props para a tag escolhida sem perder <code>href</code>, <code>onClick</code> ou <code>disabled</code>.</li>
+  <li>Que <code>as</code> também aceita um componente, não só uma tag.</li>
+  <li>Como juntar a classe base do componente com a classe de quem chama.</li>
+  <li>Por que trocar de tag não é só visual: cada elemento tem uma semântica.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o mesmo botão que precisa ser link</h2>
+
+<p>Na padaria da Ana existem dois tipos de ação que parecem iguais na tela. "Encomendar" abre o
+formulário de encomenda dentro do próprio site — é uma ação, feita por um botão. "Ver a vitrine" leva
+para outra página, a vitrine de pães — é uma navegação, e o elemento certo para navegar é um link.</p>
+
+<p>Visualmente as duas coisas são um retângulo com fundo escuro e texto claro. A Ana copiou o CSS em um
+componente <code>Botao</code> e, no dia em que precisou do link, escreveu
+<code>&lt;a className="botao"&gt;</code> na mão. Funcionou — até ela mudar a cor do botão e metade dos
+links ficar com a cor antiga.</p>
+
+<p>Ela quer um componente só, com o visual em um lugar, que decida na hora do uso se vai desenhar um
+<code>button</code>, um <code>a</code>, um <code>h2</code> ou o que for preciso. Um componente que pode
+assumir várias formas tem nome: <strong>polimórfico</strong>. A palavra vem do grego e significa
+"muitas formas"; aqui, muitas tags.</p>
+
+<p>O caminho mais comum é uma prop chamada <code>as</code> — convenção da comunidade, não regra do React.
+Você poderia chamar de <code>tag</code> ou <code>elemento</code>; <code>as</code> pegou porque lê bem em
+inglês ("um botão <em>como</em> link"). O componente recebe esse valor e usa como nome da tag que vai
+desenhar.</p>
+
+<h2>2. O que é um componente polimórfico, na prática</h2>
+
+<p>A ideia é simples e o código tem três peças: uma prop com valor padrão, uma variável que começa com
+maiúscula e um JSX que usa essa variável no lugar do nome fixo da tag. O resto é repasse de props, que
+você já viu no HOC.</p>
+
+<dl class="anatomy">
+<dt>polimórfico</dt>
+<dd>Componente que desenha uma tag escolhida por quem o usa, em vez de uma tag fixa no código. "Um
+botão que pode ser link".</dd>
+<dt><code>as</code></dt>
+<dd>A prop que carrega a escolha: <code>as="a"</code>, <code>as="h2"</code>,
+<code>as={Destaque}</code>. O nome é convenção; funciona igual com outro nome.</dd>
+<dt><code>as: Tag</code></dt>
+<dd>Desestruturação com renomeação: pega a prop <code>as</code> e guarda em uma variável chamada
+<code>Tag</code>, que começa com maiúscula.</dd>
+<dt>tag dinâmica</dt>
+<dd>Usar uma variável onde você usaria uma tag: <code>&lt;Tag {...props} /&gt;</code>. O React olha o
+valor da variável para saber o que desenhar.</dd>
+<dt>semântica</dt>
+<dd>O significado que a tag carrega para o navegador e para leitores de tela. Link navega; botão
+executa uma ação.</dd>
+</dl>
+
+<p>A primeira decisão é o padrão. Se o uso mais comum do componente é ser um botão, o padrão é
+<code>"button"</code>; se é uma caixa de texto, o padrão é <code>"div"</code>. Quem não passa
+<code>as</code> recebe o padrão, e o componente continua funcionando como antes. Padrão bom é o que
+deixa o código de quem chama mais curto no caso comum.</p>
+
+<p>A segunda decisão é o que fazer com o resto das props. Um <code>Botao</code> que vira link precisa
+receber <code>href</code>; um que vira botão precisa receber <code>type</code>, <code>disabled</code>,
+<code>onClick</code>. Você não sabe de antemão, então repassa tudo. É o mesmo
+<code>{...props}</code> que a aula de <a href="hocs.html">Higher-Order Components</a> usou para o
+componente de dentro continuar funcionando.</p>
+
+<h2>3. A prop <code>as</code> com valor padrão</h2>
+
+<p>Olhe o código. O <code>Botao</code> já declara <code>as: Tag = "button"</code>, mas o JSX ainda
+desenha um <code>&lt;button&gt;</code> fixo — então o segundo uso, que pede um link, sai como botão.
+O conserto é usar a variável e espalhar as props.</p>
+
+<div class="tryreact" data-goal="conta:a=1;;conta:button=1;;attr:a|href=https://loja.test/vitrine;;texto:Encomendar">
+  <p class="try-task">Troque o <code>&lt;button&gt;</code> fixo pelo dinâmico <code>&lt;Tag&gt;</code>,
+  mantendo a classe <code>botao</code> e espalhando as props. O segundo uso é um link e precisa sair
+  como <code>&lt;a&gt;</code> com o <code>href</code>.</p>
+  <pre class="jsx">function Botao({ as: Tag = "button", texto, ...props }) {
+  return &lt;button className="botao"&gt;{texto}&lt;/button&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Botao texto="Ver a vitrine" /&gt;
+      &lt;Botao as="a" href="https://loja.test/vitrine" texto="Encomendar" /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button class="botao"&gt;Ver a vitrine&lt;/button&gt;
+  &lt;button class="botao"&gt;Encomendar&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Botao({ as: Tag = "button", texto, ...props }) {
+  return (
+    &lt;Tag className="botao" {...props}&gt;
+      {texto}
+    &lt;/Tag&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Botao texto="Ver a vitrine" /&gt;
+      &lt;Botao as="a" href="https://loja.test/vitrine" texto="Encomendar" /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra um <code>&lt;button&gt;</code> e um <code>&lt;a href="https://loja.test/vitrine"&gt;</code>,
+os dois com <code>class="botao"</code>. O primeiro não recebeu <code>as</code> e usou o padrão; o segundo
+pediu <code>a</code> e recebeu o <code>href</code> pelo espalhamento. Uma classe, dois elementos, nenhuma
+cópia de CSS.</p>
+
+<p>Repare na ordem dentro do <code>&lt;Tag&gt;</code>: primeiro a classe do componente, depois as props.
+Assim, se alguém passar <code>className="grande"</code>, a prop sobrescreve a classe base e o botão perde
+o visual. A seção 6 resolve isso; por enquanto, guarde que a ordem do espalhamento é uma decisão, não um
+detalhe.</p>
+
+<h2>4. Por que <code>as: Tag</code> e por que a maiúscula</h2>
+
+<p>Três coisas acontecem nesse pedaço de código, e cada uma tem um motivo. A primeira é a renomeação:
+<code>as: Tag</code> diz "pegue a prop <code>as</code> e chame de <code>Tag</code> aqui dentro". Você
+não pode usar <code>as</code> direto no JSX porque <code>&lt;as&gt;</code> começa com minúscula e o React
+leria como uma tag HTML chamada "as" — desenharia um elemento vazio, sem erro.</p>
+
+<p>A segunda é a maiúscula. O React decide entre tag e componente pela primeira letra do nome: minúscula
+é tag do navegador, maiúscula é variável. <code>&lt;Tag /&gt;</code> é "desenhe o que estiver na variável
+Tag"; <code>&lt;tag /&gt;</code> é "desenhe uma tag chamada tag". A convenção de chamar a variável de
+<code>Tag</code> com maiúscula não é estilo: é o que faz o JSX funcionar.</p>
+
+<p>A terceira é o valor padrão. <code>as: Tag = "button"</code> significa que, quando a prop não vier, a
+variável vale a string <code>"button"</code>. Como a string é minúscula, o React a trata como tag do
+navegador — e é isso que queremos. O padrão pode ser qualquer tag: <code>"div"</code>,
+<code>"span"</code>, <code>"section"</code>.</p>
+
+<p>Para ver o que chega na variável, um log com <code>typeof</code> mostra a diferença entre tag e
+componente:</p>
+
+<pre class="file" data-file="Texto.jsx">function Texto({ as: Tag = "p", ...props }) {
+  const nome = typeof Tag === "string" ? Tag : Tag.name;
+  console.log("Tag: " + nome + " (" + typeof Tag + ")");
+  return &lt;Tag {...props} /&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Texto&gt;Pão quentinho&lt;/Texto&gt;
+      &lt;Texto as={Destaque}&gt;Feito na hora&lt;/Texto&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Com essas duas chamadas, o console mostra:</p>
+
+<pre class="term">console: Tag: p (string)
+console: Tag: Destaque (function)</pre>
+
+<p>String é tag do navegador; função é componente. O mesmo componente aceita os dois porque o JSX aceita
+os dois no mesmo lugar. Essa é a razão de a prop <code>as</code> ser tão curta e tão poderosa: ela não
+guarda um texto, guarda <em>o que o React deve desenhar</em>.</p>
+
+<h2>5. <code>as</code> também aceita um componente</h2>
+
+<p>Até aqui a prop recebeu nomes de tag. Mas o valor pode ser um componente seu — e aí o polimorfismo
+fica mais útil: o <code>Texto</code> pode virar um parágrafo, um subtítulo ou o seu componente
+<code>Destaque</code>, com o visual que ele já tem, sem que ninguém saiba como ele é feito por
+dentro.</p>
+
+<div class="tryreact" data-goal="conta:p=1;;conta:h2=1;;conta:strong.destaque=1">
+  <p class="try-task">O <code>Texto</code> ignora a prop <code>as</code> e desenha sempre um
+  <code>&lt;p&gt;</code>. Implemente a tag dinâmica com <code>as: Tag = "p"</code> e espalhe as props,
+  para os três usos saírem diferentes.</p>
+  <pre class="jsx">function Destaque({ children }) {
+  return &lt;strong className="destaque"&gt;{children}&lt;/strong&gt;;
+}
+
+function Texto({ children }) {
+  return &lt;p&gt;{children}&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Texto&gt;Pão quentinho&lt;/Texto&gt;
+      &lt;Texto as="h2"&gt;Encomendas&lt;/Texto&gt;
+      &lt;Texto as={Destaque}&gt;Feito na hora&lt;/Texto&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Pão quentinho&lt;/p&gt;
+  &lt;p&gt;Encomendas&lt;/p&gt;
+  &lt;p&gt;Feito na hora&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Destaque({ children }) {
+  return &lt;strong className="destaque"&gt;{children}&lt;/strong&gt;;
+}
+
+function Texto({ as: Tag = "p", ...props }) {
+  return &lt;Tag {...props} /&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Texto&gt;Pão quentinho&lt;/Texto&gt;
+      &lt;Texto as="h2"&gt;Encomendas&lt;/Texto&gt;
+      &lt;Texto as={Destaque}&gt;Feito na hora&lt;/Texto&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra um <code>&lt;p&gt;</code>, um <code>&lt;h2&gt;</code> e um
+<code>&lt;strong class="destaque"&gt;</code>. Repare que o <code>Destaque</code> recebeu o texto mesmo
+sem o <code>Texto</code> passar <code>children</code> explicitamente: <code>children</code> está dentro
+de <code>props</code>, e o espalhamento leva junto. Se você desestruturar <code>children</code> para
+usar em outro lugar, precisa passá-lo à mão.</p>
+
+<p>Esse é o ponto mais delicado do componente polimórfico: ele não sabe quais props a tag escolhida
+aceita. Passar <code>href</code> para um <code>&lt;div&gt;</code> não navega nada — no React 19 vira só um
+atributo estranho no HTML; passar <code>disabled</code> para um <code>&lt;a&gt;</code> também não
+desabilita coisa nenhuma. Quem escolhe <code>as</code> precisa
+escolher as props que combinam — e é por isso que a documentação do componente precisa dizer quais
+combinações fazem sentido.</p>
+
+<h2>6. Juntando classes: o visual base não se perde</h2>
+
+<p>Um componente polimórfico costuma ter uma classe base — <code>botao</code> — que traz o visual. Quem
+chama, muitas vezes, quer acrescentar a sua: <code>grande</code>, <code>link</code>,
+<code>perigo</code>. Se o componente simplesmente repassa <code>className</code>, a classe base
+desaparece; se ignora, a classe de quem chama não entra. O certo é juntar as duas.</p>
+
+<div class="tryreact" data-goal="attr:button|class=botao grande;;attr:a|class=botao link;;conta:a=1">
+  <p class="try-task">O componente está usando só a classe de quem chama, e o visual base se perde.
+  Junte <code>botao</code> com a classe recebida, sem deixar espaço sobrando.</p>
+  <pre class="jsx">function Botao({ as: Tag = "button", className = "", children, ...props }) {
+  return (
+    &lt;Tag className={className} {...props}&gt;
+      {children}
+    &lt;/Tag&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Botao className="grande"&gt;Comprar&lt;/Botao&gt;
+      &lt;Botao as="a" href="https://loja.test/vitrine" className="link"&gt;
+        Ver vitrine
+      &lt;/Botao&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button class="grande"&gt;Comprar&lt;/button&gt;
+  &lt;a class="link" href="https://loja.test/vitrine"&gt;Ver vitrine&lt;/a&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Botao({ as: Tag = "button", className = "", children, ...props }) {
+  return (
+    &lt;Tag className={("botao " + className).trim()} {...props}&gt;
+      {children}
+    &lt;/Tag&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Botao className="grande"&gt;Comprar&lt;/Botao&gt;
+      &lt;Botao as="a" href="https://loja.test/vitrine" className="link"&gt;
+        Ver vitrine
+      &lt;/Botao&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra <code>class="botao grande"</code> no <code>button</code> e
+<code>class="botao link"</code> no <code>a</code>. O <code>trim()</code> no fim existe para o caso em que
+ninguém passa classe: sem ele, sobraria um espaço solto no atributo — inofensivo para o navegador, mas
+sujo no DevTools e em testes que comparam texto.</p>
+
+<p>Vale conferir no console quando a conta de classes é maior do que uma concatenação:</p>
+
+<pre class="file" data-file="Botao.jsx">function Botao({ as: Tag = "button", className = "" }) {
+  const classes = ("botao " + className).trim();
+  console.log("classe final: " + classes);
+  return &lt;Tag className={classes} /&gt;;
+}</pre>
+
+<p>Com <code>&lt;Botao className="grande"&gt;</code>, o console mostra:</p>
+
+<pre class="term">console: classe final: botao grande</pre>
+
+<p>Em código de verdade, essa junção costuma virar uma função auxiliar — algo como
+<code>juntarClasses("botao", className, { grande: ehGrande })</code> — porque as condições se
+multiplicam. A ideia, porém, é sempre a mesma: o componente garante a base, quem chama acrescenta o que
+precisa.</p>
+
+<h2>7. Semântica: link é link, botão é ação</h2>
+
+<p>Aqui está a parte que separa um componente polimórfico bem feito de uma armadilha de acessibilidade.
+Se o "botão" que navega é desenhado como <code>&lt;button&gt;</code>, ele não pode ser aberto em outra
+aba, não aparece no menu de contexto como link, e leitores de tela anunciam "botão" onde deveria estar
+"link". Se o "link" que envia uma encomenda é desenhado como <code>&lt;a&gt;</code> sem
+<code>href</code>, ele nem recebe foco pelo teclado.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que a ação faz</th><th>Tag certa</th><th>Por quê</th></tr>
+<tr><td>leva para outra página ou âncora</td><td><code>a</code> com <code>href</code></td><td>navegação, histórico, abrir em nova aba, foco por teclado</td></tr>
+<tr><td>executa algo na mesma tela</td><td><code>button</code></td><td>ação; <code>Enter</code> e <code>Espaço</code> funcionam de graça</td></tr>
+<tr><td>agrupa um bloco da página</td><td><code>section</code> ou <code>div</code></td><td>estrutura, não interação</td></tr>
+<tr><td>dá ênfase a um trecho</td><td><code>strong</code> ou <code>em</code></td><td>o texto continua selecionável e legível</td></tr>
+</table>
+</div>
+
+<p>A regra prática: escolha a tag pelo comportamento, não pelo desenho. O CSS deixa qualquer elemento
+parecido com um botão; o que ele <em>é</em> vem da tag. Um componente polimórfico só é uma boa ideia
+quando as formas que ele assume compartilham o mesmo visual e o mesmo papel — ou quando quem chama sabe
+escolher a forma certa.</p>
+
+<p>Dois cuidados pequenos e frequentes. O primeiro: dentro de um formulário, um
+<code>&lt;button&gt;</code> sem <code>type</code> envia o formulário ao ser clicado; se ele é só um
+botão de abrir detalhe, escreva <code>type="button"</code>. O segundo: quando a ação é feita por um
+link, deixe o <code>href</code> de verdade — um <code>onClick</code> em um <code>&lt;a&gt;</code> sem
+<code>href</code> não é link nem botão, e o teclado não alcança.</p>
+
+<p>No mundo TypeScript, componentes polimórficos pedem tipos generosos, e é comum ver bibliotecas com
+tipos assustadores para isso. Em JavaScript puro, o custo é só a disciplina de escolher a tag certa e
+documentar as combinações. Se o componente começa a acumular regras do tipo "se for link, não aceite
+disabled", talvez ele esteja tentando ser dois componentes ao mesmo tempo — e a saída é separar.</p>
+
+<h2>8. Quando não vale a pena</h2>
+
+<p>Polimorfismo tem custo de leitura. Quem vê <code>&lt;Botao as="a"&gt;</code> precisa saber que a
+tag mudou, que as props mudam junto e que a semântica mudou. Em um componente pequeno e estável, como a
+moldura de um cartão, isso é exagero: melhor ter <code>Cartao</code> e <code>CartaoLink</code>, ou um
+<code>Cartao</code> que recebe o conteúdo por <code>children</code>.</p>
+
+<p>O critério que funciona: use <code>as</code> quando o componente é <strong>visual</strong> e a tag é
+uma escolha legítima de quem usa — botão, link, título. Evite <code>as</code> quando a tag faz parte da
+identidade do componente — uma linha de tabela que pode virar <code>div</code> deixa de ser linha de
+tabela. E evite quando o número de combinações passa de três ou quatro: aí o componente precisa de
+variantes, não de mais liberdade.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Eu preciso mudar…</th><th>Ferramenta</th><th>Exemplo</th></tr>
+<tr><td>a tag, mantendo o visual</td><td><code>as</code></td><td><code>&lt;Botao as="a" href="..."&gt;</code></td></tr>
+<tr><td>a aparência, mantendo o comportamento</td><td>variante</td><td><code>&lt;Botao variante="perigo"&gt;</code></td></tr>
+<tr><td>o conteúdo interno</td><td><code>children</code></td><td><code>&lt;Botao&gt;Comprar&lt;/Botao&gt;</code></td></tr>
+</table>
+</div>
+
+<p>As três linhas convivem bem no mesmo componente. O erro comum é usar <code>as</code> para resolver
+aparência — <code>as="a"</code> porque o link é menor — e variante para resolver semântica. A escolha é
+sempre pelo significado, nunca pelo desenho.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a tag "tag" apareceu no HTML</h3>
+<p>A Ana escreveu <code>&lt;tag className="botao"&gt;</code> em vez de <code>&lt;Tag ...&gt;</code>. O
+navegador aceitou a tag inventada e desenhou um elemento vazio, do tamanho do texto que estava dentro. O
+sintoma é um botão sem estilo e sem clique. A causa é a primeira letra: minúscula vira tag literal,
+maiúscula vira variável. É a mesma regra do nome do componente, aplicada a uma variável.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o link não recebe foco</h3>
+<p>Ela trocou o botão por <code>as="a"</code> e esqueceu de passar <code>href</code>. O elemento saiu
+como <code>&lt;a class="botao"&gt;</code>, sem endereço: o clique não navega e o teclado não alcança o
+elemento. O conserto é passar o endereço de verdade — e, se não houver endereço nenhum, voltar para
+<code>button</code>, porque a ação é na mesma tela. Aparência igual, comportamento diferente.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o texto sumiu ao virar componente</h3>
+<p>Ao usar <code>as={Destaque}</code>, o conteúdo desapareceu porque o <code>Destaque</code> não
+renderizava <code>children</code> — só um <code>&lt;strong&gt;</code> vazio. Um componente usado como
+tag precisa aceitar o conteúdo que chega. O conserto é receber <code>children</code> e desenhá-lo. Sem
+isso, o polimorfismo funciona, mas o texto fica pelo caminho.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Que prop costuma escolher a tag de um componente
+polimórfico?</p>
+<label><input type="radio" name="pl1"> <code>tagName</code>, sempre</label>
+<label><input type="radio" name="pl1"> <code>as</code>, por convenção</label>
+<label><input type="radio" name="pl1"> <code>element</code>, imposta pelo React</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que escrever <code>as: Tag</code> em vez de usar
+<code>as</code> direto no JSX?</p>
+<label><input type="radio" name="pl2"> porque <code>as</code> é palavra reservada do JavaScript</label>
+<label><input type="radio" name="pl2"> para o componente ficar mais curto</label>
+<label><input type="radio" name="pl2"> porque a variável usada no JSX precisa começar com maiúscula</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O componente é visual, mas precisa virar link em
+alguns lugares. O que fazer?</p>
+<label><input type="radio" name="pl3"> passar <code>as="a"</code> e o <code>href</code> de verdade</label>
+<label><input type="radio" name="pl3"> passar <code>onClick</code> e manter o <code>button</code></label>
+<label><input type="radio" name="pl3"> usar <code>as="div"</code>, que é neutro</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a tag dinâmica</h2>
+<p>Complete o JSX do componente para que ele desenhe a tag que chegou na prop <code>as</code>, já
+guardada na variável. Depois responda: o que a primeira letra do nome precisa ser?</p>
+<div class="ex-code">function Caixa({ as: Tag = "div", ...props }) {
+  return &lt;<input aria-label="resposta 1" data-answer="Tag" placeholder="..."> {...props} /&gt;;
+}</div>
+<p class="ex-dica">Dica: é o nome que você escolheu na desestruturação — com maiúscula, senão vira tag
+literal do navegador.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Componente polimórfico é o que escolhe a tag na hora do uso, por uma prop — na convenção da
+comunidade, <code>as</code>. Dentro do componente, a prop é renomeada para uma variável com maiúscula
+(<code>as: Tag</code>) e usada no JSX como <code>&lt;Tag {...props} /&gt;</code>. O valor pode ser uma
+string (<code>"a"</code>, <code>"h2"</code>) ou um componente seu (<code>{Destaque}</code>), e o
+espalhamento leva as props e o <code>children</code> junto.</p>
+
+<p>O padrão precisa de três cuidados. O primeiro: dar um valor padrão que corresponda ao uso mais comum.
+O segundo: repassar as props, senão <code>href</code>, <code>disabled</code> e <code>onClick</code> se
+perdem no caminho. O terceiro: juntar a classe base com a classe de quem chama, em vez de escolher uma
+das duas.</p>
+
+<p>E a parte que não é de sintaxe: cada tag carrega um significado. Link navega, botão executa ação,
+título organiza a página. O componente polimórfico só ajuda se quem escolhe a tag escolher pelo
+comportamento — CSS deixa qualquer coisa parecida com botão, mas não muda o que o navegador e os
+leitores de tela entendem. Use <code>as</code> quando a forma é uma escolha legítima do uso; prefira
+variantes quando o que muda é só a aparência.</p>
+
+<p>Por último, uma dose de realismo: se o componente começa a acumular exceções do tipo "se for link,
+não aceite disabled", é sinal de que duas coisas foram empacotadas em uma. Separar costuma ser mais
+barato do que ensinar o componente a ser esperto.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Polimórfico: o componente escolhe a tag; a prop <code>as</code> é convenção, não API do React.</li>
+<li><code>as: Tag = "button"</code> renomeia e dá o padrão em uma linha.</li>
+<li>A variável do JSX começa com maiúscula; <code>&lt;tag&gt;</code> vira tag literal vazia.</li>
+<li>Espalhe as props: <code>&lt;Tag className="botao" {...props} /&gt;</code>.</li>
+<li><code>as</code> aceita componente: <code>as={Destaque}</code>.</li>
+<li><code>children</code> viaja dentro de <code>props</code>; se desestruturar, passe à mão.</li>
+<li>Junte classes: <code>("botao " + className).trim()</code>.</li>
+<li>Escolha a tag pelo comportamento: link navega, botão executa.</li>
+<li><code>&lt;a&gt;</code> sem <code>href</code> não recebe foco; <code>button</code> em formulário pede <code>type</code>.</li>
+<li>Mudança de aparência é variante; mudança de tag é <code>as</code>.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

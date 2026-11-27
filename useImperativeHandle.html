@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O useImperativeHandle | Guia React</title>
+<meta name="description" content="O useImperativeHandle: como um componente expõe só o que o pai precisa — focar, limpar, confirmar — sem entregar o elemento cru nem vazar o estado interno.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O <span class="hl">useImperativeHandle</span></h1>
+<p class="intro">A Ana tem um botão "Focar o nome" no formulário de encomenda: o cliente abre a tela, o botão
+põe o cursor no primeiro campo. O botão está fora do componente do campo, e focar é uma coisa que só o próprio
+campo sabe fazer. Até hoje a Ana resolvia isso passando o elemento do <code>input</code> para o pai — e o pai
+acabava com o campo inteiro nas mãos, podendo apagar o texto por baixo do React. Nesta aula ela aprende o
+<code>useImperativeHandle</code>: o jeito de um componente dizer "eu sei focar e eu sei limpar; o resto não é
+da sua conta".</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que existem ações que o pai não consegue fazer sozinho.</li>
+  <li>O que é um <em>handle</em> e como uma <code>ref</code> deixa de ser "o elemento" e passa a ser "a API".</li>
+  <li>Como escrever <code>useImperativeHandle(ref, () =&gt; ({ … }))</code> e chamar os métodos de fora.</li>
+  <li>Como o React 19 entrega a <code>ref</code> por prop, sem <code>forwardRef</code>.</li>
+  <li>O que dá errado quando o pai recebe o elemento cru e escreve direto no DOM.</li>
+  <li>Por que o handle também tem array de dependências.</li>
+  <li>O que vale a pena expor, e o que é sinal de que o desenho está errado.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o botão que mora fora do campo</h2>
+
+<p>O formulário de encomenda tem uma caixa de texto para o nome do cliente e, acima dela, um botão "Focar o
+nome". Quando o cliente clica no botão, o cursor tem de pular para o campo. Parece pouco, e é exatamente o
+tipo de coisa que o React não faz por você: o foco é um estado do navegador, mora no elemento, e nenhuma prop
+o controla. Não existe <code>focado={true}</code> no vocabulário do JSX.</p>
+
+<p>A primeira tentativa da Ana foi passar uma <code>ref</code> do <code>App</code> para o
+<code>Campo</code>, e o <code>Campo</code> a pendurou no <code>input</code>. Funcionou: o pai chamou
+<code>entrada.current.focus()</code> e o cursor apareceu. O problema veio depois, quando ela quis limpar o
+campo pelo mesmo caminho e escreveu <code>entrada.current.value = ""</code>. O campo esvaziou na tela, o
+estado do componente continuou com o nome antigo, e a tela passou a mostrar duas verdades diferentes.</p>
+
+<p>O <code>useImperativeHandle</code> existe para esse meio-termo. Em vez de o pai receber o elemento — com
+<code>value</code>, <code>style</code>, <code>remove()</code> e tudo o mais —, ele recebe um objeto pequeno,
+escrito pelo próprio componente, com os métodos que o componente decidiu publicar. Um handle é uma API com
+verbo, não um monte de propriedades. "Focar" e "limpar" são verbos; <code>.value</code> é um detalhe interno
+que vazou.</p>
+
+<h2>2. Um handle, três peças</h2>
+
+<p>A palavra <em>imperative</em> assusta e quer dizer apenas "por comando". No estilo declarativo, você diz
+como a tela deve ser e o React cuida do resto; no estilo imperativo, você manda fazer uma coisa agora —
+focar, rolar, tocar. Os dois convivem no React, e o hook é a porta oficial entre eles. As peças são sempre as
+mesmas três: alguém cria a <code>ref</code>, o componente se registra nela com o hook, e alguém chama um
+método.</p>
+
+<dl class="anatomy">
+<dt>ref</dt>
+<dd>O objeto criado com <code>useRef(null)</code> pelo pai e entregue ao filho como prop. O
+<code>.current</code> é o que o filho preencher.</dd>
+<dt>useImperativeHandle</dt>
+<dd>O hook que registra no <code>.current</code> o objeto que o filho quer publicar. No projeto ele vem de
+<code>import { useImperativeHandle } from "react"</code>; aqui na caixa, escreva
+<code>React.useImperativeHandle</code>.</dd>
+<dt>handle</dt>
+<dd>O objeto publicado: <code>{ focar() { … } }</code>. Um contrato pequeno, com os verbos que o pai pode
+usar.</dd>
+<dt>método</dt>
+<dd>Cada verbo do handle. É uma função comum, e por isso pode ler o estado do componente e chamar
+<code>setAlgumaCoisa</code>.</dd>
+<dt>dependências</dt>
+<dd>O terceiro argumento, um array: quando um valor usado dentro dos métodos muda, o handle é recriado com o
+valor novo.</dd>
+<dt>forwardRef</dt>
+<dd>O jeito antigo de receber a <code>ref</code>. No React 19 a <code>ref</code> chega como uma prop comum,
+e você não precisa dele.</dd>
+</dl>
+
+<p>Duas observações sobre versões, porque você vai encontrar as duas formas em código por aí. Antes do React
+19, uma função componente não recebia <code>ref</code> como prop: era preciso embrulhar o componente em
+<code>forwardRef</code> e declarar <code>(props, ref)</code>. Hoje basta declarar a prop, como qualquer outra:
+<code>function Campo({ ref })</code>. O <code>forwardRef</code> continua funcionando, e você vai vê-lo em
+tutoriais; não precisa dele em código novo.</p>
+
+<p>A segunda observação é do nosso motor: os hooks mais comuns já estão no escopo das caixas, mas
+<code>useImperativeHandle</code> não está entre eles. Por isso o código da aula escreve
+<code>React.useImperativeHandle</code>. Num projeto de verdade, a primeira linha do arquivo importa o hook e
+o resto do código fica igual.</p>
+
+<h2>3. A primeira exposição: focar</h2>
+
+<p>O <code>Campo</code> guarda a <code>ref</code> do <code>input</code> numa variável interna e publica um
+único método, <code>focar</code>. O <code>App</code> recebe a <code>ref</code> do <code>Campo</code> e chama
+<code>campo.current?.focar()</code>. Repare no ponto de interrogação: antes de o filho montar, o
+<code>.current</code> é <code>null</code>, e o <code>?.</code> evita o erro. No código inicial o hook não
+existe, então o clique não faz nada — a missão é escrevê-lo.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Campo em foco">
+  <p class="try-task">O <code>Campo</code> recebe a <code>ref</code> e não faz nada com ela. Registre um handle
+  com o método <code>focar()</code>, que chama <code>entrada.current.focus()</code>. Depois clique em "Focar o
+  nome": o cursor vai para o campo e o aviso muda para "Campo em foco".</p>
+  <pre class="jsx">function Campo({ ref }) {
+  const [focado, setFocado] = useState(false);
+  const entrada = useRef(null);
+
+  return (
+    &lt;div&gt;
+      &lt;input
+        ref={entrada}
+        placeholder="Nome do cliente"
+        onFocus={() =&gt; setFocado(true)}
+        onBlur={() =&gt; setFocado(false)}
+      /&gt;
+      &lt;p&gt;{focado ? "Campo em foco" : "Campo sem foco"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const campo = useRef(null);
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={() =&gt; campo.current?.focar()}&gt;Focar o nome&lt;/button&gt;
+      &lt;Campo ref={campo} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Focar o nome&lt;/button&gt;
+  &lt;div&gt;
+    &lt;input placeholder="Nome do cliente"&gt;
+    &lt;p&gt;Campo sem foco&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Campo({ ref }) {
+  const [focado, setFocado] = useState(false);
+  const entrada = useRef(null);
+
+  React.useImperativeHandle(ref, () =&gt; ({
+    focar() {
+      entrada.current.focus();
+    }
+  }));
+
+  return (
+    &lt;div&gt;
+      &lt;input
+        ref={entrada}
+        placeholder="Nome do cliente"
+        onFocus={() =&gt; setFocado(true)}
+        onBlur={() =&gt; setFocado(false)}
+      /&gt;
+      &lt;p&gt;{focado ? "Campo em foco" : "Campo sem foco"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const campo = useRef(null);
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={() =&gt; campo.current?.focar()}&gt;Focar o nome&lt;/button&gt;
+      &lt;Campo ref={campo} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Vale ler o caminho do clique inteiro, porque ele mostra a diferença entre os dois mundos. O botão chama
+<code>campo.current.focar()</code> — um comando, do lado de fora. O método roda dentro do
+<code>Campo</code>, onde a <code>entrada</code> existe, e chama <code>focus()</code>, que é do navegador. O
+navegador dispara o evento <code>focus</code>, o <code>onFocus</code> do <code>input</code> roda, o estado
+<code>focado</code> vira <code>true</code> e o parágrafo muda. Nada disso passou pelo <code>App</code>: ele só
+sabia o verbo.</p>
+
+<p>Se o botão estivesse dentro do próprio <code>Campo</code>, o handle não seria necessário — bastaria chamar
+<code>entrada.current.focus()</code> no <code>onClick</code>. A regra prática é essa: handle é para quando
+quem manda está fora e não tem acesso ao elemento. Quando o botão e o campo moram no mesmo componente, você
+está resolvendo um problema que não existe.</p>
+
+<h2>4. Por que não entregar o elemento cru</h2>
+
+<p>A tentação de economizar o hook é grande: basta passar <code>ref={entrada}</code> do <code>App</code> para
+o <code>input</code> e usar tudo. É o que o código inicial da segunda caixa faz. A Ana queria limpar o nome do
+cliente depois de enviar a encomenda; escreveu uma linha e o campo esvaziou. Mas o <code>Caracteres</code>
+continuava três, e o <code>Cliente</code> continuava "Ana".</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Caracteres: 0">
+  <p class="try-task">O botão esvazia o campo escrevendo no DOM e o estado não fica sabendo. Troque a
+  <code>ref</code> crua por um handle com o método <code>limpar()</code>, que chama <code>setTexto("")</code>,
+  e clique em "Limpar o nome".</p>
+  <pre class="jsx">function Campo({ entrada }) {
+  const [texto, setTexto] = useState("Ana");
+
+  return (
+    &lt;div&gt;
+      &lt;input ref={entrada} value={texto} onChange={(e) =&gt; setTexto(e.target.value)} /&gt;
+      &lt;p&gt;Cliente: {texto || "(vazio)"}&lt;/p&gt;
+      &lt;p&gt;Caracteres: {texto.length}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const entrada = useRef(null);
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={() =&gt; { entrada.current.value = ""; }}&gt;Limpar o nome&lt;/button&gt;
+      &lt;Campo entrada={entrada} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Limpar o nome&lt;/button&gt;
+  &lt;div&gt;
+    &lt;input value="Ana"&gt;
+    &lt;p&gt;Cliente: Ana&lt;/p&gt;
+    &lt;p&gt;Caracteres: 3&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Campo({ ref }) {
+  const [texto, setTexto] = useState("Ana");
+
+  React.useImperativeHandle(ref, () =&gt; ({
+    limpar() {
+      setTexto("");
+    }
+  }));
+
+  return (
+    &lt;div&gt;
+      &lt;input value={texto} onChange={(e) =&gt; setTexto(e.target.value)} /&gt;
+      &lt;p&gt;Cliente: {texto || "(vazio)"}&lt;/p&gt;
+      &lt;p&gt;Caracteres: {texto.length}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const campo = useRef(null);
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={() =&gt; campo.current?.limpar()}&gt;Limpar o nome&lt;/button&gt;
+      &lt;Campo ref={campo} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Na prévia, logo depois do clique, o campo aparece vazio e o parágrafo continua "Cliente: Ana". O painel
+mostra o desencontro pelo outro lado: o <code>input</code> com <code>value="Ana"</code> e
+<code>Caracteres: 3</code>, porque ele lê o HTML que o React desenhou — e para o React o valor do campo nunca
+mudou. É o retrato de um componente com dois donos: o navegador achando uma coisa, o estado achando outra, e
+ninguém avisando.</p>
+
+<p>Não é que escrever no DOM seja proibido. Rolar uma lista, como na aula do
+<a href="useLayoutEffect.html">useLayoutEffect</a>, é exatamente isso, e não tem nada de errado porque rolagem
+não é dado. O problema é a escrita que <em>deveria</em> ter passado pelo estado: o valor de um campo é dado do
+componente, e mexer nele por fora quebra a regra de um dado, um dono. Com o handle, o pai pede "limpe" e o
+filho decide como — no caso, mudando o estado, que é o caminho certo.</p>
+
+<h2>5. O que o painel mostra quando o DOM e o estado discordam</h2>
+
+<p>Essa discordância merece um parágrafo, porque ela é a causa de metade dos bugs estranhos de formulário. O
+React desenha o campo a partir do estado: se o estado diz "Ana", o campo mostra "Ana". Quando alguém escreve
+no elemento por fora, o navegador mostra outra coisa até o próximo desenho; nesse instante, os dois lados
+estão errados de um jeito diferente. Qualquer evento que dispare um desenho — um clique em outro botão, uma
+tecla, um temporizador — pode trazer o texto antigo de volta, e o leitor vê o campo "se consertar sozinho".</p>
+
+<pre class="term">valor do campo (DOM): ""
+cliente no estado: Ana</pre>
+
+<p>Um painel assim, com os dois valores lado a lado, é a melhor forma de diagnosticar. Se eles discordam, o
+culpado é sempre uma escrita fora do fluxo: atribuição em <code>.value</code>, <code>innerHTML</code>,
+manipulação com <code>document.querySelector</code>. A cura também é sempre a mesma: trazer a intenção para
+dentro do componente e publicá-la como método no handle.</p>
+
+<p>Há um custo escondido em entregar o elemento cru, além do bug: o contrato vira "o campo todo". No dia em
+que a Ana trocar o <code>&lt;input&gt;</code> por um componente de máscara de telefone, o pai que escrevia
+<code>entrada.current.value</code> quebra, porque o que está lá dentro mudou. Com o handle, o pai chama
+<code>limpar()</code>, o contrato continua valendo, e a troca por dentro não vaza. É a mesma ideia de
+encapsulamento que você já usa ao escolher props em vez de passar o objeto inteiro.</p>
+
+<h2>6. O handle também tem dependências</h2>
+
+<p>Falta a parte que quase ninguém explica: o terceiro argumento do <code>useImperativeHandle</code>. Ele
+funciona como o array do <code>useEffect</code> e responde a uma pergunta simples: quando o handle deve ser
+recriado? Os métodos que você publica são funções criadas naquele desenho, e funções lembram das variáveis do
+desenho em que nasceram. Se o handle é criado uma vez e nunca mais, ele guarda os valores do primeiro
+desenho.</p>
+
+<p>Na caixa, o <code>Campo</code> publica <code>confirmar()</code>, que monta um recado com o texto atual. O
+array está vazio, então o handle nasceu com o texto "Baguete" e ficou com ele. Digite "Croissant" no campo e
+clique em "Confirmar": aparece "Confirmado: Baguete". O estado está certo, o campo está certo, o handle está
+velho.</p>
+
+<div class="tryreact" data-goal="digite:input=Croissant;;clique:#confirmar;;texto:Confirmado: Croissant">
+  <p class="try-task">O handle foi criado uma vez e guardou o texto do primeiro desenho. Acrescente
+  <code>texto</code> ao array de dependências, digite <strong>Croissant</strong> no campo e clique em
+  "Confirmar".</p>
+  <pre class="jsx">function Campo({ ref }) {
+  const [texto, setTexto] = useState("Baguete");
+  const [recado, setRecado] = useState("Nada confirmado");
+
+  React.useImperativeHandle(ref, () =&gt; ({
+    confirmar() {
+      setRecado("Confirmado: " + texto);
+    }
+  }), []);
+
+  return (
+    &lt;div&gt;
+      &lt;input value={texto} onChange={(e) =&gt; setTexto(e.target.value)} /&gt;
+      &lt;p&gt;{recado}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const campo = useRef(null);
+
+  return (
+    &lt;div&gt;
+      &lt;button id="confirmar" onClick={() =&gt; campo.current?.confirmar()}&gt;Confirmar&lt;/button&gt;
+      &lt;Campo ref={campo} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="confirmar"&gt;Confirmar&lt;/button&gt;
+  &lt;div&gt;
+    &lt;input value="Baguete"&gt;
+    &lt;p&gt;Nada confirmado&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Campo({ ref }) {
+  const [texto, setTexto] = useState("Baguete");
+  const [recado, setRecado] = useState("Nada confirmado");
+
+  React.useImperativeHandle(ref, () =&gt; ({
+    confirmar() {
+      setRecado("Confirmado: " + texto);
+    }
+  }), [texto]);
+
+  return (
+    &lt;div&gt;
+      &lt;input value={texto} onChange={(e) =&gt; setTexto(e.target.value)} /&gt;
+      &lt;p&gt;{recado}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const campo = useRef(null);
+
+  return (
+    &lt;div&gt;
+      &lt;button id="confirmar" onClick={() =&gt; campo.current?.confirmar()}&gt;Confirmar&lt;/button&gt;
+      &lt;Campo ref={campo} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Com <code>[texto]</code> no array, cada mudança no campo recria o handle, o método novo enxerga o valor
+novo, e o recado sai certo. Quando não há array nenhum, o handle é recriado em todo desenho — funciona, mas
+entrega um objeto novo a cada render, e qualquer coisa que compare identidade vai ver diferença. Na dúvida,
+liste as dependências: é a mesma disciplina do <code>useEffect</code>, e o motivo é o mesmo, o de não guardar
+uma foto velha do mundo.</p>
+
+<p>Note que o conjunto de verbos não muda quando o handle é recriado: continua sendo <code>{ confirmar
+}</code>. O pai não percebe nada, porque ele nunca guardou uma cópia do objeto — ele lê
+<code>campo.current</code> na hora do clique. Essa indireção é o que faz o mecanismo funcionar sem o pai
+precisar saber que houve recriação.</p>
+
+<h2>7. O que entra e o que não entra no handle</h2>
+
+<p>A pergunta de projeto é: o que publicar? A resposta curta é "o que só o filho sabe fazer". O foco, a
+rolagem interna, o play de um vídeo, o início de uma animação, a validação de um campo com máscara — coisas
+que dependem do elemento ou de um estado que o pai não tem. O que é dado deve ir por prop, porque prop é
+declarativa e o React consegue comparar.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O pai quer…</th><th>Handle</th><th>Prop</th></tr>
+<tr><td>que o cursor vá para o campo</td><td>sim: <code>focar()</code></td><td>não existe prop para foco</td></tr>
+<tr><td>limpar o texto do campo</td><td>sim: <code>limpar()</code></td><td>ou controlar o valor por prop, se o pai já é dono</td></tr>
+<tr><td>saber quantos itens há no carrinho</td><td>não</td><td>sim: o dado desce e sobe por callback</td></tr>
+<tr><td>desenhar o campo com outra cor</td><td>não</td><td>sim: <code>variante="alerta"</code></td></tr>
+<tr><td>rolar a lista interna até o item 3</td><td>sim: <code>irPara(3)</code></td><td>não dá: é posição de DOM</td></tr>
+<tr><td>validar o formulário inteiro</td><td>às vezes: <code>validar()</code></td><td>melhor: o pai junta os valores que já tem</td></tr>
+</table>
+</div>
+
+<p>Se a sua lista de verbos passa de dois ou três, pare e releia: provavelmente o pai está tentando controlar
+o filho por comando em vez de conversar por dados. Um handle com dez métodos é um componente que nunca
+aprendeu a receber props. O sintoma clássico é o método <code>getValor()</code>: se o pai precisa perguntar o
+valor, o valor deve estar no pai desde o começo — é o assunto da aula de
+<a href="elevando-estado.html">elevar o estado</a>.</p>
+
+<p>Outro detalhe prático: o handle pode perfeitamente chamar <code>setState</code>, como o
+<code>limpar()</code> da segunda caixa faz. Ele roda dentro do componente, no mesmo lugar de qualquer outra
+função de evento, e as regras são as mesmas. O que ele não pode é ser chamado durante o desenho de outro
+componente: chamadas imperativas acontecem em eventos, efeitos ou temporizadores, nunca no corpo do render.</p>
+
+<h2>8. Os tropeços</h2>
+
+<p>O primeiro tropeço é esquecer que <code>.current</code> pode ser <code>null</code>. No primeiro desenho, o
+handle ainda não existe; se o seu evento disparar antes disso — um efeito que roda na montagem, por exemplo —
+a chamada quebra. O <code>?.</code> resolve a chamada, e a mensagem abaixo é o que aparece sem ele:</p>
+
+<pre class="term">TypeError: campo.current.focar is not a function</pre>
+
+<p>Essa mensagem tem duas leituras. Se <code>campo.current</code> é <code>null</code>, o filho não montou ou
+não recebeu a <code>ref</code>. Se é um objeto mas não tem <code>focar</code>, o nome do método no handle é
+outro — ou o hook não foi chamado. Vale conferir a assinatura do componente: com <code>forwardRef</code> o
+segundo parâmetro é a <code>ref</code>; sem ele, no React 19, a <code>ref</code> chega dentro das props e
+precisa ser desestruturada com o nome exato.</p>
+
+<p>O segundo tropeço é usar <code>useImperativeHandle</code> para devolver o próprio elemento:
+<code>useImperativeHandle(ref, () =&gt; entrada.current)</code>. Funciona e não resolve nada — é o elemento
+cru com uma camada extra de cerimônia. O terceiro é publicar o handle inteiro sem necessidade, coisa de quem
+veio de programação orientada a objetos e quer um <code>this</code>. Aqui, menos verbos é melhor.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sintoma</th><th>Causa</th><th>Conserto</th></tr>
+<tr><td>o clique não faz nada</td><td>o filho não registrou o handle</td><td>chamar <code>React.useImperativeHandle(ref, …)</code> com a <code>ref</code> recebida</td></tr>
+<tr><td>"… is not a function"</td><td><code>.current</code> nulo ou método com outro nome</td><td><code>?.</code> e conferir o nome no handle</td></tr>
+<tr><td>o método age com o valor antigo</td><td>array de dependências vazio</td><td>listar o estado que o método lê</td></tr>
+<tr><td>o campo esvazia e o texto não muda</td><td>escrita direta no DOM</td><td>publicar <code>limpar()</code> e mudar o estado</td></tr>
+</table>
+</div>
+
+<p>Um último detalhe de leitura do painel: quando um componente quebra dentro de um evento, o React de
+produção não desenha uma tela de erro com a mensagem — ele para de atualizar aquele pedaço. Se um clique
+"não faz nada" e o console não mostra nada no painel, o caminho é abrir o console do navegador com
+<code>F12</code>, porque o erro foi para lá. Aqui na caixa, os erros de desenho aparecem como
+<code>Erro:</code> no painel; os de evento, não.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o botão "escrever avaliação"</h3>
+<p>Na página do produto, o botão "Escrever avaliação" abre o formulário e põe o cursor no campo de texto. O
+formulário é um componente à parte, com o próprio estado. O handle publica <code>abrirEFocar()</code>, que
+faz as duas coisas na ordem certa: muda o estado que mostra o campo e, num <code>useEffect</code>, chama
+<code>focus()</code> depois que o campo existe. O pai nem sabe que houve uma etapa no meio.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o carrossel da vitrine</h3>
+<p>O carrossel de pães é um componente que guarda o índice atual. As setas ficam fora, na barra da seção, e
+chamam <code>proximo()</code> e <code>anterior()</code> pelo handle. O estado continua dentro do carrossel,
+onde pertence; o pai só empurra. Se amanhã o carrossel ganhar autoplay, o handle pode ganhar
+<code>pausar()</code> sem quebrar ninguém, porque o contrato só cresce.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: a busca que limpa tudo</h3>
+<p>O campo de busca da padaria tem um "x" que aparece quando há texto. O botão está fora do componente do
+campo, na barra de filtros. O campo publica <code>limpar()</code>, que zera o texto e avisa o pai pelo
+<code>onBuscar("")</code> — os dois caminhos convivem: prop para o dado que sobe, handle para a ação que só o
+filho sabe executar. Quando os dois são usados no mesmo componente, é sinal de que o desenho está são.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Para que serve o <code>useImperativeHandle</code>?</p>
+<label><input type="radio" name="q1"> para guardar valores entre desenhos, no lugar do <code>useState</code></label>
+<label><input type="radio" name="q1"> para o filho publicar numa <code>ref</code> os métodos que o pai pode chamar</label>
+<label><input type="radio" name="q1"> para impedir que o pai veja o componente</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que o código desta aula escreve <code>React.useImperativeHandle</code>?</p>
+<label><input type="radio" name="q2"> porque o hook só funciona com esse prefixo</label>
+<label><input type="radio" name="q2"> porque é a forma nova, que substitui o <code>forwardRef</code></label>
+<label><input type="radio" name="q2"> porque o motor da caixa não põe esse hook no escopo; num projeto, ele vem de <code>import</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que acontece se o array de dependências do handle ficar vazio?</p>
+<label><input type="radio" name="q3"> os métodos guardam os valores do primeiro desenho</label>
+<label><input type="radio" name="q3"> o handle deixa de existir</label>
+<label><input type="radio" name="q3"> o React reclama no console</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o verbo que faltava</h2>
+<p>Complete o handle para que o pai consiga pôr o cursor no campo, sabendo que <code>entrada</code> é a
+<code>ref</code> do <code>input</code>:</p>
+<div class="ex-code">React.useImperativeHandle(ref, () =&gt; ({<br>
+&nbsp;&nbsp;focar() {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;entrada.current.<input aria-label="resposta 1" data-answer="focus" placeholder="...">();<br>
+&nbsp;&nbsp;}<br>
+}));</div>
+<p class="ex-dica">Dica: é o método do próprio elemento do DOM que coloca o cursor nele. Não é
+<code>click()</code>, e não é do React — é do navegador.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O <code>useImperativeHandle</code> é a porta oficial entre o React declarativo e os comandos do navegador.
+O pai cria uma <code>ref</code>, o filho a recebe como prop e registra nela um objeto com os métodos que quer
+publicar; o pai chama esses métodos quando precisa. O elemento do DOM continua lá dentro, escondido, e o pai
+nunca recebe <code>value</code>, <code>style</code> ou <code>remove()</code>. É a diferença entre entregar a
+chave da casa e entregar o controle remoto do portão.</p>
+
+<p>No React 19 a <code>ref</code> chega como prop comum, então não há <code>forwardRef</code> no caminho.
+Aqui nas caixas, o hook aparece como <code>React.useImperativeHandle</code> porque não está no escopo
+automático; num projeto, ele vem de <code>import</code> e o código é idêntico. Os métodos publicados podem
+ler estado e chamar <code>setState</code> — é isso que faz o handle ser a solução certa para limpar um campo
+sem criar dois donos para o mesmo dado.</p>
+
+<p>E o array de dependências não é enfeite: ele decide quando o handle é recriado, e um handle velho age com
+valores velhos. Liste o que os métodos leem. Se você se pegar querendo publicar <code>getValor()</code> ou
+uma dúzia de métodos, é sinal de que o dado deveria subir por prop ou por callback. Guarde o handle para o
+que é comando: foco, rolagem, reprodução, validação pontual. O resto é conversa por dados, que é onde o React
+brilha.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Handle é a API que o filho publica numa <code>ref</code>, não o elemento do DOM.</li>
+<li><code>React.useImperativeHandle(ref, () =&gt; ({ focar() { … } }), [deps])</code>.</li>
+<li>No React 19 a <code>ref</code> é prop: <code>function Campo({ ref })</code>; <code>forwardRef</code> é código antigo.</li>
+<li>O pai chama <code>campo.current?.focar()</code>; antes da montagem, o <code>.current</code> é <code>null</code>.</li>
+<li>Métodos do handle podem chamar <code>setState</code>: é assim que o estado continua sendo um só.</li>
+<li>Escrever em <code>.value</code> por fora esvazia a tela e deixa o estado para trás.</li>
+<li>Array de dependências vazio congela os valores do primeiro desenho.</li>
+<li>Publique o que só o filho sabe fazer; dado vai por prop.</li>
+<li>Handle com muitos verbos é sintoma de componente que não aprendeu a receber props.</li>
+<li>Chamada imperativa acontece em evento ou efeito, nunca no corpo do render.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

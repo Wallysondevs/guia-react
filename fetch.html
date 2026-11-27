@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O fetch | Guia React</title>
+<meta name="description" content="Como o fetch funciona de verdade: a Promise, o objeto Response, o corpo lido com json(), a diferença entre erro de rede e resposta 404, e o que fazer quando o corpo não é JSON.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O <span class="hl">fetch</span></h1>
+
+<p class="intro">A Ana ficou surpresa ao descobrir que o <code>fetch</code> não devolve os pães: devolve uma
+espécie de senha de balcão. Ela pede, recebe um papel dizendo "seu pedido está sendo preparado" e só
+depois de um tempo chega a bandeja — e a bandeja ainda vem embrulhada, com a etiqueta da entrega por
+fora. Nesta aula ela vai abrir esse embrulho: entender o que a função devolve, o que vem dentro da
+resposta, por que um 404 não é o mesmo que ficar sem internet, e por que tentar ler o corpo duas vezes
+dá erro.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que o <code>fetch</code> devolve e o que ele <em>não</em> devolve.</li>
+  <li>O objeto <code>Response</code>: <code>ok</code>, <code>status</code>, <code>headers</code>.</li>
+  <li>Por que o corpo exige um segundo passo, com <code>json()</code>.</li>
+  <li>Erro de rede x resposta 404: quem rejeita e quem não rejeita.</li>
+  <li>O corpo se lê uma vez só, e o que fazer com isso.</li>
+  <li>A URL: caminho relativo, domínio e parâmetros de busca.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a senha do balcão</h2>
+
+<p>Na padaria, quando o pedido é grande, a Ana não entrega na hora: dá uma senha e chama quando estiver
+pronto. O <code>fetch</code> funciona assim. Você chama, ele responde imediatamente com uma promessa —
+"vou te avisar quando tiver notícia" — e segue a vida. Quem precisa do resultado espera essa promessa se
+cumprir.</p>
+
+<p>Só que a notícia que chega primeiro não é o pão: é a confirmação de que o servidor respondeu. Vem com
+número de status, cabeçalhos e a promessa do corpo. O pão de verdade, a lista de produtos, o preço — isso é
+o corpo, e ele chega num segundo momento, que você precisa pedir explicitamente. Duas etapas, dois
+<code>await</code>. Quem entende isso para de brigar com o <code>fetch</code>.</p>
+
+<p>A aula de Buscando Dados já mostrou o desenho completo: estado, efeito e <code>.then</code>. Aqui o assunto é a
+ferramenta em si — o que ela entrega em cada etapa e como não se enganar com o que parece ter dado certo.</p>
+
+<h2>2. O que a função devolve</h2>
+
+<p><code>fetch</code> recebe uma URL e, opcionalmente, um objeto de opções. Devolve sempre uma Promise. Não
+devolve lista, não devolve texto, não devolve objeto com os dados: devolve a promessa de uma resposta.</p>
+
+<pre class="file" data-file="console">const resposta = await fetch("https://loja.test/api/paes");</pre>
+
+<p>Se você não usar <code>await</code>, o que fica na variável é a promessa, e não a resposta. É o erro
+número um de quem começa: <code>const resposta = fetch(url)</code>, seguido de uma tela que mostra
+<code>undefined</code> ou quebra ao tentar ler uma propriedade. A promessa é um objeto que representa "vai
+chegar"; ela não tem <code>status</code> nem <code>json()</code>.</p>
+
+<p>A URL pode ser absoluta ou relativa. Absoluta, como <code>https://loja.test/api/paes</code>, aponta
+para outro servidor e está sujeita a CORS — o navegador só entrega a resposta se aquele servidor autorizar
+o seu site. Relativa, como <code>/api/paes</code>, aponta para o mesmo servidor que serviu a página, e é o
+caso mais comum em projeto real: o front e a API no mesmo domínio.</p>
+
+<dl class="anatomy">
+<dt>pedido</dt>
+<dd>A chamada <code>fetch(url)</code>. Sai na hora e volta na hora, com uma promessa na mão.</dd>
+<dt>Promise</dt>
+<dd>O objeto que representa "ainda vai chegar". Não tem dados dentro; tem a promessa de um resultado.</dd>
+<dt>Response</dt>
+<dd>O que chega quando a promessa se cumpre: status, cabeçalhos e o direito de ler o corpo.</dd>
+<dt>corpo</dt>
+<dd>O conteúdo de verdade, que viaja em pedaços e é lido uma única vez, com <code>json()</code> ou
+<code>text()</code>.</dd>
+<dt><code>ok</code></dt>
+<dd>Atalho booleano para "o status está entre 200 e 299". É ele que separa sucesso de resposta de
+erro.</dd>
+<dt>JSON</dt>
+<dd>O formato de texto que vira objeto quando lido: <code>{ "titulo": "Pão de queijo" }</code>.</dd>
+</dl>
+
+<h2>3. A resposta não é o dado</h2>
+
+<p>Quando a promessa se cumpre, você recebe um objeto <code>Response</code>. Ele descreve a entrega:
+status, cabeçalhos, endereço final. O conteúdo — a lista de pães, o preço, a mensagem de erro — está no
+<em>corpo</em>, e o corpo é um fluxo de bytes que precisa ser lido. No caso mais comum, lido e convertido
+de JSON para objeto com <code>json()</code>.</p>
+
+<p>Na caixa abaixo, o pedido é feito do jeito certo, mas o código procura o título dentro da resposta. O
+resultado é uma linha com "Produto:" e nada depois. A missão é abrir o embrulho.</p>
+
+<div class="tryreact" data-goal="texto:Produto: Pão de queijo">
+  <p class="try-task">O título não está na resposta: está no corpo. Use <code>resposta.json()</code> e
+  leia o campo <code>titulo</code> do objeto que ela devolve.</p>
+  <pre class="jsx">function buscarPao() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; {
+      ok({
+        ok: true,
+        status: 200,
+        json: () =&gt; Promise.resolve({ titulo: "Pão de queijo", preco: 6 })
+      });
+    }, 10);
+  });
+}
+
+function App() {
+  const [titulo, setTitulo] = useState("(nada)");
+
+  useEffect(() =&gt; {
+    buscarPao().then((resposta) =&gt; {
+      setTitulo(resposta.titulo);
+    });
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Produto: {titulo}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Produto:&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscarPao() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; {
+      ok({
+        ok: true,
+        status: 200,
+        json: () =&gt; Promise.resolve({ titulo: "Pão de queijo", preco: 6 })
+      });
+    }, 10);
+  });
+}
+
+function App() {
+  const [titulo, setTitulo] = useState("(nada)");
+
+  useEffect(() =&gt; {
+    buscarPao()
+      .then((resposta) =&gt; resposta.json())
+      .then((dados) =&gt; setTitulo(dados.titulo));
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Produto: {titulo}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Repare que a resposta nem tem campo <code>titulo</code>: ela tem <code>ok</code>, <code>status</code> e
+<code>json</code>. Procurar dado dentro da resposta é procurar pão dentro da senha. O dado vem do
+<code>json()</code>, que também é assíncrono — por isso o segundo <code>.then</code>, e por isso dois
+<code>await</code> quando se usa <code>await</code>.</p>
+
+<p>O <code>json()</code> faz duas coisas de uma vez: lê todos os bytes do corpo e transforma o texto em
+objeto JavaScript. Se o corpo não for JSON, ele não devolve texto: ele rejeita com
+<code>SyntaxError</code>. É um erro diferente dos outros, e vale reconhecer pelo nome.</p>
+
+<h2>4. O que vem na resposta</h2>
+
+<p>O objeto <code>Response</code> tem poucos campos e todos úteis. Esta é a tabela para consultar quando
+bater dúvida sobre o que dá para perguntar antes de ler o corpo.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Campo</th><th>Exemplo</th><th>Para que serve</th></tr>
+<tr><td><code>ok</code></td><td><code>true</code> ou <code>false</code></td><td>dizer se o status está entre 200 e 299, sem decorar números</td></tr>
+<tr><td><code>status</code></td><td><code>200</code>, <code>404</code>, <code>500</code></td><td>mostrar o código e tratar casos específicos</td></tr>
+<tr><td><code>statusText</code></td><td><code>"Not Found"</code></td><td>texto do servidor; bom para log, ruim para a tela</td></tr>
+<tr><td><code>headers.get()</code></td><td><code>"application/json"</code></td><td>conferir o tipo antes de escolher como ler</td></tr>
+<tr><td><code>json()</code></td><td><code>{ titulo: "Pão" }</code></td><td>ler o corpo como JSON, em uma Promise</td></tr>
+<tr><td><code>text()</code></td><td><code>"&lt;p&gt;Oi&lt;/p&gt;"</code></td><td>ler o corpo cru, quando não é JSON</td></tr>
+<tr><td><code>url</code></td><td>o endereço final</td><td>descobrir se houve redirecionamento</td></tr>
+</table>
+</div>
+
+<p>Dois detalhes de quem já apanhou. Primeiro: <code>headers</code> não é um objeto comum — é um
+<code>Headers</code>, e se lê com <code>.get("content-type")</code>, não com
+<code>headers["content-type"]</code>. Segundo: <code>status</code> é número, então comparar com
+<code>"200"</code> entre aspas nunca dá certo. O hábito saudável é usar <code>ok</code> para decidir e
+guardar <code>status</code> só para exibir ou registrar.</p>
+
+<h2>5. Erro de rede x resposta de erro</h2>
+
+<p>Aqui está a confusão que faz mais gente perder uma tarde. O <code>fetch</code> só considera fracasso
+quando o pedido não chegou a lugar nenhum: sem internet, domínio que não existe, servidor fora do ar,
+CORS bloqueado. Nesses casos, a promessa é rejeitada e o <code>.catch</code> roda.</p>
+
+<p>Se o servidor respondeu — mesmo respondendo "não encontrado" ou "erro interno" —, o
+<code>fetch</code> considera sucesso: a promessa se cumpre e o <code>.then</code> roda normalmente. Um
+<code>404</code> não cai no <code>.catch</code>. Quem decide se a resposta serve é você, olhando
+<code>ok</code>.</p>
+
+<div class="tryreact" data-goal="texto:Pão não encontrado">
+  <p class="try-task">O servidor respondeu 404 com a mensagem no corpo. O código lê o corpo e mostra
+  <code>dados.titulo</code>, que não existe nesse caso. Confira <code>resposta.ok</code> e mostre
+  <code>dados.erro</code> quando a resposta não for boa.</p>
+  <pre class="jsx">function buscarPao(nome) {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; {
+      if (nome === "brioche") {
+        ok({
+          ok: false,
+          status: 404,
+          json: () =&gt; Promise.resolve({ erro: "Pão não encontrado" })
+        });
+      } else {
+        ok({
+          ok: true,
+          status: 200,
+          json: () =&gt; Promise.resolve({ titulo: "Pão de queijo" })
+        });
+      }
+    }, 10);
+  });
+}
+
+function App() {
+  const [mensagem, setMensagem] = useState("Buscando...");
+
+  useEffect(() =&gt; {
+    buscarPao("brioche")
+      .then((resposta) =&gt; resposta.json())
+      .then((dados) =&gt; setMensagem(dados.titulo));
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Busca&lt;/h1&gt;
+      &lt;p&gt;{mensagem}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Busca&lt;/h1&gt;
+  &lt;p&gt;&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscarPao(nome) {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; {
+      if (nome === "brioche") {
+        ok({
+          ok: false,
+          status: 404,
+          json: () =&gt; Promise.resolve({ erro: "Pão não encontrado" })
+        });
+      } else {
+        ok({
+          ok: true,
+          status: 200,
+          json: () =&gt; Promise.resolve({ titulo: "Pão de queijo" })
+        });
+      }
+    }, 10);
+  });
+}
+
+function App() {
+  const [mensagem, setMensagem] = useState("Buscando...");
+
+  useEffect(() =&gt; {
+    buscarPao("brioche")
+      .then((resposta) =&gt; {
+        return resposta.json().then((dados) =&gt; {
+          setMensagem(resposta.ok ? dados.titulo : dados.erro);
+        });
+      });
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Busca&lt;/h1&gt;
+      &lt;p&gt;{mensagem}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A API de resposta de erro é comum e é uma boa notícia: mesmo quando o status é 404 ou 400, o servidor
+costuma mandar um corpo explicando o motivo. Ler esse corpo é o que permite dizer "Pão não encontrado" em
+vez de um genérico "deu erro". O <code>ok</code> decide o caminho; o corpo dá o texto.</p>
+
+<p>Quando a resposta é boa, <code>ok</code> é <code>true</code> e o corpo tem os dados. Quando é ruim,
+<code>ok</code> é <code>false</code> e o corpo tem a explicação. Nos dois casos o <code>json()</code>
+funciona — o que muda é o campo que você vai usar. E, em ambos, o <code>.catch</code> continua reservado
+para o que nem chegou.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que aconteceu</th><th>O que o <code>fetch</code> faz</th><th>Como detectar</th></tr>
+<tr><td>internet fora, domínio errado, servidor morto</td><td>rejeita a promessa</td><td>o <code>.catch</code> roda, com <code>TypeError: Failed to fetch</code></td></tr>
+<tr><td>CORS bloqueado pelo navegador</td><td>rejeita a promessa</td><td><code>TypeError</code> no <code>.catch</code>, com aviso de CORS no console</td></tr>
+<tr><td>resposta 404 ou 500</td><td>cumpre a promessa</td><td><code>resposta.ok === false</code>, e o corpo costuma explicar</td></tr>
+<tr><td>corpo que não é JSON</td><td>cumpre, e o <code>json()</code> rejeita</td><td><code>SyntaxError</code> no <code>.catch</code> do segundo passo</td></tr>
+<tr><td>pedido cancelado com <code>signal</code></td><td>rejeita a promessa</td><td><code>e.name === "AbortError"</code></td></tr>
+</table>
+</div>
+
+<p>Vale reparar na primeira e na terceira linha: o mesmo <code>.catch</code> que pega "sem internet" não
+pega "404". São caminhos diferentes, e tratar os dois como se fossem um só é o que produz telas dizendo
+"verifique sua conexão" quando o problema era o nome do pão no endereço.</p>
+
+<h2>6. O corpo se lê uma vez só</h2>
+
+<p>O corpo de uma resposta é um fluxo: sai do servidor em pedaços e é consumido enquanto é lido. Por isso
+ele só pode ser lido uma vez. Chamar <code>json()</code> duas vezes na mesma resposta não devolve os dados
+de novo: a segunda chamada rejeita com <code>TypeError</code>, dizendo que o fluxo já foi lido.</p>
+
+<div class="tryreact" data-goal="texto:Loja: Padaria da Ana;;texto:itens: 2">
+  <p class="try-task">O código lê o corpo duas vezes: uma para a loja e outra para os itens. Leia uma vez
+  só, guarde o resultado numa variável e mostre as duas informações.</p>
+  <pre class="jsx">function buscarCardapio() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; {
+      let lido = false;
+      ok({
+        ok: true,
+        status: 200,
+        json: () =&gt; {
+          if (lido) {
+            return Promise.reject(
+              new TypeError("Failed to execute 'json' on 'Response': body stream already read")
+            );
+          }
+          lido = true;
+          return Promise.resolve({ loja: "Padaria da Ana", itens: ["pão", "croissant"] });
+        }
+      });
+    }, 10);
+  });
+}
+
+function App() {
+  const [linha, setLinha] = useState("Carregando...");
+
+  useEffect(() =&gt; {
+    buscarCardapio().then((resposta) =&gt; {
+      resposta.json().then((dados) =&gt; {
+        setLinha("Loja: " + dados.loja);
+      });
+      resposta.json().then((dados) =&gt; {
+        setLinha("itens: " + dados.itens.length);
+      });
+    });
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Cardápio&lt;/h1&gt;
+      &lt;p&gt;{linha}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Cardápio&lt;/h1&gt;
+  &lt;p&gt;Loja: Padaria da Ana&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscarCardapio() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; {
+      let lido = false;
+      ok({
+        ok: true,
+        status: 200,
+        json: () =&gt; {
+          if (lido) {
+            return Promise.reject(
+              new TypeError("Failed to execute 'json' on 'Response': body stream already read")
+            );
+          }
+          lido = true;
+          return Promise.resolve({ loja: "Padaria da Ana", itens: ["pão", "croissant"] });
+        }
+      });
+    }, 10);
+  });
+}
+
+function App() {
+  const [linha, setLinha] = useState("Carregando...");
+
+  useEffect(() =&gt; {
+    buscarCardapio().then((resposta) =&gt; {
+      resposta.json().then((dados) =&gt; {
+        setLinha("Loja: " + dados.loja + " — itens: " + dados.itens.length);
+      });
+    });
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Cardápio&lt;/h1&gt;
+      &lt;p&gt;{linha}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No console do navegador, o sintoma é este:</p>
+
+<pre class="term">Uncaught (in promise) TypeError: Failed to execute 'json' on 'Response': body stream already read</pre>
+
+<p>A correção é sempre a mesma: ler uma vez, guardar numa variável e usar quantas vezes precisar. Quando
+o corpo tem várias informações e você quer duas, o caminho é ler o objeto inteiro e depois acessar
+<code>dados.loja</code> e <code>dados.itens</code>. Não se lê o fluxo duas vezes; lê-se o objeto.</p>
+
+<p>Existe um irmão desse erro, e ele confunde porque fala de JSON: quando o servidor devolve HTML — uma
+página de erro, por exemplo — e você chama <code>json()</code>, a conversão falha. A mensagem mostra o
+começo do corpo para você perceber o engano:</p>
+
+<pre class="term">Uncaught (in promise) SyntaxError: Unexpected token '&lt;', "&lt;!doctype "... is not valid JSON</pre>
+
+<p>A tradução é direta: o corpo começa com <code>&lt;!doctype</code>, então é HTML, não JSON. Nesse caso,
+vale conferir <code>headers.get("content-type")</code> ou simplesmente usar <code>text()</code> para ver o
+que veio antes de tentar converter.</p>
+
+<h2>7. A URL e os parâmetros de busca</h2>
+
+<p>Um <code>fetch</code> de GET carrega os dados na própria URL. O endereço é uma string, e o que vem
+depois da interrogação são os parâmetros: <code>/api/paes?busca=queijo&amp;limite=10</code>. Cada par é
+<code>nome=valor</code>, separados por <code>&amp;</code>, e o valor precisa ir codificado — espaço vira
+<code>%20</code>, acento vira código, <code>&amp;</code> vira <code>%26</code>.</p>
+
+<p>Fazer isso na mão com concatenação funciona até o dia em que a Ana digita "pão &amp; queijo" e a URL se
+quebra em dois parâmetros. O jeito seguro é o <code>URLSearchParams</code>, que monta a string codificada
+para você:</p>
+
+<pre class="file" data-file="busca.js">const parametros = new URLSearchParams({ busca: "pão &amp; queijo", limite: 10 });
+const resposta = await fetch("/api/paes?" + parametros);
+// /api/paes?busca=p%C3%A3o+%26+queijo&amp;limite=10</pre>
+
+<p>Duas observações práticas. O caminho relativo <code>/api/paes</code> começa com barra e aponta para a
+raiz do mesmo servidor; sem a barra, o caminho é relativo à página atual, o que gera endereços errados em
+páginas mais profundas. E a URL que você escreve não é necessariamente a que responde: redirecionamentos
+podem levar a outro endereço, e o campo <code>url</code> da resposta mostra o endereço final.</p>
+
+<h2>8. O segundo argumento e o que vem depois</h2>
+
+<p>Até aqui, todos os pedidos foram GET. O segundo argumento do <code>fetch</code> é um objeto de opções, e
+é ele que muda o método, manda cabeçalhos e carrega o corpo:</p>
+
+<pre class="file" data-file="requisicao.js">const resposta = await fetch("https://loja.test/api/pedidos", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ pao: "brioche", quantidade: 2 })
+});</pre>
+
+<p>São três peças que andam juntas: o método, o cabeçalho avisando que o corpo é JSON e o corpo de
+verdade, sempre como texto — JSON.stringify. Mandar objeto sem transformar em texto faz o servidor receber
+"<code>[object Object]</code>" e recusar. POST tem a sua própria aula mais adiante, com o que a API
+responde e como tratar erro de validação.</p>
+
+<p>Duas opções úteis que não envolvem método: <code>signal</code>, que permite cancelar o pedido (duas
+aulas à frente), e <code>credentials</code>, que decide se os cookies vão junto. Em projeto com login, sem
+<code>credentials: "include"</code> o servidor não reconhece quem está pedindo. E vale saber que o
+<code>fetch</code> não tem timeout: se o servidor demorar para sempre, o pedido fica pendurado. Quem
+resolve isso é o <code>AbortSignal.timeout</code>, também na aula de cancelamento.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a lista que veio como objeto estranho</h3>
+<p>A Ana guardou a resposta no estado e a tela virou um texto sem sentido, cheio de campos internos. Foi o
+esquecimento do <code>json()</code>: o que estava guardado era o objeto <code>Response</code>, não a lista.
+O conserto é o segundo passo — <code>resposta.json()</code> — e a lição é que guardar a resposta inteira no
+estado é sempre sinal de que faltou abrir o embrulho.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o catch que nunca roda</h3>
+<p>Ela escreveu um <code>.catch</code> para tratar "pão não encontrado" e o <code>catch</code> nunca era
+chamado. O servidor respondia 404, e 404 é resposta, não falha de rede: a promessa se cumpre e o
+<code>.then</code> roda. A correção foi olhar <code>resposta.ok</code> e tratar o caso dentro do próprio
+fluxo. O <code>.catch</code> ficou para o que ele faz de verdade — internet fora, domínio errado, pedido
+cancelado.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: a página de erro do servidor dentro do json()</h3>
+<p>Em produção, o pedido a uma rota errada devolveu a página HTML de erro, e o <code>json()</code> estourou
+com <code>SyntaxError</code>. O código tratava o erro como se o servidor tivesse caído, mas o servidor
+estava lá, respondendo 404 em HTML. O hábito que resolve: conferir <code>resposta.status</code> antes de
+converter e, quando o <code>content-type</code> não for JSON, ler com <code>text()</code> para ver o que
+realmente veio.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. O que o <code>fetch(url)</code> devolve?</p>
+<label><input type="radio" name="q1"> a lista de dados já convertida</label>
+<label><input type="radio" name="q1"> o texto puro da resposta</label>
+<label><input type="radio" name="q1"> uma Promise que se cumpre com um objeto <code>Response</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. O que acontece quando o servidor responde 404?</p>
+<label><input type="radio" name="q2"> a promessa se cumpre, com <code>ok</code> valendo <code>false</code></label>
+<label><input type="radio" name="q2"> a promessa é rejeitada e o <code>.catch</code> roda</label>
+<label><input type="radio" name="q2"> o <code>fetch</code> lança um erro de sintaxe</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. Para que serve o <code>resposta.json()</code>?</p>
+<label><input type="radio" name="q3"> para conferir se a resposta está ok</label>
+<label><input type="radio" name="q3"> para ler o corpo e transformá-lo em objeto</label>
+<label><input type="radio" name="q3"> para mandar dados ao servidor</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o segundo passo</h2>
+<p>Complete o código que lê o corpo da resposta e guarda o título no estado:</p>
+<div class="ex-code">buscarPao()
+  .then((resposta) =&gt; resposta.<input aria-label="resposta 1" data-answer="json()" placeholder="...">)
+  .then((dados) =&gt; setTitulo(dados.titulo));</div>
+<p class="ex-dica">Dica: é o método que lê o corpo e converte de JSON para objeto, com os parênteses.
+Ele devolve uma Promise — por isso o <code>.then</code> seguinte.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p><code>fetch(url)</code> devolve uma Promise que se cumpre com um objeto <code>Response</code>. Esse
+objeto descreve a entrega — <code>ok</code>, <code>status</code>, <code>headers</code> — e o conteúdo está
+no corpo, que precisa ser lido com <code>json()</code> (ou <code>text()</code>), num segundo passo
+assíncrono. Dois passos, dois <code>await</code>: sem o segundo, o que fica na variável é a resposta, não o
+dado.</p>
+
+<p>O <code>fetch</code> só rejeita quando o pedido não chega a lugar nenhum: rede, DNS, CORS. Resposta 404
+ou 500 é sucesso do ponto de vista dele, e quem separa o joio do trigo é <code>resposta.ok</code>. Corpo
+que não é JSON faz o <code>json()</code> rejeitar com <code>SyntaxError</code> — nesse caso, ler com
+<code>text()</code> mostra o que veio de verdade.</p>
+
+<p>E o corpo é um fluxo: lê-se uma vez. Ler duas vezes rejeita com <code>TypeError</code>; ler uma vez,
+guardar o objeto e usar os campos é o jeito certo. A URL também merece cuidado: parâmetro com espaço ou
+acento precisa de codificação, e o <code>URLSearchParams</code> faz isso por você.</p>
+
+<p>Na próxima aula, a sintaxe que deixa tudo isso mais legível: <code>async</code> e <code>await</code>,
+com <code>try</code>, <code>catch</code> e a diferença entre esperar em série e esperar em paralelo.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>fetch</code> devolve Promise, não dados.</li>
+<li>A resposta se chama <code>Response</code>; o dado está no corpo.</li>
+<li><code>json()</code> é o segundo passo, e também é assíncrono.</li>
+<li><code>ok</code> decide sucesso; <code>status</code> é para exibir.</li>
+<li>404 não rejeita; só falha de rede rejeita.</li>
+<li>O corpo se lê uma vez só: <code>TypeError</code> na segunda.</li>
+<li>Corpo em HTML no <code>json()</code> dá <code>SyntaxError</code>.</li>
+<li>Parâmetro de URL vai codificado: use <code>URLSearchParams</code>.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O useMemo | Guia React</title>
+<meta name="description" content="O useMemo no React 19: guardar o resultado de um cálculo entre renders, o array de dependências, a identidade de arrays e objetos, e quando não vale a pena memoizar.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O <span class="hl">useMemo</span></h1>
+<p class="intro">A lista de pães da Ana cresceu: são 240 itens, cada um com nome, preço e tipo. O campo de
+busca filtra essa lista a cada tecla, e no notebook velho do balcão a digitação começou a engasgar — a
+letra aparece com atraso, o cursor pula. O culpado não é o filtro: é o fato de ele rodar de novo em
+<em>todo</em> desenho da tela, inclusive quando a Ana só troca o aviso do dia. Nesta aula ela conhece o
+<code>useMemo</code>, a ferramenta que guarda o resultado de um cálculo entre um desenho e outro — e
+aprende também quando ele é perda de tempo.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que um cálculo no corpo do componente roda em todo render.</li>
+  <li>Como o <code>useMemo</code> guarda o resultado entre renders.</li>
+  <li>O que o array de dependências faz e quando o cache é jogado fora.</li>
+  <li>Como a identidade de um array muda o comportamento de um filho com <code>memo</code>.</li>
+  <li>Como reconhecer um cálculo caro — e um barato disfarçado.</li>
+  <li>Quando <strong>não</strong> usar <code>useMemo</code>.</li>
+  <li>As regras: função pura, dependências completas e nada de efeito colateral.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a busca que engasga</h2>
+
+<p>O componente da Ana é simples: um campo de busca, um aviso do dia e a lista filtrada. A cada tecla, o
+React chama a função do componente, ela filtra os 240 pães e devolve o JSX. Enquanto a lista era de seis
+pães, ninguém notou. Com 240, cada tecla custa uma varredura completa — e a Ana ainda tem um segundo
+estado, o aviso do dia, que também provoca renders.</p>
+
+<p>O sintoma que a fez procurar ajuda foi outro: quando ela clicava em "trocar o aviso", a lista piscava.
+Nada na lista tinha mudado. O que aconteceu é que o componente inteiro rodou de novo e o filtro foi
+refeito do zero, à toa, porque o React não tem como saber que aquele cálculo depende só da busca.</p>
+
+<p>A ideia do <code>useMemo</code> é essa: dizer ao React "este resultado só muda quando estas coisas
+mudarem; se elas estão iguais, reaproveite o resultado anterior". Não é mágica nem cache automático; é
+você apontando a dependência e o React guardando o valor entre um render e outro.</p>
+
+<h2>2. O cálculo que roda em todo render</h2>
+
+<p>Todo código que está no corpo do componente roda a cada render. Isso não é detalhe: é o modelo. O React
+chama a função para saber o que desenhar, e a função precisa ser capaz de produzir o desenho do zero,
+sempre. Um filtro, uma soma, uma ordenação — tudo isso acontece de novo, mesmo que os dados sejam os
+mesmos.</p>
+
+<pre class="file" data-file="ListaDePaes.jsx">function ListaDePaes() {
+  const [busca, setBusca] = useState("");
+  const [aviso, setAviso] = useState("Padaria aberta");
+
+  const lista = PAES.filter((pao) =&gt;
+    pao.nome.toLowerCase().includes(busca.toLowerCase())
+  );
+
+  return (
+    &lt;div&gt;
+      &lt;input value={busca} onChange={(e) =&gt; setBusca(e.target.value)} /&gt;
+      &lt;button onClick={() =&gt; setAviso("Forno quente")}&gt;Trocar aviso&lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;p&gt;{lista.length} pães encontrados&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Quando a pessoa digita, faz sentido filtrar: a busca mudou, o resultado muda. Quando ela troca o aviso,
+o filtro roda igual — e o resultado é exatamente o mesmo da última vez. Esse é o desperdício que o
+<code>useMemo</code> corta.</p>
+
+<p>Antes de seguir, uma pergunta obrigatória: esse cálculo é caro? Filtrar 240 itens com
+<code>includes</code> leva microssegundos num notebook moderno; num celular antigo, talvez um milissegundo.
+Ninguém sente. O engasgo que a Ana viu vinha mais do tamanho da lista desenhada do que do filtro. Mas o
+raciocínio vale para qualquer conta — e a aula precisa de um exemplo visível, então vamos contar quantas
+vezes o cálculo rodou.</p>
+
+<dl class="anatomy">
+<dt>cálculo</dt>
+<dd>A conta que transforma dados em outro dado: filtrar, somar, ordenar, formatar. Não desenha nada por
+si só.</dd>
+<dt><code>useMemo</code></dt>
+<dd>O hook que guarda o resultado de um cálculo entre renders e devolve o mesmo valor enquanto as
+dependências não mudam.</dd>
+<dt>dependências</dt>
+<dd>O array que diz quando o cache vale. É comparado item por item com o da renderização anterior.</dd>
+<dt>identidade</dt>
+<dd>Ser o mesmo objeto, não um igual. Dois arrays com os mesmos itens são diferentes; o mesmo array,
+guardado, é igual a si mesmo.</dd>
+<dt>cache</dt>
+<dd>O valor guardado da última execução. O React pode descartá-lo; ele é otimização, não garantia.</dd>
+</dl>
+
+<p>O <code>useMemo</code> recebe uma função e um array, e devolve o valor que a função produziu:</p>
+
+<pre class="file" data-file="ListaDePaes.jsx">const lista = useMemo(
+  () =&gt; PAES.filter((pao) =&gt; pao.nome.includes(busca)),
+  [busca]
+);</pre>
+
+<p>Na primeira renderização, o React chama a função e guarda o resultado. Nas seguintes, ele compara o
+array: se <code>busca</code> continua igual, devolve o resultado guardado sem chamar a função. Se
+<code>busca</code> mudou, chama de novo e guarda o novo resultado. É um cache com prazo de validade
+definido por você.</p>
+
+<h2>3. O cache visto por dentro</h2>
+
+<p>Para enxergar o cache, a caixa abaixo conta quantas vezes o filtro rodou numa variável fora do
+componente. O contador é um truque de aula: em código de verdade ninguém conta isso em produção, mas ele
+torna visível um comportamento que normalmente é invisível.</p>
+
+<div class="tryreact" data-goal="clique:#trocar;;texto:cálculos: 1">
+  <p class="try-task">O filtro roda a cada render, inclusive quando só o aviso muda. Envolva a chamada de
+  <code>filtrar(busca)</code> num <code>useMemo</code> com dependência <code>[busca]</code>: depois de
+  trocar o aviso, o painel tem de mostrar <strong>cálculos: 1</strong>.</p>
+  <pre class="jsx">const PAES = ["pão francês", "pão de queijo", "sonho", "croissant", "baguete", "rosca"];
+
+let calculos = 0;
+function filtrar(busca) {
+  calculos = calculos + 1;
+  return PAES.filter((pao) =&gt; pao.includes(busca));
+}
+
+function App() {
+  const [busca, setBusca] = useState("");
+  const [aviso, setAviso] = useState("Padaria aberta");
+
+  const lista = filtrar(busca);
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="busca"&gt;Buscar pão&lt;/label&gt;
+      &lt;input
+        id="busca"
+        value={busca}
+        onChange={(e) =&gt; setBusca(e.target.value)}
+      /&gt;
+      &lt;button id="trocar" onClick={() =&gt; setAviso("Forno quente até as 10h")}&gt;
+        Trocar aviso
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;p&gt;pães encontrados: {lista.length}&lt;/p&gt;
+      &lt;p&gt;cálculos: {calculos}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="busca"&gt;Buscar pão&lt;/label&gt;
+  &lt;input id="busca" value=""&gt;
+  &lt;button id="trocar"&gt;Trocar aviso&lt;/button&gt;
+  &lt;p&gt;Padaria aberta&lt;/p&gt;
+  &lt;p&gt;pães encontrados: 6&lt;/p&gt;
+  &lt;p&gt;cálculos: 1&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const PAES = ["pão francês", "pão de queijo", "sonho", "croissant", "baguete", "rosca"];
+
+let calculos = 0;
+function filtrar(busca) {
+  calculos = calculos + 1;
+  return PAES.filter((pao) =&gt; pao.includes(busca));
+}
+
+function App() {
+  const [busca, setBusca] = useState("");
+  const [aviso, setAviso] = useState("Padaria aberta");
+
+  const lista = useMemo(() =&gt; filtrar(busca), [busca]);
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="busca"&gt;Buscar pão&lt;/label&gt;
+      &lt;input
+        id="busca"
+        value={busca}
+        onChange={(e) =&gt; setBusca(e.target.value)}
+      /&gt;
+      &lt;button id="trocar" onClick={() =&gt; setAviso("Forno quente até as 10h")}&gt;
+        Trocar aviso
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;p&gt;pães encontrados: {lista.length}&lt;/p&gt;
+      &lt;p&gt;cálculos: {calculos}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No código inicial, clique em Trocar aviso: o aviso muda e o contador vai para 2, porque o componente
+rodou de novo e o filtro junto. Na solução, o aviso muda, o componente roda, mas o contador continua em 1
+— a busca não mudou, então o React devolveu o array guardado. Agora digite no campo: o contador sobe,
+porque aí a dependência mudou de verdade.</p>
+
+<p>Esse é o comportamento inteiro do <code>useMemo</code>. O que muda de um caso para outro é só o que
+entra no array de dependências — e é aí que mora o perigo.</p>
+
+<h2>4. O array de dependências</h2>
+
+<p>O array não é uma lista de "coisas que eu quero observar"; é a lista <strong>completa</strong> de tudo
+que o cálculo lê de dentro do componente. Se o cálculo usa <code>busca</code> e <code>tipo</code>, os dois
+precisam estar ali. Se falta um, o React pode devolver um resultado calculado com o valor antigo — e a
+tela mostra dados errados, sem erro nenhum no console.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Array</th><th>Quando o cálculo roda</th><th>Use quando</th></tr>
+<tr><td><code>[]</code></td><td>uma vez, na montagem</td><td>o cálculo não lê nada que mude</td></tr>
+<tr><td><code>[busca]</code></td><td>na montagem e quando <code>busca</code> muda</td><td>um valor só manda no resultado</td></tr>
+<tr><td><code>[busca, tipo]</code></td><td>quando qualquer um dos dois muda</td><td>o resultado depende de mais de um valor</td></tr>
+<tr><td>objeto ou array criado no render</td><td>em todo render</td><td>nunca: o valor é novo a cada desenho</td></tr>
+<tr><td>função criada no render</td><td>em todo render</td><td>nunca; para funções existe o <code>useCallback</code></td></tr>
+</table>
+</div>
+
+<p>A comparação é de identidade, não de conteúdo: o React usa <code>Object.is</code> em cada item. Números,
+textos e booleanos são comparados pelo valor, e por isso são as dependências tranquilas. Objetos, arrays e
+funções criados no corpo do componente são novos a cada render — e uma dependência "nova" a cada render
+anula o cache por completo. A aula de <a href="dependencias.html">dependências</a> mostra esse mecanismo
+em detalhe; aqui ele volta porque é a causa número um de <code>useMemo</code> que não funciona.</p>
+
+<p>Veja o erro na prática: a lista abaixo guarda o resultado com <code>[]</code>, então ela é calculada
+uma vez e nunca mais. Digitar no campo não muda nada na tela — o famoso valor velho, ou
+<em>stale value</em>.</p>
+
+<div class="tryreact" data-goal="digite:#busca=queijo;;conta:li=1;;texto:pão de queijo">
+  <p class="try-task">O <code>useMemo</code> tem o array vazio, então a lista nunca acompanha a busca.
+  Coloque <code>busca</code> nas dependências e digite <strong>queijo</strong>: a lista tem de ficar com
+  um pão só.</p>
+  <pre class="jsx">const PAES = ["pão francês", "pão de queijo", "sonho", "croissant", "baguete", "rosca"];
+
+function App() {
+  const [busca, setBusca] = useState("");
+
+  const lista = useMemo(
+    () =&gt; PAES.filter((pao) =&gt; pao.includes(busca)),
+    []
+  );
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="busca"&gt;Buscar pão&lt;/label&gt;
+      &lt;input
+        id="busca"
+        value={busca}
+        onChange={(e) =&gt; setBusca(e.target.value)}
+      /&gt;
+      &lt;p&gt;pães encontrados: {lista.length}&lt;/p&gt;
+      &lt;ul&gt;
+        {lista.map((pao) =&gt; (
+          &lt;li key={pao}&gt;{pao}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="busca"&gt;Buscar pão&lt;/label&gt;
+  &lt;input id="busca" value=""&gt;
+  &lt;p&gt;pães encontrados: 6&lt;/p&gt;
+  &lt;ul&gt;
+    &lt;li&gt;pão francês&lt;/li&gt;
+    &lt;li&gt;pão de queijo&lt;/li&gt;
+    &lt;li&gt;sonho&lt;/li&gt;
+    &lt;li&gt;croissant&lt;/li&gt;
+    &lt;li&gt;baguete&lt;/li&gt;
+    &lt;li&gt;rosca&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const PAES = ["pão francês", "pão de queijo", "sonho", "croissant", "baguete", "rosca"];
+
+function App() {
+  const [busca, setBusca] = useState("");
+
+  const lista = useMemo(
+    () =&gt; PAES.filter((pao) =&gt; pao.includes(busca)),
+    [busca]
+  );
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="busca"&gt;Buscar pão&lt;/label&gt;
+      &lt;input
+        id="busca"
+        value={busca}
+        onChange={(e) =&gt; setBusca(e.target.value)}
+      /&gt;
+      &lt;p&gt;pães encontrados: {lista.length}&lt;/p&gt;
+      &lt;ul&gt;
+        {lista.map((pao) =&gt; (
+          &lt;li key={pao}&gt;{pao}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Com <code>[]</code>, digitar "queijo" não muda a lista: o painel continua mostrando os seis pães e a
+contagem 6, porque o resultado guardado nunca é recalculado. Com <code>[busca]</code>, a lista vira um item
+e o texto acompanha. O console do navegador não avisa nada nesse caso — o valor só está errado. Quem avisa
+é o ESLint do projeto:</p>
+
+<pre class="term">React Hook useMemo has a missing dependency: 'busca'.
+Either include it or remove the dependency array.
+  react-hooks/exhaustive-deps</pre>
+
+<p>A tradução é literal: "o seu <code>useMemo</code> usa <code>busca</code> e o array não lista
+<code>busca</code>". A regra do ESLint é a mesma que você viu para o <code>useEffect</code>, e a resposta
+quase sempre é incluir a dependência. Se incluir criar um laço, o problema é outro — provavelmente um
+objeto recriado a cada render, que a próxima seção resolve.</p>
+
+<h2>5. Identidade: o array que precisa ser o mesmo</h2>
+
+<p>Existe um segundo motivo para usar <code>useMemo</code>, e ele não tem nada a ver com velocidade. É a
+identidade. Um array criado no corpo do componente é um array novo a cada render, mesmo que os itens sejam
+idênticos. Para o React, "novo" quer dizer "mudou" — e um componente filho embrulhado em
+<code>memo</code> redesenha à toa por causa disso.</p>
+
+<p>O <code>memo</code> compara as props com <code>Object.is</code>. Se o pai passa sempre um array novo,
+a comparação falha em todo render e o filho desenha de novo. Com <code>useMemo</code>, o pai passa o
+mesmo array enquanto o filtro não muda, e o <code>memo</code> finalmente tem o que comparar.</p>
+
+<pre class="file" data-file="ListaDePaes.jsx">const Lista = memo(function Lista({ itens }) {
+  return &lt;p&gt;{itens.length} pães na lista&lt;/p&gt;;
+});
+
+function App() {
+  const [filtro, setFiltro] = useState("todos");
+  const [aviso, setAviso] = useState("Padaria aberta");
+
+  const itens = useMemo(
+    () =&gt; PAES.filter((pao) =&gt; filtro === "todos" || pao.tipo === filtro),
+    [filtro]
+  );
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;Lista itens={itens} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Aqui o <code>useMemo</code> não economiza uma conta pesada: ele garante que <code>itens</code> seja o
+mesmo array entre renders em que o filtro não mudou. É um uso legítimo e comum. A caixa abaixo mostra isso
+acontecendo com um contador de desenhos no filho.</p>
+
+<div class="tryreact" data-goal="clique:#trocar;;texto:desenho 1">
+  <p class="try-task">O filho está embrulhado em <code>memo</code>, mas o pai entrega um array novo a cada
+  render. Envolva o filtro num <code>useMemo</code> com dependência <code>[filtro]</code>: depois de
+  trocar o aviso, o filho tem de continuar em <strong>desenho 1</strong>.</p>
+  <pre class="jsx">const PAES = [
+  { nome: "pão francês", tipo: "salgado" },
+  { nome: "pão de queijo", tipo: "salgado" },
+  { nome: "sonho", tipo: "doce" },
+];
+
+let desenhos = 0;
+const Lista = memo(function Lista({ itens }) {
+  desenhos = desenhos + 1;
+  return (
+    &lt;p&gt;
+      lista com {itens.length} pães - desenho {desenhos}
+    &lt;/p&gt;
+  );
+});
+
+function App() {
+  const [filtro, setFiltro] = useState("todos");
+  const [aviso, setAviso] = useState("Padaria aberta");
+
+  const itens = PAES.filter(
+    (pao) =&gt; filtro === "todos" || pao.tipo === filtro
+  );
+
+  return (
+    &lt;div&gt;
+      &lt;button id="trocar" onClick={() =&gt; setAviso("Forno quente")}&gt;
+        Trocar aviso
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;Lista itens={itens} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="trocar"&gt;Trocar aviso&lt;/button&gt;
+  &lt;p&gt;Padaria aberta&lt;/p&gt;
+  &lt;p&gt;lista com 3 pães - desenho 1&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const PAES = [
+  { nome: "pão francês", tipo: "salgado" },
+  { nome: "pão de queijo", tipo: "salgado" },
+  { nome: "sonho", tipo: "doce" },
+];
+
+let desenhos = 0;
+const Lista = memo(function Lista({ itens }) {
+  desenhos = desenhos + 1;
+  return (
+    &lt;p&gt;
+      lista com {itens.length} pães - desenho {desenhos}
+    &lt;/p&gt;
+  );
+});
+
+function App() {
+  const [filtro, setFiltro] = useState("todos");
+  const [aviso, setAviso] = useState("Padaria aberta");
+
+  const itens = useMemo(
+    () =&gt; PAES.filter((pao) =&gt; filtro === "todos" || pao.tipo === filtro),
+    [filtro]
+  );
+
+  return (
+    &lt;div&gt;
+      &lt;button id="trocar" onClick={() =&gt; setAviso("Forno quente")}&gt;
+        Trocar aviso
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;Lista itens={itens} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Sem o <code>useMemo</code>, o clique em Trocar aviso redesenha o pai, cria um array novo e o
+<code>memo</code> do filho compara: array novo, props diferentes, filho desenha de novo — o contador vai
+para 2. Com o <code>useMemo</code>, o array é o mesmo, o <code>memo</code> percebe que as props não
+mudaram e o filho fica em 1. O mesmo raciocínio vale para efeitos: um array novo no array de dependências
+de um <code>useEffect</code> faz o efeito rodar em todo render.</p>
+
+<p>Repare que o <code>memo</code> no filho é metade da solução. Se o filho não estivesse embrulhado, ele
+desenharia de qualquer jeito, e o <code>useMemo</code> só teria economizado a conta do filtro. As duas
+peças trabalham juntas: o pai segura a identidade, o filho evita o trabalho.</p>
+
+<h2>6. O que o useMemo não faz</h2>
+
+<p>Três confusões aparecem sempre. A primeira: <code>useMemo</code> não impede o componente de rodar. Ele
+é chamado dentro do componente, depois que o componente já foi chamado. O que ele evita é a
+<em>conta</em>, não o render.</p>
+
+<p>A segunda: <code>useMemo</code> não é garantia. A documentação do React diz que o cache pode ser
+descartado — por exemplo, quando a memória aperta ou quando o React precisa jogar fora o estado de uma
+tela que saiu de vista. Se o seu código depende de o valor ser sempre o mesmo objeto para funcionar (e não
+só para ficar rápido), o lugar certo é um estado, uma ref ou um dado fora do componente. Otimização não é
+regra de negócio.</p>
+
+<p>A terceira: <code>useMemo</code> não conserta laço infinito. Se um efeito roda sem parar por causa de
+um objeto recriado, colocar o objeto num <code>useMemo</code> resolve o sintoma, mas a pergunta anterior
+continua valendo — aquele efeito precisava existir? A aula de
+<a href="quando-nao-usar-efeito.html">quando não usar efeito</a> é sobre isso.</p>
+
+<p>Vale saber também que o React 19 vem com o compilador, que faz esse tipo de memoização automática em
+muitos casos. Isso não torna o <code>useMemo</code> inútil: ele continua sendo a forma explícita de dizer
+"este valor pode ser reaproveitado", e continua aparecendo em código escrito à mão. O que muda é a
+expectativa: você não precisa memoizar tudo por medo. Precisa entender quando faz diferença.</p>
+
+<h2>7. Quando não vale a pena</h2>
+
+<p>A recomendação oficial é medir antes de otimizar, e ela existe porque o <code>useMemo</code> tem custo:
+um array novo, uma comparação, uma entrada a mais na memória do React e uma camada de leitura a mais para
+quem mantém o código. Em cálculos baratos, esse custo é maior que a economia.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Cálculo</th><th>Memoizar?</th><th>Por quê</th></tr>
+<tr><td>somar dois números, montar uma string</td><td>não</td><td>custa menos que a comparação do array</td></tr>
+<tr><td>filtrar 10 itens de uma lista fixa</td><td>não</td><td>imperceptível; o código fica mais difícil</td></tr>
+<tr><td>filtrar ou ordenar milhares de itens</td><td>sim</td><td>a diferença aparece na digitação</td></tr>
+<tr><td>formatar datas e preços de uma lista grande</td><td>sim</td><td>formatação é mais cara do que parece</td></tr>
+<tr><td>criar um objeto para a prop de um filho com <code>memo</code></td><td>sim</td><td>é identidade, não velocidade</td></tr>
+<tr><td>alimentar o array de dependências de um efeito</td><td>sim</td><td>evita o efeito rodando à toa</td></tr>
+</table>
+</div>
+
+<p>Se você não sabe se o cálculo é caro, meça. Abra o DevTools na aba <em>Performance</em>, grave enquanto
+digita e olhe o tempo de cada render. Um jeito mais simples: coloque um <code>console.time</code> em volta
+da conta e leia o resultado no console.</p>
+
+<pre class="file" data-file="ListaDePaes.jsx">console.time("filtro");
+const lista = PAES.filter((pao) =&gt; pao.nome.includes(busca));
+console.timeEnd("filtro");</pre>
+
+<p>No console, o tempo de cada execução aparece com o rótulo que você deu:</p>
+
+<pre class="term">filtro: 0.412 ms
+filtro: 3.870 ms</pre>
+
+<p>A primeira linha é uma lista pequena; a segunda, uma lista grande com formatação no meio. Números como
+0,4 ms não justificam <code>useMemo</code> nenhum — quem sente 0,4 ms é o cronômetro, não a pessoa. Acima
+de alguns milissegundos por tecla, a conversa muda.</p>
+
+<h2>8. As regras do useMemo</h2>
+
+<p><strong>A função tem que ser pura.</strong> Ela recebe dados e devolve um valor; não muda estado, não
+chama <code>setAlgo</code>, não escreve no banco, não faz <code>console.log</code> de efeito. O React pode
+chamar essa função mais de uma vez (em desenvolvimento, por exemplo) e o resultado tem que ser sempre o
+mesmo. Efeito colateral dentro de <code>useMemo</code> é bomba-relógio.</p>
+
+<p><strong>Liste tudo o que a função lê.</strong> Não só as props e o estado: qualquer valor de fora que
+participe da conta. O ESLint ajuda, mas ele não adivinha tudo — valores lidos de um módulo externo, por
+exemplo, não entram na conta dele.</p>
+
+<p><strong>Não chame hooks dentro do useMemo.</strong> Hooks seguem a ordem das chamadas no componente;
+dentro de uma função que pode ou não rodar, essa ordem quebra. O React reclama na hora, e a regra é a
+mesma de qualquer callback.</p>
+
+<p><strong>Não guarde estado dentro do useMemo.</strong> Ele não tem setter e não avisa ninguém: é cache
+de cálculo, não memória mutável. Para memória mutável, a aula de <a href="useRef.html">useRef</a>; para
+valor que a tela mostra, <code>useState</code>.</p>
+
+<p><strong>Não memoize o que você vai usar uma vez.</strong> Criar um objeto dentro do
+<code>useMemo</code> para passá-lo a uma função que o consome na mesma linha é trabalho puro. O cache só
+vale quando o valor atravessa renders.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o useMemo que não memorizava nada</h3>
+<p>A Ana colocou o array de dependências com um objeto criado ali mesmo:
+<code>[{ termo: busca }]</code>. Como o objeto é novo a cada render, o React concluía que a dependência
+mudou e recalculava sempre — o <code>useMemo</code> existia e não servia para nada. O conserto é listar os
+valores simples: <code>[busca]</code>.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a lista que ficou velha</h3>
+<p>Ela colocou <code>[]</code> nas dependências para "rodar uma vez só" e a busca parou de filtrar. Sem
+erro, sem aviso: só resultado errado. Array de dependências incompleto é o bug mais silencioso do
+<code>useMemo</code> e do <code>useEffect</code>, e a defesa é a mesma nos dois: listar tudo o que a
+função lê.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o filho que redesenha sem motivo</h3>
+<p>O filho tinha <code>memo</code> e mesmo assim redesenhava a cada tecla. O pai passava um array criado
+no render, então as props eram sempre diferentes por identidade. Com <code>useMemo</code> no pai, o array
+passou a ser o mesmo enquanto o filtro não mudava, e o <code>memo</code> começou a funcionar. Note: um
+problema de identidade, não de velocidade.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. O que o <code>useMemo</code> guarda entre renders?</p>
+<label><input type="radio" name="q1"> o componente inteiro, para não rodar de novo</label>
+<label><input type="radio" name="q1"> o estado do formulário</label>
+<label><input type="radio" name="q1"> o resultado do cálculo, enquanto as dependências não mudam</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. O que acontece com <code>[]</code> nas dependências?</p>
+<label><input type="radio" name="q2"> o cálculo roda uma vez e pode ficar com valor velho</label>
+<label><input type="radio" name="q2"> o cálculo roda em todo render, como antes</label>
+<label><input type="radio" name="q2"> o React avisa no console que o array está vazio</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. Quando o <code>useMemo</code> ajuda por
+<strong>identidade</strong>?</p>
+<label><input type="radio" name="q3"> quando o cálculo é caro e demora muitos milissegundos</label>
+<label><input type="radio" name="q3"> quando um array ou objeto vai para um filho com <code>memo</code> ou para as dependências de um efeito</label>
+<label><input type="radio" name="q3"> quando o valor precisa aparecer na tela e mudar com o clique</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o cache certo para a busca</h2>
+<p>O filtro abaixo precisa ser recalculado sempre que <code>busca</code> mudar. Complete o array de
+dependências:</p>
+<div class="ex-code">const lista = useMemo(() =&gt; filtrar(busca), [<input aria-label="resposta 1" data-answer="busca" placeholder="...">]);</div>
+<p class="ex-dica">Dica: é exatamente o valor que a função de dentro do <code>useMemo</code> lê. Sem ele,
+o resultado fica velho e a lista para de acompanhar a digitação.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Todo cálculo escrito no corpo do componente roda em todo render, porque o React chama a função de novo
+para saber o que desenhar. O <code>useMemo</code> guarda o resultado desse cálculo e devolve o mesmo valor
+enquanto as dependências não mudam. A função é pura, o array lista tudo o que ela lê, e a comparação é de
+identidade: números e textos são comparados pelo valor; objetos, arrays e funções criados no render são
+sempre novos.</p>
+
+<p>Há dois motivos legítimos para usar: economizar uma conta caro e manter a identidade de um array ou
+objeto. O segundo é mais comum do que parece — é ele que faz o <code>memo</code> de um filho valer alguma
+coisa e que evita um efeito rodando em todo render. E há um motivo ilegítimo: "colocar useMemo em tudo por
+segurança". Em cálculo barato, o custo do hook é maior que a economia, e o código fica mais difícil de
+ler.</p>
+
+<p>Antes de memoizar, meça. Depois de memoizar, confira as dependências. E se o valor precisa aparecer na
+tela e mudar com o clique, ele não é assunto do <code>useMemo</code>: é estado. O próximo hook da fila, o
+<code>useCallback</code>, é a mesma ideia aplicada a funções.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>O corpo do componente roda em todo render; o cálculo junto.</li>
+<li><code>useMemo(() =&gt; conta, [deps])</code> guarda o resultado até as dependências mudarem.</li>
+<li>Array vazio: calcula uma vez e pode ficar velho.</li>
+<li>Dependência faltando: valor errado, sem erro no console.</li>
+<li>A comparação é por identidade; objeto criado no render é sempre novo.</li>
+<li>O segundo uso é manter a identidade para <code>memo</code> e para efeitos.</li>
+<li><code>useMemo</code> não impede render: ele evita a conta.</li>
+<li>O React pode jogar o cache fora; não dependa dele para funcionar.</li>
+<li>A função tem que ser pura: nada de efeito colateral ali dentro.</li>
+<li>Cálculo barato não se memoiza; meça antes de otimizar.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

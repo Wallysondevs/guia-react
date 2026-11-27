@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>async e await | Guia React</title>
+<meta name="description" content="async e await sem mistério: a função async sempre devolve Promise, o await espera e desembrulha o valor, e Promise.all pede em paralelo o que é independente.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">async</span> e await</h1>
+
+<p class="intro">Na aula anterior a Ana viu o <code>fetch</code> e a espera com <code>.then</code>. Funciona, mas
+o código fica em escada: um degrau para a resposta, outro para o corpo, outro para o que depende do
+anterior. O JavaScript tem uma sintaxe que desmancha a escada em linha reta, e é ela que todo projeto React
+usa hoje: <code>async</code> e <code>await</code>. Não é uma biblioteca nova nem um recurso do React — é
+JavaScript puro, e a diferença é de leitura. Nesta aula ela vê as duas palavras, o que cada uma faz por
+baixo e os três erros que aparecem em quase todo código que começa.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que a função <code>async</code> sempre devolve uma Promise.</li>
+  <li>O que o <code>await</code> faz na prática, linha por linha.</li>
+  <li>Onde o <code>await</code> pode ficar — e onde não pode.</li>
+  <li>O erro de esquecer o <code>await</code> e como reconhecer o sintoma.</li>
+  <li>A diferença entre esperar em série e esperar em paralelo.</li>
+  <li><code>Promise.all</code> e <code>Promise.allSettled</code>: quando cada um serve.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a fila que anda em linha reta</h2>
+
+<p>Imagine o balcão da padaria com uma fila. A atendente chama o primeiro, entrega o pão, chama o segundo.
+Cada pedido termina antes de o próximo começar, e o mundo faz sentido na ordem em que as coisas aparecem.
+O <code>.then</code> é o contrário disso: ele entrega um papel com "quando ficar pronto, faça isto", e você
+segue trabalhando em outra coisa. Poderoso, mas difícil de ler quando há três pedidos encadeados.</p>
+
+<p><code>async</code> e <code>await</code> devolvem a sensação da fila. A função marcada com
+<code>async</code> ganha permissão para usar <code>await</code>, e o <code>await</code> faz o código
+<em>parar naquela linha</em> até o valor chegar. O resto do programa continua rodando — só aquela função
+espera. É a diferença entre "a atendente espera o pão assar" e "a padaria inteira fecha até o pão
+assar".</p>
+
+<p>O resultado é o mesmo <code>.then</code> de antes, escrito de cima para baixo. E é exatamente por isso
+que essa sintaxe virou padrão: ela parece código comum, com <code>try</code>, <code>catch</code> e
+<code>return</code> nos lugares de sempre.</p>
+
+<h2>2. <code>async</code>: a função que promete</h2>
+
+<p>Marcar uma função com <code>async</code> muda uma coisa só, e é bom saber qual: o valor devolvido por
+ela nunca sai direto. Sai embrulhado em uma Promise. Se a função faz <code>return 3</code>, quem chamou
+recebe uma Promise que se cumpre com 3.</p>
+
+<pre class="file" data-file="conta.js">async function total() {
+  return 3;
+}
+
+const a = total();        // Promise {&lt;fulfilled&gt;: 3}
+const b = await total();  // 3</pre>
+
+<p>Isso não é capricho: a palavra <code>async</code> é o contrato de que a função pode esperar coisas do
+mundo real — rede, arquivo, temporizador — e por isso ninguém pode depender de o resultado estar pronto
+imediatamente. O embrulho garante que existe um jeito de esperar. No console, a diferença é visível:</p>
+
+<pre class="term">&gt; async function total() { return 3; }
+undefined
+&gt; total()
+Promise {&lt;fulfilled&gt;: 3}
+&gt; await total()
+3</pre>
+
+<p>A primeira linha devolve <code>undefined</code> porque declarar função não produz valor. A segunda
+mostra o embrulho, com o valor já dentro — mas dentro do embrulho. Só o <code>await</code> entrega o
+<code>3</code>. E note que uma função <code>async</code> que não devolve nada devolve uma Promise cumprida
+com <code>undefined</code>: o embrulho existe do mesmo jeito.</p>
+
+<dl class="anatomy">
+<dt><code>async</code></dt>
+<dd>Marca a função. Ela passa a devolver Promise e ganha o direito de usar <code>await</code> dentro.</dd>
+<dt><code>await</code></dt>
+<dd>Espera a Promise da direita se cumprir e devolve o valor dela. Só existe dentro de função
+<code>async</code>.</dd>
+<dt>Promise</dt>
+<dd>O embrulho do valor que ainda vai chegar. Tem três estados: pendente, cumprida e rejeitada.</dd>
+<dt><code>Promise.all</code></dt>
+<dd>Recebe uma lista de Promises e devolve uma só, com a lista de resultados na mesma ordem.</dd>
+<dt><code>Promise.allSettled</code></dt>
+<dd>Igual ao anterior, mas espera todas terminarem, mesmo quando alguma é rejeitada.</dd>
+<dt>rejeição</dt>
+<dd>O "não deu" de uma Promise. Sem tratamento, vira erro não capturado no console.</dd>
+</dl>
+
+<h2>3. <code>await</code>: esperando o valor</h2>
+
+<p><code>await</code> faz duas coisas ao mesmo tempo. Primeiro, espera: se a Promise da direita ainda não
+se cumpriu, a função para ali e devolve o controle para quem a chamou. Segundo, desembrulha: quando a
+Promise se cumpre, o <code>await</code> devolve o valor de dentro, e não a Promise.</p>
+
+<p>É por isso que <code>const dados = await resposta.json()</code> dá o objeto, enquanto
+<code>const dados = resposta.json()</code> dá a Promise. A diferença de duas palavras muda o tipo do
+valor, e tipo errado é a causa da maior parte dos bugs desta aula.</p>
+
+<p>Vale entender o que acontece enquanto a função espera, porque é a pergunta que todo mundo faz. O
+JavaScript tem uma única linha de execução: quando o <code>await</code> para a função, ele <em>devolve o
+controle</em> para quem chamou e continua atendendo o resto da página — cliques, digitação, animações. A
+função fica parada num canto, esperando a promessa avisar. Quando o valor chega, ela retoma exatamente da
+linha seguinte, com o valor na mão. Nada de tela congelada.</p>
+
+<p>Um detalhe que alivia: por baixo dos panos, <code>await</code> é <code>.then</code>. Nada de mágica e
+nada de bloqueio real da página. Se a função tem três <code>await</code> em sequência, os três pedidos
+saem em sequência — e isso pode ser lento de propósito ou por acidente, assunto da seção 6.</p>
+
+<h2>4. O erro número um: esquecer o <code>await</code></h2>
+
+<p>A função <code>contarPaes</code> abaixo é <code>async</code>: devolve uma Promise que se cumpre com o
+número de pães. Quem chama sem <code>await</code> recebe o embrulho, e o embrulho não soma. Veja o que
+acontece na tela:</p>
+
+<div class="tryreact" data-goal="texto:Total: 13 reais">
+  <p class="try-task">O painel mostra <code>10[object Promise]</code> no lugar do total. Falta esperar a
+  função <code>contarPaes()</code>: coloque <code>await</code> antes dela.</p>
+  <pre class="jsx">function buscarPaes() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok(["pão francês", "croissant", "brioche"]), 10);
+  });
+}
+
+async function contarPaes() {
+  const lista = await buscarPaes();
+  return lista.length;
+}
+
+function App() {
+  const [total, setTotal] = useState(0);
+
+  useEffect(() =&gt; {
+    async function carregar() {
+      const n = contarPaes();
+      setTotal(10 + n);
+    }
+    carregar();
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Total: {total} reais&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Total: 10[object Promise] reais&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscarPaes() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok(["pão francês", "croissant", "brioche"]), 10);
+  });
+}
+
+async function contarPaes() {
+  const lista = await buscarPaes();
+  return lista.length;
+}
+
+function App() {
+  const [total, setTotal] = useState(0);
+
+  useEffect(() =&gt; {
+    async function carregar() {
+      const n = await contarPaes();
+      setTotal(10 + n);
+    }
+    carregar();
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Total: {total} reais&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O texto <code>10[object Promise]</code> é o resultado de somar número com Promise: o JavaScript desiste
+da conta e junta tudo como texto. Se fosse uma conta de multiplicação, apareceria <code>NaN</code>. Se o
+valor fosse direto para o JSX, apareceria nada — ou um erro dizendo que objeto não é filho válido do React.
+Três sintomas, uma causa.</p>
+
+<p>O hábito que evita o problema: sempre que chamar uma função <code>async</code>, pergunte "eu quero a
+Promise ou o valor?". Se quiser o valor, <code>await</code>. E se você não tem certeza de que a função é
+<code>async</code>, olhe a declaração — a palavra está lá, antes do nome.</p>
+
+<h2>5. Onde o <code>await</code> pode ficar</h2>
+
+<p><code>await</code> é filho de <code>async</code>. Fora de uma função marcada, ele nem compila: o
+JavaScript recusa a sintaxe antes de rodar qualquer coisa. Isso explica três situações que confundem.</p>
+
+<p>A primeira é no componente: o corpo de <code>App</code> não é uma função <code>async</code>, então
+<code>const dados = await buscar()</code> direto no componente não compila. O lugar certo é dentro do
+efeito, em uma função interna, como na caixa anterior.</p>
+
+<p>A segunda é no efeito: <code>useEffect(async () =&gt; { ... })</code> parece a solução, mas o React
+espera uma função que devolve nada — e uma função <code>async</code> devolve Promise. O efeito passa a
+devolver uma Promise no lugar da função de limpeza, e a limpeza se perde. A forma que funciona é declarar
+uma função <code>async</code> dentro do efeito e chamá-la em seguida.</p>
+
+<p>A terceira é em retorno de chamada de evento: <code>onClick={() =&gt; await salvar()}</code> também não
+compila. O contorno é o mesmo: marcar a função como <code>async</code>, e aí o
+<code>onClick={async () =&gt; { await salvar(); }}</code> funciona. Um <code>async</code> a mais resolve, e
+o React trata o retorno como "não me interessa".</p>
+
+<h2>6. Em série ou em paralelo</h2>
+
+<p>Três <code>await</code> em sequência somam os tempos: se cada pedido leva um segundo, a tela espera
+três. Às vezes é necessário — quando o segundo pedido depende do primeiro —, mas na maioria dos casos não é.
+Pedir o cardápio, as promoções e o horário são pedidos independentes, e esperar um depois do outro é
+desperdício.</p>
+
+<p>O erro comum com <code>await</code> e <code>map</code> é achar que o <code>map</code> espera. Ele não
+espera: ele chama as funções e guarda o que cada uma devolve. Se a função é <code>async</code>, o que fica
+no array são Promises — três embrulhos no lugar de três pães.</p>
+
+<div class="tryreact" data-goal="texto:Pão francês;;conta:li=3">
+  <p class="try-task">A lista tem três itens, mas todos vazios: o <code>map</code> devolveu Promises. Troque
+  por <code>await Promise.all(ids.map((id) =&gt; buscarPao(id)))</code> para ter os três pães.</p>
+  <pre class="jsx">const NOMES = { pao: "Pão francês", croissant: "Croissant", brioche: "Brioche" };
+
+function buscarPao(id) {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok({ id: id, nome: NOMES[id] }), 10);
+  });
+}
+
+function App() {
+  const [paes, setPaes] = useState([]);
+
+  useEffect(() =&gt; {
+    async function carregar() {
+      const ids = ["pao", "croissant", "brioche"];
+      const lista = ids.map(async (id) =&gt; await buscarPao(id));
+      setPaes(lista);
+    }
+    carregar();
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Vitrine&lt;/h1&gt;
+      &lt;ul&gt;
+        {paes.map((p) =&gt; (
+          &lt;li key={p.id}&gt;{p.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Vitrine&lt;/h1&gt;
+  &lt;ul&gt;
+    &lt;li&gt;&lt;/li&gt;
+    &lt;li&gt;&lt;/li&gt;
+    &lt;li&gt;&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const NOMES = { pao: "Pão francês", croissant: "Croissant", brioche: "Brioche" };
+
+function buscarPao(id) {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok({ id: id, nome: NOMES[id] }), 10);
+  });
+}
+
+function App() {
+  const [paes, setPaes] = useState([]);
+
+  useEffect(() =&gt; {
+    async function carregar() {
+      const ids = ["pao", "croissant", "brioche"];
+      const lista = await Promise.all(ids.map((id) =&gt; buscarPao(id)));
+      setPaes(lista);
+    }
+    carregar();
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Vitrine&lt;/h1&gt;
+      &lt;ul&gt;
+        {paes.map((p) =&gt; (
+          &lt;li key={p.id}&gt;{p.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O <code>Promise.all</code> recebe a lista de Promises e devolve uma Promise só, que se cumpre com a
+lista de resultados <strong>na mesma ordem</strong> — a ordem do array, não a ordem de chegada. É esse
+detalhe que faz o <code>map</code> voltar a ser útil: você mapeia os ids, o <code>all</code> espera todos e
+o resultado sai alinhado com o que você pediu.</p>
+
+<p>E os pedidos saem juntos: três pedidos de 20 milissegundos levam 20 milissegundos no total, não 60.
+Sempre que os pedidos não dependem um do outro, <code>Promise.all</code> é a resposta. Quando dependem,
+<code>await</code> em série, um depois do outro, e não há vergonha nisso.</p>
+
+<p>Para guardar os lados bons e os ruins, existe o <code>Promise.allSettled</code>, e é ele que resolve o
+caso mais chato de todos: a vitrine com três pães em que um deles está esgotado. Com
+<code>Promise.all</code>, os três pedidos são jogados fora; com <code>allSettled</code>, os dois que deram
+certo chegam e o que falhou vem marcado. Você mostra os dois e um aviso discreto sobre o terceiro. A
+seção seguinte mostra isso em código.</p>
+
+<h2>7. Quando um dos pedidos falha</h2>
+
+<p><code>Promise.all</code> tem um comportamento duro: se uma das Promises for rejeitada, o
+<code>all</code> inteiro é rejeitado, com o erro daquela. As outras podem até se cumprir, mas o resultado
+já foi descartado. Em uma vitrine de três pães, um brioche esgotado derruba a lista toda.</p>
+
+<div class="tryreact" data-goal="texto:Carregou 2 de 3">
+  <p class="try-task">Um dos pedidos falha, e o <code>Promise.all</code> derruba os três. Use
+  <code>Promise.allSettled</code> e conte quantos resultados têm <code>status</code> igual a
+  <code>"fulfilled"</code>.</p>
+  <pre class="jsx">const NOMES = { pao: "Pão francês", croissant: "Croissant", brioche: "Brioche" };
+
+function buscar(id) {
+  return new Promise((ok, falha) =&gt; {
+    setTimeout(() =&gt; {
+      if (id === "brioche") falha(new Error("brioche esgotado"));
+      else ok(NOMES[id]);
+    }, 10);
+  });
+}
+
+function App() {
+  const [resumo, setResumo] = useState("Buscando...");
+
+  useEffect(() =&gt; {
+    async function carregar() {
+      try {
+        const lista = await Promise.all([buscar("pao"), buscar("brioche"), buscar("croissant")]);
+        setResumo("Carregou " + lista.length + " de 3");
+      } catch (e) {
+        setResumo("Falhou tudo");
+      }
+    }
+    carregar();
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Vitrine&lt;/h1&gt;
+      &lt;p&gt;{resumo}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Vitrine&lt;/h1&gt;
+  &lt;p&gt;Falhou tudo&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const NOMES = { pao: "Pão francês", croissant: "Croissant", brioche: "Brioche" };
+
+function buscar(id) {
+  return new Promise((ok, falha) =&gt; {
+    setTimeout(() =&gt; {
+      if (id === "brioche") falha(new Error("brioche esgotado"));
+      else ok(NOMES[id]);
+    }, 10);
+  });
+}
+
+function App() {
+  const [resumo, setResumo] = useState("Buscando...");
+
+  useEffect(() =&gt; {
+    async function carregar() {
+      const resultados = await Promise.allSettled([buscar("pao"), buscar("brioche"), buscar("croissant")]);
+      const bons = resultados.filter((r) =&gt; r.status === "fulfilled").length;
+      setResumo("Carregou " + bons + " de 3");
+    }
+    carregar();
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Vitrine&lt;/h1&gt;
+      &lt;p&gt;{resumo}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O <code>allSettled</code> espera todas terminarem — cumpridas ou rejeitadas — e devolve uma lista de
+objetos com <code>status</code> e, conforme o caso, <code>value</code> ou <code>reason</code>. Você decide o
+que fazer com cada um. É o coletor certo quando o pedido é "traga o que der".</p>
+
+<p>Sem tratamento, o erro de uma Promise aparece assim no console, e é o sintoma de <code>Promise.all</code>
+com um item quebrado:</p>
+
+<pre class="term">Uncaught (in promise) Error: brioche esgotado</pre>
+
+<p>O <code>try</code> e o <code>catch</code> em volta do <code>await</code> pegam esse erro — e essa é uma
+das grandes vantagens da sintaxe: o erro cai no <code>catch</code> de sempre, com a mesma cara de qualquer
+outro erro. A aula de tratamento de erro explora isso a fundo.</p>
+
+<h2>8. Os atalhos que economizam linhas</h2>
+
+<p>Três práticas que você vê em código experiente e que vale entender. A primeira: <code>return await</code>
+dentro de <code>try</code> é útil (o <code>catch</code> pega o erro); fora dele, é redundante — o
+<code>return</code> de uma função <code>async</code> já embrulha o valor. A segunda: em laço com
+dependência, <code>for (const id of ids) { const p = await buscar(id); }</code> roda em série, e é o que
+você quer quando cada pedido depende do anterior.</p>
+
+<p>A terceira é sobre tempo total. Vale fazer a conta antes de escolher: cinco pedidos de 300 milissegundos
+em série levam um segundo e meio; em paralelo, 300 milissegundos. O usuário sente a diferença, e a mudança
+é de uma linha — trocar o laço por <code>Promise.all(ids.map(...))</code>.</p>
+
+<p>O <code>Promise.race</code> merece um exemplo, porque resolve um problema real sem biblioteca: se o
+servidor da padaria às vezes demora demais, você pode apostar corrida entre o pedido e um relógio. O
+primeiro que terminar define o resultado — se o relógio ganhar, o código segue com um erro de "demorou
+demais" em vez de esperar para sempre. É a versão em JavaScript do bom e velho tempo limite, e a aula de
+cancelamento mostra a versão moderna, que também interrompe o pedido na rede.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Com <code>.then</code></th><th>Com <code>await</code></th><th>Quando usar</th></tr>
+<tr><td><code>f().then((x) =&gt; usar(x))</code></td><td><code>const x = await f(); usar(x)</code></td><td>o padrão do dia a dia</td></tr>
+<tr><td><code>f().catch((e) =&gt; tratar(e))</code></td><td><code>try { await f() } catch (e) { tratar(e) }</code></td><td>quando há mais de uma linha para tratar</td></tr>
+<tr><td><code>f().then(a).then(b)</code></td><td>dois <code>await</code> em sequência</td><td>quando o segundo depende do primeiro</td></tr>
+<tr><td><code>Promise.all([a(), b()])</code></td><td><code>await Promise.all([a(), b()])</code></td><td>pedidos independentes, resultado junto</td></tr>
+</table>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Coletor</th><th>O que devolve</th><th>Quando usar</th></tr>
+<tr><td><code>Promise.all</code></td><td>lista de valores; rejeita se um falhar</td><td>todos precisam dar certo</td></tr>
+<tr><td><code>Promise.allSettled</code></td><td>lista de objetos com <code>status</code></td><td>trazer o que der, mesmo com falhas</td></tr>
+<tr><td><code>Promise.race</code></td><td>o primeiro que terminar</td><td>disputar quem responde primeiro</td></tr>
+<tr><td><code>Promise.any</code></td><td>o primeiro que der certo</td><td>ter dois servidores e usar o que responder</td></tr>
+</table>
+</div>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o preço que virou texto estranho</h3>
+<p>A Ana somou o frete ao total e a tela mostrou <code>15[object Promise]</code>. A função do frete era
+<code>async</code> e ela esqueceu o <code>await</code> na chamada. O sintoma é sempre esse: número virando
+texto esquisito, conta virando <code>NaN</code>, valor sumindo do JSX. O conserto é o
+<code>await</code> — e a checagem é olhar a declaração da função chamada.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a lista com três itens vazios</h3>
+<p>Ela mapeou os ids com <code>ids.map(async (id) =&gt; buscar(id))</code> e a lista apareceu com os
+lugares certos e sem conteúdo. O <code>map</code> não espera: guardou três Promises. A correção foi
+<code>await Promise.all(ids.map((id) =&gt; buscar(id)))</code>, que espera as três e entrega os valores na
+ordem dos ids. O <code>async</code> dentro do <code>map</code> não é proibido — só não faz o que se espera
+dele.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o efeito que devolveu Promise</h3>
+<p>Ela escreveu <code>useEffect(async () =&gt; { ... }, [])</code> e recebeu um aviso no console do
+navegador. O React espera que a função do efeito devolva nada ou uma função de limpeza; uma função
+<code>async</code> devolve Promise, e a limpeza se perde. A correção é declarar uma função interna
+<code>async</code> e chamá-la — o efeito continua devolvendo o que o React espera, e a limpeza volta a
+funcionar.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que uma função marcada com <code>async</code> devolve?</p>
+<label><input type="radio" name="q1"> o valor direto, como qualquer função</label>
+<label><input type="radio" name="q1"> uma Promise que se cumpre com o valor</label>
+<label><input type="radio" name="q1"> <code>undefined</code>, sempre</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que o <code>await</code> faz?</p>
+<label><input type="radio" name="q2"> bloqueia a página inteira até a resposta chegar</label>
+<label><input type="radio" name="q2"> transforma a Promise em função</label>
+<label><input type="radio" name="q2"> espera a Promise e devolve o valor de dentro dela</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Quando usar <code>Promise.all</code> em vez de
+<code>await</code> em série?</p>
+<label><input type="radio" name="q3"> quando os pedidos não dependem um do outro</label>
+<label><input type="radio" name="q3"> sempre, em qualquer caso</label>
+<label><input type="radio" name="q3"> só quando um dos pedidos pode falhar</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: os dois pedidos juntos</h2>
+<p>Complete o código para pedir os dois produtos ao mesmo tempo, numa espera só:</p>
+<div class="ex-code">const lista = await <input aria-label="resposta 1" data-answer="Promise.all" placeholder="...">([buscar("pao"), buscar("croissant")]);</div>
+<p class="ex-dica">Dica: é o coletor que recebe uma lista de Promises e devolve uma Promise com a lista de
+resultados, na mesma ordem. Tem ponto no meio: <code>Promise.all</code>, com o <code>all</code> em
+minúsculas.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p><code>async</code> marca a função e embrulha o retorno em Promise; <code>await</code> espera essa
+Promise e devolve o valor de dentro. Os dois juntos transformam a escada de <code>.then</code> em linha
+reta, com <code>try</code> e <code>catch</code> nos lugares de sempre. Nada de bloqueio: só a função
+marcada espera, o resto da página continua vivo.</p>
+
+<p>O erro mais comum é esquecer o <code>await</code>, e os sintomas são reconhecíveis: número somando com
+Promise vira texto estranho, conta vira <code>NaN</code>, e o JSX às vezes não desenha nada. O segundo erro
+é achar que <code>map</code> com <code>async</code> espera: ele devolve Promises, e o conserto é
+<code>Promise.all</code>.</p>
+
+<p>E o terceiro é escolher mal o coletor. <code>Promise.all</code> quando todos precisam dar certo;
+<code>Promise.allSettled</code> quando basta trazer o que der. Pedidos independentes em paralelo, pedidos
+dependentes em série. A conta do tempo total vale antes de escrever, não depois.</p>
+
+<p>Na próxima aula, um botão que ninguém aperta duas vezes: cancelar um pedido em andamento com o
+<code>AbortController</code>, e o que fazer com o erro que aparece quando o pedido é interrompido.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>async</code> sempre devolve Promise, mesmo com <code>return 3</code>.</li>
+<li><code>await</code> só existe dentro de função <code>async</code>.</li>
+<li>Sem <code>await</code>, você recebe o embrulho, não o valor.</li>
+<li><code>map</code> com <code>async</code> devolve Promises: use <code>Promise.all</code>.</li>
+<li><code>Promise.all</code> rejeita se um falhar; <code>allSettled</code> espera todos.</li>
+<li>Pedidos independentes rodam juntos; dependentes, em série.</li>
+<li><code>try</code>/<code>catch</code> em volta do <code>await</code> pega o erro.</li>
+<li>No efeito, função <code>async</code> interna — nunca <code>useEffect(async …)</code>.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slots com children | Guia React</title>
+<meta name="description" content="Slots com children na prática: um componente de layout com lugares reservados, slots com nome por props, slot opcional e conteúdo padrão quando ninguém manda nada.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Slots com <span class="hl">children</span></h1>
+<p class="intro">As três páginas do site da Ana têm o mesmo desenho: um topo, um miolo, uma coluna
+lateral com o aviso do dia e um rodapé. O que muda é o conteúdo de cada pedaço. Nesta aula ela monta um
+componente de molde com <strong>lugares reservados</strong> — o miolo entra pelo <code>children</code> e
+os outros pedaços entram por props com nome — e aprende a lidar com o slot que ninguém preencheu.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um slot: um lugar reservado no desenho de um componente.</li>
+  <li>Por que o <code>children</code> é o slot principal e o que ele resolve sozinho.</li>
+  <li>Como criar slots com nome usando props que recebem elementos.</li>
+  <li>Quem manda na ordem e na moldura: o molde, não quem chama.</li>
+  <li>O que fazer com slot vazio: não desenhar ou desenhar um padrão.</li>
+  <li>Como escolher o nome e a quantidade de slots de um layout.</li>
+  <li>Por que um slot não substitui uma render prop quando o conteúdo depende do dado.</li>
+</ul>
+</div>
+
+<h2>1. A cena: três páginas, um molde</h2>
+
+<p>O site da Ana tem três páginas e um problema de manutenção. Todas começam com o mesmo topo, todas
+têm a mesma coluna lateral com o aviso de encomendas, todas terminam com o mesmo rodapé. O que muda é o
+miolo: na inicial, a vitrine; nas encomendas, o formulário; no contato, o endereço e o horário.</p>
+
+<p>Quando ela muda a cor da borda do aviso, mexe em três arquivos. Quando decide que o rodapé vem antes
+da lateral, mexe em três arquivos. É o mesmo sofrimento da primeira aula, com uma diferença: agora ela
+já sabe escrever componentes. O que falta é um componente cujo desenho tenha <em>buracos</em> — um
+molde com lugares reservados para o conteúdo de cada página.</p>
+
+<p>Na aula de <a href="children.html">O children</a> você viu o primeiro buraco: o conteúdo escrito
+entre a tag de abertura e a de fechamento chega ao componente como <code>children</code>, e o
+componente decide onde desenhá-lo. Na aula de <a href="composicao.html">Composição</a> apareceu a
+segunda ideia: uma prop também pode receber um pedaço de tela. Juntando as duas, dá para montar um molde
+com vários lugares: um principal, pelo <code>children</code>, e os outros por props com nome. É esse
+arranjo que o pessoal do React chama de <strong>slots</strong>, por analogia com os encaixes de uma
+fôrma.</p>
+
+<p>Vale fixar a imagem antes do código: pense em uma fôrma de bolo com divisórias. A fôrma decide onde
+cada parte fica e qual é o formato; você decide o que colocar em cada divisão. Se a fôrma tem três
+divisões e você só tem massa para duas, uma divisão fica vazia — e provavelmente não é isso que você
+quer na tela.</p>
+
+<h2>2. O que é um slot, na prática</h2>
+
+<p>Slot é um lugar no JSX do componente onde entra conteúdo de fora. Nada mais que isso. Do ponto de
+vista do React, todo slot é uma prop: o <code>children</code> é uma prop de nome reservado, e os outros
+slots são props com o nome que você escolher. A diferença está na forma de passar: um vai entre as tags,
+os outros vão como atributo.</p>
+
+<dl class="anatomy">
+<dt>slot</dt>
+<dd>Um lugar reservado no desenho de um componente, preenchido por quem usa o componente. No código,
+é uma prop que aparece dentro do JSX do molde.</dd>
+<dt>slot principal</dt>
+<dd>O <code>children</code>: tudo o que fica entre as tags. Serve bem para o miolo, o conteúdo que
+existe em toda página.</dd>
+<dt>slot com nome</dt>
+<dd>Uma prop como <code>topo</code>, <code>lateral</code> ou <code>rodape</code> que recebe um
+elemento. Serve quando o molde precisa de dois ou três lugares diferentes.</dd>
+<dt>molde</dt>
+<dd>O componente que organiza os slots: decide a ordem, as tags em volta de cada um e o que aparece
+quando o slot vem vazio. Também chamado de layout ou template.</dd>
+<dt>padrão do slot</dt>
+<dd>O conteúdo que o molde usa quando ninguém passa nada. Em JavaScript, é o valor padrão do
+parâmetro na desestruturação.</dd>
+</dl>
+
+<p>Repare que o slot recebe <strong>elemento</strong>, não dado. Isso tem uma consequência importante:
+quem preenche o slot já decidiu o que vai aparecer ali. O molde não tem acesso ao pão, ao preço ou ao
+nome do cliente; ele só tem o pedaço de tela pronto. Se o conteúdo precisa mudar conforme o dado, o
+molde não é a ferramenta certa — a aula anterior, <a href="render-props.html">Render Props</a>, mostra
+o que fazer nesse caso.</p>
+
+<h2>3. O slot principal é o children</h2>
+
+<p>Comece pelo buraco mais usado. O componente <code>Pagina</code> recebe o miolo pelo
+<code>children</code> e monta em volta o que é igual em toda página. Quem escreve a página não precisa
+saber em que tag o miolo vai ficar, nem se existe uma <code>div</code> em volta: isso é assunto do
+molde.</p>
+
+<pre class="file" data-file="Pagina.jsx">function Pagina({ children }) {
+  return (
+    &lt;div className="pagina"&gt;
+      &lt;header&gt;&lt;h1&gt;Padaria da Ana&lt;/h1&gt;&lt;/header&gt;
+      &lt;main&gt;{children}&lt;/main&gt;
+      &lt;footer&gt;Desde 1998&lt;/footer&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;Pagina&gt;
+      &lt;p&gt;Pão francês saindo do forno às 6h&lt;/p&gt;
+    &lt;/Pagina&gt;
+  );
+}</pre>
+
+<p>Com um slot só, o molde já resolve metade do problema: se o topo muda de lugar, muda em um arquivo.
+Mas o site da Ana tem mais dois pedaços que variam — o aviso da lateral e o texto do rodapé. Enfiar os
+dois dentro do miolo seria desfazer o molde; o caminho é dar nome a esses lugares.</p>
+
+<h2>4. Slots com nome: props que recebem pedaços de tela</h2>
+
+<p>Agora o molde ganha dois parâmetros a mais. <code>topo</code> e <code>rodape</code> são props como
+quaisquer outras; o valor delas é JSX, escrito na hora da chamada. Repare que a caixa já passa o rodapé
+— o componente é que esqueceu de desenhá-lo.</p>
+
+<div class="tryreact" data-goal="conta:footer=1;;texto:desde 1998">
+  <p class="try-task">O <code>App</code> entrega o rodapé na prop <code>rodape</code>, mas a
+  <code>Pagina</code> nunca o desenha. Coloque <code>{rodape}</code> dentro de um
+  <code>&lt;footer&gt;</code>, depois do <code>main</code>.</p>
+  <pre class="jsx">function Pagina({ topo, rodape, children }) {
+  return (
+    &lt;div className="pagina"&gt;
+      &lt;header&gt;{topo}&lt;/header&gt;
+      &lt;main&gt;{children}&lt;/main&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;Pagina topo={&lt;h1&gt;Pão do dia&lt;/h1&gt;} rodape={&lt;small&gt;Padaria da Ana — desde 1998&lt;/small&gt;}&gt;
+      &lt;p&gt;Francês saindo do forno às 6h&lt;/p&gt;
+    &lt;/Pagina&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div class="pagina"&gt;
+  &lt;header&gt;
+    &lt;h1&gt;Pão do dia&lt;/h1&gt;
+  &lt;/header&gt;
+  &lt;main&gt;
+    &lt;p&gt;Francês saindo do forno às 6h&lt;/p&gt;
+  &lt;/main&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Pagina({ topo, rodape, children }) {
+  return (
+    &lt;div className="pagina"&gt;
+      &lt;header&gt;{topo}&lt;/header&gt;
+      &lt;main&gt;{children}&lt;/main&gt;
+      &lt;footer&gt;{rodape}&lt;/footer&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;Pagina topo={&lt;h1&gt;Pão do dia&lt;/h1&gt;} rodape={&lt;small&gt;Padaria da Ana — desde 1998&lt;/small&gt;}&gt;
+      &lt;p&gt;Francês saindo do forno às 6h&lt;/p&gt;
+    &lt;/Pagina&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra o <code>div.pagina</code> com as três partes na ordem em que o molde as escreveu:
+cabeçalho, miolo, rodapé. O <code>App</code> não escolheu essa ordem — ele só entregou os pedaços. Essa
+é a vantagem principal dos slots: o molde manda na arrumação, quem chama manda no conteúdo.</p>
+
+<p>Uma dúvida que aparece aqui: por que <code>rodape={&lt;small&gt;...&lt;/small&gt;}</code> e não
+<code>rodape="Desde 1998"</code>? As duas formas funcionam — a segunda passa texto, o que é perfeitamente
+válido. A primeira passa um elemento completo, com tag e atributos, e é o que dá liberdade para o
+conteúdo ter negrito, link ou ícone. Use a mais simples que resolva.</p>
+
+<h2>5. O molde manda na ordem e na moldura</h2>
+
+<p>Este é o ponto que separa um layout de uma pilha de props. O molde não só reserva lugares: ele
+embrulha cada um na tag certa e na ordem certa. O topo sempre dentro de <code>&lt;header&gt;</code>, o
+miolo sempre dentro de <code>&lt;main&gt;</code>, o rodapé sempre depois. Quem escreve a página de
+contato não precisa lembrar disso — e não pode esquecer.</p>
+
+<p>É por isso que o slot costuma vir com uma <em>promessa</em>: "o que você passar em
+<code>topo</code> aparece dentro do cabeçalho, antes do miolo". Essa promessa é a API do componente de
+layout, do mesmo jeito que as props de um cartão são a API do cartão. Se o molde muda a promessa sem
+avisar — troca o rodapé de lugar, renomeia o slot —, todas as páginas quebram de uma vez.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Decisão</th><th>Quem decide</th><th>Por quê</th></tr>
+<tr><td>ordem das partes na tela</td><td>o molde</td><td>é o desenho da página, igual para todas</td></tr>
+<tr><td>tag que embrulha cada slot</td><td>o molde</td><td>garante a estrutura e o CSS em um lugar só</td></tr>
+<tr><td>nome do slot</td><td>o molde</td><td>faz parte da API; quem chama só usa</td></tr>
+<tr><td>o conteúdo de cada parte</td><td>quem chama</td><td>é o que muda de página para página</td></tr>
+</table>
+</div>
+
+<p>Um detalhe de HTML que vale o cuidado: se o molde coloca o slot dentro de um <code>&lt;p&gt;</code> e
+você passa um <code>&lt;div&gt;</code>, o navegador vai corrigir a estrutura por conta própria e o
+resultado pode surpreender. Slot dentro de <code>header</code>, <code>main</code>,
+<code>footer</code> e <code>aside</code> aceita quase tudo; slot dentro de <code>p</code> pede conteúdo
+em linha. Na dúvida, olhe o painel: o HTML que aparece ali é o que o navegador realmente montou.</p>
+
+<h2>6. Slot opcional: só desenhe quando veio</h2>
+
+<p>Nem toda página tem aviso lateral. A de contato, por exemplo, não precisa. Se o molde desenha o
+<code>&lt;aside&gt;</code> sempre, a página sem aviso ganha uma caixa vazia na lateral — e um espaço em
+branco que ninguém pediu. O conserto é desenhar o slot só quando ele existe, e isso é uma condição
+comum aplicada a uma prop.</p>
+
+<div class="tryreact" data-goal="conta:aside=1;;texto:Encomendas até as 17h;;conta:main=2">
+  <p class="try-task">A segunda página não passa <code>lateral</code>, mas o molde desenha o
+  <code>&lt;aside&gt;</code> de qualquer jeito. Desenhe a lateral apenas quando ela vier.</p>
+  <pre class="jsx">function Pagina({ topo, lateral, children }) {
+  return (
+    &lt;div className="pagina"&gt;
+      &lt;header&gt;{topo}&lt;/header&gt;
+      &lt;aside className="lateral"&gt;{lateral}&lt;/aside&gt;
+      &lt;main&gt;{children}&lt;/main&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Pagina topo={&lt;h1&gt;Pão do dia&lt;/h1&gt;} lateral={&lt;p&gt;Encomendas até as 17h&lt;/p&gt;}&gt;
+        &lt;p&gt;Francês saindo do forno às 6h&lt;/p&gt;
+      &lt;/Pagina&gt;
+      &lt;Pagina topo={&lt;h1&gt;Contato&lt;/h1&gt;}&gt;
+        &lt;p&gt;Fale com a Ana no balcão&lt;/p&gt;
+      &lt;/Pagina&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;div class="pagina"&gt;
+    &lt;header&gt;
+      &lt;h1&gt;Pão do dia&lt;/h1&gt;
+    &lt;/header&gt;
+    &lt;aside class="lateral"&gt;
+      &lt;p&gt;Encomendas até as 17h&lt;/p&gt;
+    &lt;/aside&gt;
+    &lt;main&gt;
+      &lt;p&gt;Francês saindo do forno às 6h&lt;/p&gt;
+    &lt;/main&gt;
+  &lt;/div&gt;
+  &lt;div class="pagina"&gt;
+    &lt;header&gt;
+      &lt;h1&gt;Contato&lt;/h1&gt;
+    &lt;/header&gt;
+    &lt;aside class="lateral"&gt;&lt;/aside&gt;
+    &lt;main&gt;
+      &lt;p&gt;Fale com a Ana no balcão&lt;/p&gt;
+    &lt;/main&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Pagina({ topo, lateral, children }) {
+  return (
+    &lt;div className="pagina"&gt;
+      &lt;header&gt;{topo}&lt;/header&gt;
+      {lateral ? &lt;aside className="lateral"&gt;{lateral}&lt;/aside&gt; : null}
+      &lt;main&gt;{children}&lt;/main&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Pagina topo={&lt;h1&gt;Pão do dia&lt;/h1&gt;} lateral={&lt;p&gt;Encomendas até as 17h&lt;/p&gt;}&gt;
+        &lt;p&gt;Francês saindo do forno às 6h&lt;/p&gt;
+      &lt;/Pagina&gt;
+      &lt;Pagina topo={&lt;h1&gt;Contato&lt;/h1&gt;}&gt;
+        &lt;p&gt;Fale com a Ana no balcão&lt;/p&gt;
+      &lt;/Pagina&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Agora o painel mostra um <code>aside</code> só, na página que passou o aviso. O
+<code>null</code> do ternário é o "nada" oficial do React: ele não desenha elemento nenhum, nem deixa
+espaço. Repare que a condição é sobre a prop, não sobre o conteúdo dela — <code>lateral</code> é um
+elemento quando existe e <code>undefined</code> quando não existe, e <code>undefined</code> é falso.</p>
+
+<p>Existe uma armadilha aqui: <code>{lateral &amp;&amp; &lt;aside&gt;...&lt;/aside&gt;}</code> também
+funciona, e é mais curto. Só que, se um dia alguém passar <code>lateral={0}</code> ou
+<code>lateral=""</code>, o <code>0</code> aparece na tela e a string vazia some. Com elemento isso não
+acontece na prática, mas o ternário não deixa dúvida. O assunto está em
+<a href="renderizacao-condicional.html">Renderização Condicional</a>.</p>
+
+<h2>7. Slot com conteúdo padrão</h2>
+
+<p>Às vezes o slot vazio não é um problema: é o convite para o molde mostrar o que ele mesmo sabe. Toda
+página da padaria deveria ter o nome no topo; se a página não manda um título próprio, o molde usa o
+título da casa. Em JavaScript isso é valor padrão de parâmetro, e a sintaxe é a mesma de uma função
+comum.</p>
+
+<div class="tryreact" data-goal="conta:h1=2;;texto:Padaria da Ana;;conta:.pagina=2">
+  <p class="try-task">A segunda página não passa <code>topo</code>, então o cabeçalho fica vazio. Dê ao
+  slot <code>topo</code> o padrão <code>&lt;h1&gt;Padaria da Ana&lt;/h1&gt;</code> e clique em Rodar.</p>
+  <pre class="jsx">function Pagina({ topo, children }) {
+  return (
+    &lt;div className="pagina"&gt;
+      &lt;header&gt;{topo}&lt;/header&gt;
+      &lt;main&gt;{children}&lt;/main&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Pagina topo={&lt;h1&gt;Pão do dia&lt;/h1&gt;}&gt;
+        &lt;p&gt;Francês saindo do forno às 6h&lt;/p&gt;
+      &lt;/Pagina&gt;
+      &lt;Pagina&gt;
+        &lt;p&gt;Encomendas pelo balcão&lt;/p&gt;
+      &lt;/Pagina&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;div class="pagina"&gt;
+    &lt;header&gt;
+      &lt;h1&gt;Pão do dia&lt;/h1&gt;
+    &lt;/header&gt;
+    &lt;main&gt;
+      &lt;p&gt;Francês saindo do forno às 6h&lt;/p&gt;
+    &lt;/main&gt;
+  &lt;/div&gt;
+  &lt;div class="pagina"&gt;
+    &lt;header&gt;&lt;/header&gt;
+    &lt;main&gt;
+      &lt;p&gt;Encomendas pelo balcão&lt;/p&gt;
+    &lt;/main&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Pagina({ topo = &lt;h1&gt;Padaria da Ana&lt;/h1&gt;, children }) {
+  return (
+    &lt;div className="pagina"&gt;
+      &lt;header&gt;{topo}&lt;/header&gt;
+      &lt;main&gt;{children}&lt;/main&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Pagina topo={&lt;h1&gt;Pão do dia&lt;/h1&gt;}&gt;
+        &lt;p&gt;Francês saindo do forno às 6h&lt;/p&gt;
+      &lt;/Pagina&gt;
+      &lt;Pagina&gt;
+        &lt;p&gt;Encomendas pelo balcão&lt;/p&gt;
+      &lt;/Pagina&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Duas páginas, dois títulos: "Pão do dia" na primeira, "Padaria da Ana" na segunda. O padrão vale
+somente quando a prop chega <code>undefined</code> — se alguém passar <code>topo={null}</code> de
+propósito, o padrão não entra e o cabeçalho fica vazio. É uma diferença sutil e útil: o padrão responde
+ao "não mandei nada", não ao "mandei nada".</p>
+
+<p>Esse recurso resolve bem o rodapé e o título, que são iguais em quase toda página. Não use padrão
+para conteúdo que muda de sentido: um aviso lateral com texto genérico é pior do que aviso nenhum. Na
+dúvida entre um padrão e um slot opcional, escolha o que deixa a página mais honesta.</p>
+
+<p>Quando a dúvida é "esse slot chegou?", um log com a lista dos preenchidos responde na hora:</p>
+
+<pre class="file" data-file="Pagina.jsx">function Pagina({ topo, lateral, rodape, children }) {
+  const recebidos = [
+    topo &amp;&amp; "topo",
+    lateral &amp;&amp; "lateral",
+    rodape &amp;&amp; "rodape",
+    children &amp;&amp; "children"
+  ];
+  console.log("slots recebidos: " + recebidos.filter(Boolean).join(", "));
+  return &lt;div className="pagina"&gt;{topo}{lateral}{children}{rodape}&lt;/div&gt;;
+}</pre>
+
+<p>Na página que manda título, aviso e miolo, o console mostra:</p>
+
+<pre class="term">console: slots recebidos: topo, lateral, children</pre>
+
+<p>A lista sai na ordem do array, e não na ordem da tela — ela serve para conferir presença, não
+posição. Se <code>rodape</code> não aparece na lista, o problema está na chamada: a página não passou
+aquela prop, ou passou <code>undefined</code> de propósito.</p>
+
+<h2>8. A API do layout: quantos slots e com que nomes</h2>
+
+<p>Nome de slot é contrato. Se você chama de <code>topo</code>, quem usa o molde escreve
+<code>topo=</code> e pronto; renomear depois quebra todas as páginas. Por isso vale escolher nomes
+ligados à <em>posição</em> na tela (topo, lateral, rodape, acoes) e não ao conteúdo daquele dia
+(avisoDeEncomenda, textoDoTitulo). Posição sobrevive à mudança de texto; conteúdo não.</p>
+
+<p>Quantos slots? O suficiente para os pedaços que realmente variam, e não mais. Um molde com sete slots
+deixa de ser molde e vira um formulário de montagem: quem chama precisa preencher sete campos para
+desenhar uma página, e metade deles fica <code>undefined</code>. Na prática, dois ou três slots cobrem
+quase todo layout de site — um principal, um de navegação e um de ações ou rodapé.</p>
+
+<p>Há também a tentação de transformar slot em configuração. Se você percebe que está passando
+<code>topo={&lt;h1 style={{color: "red"}}&gt;...&lt;/h1&gt;}</code> em toda página para "deixar igual",
+o que você quer não é um slot: é uma variante do molde, ou um estilo dentro dele. Slot é para o que
+muda; o que é sempre igual mora no molde.</p>
+
+<pre class="file" data-file="Pagina.jsx">function Pagina({ topo, lateral, children }) {
+  console.log("typeof topo: " + typeof topo);
+  console.log("typeof lateral: " + typeof lateral);
+  return (
+    &lt;div className="pagina"&gt;
+      &lt;header&gt;{topo}&lt;/header&gt;
+      {lateral ? &lt;aside&gt;{lateral}&lt;/aside&gt; : null}
+      &lt;main&gt;{children}&lt;/main&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Para descobrir o que chegou em cada slot, um <code>console.log</code> com <code>typeof</code> já
+resolve. Na página que passa <code>topo</code> e não passa <code>lateral</code>, o console mostra:</p>
+
+<pre class="term">typeof topo: object
+typeof lateral: undefined</pre>
+
+<p><code>object</code> é o esperado: um elemento React é um objeto que descreve a tag. Se aparecer
+<code>function</code>, você passou o componente em vez do elemento — <code>topo={Cabecalho}</code> em
+vez de <code>topo={&lt;Cabecalho /&gt;}</code> — e o slot não desenha nada. Se aparecer
+<code>string</code>, você passou texto, que é válido, mas não traz tag nenhuma junto.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O conteúdo depende de…</th><th>Passe</th><th>Porque o componente</th></tr>
+<tr><td>nada: já é o que aparece na tela</td><td>elemento (<code>children</code> ou prop)</td><td>só posiciona; conteúdo pronto</td></tr>
+<tr><td>um item por vez de uma lista</td><td>função (render prop)</td><td>chama a função para cada item</td></tr>
+<tr><td>um dado simples, como um nome</td><td>prop de texto</td><td>decide a tag e o formato</td></tr>
+<tr><td>o estado do próprio componente</td><td>só o molde</td><td>o resto nem precisa saber</td></tr>
+</table>
+</div>
+
+<p>A primeira linha é o caso do slot; a segunda, o da render prop. As duas reservam lugar no desenho, e
+a diferença é <em>quando</em> o conteúdo é decidido: antes, por quem chama; durante, pelo componente. Com
+essa pergunta — "quem decide o conteúdo, e quando?" — você acerta o padrão sem tentativa e erro.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a página sem rodapé</h3>
+<p>A Ana criou a página de contato e esqueceu de passar <code>rodape</code>. O molde desenhou um
+<code>&lt;footer&gt;</code> vazio, com a borda de cima aparecendo sozinha. Duas saídas: dar um padrão ao
+slot, como no exemplo do título, ou desenhar o rodapé só quando vier. Se o rodapé é obrigatório em toda
+página, a terceira saída é a mais honesta — tirar o slot e escrever o rodapé dentro do molde, já que ele
+nunca muda.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o slot recebeu um componente</h3>
+<p>Ela escreveu <code>topo={TituloDaPagina}</code>, sem os sinais de menor e maior. O valor chegou como
+função, e função não é conteúdo que o React desenhe: o cabeçalho ficou vazio, sem erro no console. O
+conserto é uma letra de cada lado — <code>topo={&lt;TituloDaPagina /&gt;}</code> — porque o slot quer o
+resultado do componente, já montado como elemento, e não a receita dele.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o mesmo slot em duas páginas com dados diferentes</h3>
+<p>Ela quis usar <code>lateral</code> para o aviso de cada pão, e percebeu que o slot recebe um elemento
+pronto: não dá para pedir "desenhe um aviso para cada pão". Slot não percorre dados. Nesse caso, o molde
+não serve — o que ela precisa é de um componente que receba o array e chame uma função por item, como a
+render prop da aula anterior, ou simplesmente montar a lista antes e passar o resultado pronto no
+slot.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. Qual é o slot que chega sem atributo nenhum?</p>
+<label><input type="radio" name="sl1"> <code>topo</code></label>
+<label><input type="radio" name="sl1"> <code>rodape</code></label>
+<label><input type="radio" name="sl1"> <code>children</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. Quem decide a ordem em que os slots aparecem?</p>
+<label><input type="radio" name="sl2"> o molde, no JSX dele</label>
+<label><input type="radio" name="sl2"> quem chama, pela ordem dos atributos</label>
+<label><input type="radio" name="sl2"> o React, pela ordem alfabética das props</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. O que acontece quando um slot opcional não é passado
+e o molde o desenha sem condição?</p>
+<label><input type="radio" name="sl3"> o React reclama e não desenha a página</label>
+<label><input type="radio" name="sl3"> o slot vira <code>undefined</code> e a caixa aparece vazia</label>
+<label><input type="radio" name="sl3"> o molde usa automaticamente o texto do slot anterior</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o nome do slot principal</h2>
+<p>O molde abaixo recebe o título por uma prop e o miolo entre as tags. Complete o nome do parâmetro que
+recebe esse miolo. Depois responda: quem manda na ordem das partes da página, o molde ou quem chama?</p>
+<div class="ex-code">function Pagina({ topo, <input aria-label="resposta 1" data-answer="children" placeholder="..."> }) {
+  return &lt;main&gt;{children}&lt;/main&gt;;
+}</div>
+<p class="ex-dica">Dica: é a prop de nome reservado que o React preenche sozinho com o que fica entre a
+tag de abertura e a de fechamento.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Slot é um lugar reservado no JSX de um componente. O principal é o <code>children</code>: tudo o que
+você escreve entre as tags chega nele. Os outros são props com nome — <code>topo</code>,
+<code>lateral</code>, <code>rodape</code>, <code>acoes</code> — que recebem elementos prontos. O molde
+manda na ordem, nas tags em volta e nos nomes; quem chama manda no conteúdo.</p>
+
+<p>Slot vazio dá dois caminhos. Se o pedaço é opcional, desenhe só quando a prop existir, com um
+ternário e <code>null</code> no outro lado. Se o pedaço é obrigatório mas tem um conteúdo natural de
+reserva, use valor padrão no parâmetro. E se o pedaço nunca muda, não faça dele um slot: escreva dentro
+do molde e economize uma prop.</p>
+
+<p>Vale guardar o limite desse padrão. Slot recebe tela pronta, então ele não sabe de dados: não
+percorre lista, não formata preço, não busca nada. Quando o conteúdo depende do dado, o padrão certo é a
+render prop, que passa uma função em vez de um elemento. As duas ideias são irmãs: uma reserva o lugar
+para o que já está desenhado; a outra reserva o lugar para o que ainda vai ser desenhado, item por
+item.</p>
+
+<p>E o ganho de tudo isso é o mesmo desde a primeira aula, agora com nome: mudar o desenho do site em um
+arquivo só. Se a Ana decidir que o aviso lateral aparece antes do miolo em todas as páginas, ela muda o
+molde e as três páginas acompanham — porque nenhuma delas sabia da ordem. Esse é o teste de um bom
+componente de layout: quem usa não precisa saber como ele arruma as coisas por dentro.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Slot é lugar reservado: no código, é uma prop desenhada dentro do JSX do molde.</li>
+<li><code>children</code> é o slot principal; os outros têm nome e viram atributo.</li>
+<li>Slot recebe elemento (<code>topo={&lt;h1&gt;...&lt;/h1&gt;}</code>), nunca o componente solto.</li>
+<li>O molde decide ordem, tags em volta e nomes dos slots.</li>
+<li>Slot opcional: <code>{lateral ? &lt;aside&gt;{lateral}&lt;/aside&gt; : null}</code>.</li>
+<li>Slot com padrão: <code>topo = &lt;h1&gt;Padaria da Ana&lt;/h1&gt;</code> no parâmetro.</li>
+<li>Padrão só entra quando a prop é <code>undefined</code>, não quando é <code>null</code>.</li>
+<li>Nome de slot é contrato: use posição, não o texto daquele dia.</li>
+<li>Dois ou três slots bastam; sete slots viram formulário de montagem.</li>
+<li>Conteúdo que depende do dado pede render prop, não slot.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

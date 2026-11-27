@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cache Simples | Guia React</title>
+<meta name="description" content="Cache simples no React: guardar a resposta, consultar antes de pedir de novo, validade com hora, chave por consulta e quando não vale a pena guardar.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Cache <span class="hl">simples</span></h1>
+<p class="intro">A vitrine da Ana passou a mostrar o preço do dia buscado no servidor. Ficou bonito e ficou
+lento: cada visita à página refazia o pedido, e no 3G da feira o preço demorava três segundos para
+aparecer. Pior, a Ana percebeu que clicava em “ver preço”, voltava, clicava de novo — e o servidor recebia
+três pedidos idênticos em quinze segundos. A resposta era a mesma nas três vezes; só o trabalho de perguntar
+de novo era desperdício. Nesta aula ela aprende a guardar a resposta na primeira vez e a servir do bolso
+nas próximas.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é cache, em três palavras: chave, valor e validade.</li>
+  <li>Como consultar antes de pedir, com um <code>Map</code>.</li>
+  <li>Onde o cache vive: <code>useRef</code>, variável de módulo ou estado — e a diferença prática.</li>
+  <li>Como dar validade à entrada para o preço não ficar velho a tarde inteira.</li>
+  <li>Por que a chave do cache tem de ser a consulta inteira, e não “a última”.</li>
+  <li>Quando <em>não</em> vale a pena guardar — e por que isso é metade do assunto.</li>
+  <li>Como mostrar na tela que o dado veio do cache.</li>
+</ul>
+</div>
+
+<h2>1. A cena: os três cliques e as três esperas</h2>
+
+<p>O componente da vitrine, na versão sem cache, faz o que parece certo: um efeito busca o preço quando a
+página monta, guarda no estado e mostra. Funciona uma vez. O problema aparece quando a Ana navega: cada
+volta para a vitrine desmonta e monta o componente de novo, o efeito roda de novo, o pedido vai de novo.</p>
+
+<pre class="file" data-file="App.jsx">function buscarPreco(nome) {
+  chamadas += 1;
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok(1.2), 0));
+}
+
+function App() {
+  const [preco, setPreco] = useState(null);
+
+  useEffect(() =&gt; {
+    buscarPreco("pão francês").then((valor) =&gt; setPreco(valor));
+  }, []);
+
+  return &lt;p&gt;Pão francês: R$ {preco}&lt;/p&gt;;
+}</pre>
+
+<p>Cada montagem custa uma ida ao servidor e um tempinho de tela vazia. Numa página só, nada demais. Num
+site em que a pessoa entra e sai da vitrine cinco vezes, são cinco esperas para receber cinco vezes o mesmo
+número. O cache resolve isso com uma ideia antiga e modesta: depois de receber a resposta, guarde uma cópia;
+antes de pedir, olhe se a cópia está ali.</p>
+
+<h2>2. O que é cache, na prática</h2>
+
+<p>Cache é uma reserva de respostas já recebidas, guardadas para serem reusadas. Toda entrada de cache tem
+três partes, e quem esquece a terceira é que se dá mal. A <strong>chave</strong> diz respeito a qual
+pergunta — aqui, o nome do pão. O <strong>valor</strong> é a resposta que veio. A
+<strong>validade</strong> é por quanto tempo essa resposta ainda pode ser considerada verdade.</p>
+
+<p>A validade é o que separa cache de mentira. Guardar o preço de hoje e servir amanhã é mostrar preço
+errado com cara de certo. Guardar por dez segundos, numa vitrine que muda de hora em hora, é seguro. A
+pergunta “por quanto tempo?” não tem resposta universal: ela depende de quanto tempo o dado leva para
+envelhecer de verdade. Preço de pão muda no começo do dia; cotação muda a cada segundo; CEP de um endereço
+não muda nunca.</p>
+
+<dl class="anatomy">
+<dt>cache</dt>
+<dd>Reserva de respostas prontas, guardadas para não perguntar de novo a mesma coisa.</dd>
+<dt>chave</dt>
+<dd>O que identifica a pergunta: o nome do pão, a página, o filtro. Duas perguntas diferentes precisam de
+chaves diferentes, senão uma resposta atende a outra.</dd>
+<dt>validade</dt>
+<dd>Por quanto tempo a cópia ainda vale. Passou do prazo, a entrada é <em>stale</em> (velha) e a resposta
+tem de ser buscada de novo.</dd>
+<dt>stale</dt>
+<dd>A entrada velha. Ainda pode ser mostrada por um instante enquanto a nova chega, mas não pode ser
+tratada como verdade.</dd>
+<dt>invalidar</dt>
+<dd>Apagar ou marcar a entrada como velha de propósito — depois de um preço novo ser salvo, por exemplo.</dd>
+</dl>
+
+<h2>3. Guardar e consultar: o Map</h2>
+
+<p>A estrutura de dados certa para um cache é o <code>Map</code>: um dicionário em que você procura pela
+chave e recebe o valor. Tem <code>set</code> para guardar, <code>get</code> para ler e <code>has</code>
+para saber se a chave existe. Diferente de um objeto comum, o <code>Map</code> aceita qualquer coisa como
+chave e sabe quantos itens tem.</p>
+
+<div class="tryreact" data-goal="clique:#buscar;;texto:veio do: cache;;texto:chamadas à API: 1">
+  <p class="try-task">O botão busca o preço <strong>duas vezes seguidas</strong> e o servidor é chamado nas
+  duas. Use o <code>Map</code> chamado <code>cache</code>: guarde na primeira busca e sirva do cache na
+  segunda, sem chamar a API — a tela tem de mostrar <strong>veio do: cache</strong> e
+  <strong>chamadas à API: 1</strong>.</p>
+  <pre class="jsx">function buscarPreco(nome) {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok(1.2), 0));
+}
+
+const cache = new Map();
+
+function App() {
+  const [preco, setPreco] = useState(null);
+  const [origem, setOrigem] = useState("");
+  const [n, setN] = useState(0);
+
+  async function buscar(nome) {
+    const valor = await buscarPreco(nome);
+    setPreco(valor);
+    setOrigem("servidor");
+    setN((v) =&gt; v + 1);
+  }
+
+  async function verDuasVezes() {
+    await buscar("pão francês");
+    await buscar("pão francês");
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button id="buscar" onClick={verDuasVezes}&gt;buscar duas vezes&lt;/button&gt;
+      &lt;p&gt;preço: {preco === null ? "—" : "R$ " + preco.toFixed(2).replace(".", ",")}&lt;/p&gt;
+      &lt;p&gt;veio do: {origem}&lt;/p&gt;
+      &lt;p&gt;chamadas à API: {n}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="buscar"&gt;buscar duas vezes&lt;/button&gt;
+  &lt;p&gt;preço: —&lt;/p&gt;
+  &lt;p&gt;veio do:&lt;/p&gt;
+  &lt;p&gt;chamadas à API: 0&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscarPreco(nome) {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok(1.2), 0));
+}
+
+const cache = new Map();
+
+function App() {
+  const [preco, setPreco] = useState(null);
+  const [origem, setOrigem] = useState("");
+  const [n, setN] = useState(0);
+
+  async function buscar(nome) {
+    if (cache.has(nome)) {
+      setPreco(cache.get(nome));
+      setOrigem("cache");
+      return;
+    }
+    const valor = await buscarPreco(nome);
+    cache.set(nome, valor);
+    setPreco(valor);
+    setOrigem("servidor");
+    setN((v) =&gt; v + 1);
+  }
+
+  async function verDuasVezes() {
+    await buscar("pão francês");
+    await buscar("pão francês");
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button id="buscar" onClick={verDuasVezes}&gt;buscar duas vezes&lt;/button&gt;
+      &lt;p&gt;preço: {preco === null ? "—" : "R$ " + preco.toFixed(2).replace(".", ",")}&lt;/p&gt;
+      &lt;p&gt;veio do: {origem}&lt;/p&gt;
+      &lt;p&gt;chamadas à API: {n}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<h2>4. Onde o cache vive</h2>
+
+<p>Essa é a decisão que mais muda o comportamento, e ela quase nunca é explicada. O cache pode ficar em três
+lugares, e cada um sobrevive a coisas diferentes:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde</th><th>Sobrevive a re-render?</th><th>Sobrevive a desmontar?</th><th>Quando usar</th></tr>
+<tr><td><code>useState</code></td><td>sim</td><td>não</td><td>quando o cache aparece na tela e mudar deve redesenhar</td></tr>
+<tr><td><code>useRef</code></td><td>sim</td><td>não</td><td>memória do componente: guarda o <code>Map</code> sem redesenhar</td></tr>
+<tr><td>variável de módulo</td><td>sim</td><td>sim</td><td>cache que vale para o site inteiro, entre páginas, até recarregar</td></tr>
+</table>
+</div>
+
+<p>A variável de módulo — <code>const cache = new Map()</code> no topo do arquivo, fora do componente — é a
+mais generosa: ela nasce uma vez, quando o arquivo é carregado, e morre quando a página é recarregada. Como
+o componente é desmontado e montado a cada visita, o cache de módulo é o único que faz a segunda visita
+valer. É o que a caixa da seção anterior usou, e é a escolha certa para preço de vitrine.</p>
+
+<p>O <code>useRef</code> resolve o caso em que o cache pertence à vida daquele componente: um
+<code>Map</code> criado com <code>useRef(new Map())</code> fica guardado entre desenhos e some quando o
+componente sai da tela. Use ref quando a reserva é da instância; use módulo quando a reserva é do site; use
+estado quando a tela precisa reagir ao cache — por exemplo, para desenhar uma lista de “já vistos”.</p>
+
+<h2>5. Validade: a etiqueta com hora</h2>
+
+<p>Sem validade, o cache vira armadilha: a Ana mudaria o preço no servidor e a vitrine mostraria o valor da
+manhã até alguém recarregar a página. A solução é guardar, junto do valor, o instante em que ele foi
+buscado, e comparar com o instante de agora.</p>
+
+<p>Nas caixas deste guia não há relógio de verdade — e usar a hora real deixaria o exemplo impossível de
+conferir, porque cada execução daria um resultado. Por isso o “agora” aqui é um contador que você avança
+com um botão. No seu projeto, o mesmo lugar é ocupado por <code>Date.now()</code>, que devolve milissegundos
+desde 1970 — o tipo de número que só serve para subtrair.</p>
+
+<div class="tryreact" data-goal="clique:#buscar;;clique:#avancar;;clique:#buscar;;texto:chamadas à API: 2">
+  <p class="try-task">O cache está sendo usado para sempre, mesmo depois dos 10 segundos de validade. Faça
+  a consulta verificar a idade da entrada: se <code>agora - salvoEm &gt;= 10</code>, busque de novo no
+  servidor (o contador de chamadas tem de chegar a 2 depois de buscar, avançar e buscar).</p>
+  <pre class="jsx">function buscarPreco(versao) {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok(1.2 + versao * 0.1), 0));
+}
+
+const cache = new Map();
+
+function App() {
+  const [agora, setAgora] = useState(0);
+  const [preco, setPreco] = useState(null);
+  const [n, setN] = useState(0);
+
+  async function ver() {
+    if (cache.has("pão francês")) {
+      setPreco(cache.get("pão francês").valor);
+    } else {
+      const valor = await buscarPreco(n);
+      cache.set("pão francês", { valor: valor, salvoEm: agora });
+      setPreco(valor);
+      setN(n + 1);
+    }
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button id="buscar" onClick={ver}&gt;ver preço&lt;/button&gt;
+      &lt;button id="avancar" onClick={() =&gt; setAgora(agora + 10)}&gt;avançar 10 s&lt;/button&gt;
+      &lt;p&gt;preço: {preco === null ? "—" : "R$ " + preco.toFixed(2).replace(".", ",")}&lt;/p&gt;
+      &lt;p&gt;agora: {agora} s&lt;/p&gt;
+      &lt;p&gt;chamadas à API: {n}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="buscar"&gt;ver preço&lt;/button&gt;
+  &lt;button id="avancar"&gt;avançar 10 s&lt;/button&gt;
+  &lt;p&gt;preço: —&lt;/p&gt;
+  &lt;p&gt;agora: 0 s&lt;/p&gt;
+  &lt;p&gt;chamadas à API: 0&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscarPreco(versao) {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok(1.2 + versao * 0.1), 0));
+}
+
+const cache = new Map();
+
+function App() {
+  const [agora, setAgora] = useState(0);
+  const [preco, setPreco] = useState(null);
+  const [n, setN] = useState(0);
+
+  async function ver() {
+    const entrada = cache.get("pão francês");
+    const velha = !entrada || agora - entrada.salvoEm &gt;= 10;
+
+    if (!velha) {
+      setPreco(entrada.valor);
+    } else {
+      const valor = await buscarPreco(n);
+      cache.set("pão francês", { valor: valor, salvoEm: agora });
+      setPreco(valor);
+      setN(n + 1);
+    }
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button id="buscar" onClick={ver}&gt;ver preço&lt;/button&gt;
+      &lt;button id="avancar" onClick={() =&gt; setAgora(agora + 10)}&gt;avançar 10 s&lt;/button&gt;
+      &lt;p&gt;preço: {preco === null ? "—" : "R$ " + preco.toFixed(2).replace(".", ",")}&lt;/p&gt;
+      &lt;p&gt;agora: {agora} s&lt;/p&gt;
+      &lt;p&gt;chamadas à API: {n}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A variável <code>velha</code> é a regra escrita por extenso, e vale criar esse nome mesmo quando o
+projeto é pequeno: ela documenta a decisão. Note os dois casos que caem em “velha”: entrada inexistente
+(<code>!entrada</code>) e entrada com idade acima do limite. Entrada inexistente é o primeiro acesso, e é
+justo que ele vá ao servidor.</p>
+
+<p>Existe um meio-termo entre mostrar o valor velho e mostrar tela vazia, e ele tem nome:
+<em>stale-while-revalidate</em> — “mostre o velho enquanto busca o novo”. A tela desenha o preço que está no
+cache na hora e a busca acontece por trás; quando a resposta chega, o preço é atualizado. Ninguém espera, e
+o valor velho aparece no máximo por instantes. Na prática: leia o cache, pinte, dispare a busca, substitua
+ao chegar.</p>
+
+<h2>6. Uma chave por consulta</h2>
+
+<p>O erro mais caro de cache é usar um espaço só para todas as perguntas. A Ana tinha isso na primeira
+versão da vitrine: guardava “o último preço buscado” numa variável. Enquanto ela olhava só o pão francês,
+funcionava. No dia em que clicou no brioche, a tela mostrou o preço do francês — com a confiança de quem
+acertou.</p>
+
+<div class="tryreact" data-goal="clique:#dois;;texto:R$ 4,50 — brioche">
+  <p class="try-task">O botão consulta o pão francês e depois o brioche. O cache guarda um valor só, então
+  o brioche aparece com o preço do francês. Guarde uma entrada por pão no <code>Map</code> e mostre
+  <strong>R$ 4,50 — brioche</strong>.</p>
+  <pre class="jsx">function buscarPreco(nome) {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok(nome === "brioche" ? 4.5 : 1.2), 0));
+}
+
+const ultimo = { valor: 0 };
+
+function App() {
+  const [nome, setNome] = useState("—");
+  const [preco, setPreco] = useState(0);
+
+  async function ver(pao) {
+    setNome(pao);
+    if (ultimo.valor) {
+      setPreco(ultimo.valor);
+      return;
+    }
+    const valor = await buscarPreco(pao);
+    ultimo.valor = valor;
+    setPreco(valor);
+  }
+
+  async function verOsDois() {
+    await ver("pão francês");
+    await ver("brioche");
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button id="dois" onClick={verOsDois}&gt;ver os dois&lt;/button&gt;
+      &lt;p&gt;R$ {preco.toFixed(2).replace(".", ",")} — {nome}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="dois"&gt;ver os dois&lt;/button&gt;
+  &lt;p&gt;R$ 0,00 — —&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscarPreco(nome) {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok(nome === "brioche" ? 4.5 : 1.2), 0));
+}
+
+const cache = new Map();
+
+function App() {
+  const [nome, setNome] = useState("—");
+  const [preco, setPreco] = useState(0);
+
+  async function ver(pao) {
+    setNome(pao);
+    if (cache.has(pao)) {
+      setPreco(cache.get(pao));
+      return;
+    }
+    const valor = await buscarPreco(pao);
+    cache.set(pao, valor);
+    setPreco(valor);
+  }
+
+  async function verOsDois() {
+    await ver("pão francês");
+    await ver("brioche");
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button id="dois" onClick={verOsDois}&gt;ver os dois&lt;/button&gt;
+      &lt;p&gt;R$ {preco.toFixed(2).replace(".", ",")} — {nome}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Um cuidado que só aparece em projeto que roda o dia inteiro: o <code>Map</code> cresce. Cada pão
+diferente vira uma entrada que fica ali até a página ser recarregada. Para uma vitrine com trinta pães não é
+problema. Para uma busca que aceita qualquer texto digitado, um cache sem limite guarda todas as consultas
+da tarde. A saída é simples: apague a entrada mais antiga quando o <code>cache.size</code> passar de um
+número que você escolheu — vinte, cinquenta —, ou use o cache só para as consultas mais repetidas.</p>
+
+<p>A chave tem de conter <em>tudo</em> que muda a resposta. Se a API recebe filtro e página, a chave é o
+filtro mais a página; se depende de quem está logado, o identificador da pessoa entra na chave — nunca o
+contrário. Cache que ignora parte da pergunta devolve a resposta de outra pessoa, e esse é o tipo de bug que
+passa em teste e aparece em produção.</p>
+
+<h2>7. Cache que mentiu: invalidar de propósito</h2>
+
+<p>Existe uma hora em que a cópia deixa de ser útil mesmo dentro da validade: quando você mesmo muda o dado.
+A Ana ajustou o preço do brioche pela tela de administração e voltou para a vitrine, que mostrou o valor
+antigo por dez segundos. Ela sabia que estava certo no servidor e não acreditou na tela — desconfiança justa.</p>
+
+<p>A saída é <code>cache.delete(chave)</code> logo depois de uma gravação bem-sucedida. Chama-se invalidar:
+o dado mudou, a cópia não presta mais. Não é preciso apagar o cache inteiro; apague a chave afetada. Se a
+gravação mexe em várias telas, apague as chaves relacionadas — preço do pão afeta a vitrine e o carrinho.</p>
+
+<p>Duas linhas de log como estas, colocadas dentro da função de busca, mostram de onde veio cada resposta e
+economizam muito tempo de investigação:</p>
+
+<pre class="term">console: entregue do cache: pão francês
+console: buscando no servidor: brioche</pre>
+
+<p>A segunda linha útil é a contagem de entradas, que mostra se o cache está crescendo como você espera —
+uma entrada por pão, não uma por visita:</p>
+
+<pre class="term">console: tamanho do cache: 2</pre>
+
+<p>Se o log do servidor aparece sempre, o cache não está sendo encontrado: chave diferente da usada no
+<code>set</code>, <code>Map</code> recriado a cada desenho ou validade curta demais. Os três tropeços da
+próxima seção são exatamente essas três causas.</p>
+
+<h2>8. Os tropeços com cache</h2>
+
+<p>O tropeço silencioso é o cache que nunca acerta: <code>const cache = new Map()</code> escrito
+<em>dentro</em> do componente. A cada desenho nasce um <code>Map</code> novo, vazio, e a consulta nunca
+encontra nada. O sintoma é o contrário do esperado — todas as buscas vão ao servidor, e o código parece
+certo na leitura.</p>
+
+<p>O segundo é o oposto: guardar sem validade e nunca invalidar. A tela fica rápida e mentirosa, e o
+conserto costuma ser procurado no servidor, que está certíssimo. O terceiro é guardar o que não deve:
+resposta com dado pessoal, token, carrinho de outra pessoa. Cache é memória compartilhada pelo tempo que
+você escolher — e vazamento de dado também.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você vê</th><th>Causa provável</th><th>Conserto</th></tr>
+<tr><td>a API é chamada em toda visita</td><td><code>Map</code> criado dentro do componente</td><td>criar fora do componente, ou em <code>useRef</code></td></tr>
+<tr><td>preço de um pão aparece em outro</td><td>chave única para consultas diferentes</td><td>chavear pelo nome (ou filtro e página)</td></tr>
+<tr><td>dado antigo depois de salvar</td><td>falta invalidar após a gravação</td><td><code>cache.delete(chave)</code> no sucesso</td></tr>
+<tr><td>cache nunca encontra nada</td><td>chave com texto diferente do usado no <code>set</code></td><td>uma constante para a chave, usada nos dois lados</td></tr>
+<tr><td>tela lenta mesmo com cache</td><td>consulta feita antes de olhar o cache</td><td>checar <code>has</code> antes de buscar</td></tr>
+</table>
+</div>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a vitrine visitada cinco vezes</h3>
+<p>A Ana entrava na vitrine, voltava para a home, entrava de novo — e cada volta custava uma ida ao
+servidor. Com o cache de módulo, a segunda visita em diante aparece instantânea. O número de chamadas caiu
+de cinco para uma por sessão, e a sensação de velocidade melhorou mais do que qualquer ajuste de CSS.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o preço que a Ana mudou e a tela não</h3>
+<p>Ela salvou o preço novo do brioche e voltou para a vitrine: R$ 4,50 no servidor, R$ 4,00 na tela. O
+<code>cache.delete("brioche")</code> depois do salvamento resolveu o caso e ensinou a regra que fica: quem
+escreve tem a obrigação de avisar quem lê. Cache sem invalidação é uma segunda fonte de verdade, e duas
+fontes de verdade sempre discordam.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o cache que não devia existir</h3>
+<p>No painel de encomendas, a Ana guardou a lista por cinco minutos para “ficar mais rápido”. O cliente
+ligou dizendo que a encomenda tinha sumido do painel; ela estava lá, salva, mas fora do cache. Depois disso
+ela adotou uma regra: dado que a pessoa acabou de gravar, ou dado que ela precisa conferir, entra sem cache
+— ou com validade de segundos.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Qual é a ordem certa dentro da função de busca?</p>
+<label><input type="radio" name="q1"> buscar no servidor e, se demorar, olhar o cache</label>
+<label><input type="radio" name="q1"> olhar o cache e só buscar no servidor se não houver entrada válida</label>
+<label><input type="radio" name="q1"> buscar nos dois e comparar os valores</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O <code>Map</code> do cache foi criado dentro do
+componente. O que acontece?</p>
+<label><input type="radio" name="q2"> o cache funciona, mas só na primeira busca</label>
+<label><input type="radio" name="q2"> o React reclama de <code>Map</code> em componente</label>
+<label><input type="radio" name="q2"> cada desenho cria um <code>Map</code> vazio e o cache nunca acerta</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Depois de salvar um preço novo, o que fazer com a
+entrada antiga?</p>
+<label><input type="radio" name="q3"> apagar a chave afetada com <code>cache.delete(...)</code></label>
+<label><input type="radio" name="q3"> apagar o cache inteiro e recarregar a página</label>
+<label><input type="radio" name="q3"> nada: a validade cuida disso sozinha</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a memória do componente</h2>
+
+<p>O cache precisa sobreviver aos desenhos do componente sem provocar um novo desenho quando muda. Complete
+com o hook que guarda um valor entre renders sem redesenhar:</p>
+
+<div class="ex-code">function Vitrine() {
+  const cache = <input aria-label="resposta 1" data-answer="useRef" placeholder="...">(new Map());
+  ...
+}</div>
+
+<p class="ex-dica">Dica: é o mesmo hook que guarda a referência de um elemento do DOM. Ele devolve um
+objeto com uma propriedade <code>current</code>, e mudar essa propriedade não chama o componente de
+novo.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Cache é guardar a resposta com uma chave e uma validade, e consultar antes de pedir. A ordem importa:
+<code>has</code> primeiro, servidor depois. O lugar onde o <code>Map</code> vive decide o alcance — dentro
+do componente ele morre a cada desmontagem; fora, em variável de módulo, ele vale para o site até recarregar
+a página; em <code>useRef</code>, vale enquanto o componente existir, sem redesenhar.</p>
+
+<p>Validade é o que impede o cache de mentir, e invalidação é o que impede o cache de contradizer você
+mesmo. A chave precisa conter tudo o que muda a resposta. E nem todo dado merece cache: o que a pessoa
+acabou de gravar, o que é pessoal e o que precisa estar certo agora ficam de fora.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Cache = chave + valor + validade. Sem validade, é mentira guardada.</li>
+<li><code>Map</code> com <code>has</code>, <code>get</code>, <code>set</code> e <code>delete</code>.</li>
+<li>Consulte o cache antes de chamar a API, nunca depois.</li>
+<li><code>Map</code> fora do componente sobrevive a desmontar; dentro, não.</li>
+<li>Guarde <code>salvoEm</code> junto do valor e compare com o agora.</li>
+<li>Uma chave por pergunta: nome, filtro, página, pessoa.</li>
+<li>Depois de gravar, <code>cache.delete(chave)</code>.</li>
+<li>Log de “veio do cache” / “foi ao servidor” economiza uma tarde de depuração.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

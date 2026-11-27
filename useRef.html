@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O useRef | Guia React</title>
+<meta name="description" content="O useRef no React 19: a caixa que sobrevive aos renders sem redesenhar a tela, como falar com um elemento do DOM, o que guardar nela e quando ela é a escolha errada.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O <span class="hl">useRef</span></h1>
+<p class="intro">A Ana quer que, quando o cliente clicar em Encomendar com o nome vazio, o cursor pule
+para o campo do nome em vez de ficar parado no botão. Ela também quer guardar o id do aviso que aparece
+depois de seis segundos, para poder cancelá-lo. As duas coisas têm o mesmo problema: precisam de um valor
+que dure enquanto o componente estiver na tela, mas que não obrigue o React a redesenhar tudo quando
+muda. Para isso existe uma caixa chamada <strong>ref</strong>, criada pelo <code>useRef</code> — e nesta
+aula a Ana aprende onde ela é a ferramenta certa e onde ela é uma armadilha.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que o <code>useRef</code> devolve e por que ele é uma caixa, não um valor.</li>
+  <li>Como a ref sobrevive aos renders sem provocar nenhum.</li>
+  <li>Como usar <code>ref={campo}</code> para falar com um elemento do DOM de verdade.</li>
+  <li>A diferença entre estado, ref e variável local.</li>
+  <li>Os casos em que a ref é a escolha certa: foco, id de timer, flags e valores anteriores.</li>
+  <li>Por que a ref não serve para o que aparece na tela.</li>
+  <li>As regras: valor inicial sempre, nada de ler ou escrever no meio do render.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o cursor que não vai para o campo</h2>
+
+<p>O formulário da padaria já estava acessível: rótulo ligado, erro anunciado, campo marcado como inválido.
+Faltava um detalhe que a Ana só percebeu usando o teclado. Ao clicar em Encomendar com o nome vazio, a
+mensagem aparecia embaixo do campo e o leitor de tela a anunciava — mas o cursor continuava no botão.
+Quem enxerga via o erro de longe; quem não enxerga tinha que apertar Shift+Tab várias vezes para voltar ao
+campo e corrigir.</p>
+
+<p>Mover o cursor para um campo é uma operação do navegador, não do React. O React desenha elementos a
+partir do estado; ele não tem uma função <code>focarCampo()</code>. Para chamar <code>.focus()</code> num
+elemento, você precisa do elemento de verdade — o objeto do DOM, aquele que o navegador criou —, e o JSX
+não entrega isso. O que o JSX entrega é uma descrição do que deve existir.</p>
+
+<p>É aí que entra a ref. Ela é uma caixa que o React mantém para você, ligada a uma posição fixa no
+componente. Você enche a caixa com o elemento quando ele aparece na tela e, depois, pode tirar de lá o
+elemento e chamar os métodos dele. A mesma caixa serve para guardar qualquer outra coisa que precise
+durar — um número, um id, um objeto — sem que o React precise saber.</p>
+
+<h2>2. O que é uma ref</h2>
+
+<p><code>useRef(0)</code> devolve um objeto com uma única propriedade: <code>current</code>. Esse objeto
+nasce na primeira renderização e continua sendo o mesmo até o componente sair da tela. Não é o valor
+<code>0</code> que fica guardado no estado do React; é a caixa que fica guardada, e dentro dela o valor
+inicial.</p>
+
+<pre class="file" data-file="Contador.jsx">function Contador() {
+  const caixa = useRef(0);
+
+  console.log(caixa);          // { current: 0 }
+  caixa.current = caixa.current + 1;
+  console.log(caixa.current);  // 1
+
+  return &lt;p&gt;guardado: {caixa.current}&lt;/p&gt;;
+}</pre>
+
+<p>No console, o que aparece é o objeto, não o número:</p>
+
+<pre class="term">{ current: 0 }
+1</pre>
+
+<p>Essa diferença de formato é a diferença de ideia. O estado é um valor que o React guarda e compara
+para decidir se redesenha. A ref é um objeto que você mesmo mexe, e o React não fica sabendo. Ninguém
+redesenha a tela quando você escreve em <code>caixa.current</code>; a tela só muda quando outra coisa
+provoca um novo render e aquele valor é lido de novo.</p>
+
+<dl class="anatomy">
+<dt>ref</dt>
+<dd>A caixa em si: o objeto devolvido por <code>useRef</code>, com a propriedade <code>current</code>.</dd>
+<dt><code>.current</code></dt>
+<dd>O que está dentro da caixa. Pode ser número, texto, objeto, função ou um elemento do DOM.</dd>
+<dt>render</dt>
+<dd>O ato de o React chamar o seu componente e montar o JSX de novo. Só acontece quando o estado ou as
+props mudam.</dd>
+<dt>DOM</dt>
+<dd>A árvore de elementos que o navegador criou. É onde vivem <code>.focus()</code>,
+<code>.scrollIntoView()</code> e <code>.play()</code>.</dd>
+<dt>estado</dt>
+<dd>O valor que o React guarda e observa. Mudar estado redesenha; mudar ref, não.</dd>
+</dl>
+
+<p>Três frases resumem a ref e valem a aula. Primeira: ela sobrevive aos renders — cada chamada do
+componente enxerga a mesma caixa, com o que você deixou lá. Segunda: mexer nela não redesenha nada — o
+React nem fica sabendo. Terceira: ela não é comparada com nada — não existe "valor antigo" para o React
+detectar.</p>
+
+<h2>3. Falar com o DOM: <code>ref={campo}</code></h2>
+
+<p>O uso mais comum é apontar a ref para um elemento. Você cria a caixa com <code>useRef(null)</code> e
+entrega essa caixa na prop <code>ref</code> do elemento. Quando o React monta aquele elemento, ele coloca
+o objeto do DOM dentro de <code>.current</code>; quando desmonta, devolve <code>null</code>.</p>
+
+<pre class="file" data-file="Busca.jsx">function Busca() {
+  const [termo, setTermo] = useState("");
+  const campo = useRef(null);
+
+  function buscar() {
+    campo.current.focus();       // o input de verdade
+    console.log("buscando " + termo);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="busca"&gt;Buscar pão&lt;/label&gt;
+      &lt;input
+        id="busca"
+        ref={campo}
+        value={termo}
+        onChange={(e) =&gt; setTermo(e.target.value)}
+      /&gt;
+      &lt;button type="button" onClick={buscar}&gt;Buscar&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Depois de montado, <code>campo.current</code> é exatamente o que você pegaria com
+<code>document.querySelector("#busca")</code> — com a diferença de que a ref aponta para o elemento certo
+daquele componente, e não para o primeiro que aparecer na página. Dois componentes iguais, cada um com a
+sua ref, não se atrapalham.</p>
+
+<p>O que dá para fazer com o elemento é o que o navegador oferece: <code>focus()</code>,
+<code>blur()</code>, <code>select()</code>, <code>scrollIntoView()</code>, <code>play()</code>,
+<code>pause()</code>, medir <code>offsetHeight</code>, ler <code>value</code>. O que não dá é mudar o
+desenho por fora: se você escrever no elemento, o React não fica sabendo e a próxima renderização
+sobrescreve. Para o desenho, quem manda é o estado.</p>
+
+<p>Agora a missão. O botão Buscar só mostra o termo; o cursor continua nele.</p>
+
+<div class="tryreact" data-goal="clique:#ir;;css:#busca|outline-style=auto">
+  <p class="try-task">Crie uma ref para o campo de busca e, dentro do clique, leve o foco até ele com
+  <code>campo.current.focus()</code>. Clique em Buscar: o contorno tem de aparecer no campo.</p>
+  <pre class="jsx">function App() {
+  const [termo, setTermo] = useState("");
+  const [aviso, setAviso] = useState("");
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="busca"&gt;Buscar pão&lt;/label&gt;
+      &lt;input
+        id="busca"
+        value={termo}
+        onChange={(e) =&gt; setTermo(e.target.value)}
+      /&gt;
+      &lt;button id="ir" type="button" onClick={() =&gt; setAviso("buscando: " + termo)}&gt;
+        Buscar
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="busca"&gt;Buscar pão&lt;/label&gt;
+  &lt;input id="busca" value=""&gt;
+  &lt;button id="ir" type="button"&gt;Buscar&lt;/button&gt;
+  &lt;p&gt;&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [termo, setTermo] = useState("");
+  const [aviso, setAviso] = useState("");
+  const campo = useRef(null);
+
+  function buscar() {
+    campo.current.focus();
+    setAviso("buscando: " + termo);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="busca"&gt;Buscar pão&lt;/label&gt;
+      &lt;input
+        id="busca"
+        ref={campo}
+        value={termo}
+        onChange={(e) =&gt; setTermo(e.target.value)}
+      /&gt;
+      &lt;button id="ir" type="button" onClick={buscar}&gt;
+        Buscar
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Se você esquecer o <code>ref={campo}</code> no input, <code>campo.current</code> continua
+<code>null</code> e o clique quebra com uma mensagem no console:</p>
+
+<pre class="term">TypeError: Cannot read properties of null (reading 'focus')</pre>
+
+<p>A leitura é direta: alguém tentou chamar <code>.focus()</code> em <code>null</code>. As duas causas
+possíveis são a prop esquecida e o momento errado — durante o primeiro render, o elemento ainda não
+existe, então <code>.current</code> ainda é <code>null</code>. Por isso o acesso a elementos acontece em
+eventos e efeitos, depois que a tela foi montada, e não no corpo do componente.</p>
+
+<h2>4. O que a ref não faz: redesenhar</h2>
+
+<p>A pergunta que separa quem entendeu de quem decorou: se eu mudar <code>caixa.current</code>, a tela
+muda? Não. E isso não é defeito — é a definição. O React redesenha quando o estado ou as props mudam,
+porque é isso que ele observa. A ref é justamente a caixa para o que não precisa de redesenho.</p>
+
+<p>O exemplo clássico é contar quantas vezes o componente foi chamado. Uma variável comum zera a cada
+render; uma ref não. Veja a diferença: no código abaixo, <code>renders</code> é uma variável
+<code>let</code> criada de novo a cada chamada da função, então ela sempre vale 1.</p>
+
+<div class="tryreact" data-goal="clique:#somar;;texto:renders: 2">
+  <p class="try-task">O contador de renders zera a cada desenho porque é uma variável local. Guarde-o
+  numa ref (<code>useRef(0)</code>) e some 1 no <code>.current</code>: depois de um clique, o painel tem
+  de mostrar <strong>renders: 2</strong>.</p>
+  <pre class="jsx">function App() {
+  const [cliques, setCliques] = useState(0);
+  let renders = 0;
+  renders = renders + 1;
+
+  return (
+    &lt;div&gt;
+      &lt;button id="somar" onClick={() =&gt; setCliques(cliques + 1)}&gt;Somar um&lt;/button&gt;
+      &lt;p&gt;cliques: {cliques}&lt;/p&gt;
+      &lt;p&gt;renders: {renders}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="somar"&gt;Somar um&lt;/button&gt;
+  &lt;p&gt;cliques: 0&lt;/p&gt;
+  &lt;p&gt;renders: 1&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [cliques, setCliques] = useState(0);
+  const renders = useRef(0);
+  renders.current = renders.current + 1;
+
+  return (
+    &lt;div&gt;
+      &lt;button id="somar" onClick={() =&gt; setCliques(cliques + 1)}&gt;Somar um&lt;/button&gt;
+      &lt;p&gt;cliques: {cliques}&lt;/p&gt;
+      &lt;p&gt;renders: {renders.current}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em Somar um: <code>cliques</code> vira 1, o React redesenha, a função roda de novo e
+<code>renders.current</code> chega a 2. A ref não provocou o desenho — ela só sobreviveu a ele. Esse é o
+comportamento que você quer numa ref e o que você <em>não</em> quer num valor que a tela mostra.</p>
+
+<p>Uma ressalva honesta: contar renders assim é truque de aula. Em desenvolvimento, o React monta o
+componente duas vezes de propósito (para denunciar efeitos colaterais), então o número aparece maior do
+que na build de produção — a caixa deste guia roda produção, e por isso o 2 é previsível. Em código de
+verdade, ninguém conta renders: o número não serve para nada além de estudar.</p>
+
+<h2>5. Estado, ref ou variável?</h2>
+
+<p>Com três lugares para guardar coisa, a dúvida é legítima. A pergunta que decide é sempre a mesma: esse
+valor precisa aparecer na tela? Se sim, estado. Se não, ref. Se ele pode ser recalculado a cada render,
+nem um nem outro — variável local.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde</th><th>Sobrevive ao render?</th><th>Redesenha quando muda?</th><th>Serve para</th></tr>
+<tr><td>estado (<code>useState</code>)</td><td>sim</td><td>sim</td><td>o que a tela mostra e a pessoa altera</td></tr>
+<tr><td>ref (<code>useRef</code>)</td><td>sim</td><td>não</td><td>o que precisa durar sem aparecer</td></tr>
+<tr><td>variável local</td><td>não</td><td>não</td><td>o que se recalcula a cada render</td></tr>
+</table>
+</div>
+
+<p>Um exemplo de cada, no mesmo componente. O <code>total</code> é calculado a partir do estado, então é
+variável local: nasce de novo a cada render, sempre com o valor certo. O <code>enviando</code> aparece no
+botão, então é estado. O <code>idDoAviso</code> é um número que o navegador usa para cancelar um timer e
+que ninguém precisa ler na tela, então é ref.</p>
+
+<pre class="file" data-file="Encomenda.jsx">function Encomenda() {
+  const [preco, setPreco] = useState(2.5);
+  const [quantidade, setQuantidade] = useState(1);
+  const [enviando, setEnviando] = useState(false);
+  const idDoAviso = useRef(null);
+
+  const total = preco * quantidade;      // variável local
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;total: {total}&lt;/p&gt;
+      &lt;button disabled={enviando} onClick={() =&gt; setEnviando(true)}&gt;
+        Encomendar
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Repare que a ref não aparece no JSX. Isso é uma pista e tanto: se você se pegar escrevendo
+<code>{caixa.current}</code> dentro do return, pare e pergunte se aquilo não devia ser estado. A resposta
+quase sempre é sim.</p>
+
+<h2>6. Onde a ref é a ferramenta certa</h2>
+
+<p>Existe um punhado de situações que se repetem. Todas têm a mesma cara: o valor precisa durar entre
+renders, ninguém precisa vê-lo e mudá-lo não deve desenhar nada.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que guardar</th><th>Como fica</th><th>Por que ref</th></tr>
+<tr><td>o elemento do DOM</td><td><code>campo.current.focus()</code></td><td>focar não é desenhar</td></tr>
+<tr><td>o id de um <code>setTimeout</code></td><td><code>id.current = setTimeout(...)</code></td><td>cancelar o timer não muda a tela</td></tr>
+<tr><td>"já mandou o formulário?"</td><td><code>enviado.current = true</code></td><td>é trava, não informação de tela</td></tr>
+<tr><td>o valor anterior de um campo</td><td><code>anterior.current = nome</code></td><td>comparar sem guardar histórico de estado</td></tr>
+<tr><td>quantas tentativas já houve</td><td><code>tentativas.current++</code></td><td>contador de bastidor</td></tr>
+<tr><td>um objeto de biblioteca</td><td><code>mapa.current = new Map()</code></td><td>instância que não deve ser recriada</td></tr>
+</table>
+</div>
+
+<p>O timer é o exemplo mais útil no dia a dia. O <code>setTimeout</code> devolve um número que identifica
+o agendamento; para cancelar, você precisa desse número. Se ele ficar numa variável local, o próximo
+render o perde e o <code>clearTimeout</code> não tem o que cancelar. Numa ref, ele dura:</p>
+
+<pre class="file" data-file="Aviso.jsx">function Aviso() {
+  const [texto, setTexto] = useState("");
+  const id = useRef(null);
+
+  function mostrar() {
+    clearTimeout(id.current);                     // cancela o anterior
+    setTexto("pão quentinho saindo do forno");
+    id.current = setTimeout(() =&gt; setTexto(""), 6000);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button type="button" onClick={mostrar}&gt;Avisar&lt;/button&gt;
+      &lt;p&gt;{texto}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>O texto do aviso é estado, porque aparece na tela. O id é ref, porque é um detalhe do navegador. Essa
+separação é o que mantém o componente legível: quem lê o código sabe, de cara, o que desenha e o que só
+controla.</p>
+
+<h2>7. Onde a ref é a ferramenta errada</h2>
+
+<p>O erro mais comum de quem acabou de conhecer a ref é usá-la para tudo — inclusive para o que a tela
+mostra. Aí a conta não fecha: o valor muda, mas a tela não. O React não tem como saber que você mexeu na
+caixa, e o desenho continua com o valor antigo até outra coisa provocar um render.</p>
+
+<p>A Ana fez exatamente isso com o total da compra: guardou o total numa ref e mostrou
+<code>{total.current}</code>. Cada clique somava 2,50 na caixa, mas a tela continuava em 0. O código
+parecia certo, o botão funcionava, o console mostrava o valor crescendo — e o cliente via zero.</p>
+
+<div class="tryreact" data-goal="clique:#somar;;texto:total: 2.5">
+  <p class="try-task">O total está numa ref, então a tela não acompanha a soma. Troque por
+  <code>useState</code> e faça o clique somar 2,50 de um jeito que o painel mostre
+  <strong>total: 2.5</strong> depois do clique.</p>
+  <pre class="jsx">function App() {
+  const total = useRef(0);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;total: {total.current}&lt;/p&gt;
+      &lt;button
+        id="somar"
+        onClick={() =&gt; {
+          total.current = total.current + 2.5;
+        }}
+      &gt;
+        Somar um pão
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;total: 0&lt;/p&gt;
+  &lt;button id="somar"&gt;Somar um pão&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [total, setTotal] = useState(0);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;total: {total}&lt;/p&gt;
+      &lt;button id="somar" onClick={() =&gt; setTotal(total + 2.5)}&gt;
+        Somar um pão
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em Somar um pão no código inicial e veja o que acontece: nada. O valor dentro da ref foi para
+2,5, mas nenhum render foi pedido, então o parágrafo continua mostrando 0. Nem o React reclama — ele não
+sabe que o valor mudou. Na solução, o <code>setTotal</code> avisa o React e o parágrafo acompanha.</p>
+
+<p>A regra de bolso: se você escreveria <code>{caixa.current}</code> no JSX, o valor é estado. Ref é para
+o que fica nos bastidores — e o sintoma de ter errado é sempre o mesmo: o dado está certo no console e
+errado na tela.</p>
+
+<h2>8. As regras da ref</h2>
+
+<p>São poucas e todas têm a ver com o momento em que você mexe na caixa.</p>
+
+<p><strong>Sempre passe um valor inicial.</strong> <code>useRef(0)</code>, <code>useRef("")</code>,
+<code>useRef(null)</code>. O valor inicial define o que existe antes de qualquer clique e deixa claro o
+tipo de coisa que vai morar ali. No React 19 ele é obrigatório na assinatura, e começar com
+<code>null</code> é o padrão quando a caixa vai receber um elemento.</p>
+
+<p><strong>Não leia nem escreva durante o render.</strong> O corpo do componente pode rodar várias vezes,
+e o React espera que ele seja previsível. Mexer na ref no meio do render é um efeito colateral escondido
+— o mesmo tipo de problema que a aula de <a href="quando-nao-usar-efeito.html">quando não usar efeito</a>
+descreve. As exceções são a inicialização e o caso de medição que você viu no contador de renders, que é
+didático e não vai para produção. Para reagir a uma mudança, use evento ou efeito.</p>
+
+<p><strong>Não use ref para disparar desenho.</strong> Se a mudança precisa aparecer, é estado. Ref não
+avisa ninguém: nem o React, nem o componente filho, nem o CSS. Quem depende do valor só vê a mudança no
+próximo render, por acidente.</p>
+
+<p><strong>Não use ref como atalho para o DOM inteiro.</strong> A ref serve para falar com o elemento do
+seu componente. Se você se pegar procurando elementos com <code>document.querySelector</code> de dentro
+de um componente, provavelmente está brigando com o React: a maior parte do que se faz assim se faz com
+estado e props.</p>
+
+<p><strong>Não guarde o que dá para calcular.</strong> Se o valor sai de uma conta com estado e props,
+faça a conta no render, como na aula de <a href="estado-derivado.html">estado derivado</a>. Uma ref com
+um total calculado à mão é uma segunda fonte de verdade esperando para divergir.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o foco que não funcionava</h3>
+<p>A Ana chamou <code>campo.current.focus()</code> no corpo do componente e levou um erro de
+<code>null</code>. No primeiro render o elemento ainda não existe: a ref só é preenchida depois que o
+React monta o DOM. O conserto é chamar dentro do evento ou de um <code>useEffect</code>, que rodam depois
+da montagem. É sempre uma questão de quando, não de como.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o total que não aparecia</h3>
+<p>Ela trocou <code>useState</code> por <code>useRef</code> para "evitar renders desnecessários" e o total
+parou de aparecer. O React não redesenha por causa de uma ref — é o que ela é. Se o valor aparece na
+tela, o lugar dele é o estado; otimizar render é assunto de <code>useMemo</code> e
+<code>useCallback</code>, não de ref.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o timer que nunca era cancelado</h3>
+<p>O id do <code>setTimeout</code> ficou numa variável local dentro do componente. Cada render criava uma
+variável nova, o <code>clearTimeout</code> recebia <code>undefined</code> e o aviso antigo continuava
+aparecendo. Numa ref, o id sobrevive e o cancelamento funciona. Detalhe: o id é do navegador, não do
+React — quem devolve é o <code>setTimeout</code>.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que o <code>useRef(0)</code> devolve?</p>
+<label><input type="radio" name="q1"> o número 0, guardado no estado do React</label>
+<label><input type="radio" name="q1"> um objeto com a propriedade <code>current</code>, que sobrevive aos renders</label>
+<label><input type="radio" name="q1"> uma função que devolve 0</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Para que serve <code>ref={campo}</code> num input?</p>
+<label><input type="radio" name="q2"> para o input virar um campo controlado</label>
+<label><input type="radio" name="q2"> para o React redesenhar quando o campo muda</label>
+<label><input type="radio" name="q2"> para colocar o elemento do DOM dentro de <code>campo.current</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Quando a ref é a escolha errada?</p>
+<label><input type="radio" name="q3"> quando o valor precisa aparecer na tela e acompanhar as mudanças</label>
+<label><input type="radio" name="q3"> quando o valor é o id de um timer</label>
+<label><input type="radio" name="q3"> quando o valor precisa durar entre renders</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: tirar o elemento da caixa</h2>
+<p>O componente guarda o campo numa ref chamada <code>campoNome</code>. Complete o acesso ao elemento para
+poder chamar <code>.focus()</code> nele:</p>
+<div class="ex-code">campoNome.<input aria-label="resposta 1" data-answer="current" placeholder="...">.focus();</div>
+<p class="ex-dica">Dica: é a única propriedade que o objeto devolvido pelo <code>useRef</code> tem. Sem ela,
+você está chamando <code>.focus()</code> no objeto, não no elemento.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p><code>useRef</code> cria uma caixa que dura enquanto o componente estiver na tela. O que está dentro
+dela fica em <code>.current</code>, e mexer ali não redesenha nada: o React não observa refs, só estado e
+props. Essa é a diferença que decide onde cada valor mora — se aparece na tela, estado; se é bastidor,
+ref; se dá para recalcular, variável local.</p>
+
+<p>O uso mais comum é falar com o DOM: <code>ref={campo}</code> coloca o elemento em
+<code>campo.current</code>, e daí você chama <code>focus()</code>, <code>select()</code>,
+<code>scrollIntoView()</code> ou mede o que precisar. O segundo uso é guardar o que precisa durar sem
+desenhar: id de timer, trava de envio, valor anterior, contador de tentativas. O erro clássico é usar a
+ref para o que a tela mostra — o valor muda, o console confirma e a tela não acompanha.</p>
+
+<p>As regras são curtas: valor inicial sempre, nada de ler ou escrever no meio do render, e nada de
+<code>{caixa.current}</code> no JSX. Guarde o sintoma para reconhecer o problema em dez segundos: dado
+certo no console, errado na tela, é sinal de que alguém guardou em ref o que devia estar no estado.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>useRef(0)</code> devolve <code>{ current: 0 }</code>, e esse objeto dura entre renders.</li>
+<li>Mudar <code>.current</code> não redesenha a tela — e isso é intencional.</li>
+<li><code>ref={campo}</code> coloca o elemento do DOM em <code>campo.current</code>.</li>
+<li><code>campo.current</code> é <code>null</code> antes da montagem: acesse em evento ou efeito.</li>
+<li>Estado aparece na tela; ref fica nos bastidores; variável local é recalculada.</li>
+<li>Ref é boa para foco, id de timer, trava de envio e valor anterior.</li>
+<li>Ref é ruim para o que a tela mostra: o valor muda e o desenho não.</li>
+<li>Passe sempre um valor inicial: <code>useRef(null)</code>, <code>useRef(0)</code>.</li>
+<li>Não leia nem escreva <code>.current</code> no meio do render.</li>
+<li>Dois componentes iguais têm refs separadas: cada um fala com o seu elemento.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

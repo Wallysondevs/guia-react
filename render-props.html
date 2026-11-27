@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Render Props | Guia React</title>
+<meta name="description" content="Render props na prática: passar uma função como prop para o componente decidir os dados e a página decidir o desenho, com children em forma de função.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Render <span class="hl">Props</span></h1>
+<p class="intro">A Ana tem três lugares no site que mostram a mesma lista de pães: a vitrine da página
+inicial, os cartões da página de encomendas e a tabela do painel dela. O laço que percorre a lista é
+sempre igual; o desenho de cada pão muda em cada lugar. Nesta aula ela aprende a passar o desenho
+<strong>como uma função</strong>, do lado de fora do componente, e a deixar dentro dele só o que não
+muda: o laço, o estado e a decisão. É o padrão que o React chama de render props.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que um componente que desenha tudo precisa de uma prop nova a cada variação.</li>
+  <li>O que é uma render prop: uma prop cujo valor é uma função que devolve JSX.</li>
+  <li>Como o componente chama essa função, uma vez por item, e o que ele passa para ela.</li>
+  <li>O mesmo padrão escrito com <code>children</code>, quando o desenho fica entre as tags.</li>
+  <li>A diferença entre <code>{desenhar}</code>, <code>{desenhar(p)}</code> e <code>&lt;desenhar /&gt;</code>.</li>
+  <li>Como o estado pode morar no componente enquanto o botão mora na página.</li>
+  <li>Por que os hooks tomaram parte desse trabalho e onde as render props continuam valendo.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o mesmo laço, três desenhos</h2>
+
+<p>Na aula de <a href="listas-com-map.html">Listas com map</a>, a Ana aprendeu a transformar um array
+de pães em uma lista de elementos. Na aula de <a href="composicao.html">Composição</a>, aprendeu a
+colocar um pedaço de tela dentro de outro pelo <code>children</code>. Agora as duas ideias se
+encontram e aparece um problema novo, bem concreto: o <em>laço</em> é sempre o mesmo, mas o
+<em>desenho de cada item</em> muda.</p>
+
+<p>Na página inicial, cada pão vira um <code>&lt;li&gt;</code> com o nome. Na página de encomendas,
+vira um cartão com nome, preço e um botão. No painel dela, vira uma linha de tabela com nome, estoque e
+um aviso. Três desenhos diferentes, três <code>map</code> copiados no código. Quando ela muda a ordem
+dos pães, precisa mudar nos três lugares.</p>
+
+<p>A primeira tentativa é a mais natural: extrair um componente <code>Lista</code> que recebe os pães
+e desenha. Só que aí o componente precisa saber que na página de encomendas existe preço, que no
+painel existe estoque, que a vitrine não tem botão. Ela começa a encher o componente de props:
+<code>mostrarPreco</code>, <code>mostrarBotao</code>, <code>mostrarEstoque</code>,
+<code>modoCartao</code>. Cada página nova pede mais uma prop. É o caminho que a aula de
+<a href="componente-reutilizavel.html">Componente Reutilizável</a> já avisou que não termina bem.</p>
+
+<p>O que ela quer de verdade é separar duas responsabilidades. Uma: percorrer a lista e dar uma
+<em>key</em> para cada item — isso é igual em todo lugar. Outra: decidir o que aparece na tela para
+cada pão — isso é diferente em cada lugar. O componente deve ficar com a primeira; a página, com a
+segunda.</p>
+
+<h2>2. O que falta quando o componente desenha tudo</h2>
+
+<p>Repare no que a <code>Lista</code> precisa saber para desenhar um cartão: o nome do pão, o preço, se
+tem botão, o texto do botão, o que o botão faz quando alguém clica. Isso tudo é informação da página
+de encomendas, não da lista. Um componente que recebe dados e também decide o desenho acaba virando
+uma cópia da página inteira, com um nome mais genérico.</p>
+
+<p>Existe uma saída que não exige inventar props: passar o desenho pronto. Já dá para fazer isso com
+elementos — é o que a aula de composição mostrou, mandando <code>&lt;p&gt;Sai às 6h&lt;/p&gt;</code>
+para dentro de uma moldura. Só que um elemento já está desenhado: ele não sabe que existem cinco pães
+diferentes. Falta o componente poder dizer "desenhe este aqui, agora" para cada item.</p>
+
+<p>E é exatamente isso que uma função faz. Uma função é uma receita guardada, que só vira tela quando
+alguém chama. Se a página passa a receita e a lista chama a receita item por item, os dois lados ficam
+com o que é deles: a lista percorre, a página desenha. O React chama esse arranjo de <strong>render
+prop</strong>: uma prop cujo valor é uma função que devolve JSX.</p>
+
+<dl class="anatomy">
+<dt>render prop</dt>
+<dd>Uma prop cujo valor é uma função que devolve JSX, em vez de um texto ou de um elemento pronto.
+O nome da prop é escolha sua: <code>desenhar</code>, <code>render</code>, <code>item</code>.</dd>
+<dt>função de desenho</dt>
+<dd>A função que a página passa. Recebe o que o componente mandar (um pão, um total, um par de
+valores) e devolve o JSX daquele pedaço.</dd>
+<dt>chamar</dt>
+<dd>Usar a função com parênteses: <code>desenhar(pao)</code>. Isso executa a receita e devolve o
+JSX, que o React então desenha.</dd>
+<dt>inversão de controle</dt>
+<dd>O componente deixa de decidir o desenho e passa essa decisão para quem o usa. Quem chama manda no
+"como"; o componente cuida do "quando" e do "quantas vezes".</dd>
+<dt>headless</dt>
+<dd>Nome que se dá a um componente sem visual próprio: ele só entrega dados e comportamento, e o
+desenho vem de fora. Uma lista com render prop é um componente assim.</dd>
+</dl>
+
+<h2>3. A primeira render prop: uma função no lugar de um item</h2>
+
+<p>Olhe o código abaixo. A <code>Lista</code> recebe os pães e uma prop chamada <code>desenhar</code>.
+Dentro do <code>map</code>, ela chama <code>desenhar(p)</code> e entrega o resultado ao React. O
+<code>Fragment</code> com <code>key</code> em volta existe porque a função devolve um elemento e a key
+precisa ficar no item que o <code>map</code> produz — quem percorre a lista é quem sabe qual é a
+identidade de cada linha.</p>
+
+<div class="tryreact" data-goal="conta:li=2;;texto:Pão francês — R$ 7,00">
+  <p class="try-task">A função <code>desenhar</code> está escrita mas ignora o pão que recebe: os dois
+  itens mostram a mesma palavra. Use o parâmetro para mostrar o nome e o preço de cada um e clique em
+  Rodar.</p>
+  <pre class="jsx">function Lista({ itens, desenhar }) {
+  return (
+    &lt;ul&gt;
+      {itens.map((p) =&gt; (
+        &lt;Fragment key={p.id}&gt;{desenhar(p)}&lt;/Fragment&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}
+
+function App() {
+  const paes = [
+    { id: 1, nome: "Pão francês", preco: "R$ 7,00" },
+    { id: 2, nome: "Broa de milho", preco: "R$ 9,00" }
+  ];
+  return &lt;Lista itens={paes} desenhar={() =&gt; &lt;li&gt;pão&lt;/li&gt;} /&gt;;
+}</pre>
+  <pre class="out">
+&lt;ul&gt;
+  &lt;li&gt;pão&lt;/li&gt;
+  &lt;li&gt;pão&lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">function Lista({ itens, desenhar }) {
+  return (
+    &lt;ul&gt;
+      {itens.map((p) =&gt; (
+        &lt;Fragment key={p.id}&gt;{desenhar(p)}&lt;/Fragment&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}
+
+function App() {
+  const paes = [
+    { id: 1, nome: "Pão francês", preco: "R$ 7,00" },
+    { id: 2, nome: "Broa de milho", preco: "R$ 9,00" }
+  ];
+  return &lt;Lista itens={paes} desenhar={(p) =&gt; &lt;li&gt;{p.nome} — {p.preco}&lt;/li&gt;} /&gt;;
+}</pre>
+</div>
+
+<p>O painel mostra dois <code>&lt;li&gt;</code> com nome e preço. Repare no caminho: o
+<code>App</code> não desenhou nada da lista. Ele entregou uma função. A <code>Lista</code> percorreu os
+pães e chamou a função duas vezes, uma por pão. Cada chamada devolveu um <code>&lt;li&gt;</code>
+diferente. O React recebeu esses elementos e montou a página.</p>
+
+<p>Quem manda no quê: <code>itens</code> é dado, <code>desenhar</code> é comportamento que produz
+desenho. Os dois são props comuns aos olhos do React — a diferença é que uma chega como array e a
+outra chega como função. Nada mágico, nada novo na linguagem: só uma função guardada dentro de um
+objeto de props.</p>
+
+<p>Um detalhe que evita bug: a função de desenho não deve ter efeito colateral. Ela é chamada durante
+o desenho do componente, como um cálculo. Chamar <code>setAlgumaCoisa</code> dali dentro pode virar laço
+infinito; buscar dados dali dentro vira pedido repetido. Ela recebe, devolve JSX e acabou.</p>
+
+<h2>4. O mesmo padrão pelo children</h2>
+
+<p>Escrever <code>desenhar={...}</code> funciona, mas tem uma posição mais confortável para a função:
+entre as tags do componente. Quando você escreve <code>&lt;Vitrine&gt;{...}&lt;/Vitrine&gt;</code>, o
+que está ali dentro chega como <code>children</code> — e nada impede que seja uma função. O componente
+só precisa chamá-la com parênteses, como qualquer outra.</p>
+
+<div class="tryreact" data-goal="conta:.cartao=2;;texto:Pão de queijo — R$ 3,00">
+  <p class="try-task">A <code>Vitrine</code> chama <code>children(p)</code> e já recebe o pão certo,
+  mas o cartão só mostra o nome. Acrescente o preço, separado por um traço, e clique em Rodar.</p>
+  <pre class="jsx">function Vitrine({ itens, children }) {
+  return (
+    &lt;div className="vitrine"&gt;
+      {itens.map((p) =&gt; (
+        &lt;Fragment key={p.id}&gt;{children(p)}&lt;/Fragment&gt;
+      ))}
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const doces = [
+    { id: 1, nome: "Pão de queijo", preco: "R$ 3,00" },
+    { id: 2, nome: "Bolo de fubá", preco: "R$ 5,00" }
+  ];
+  return (
+    &lt;Vitrine itens={doces}&gt;
+      {(p) =&gt; &lt;p className="cartao"&gt;{p.nome}&lt;/p&gt;}
+    &lt;/Vitrine&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div class="vitrine"&gt;
+  &lt;p class="cartao"&gt;Pão de queijo&lt;/p&gt;
+  &lt;p class="cartao"&gt;Bolo de fubá&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Vitrine({ itens, children }) {
+  return (
+    &lt;div className="vitrine"&gt;
+      {itens.map((p) =&gt; (
+        &lt;Fragment key={p.id}&gt;{children(p)}&lt;/Fragment&gt;
+      ))}
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const doces = [
+    { id: 1, nome: "Pão de queijo", preco: "R$ 3,00" },
+    { id: 2, nome: "Bolo de fubá", preco: "R$ 5,00" }
+  ];
+  return (
+    &lt;Vitrine itens={doces}&gt;
+      {(p) =&gt; &lt;p className="cartao"&gt;{p.nome} — {p.preco}&lt;/p&gt;}
+    &lt;/Vitrine&gt;
+  );
+}</pre>
+</div>
+
+<p>Note as duas chaves: <code>{(p) =&gt; ...}</code> está dentro de <code>{ }</code> porque é uma
+expressão JavaScript, e o corpo da função devolve JSX. Quem lê rápido acha que é um elemento dentro do
+componente; não é. É uma função esperando ser chamada. A <code>Vitrine</code> chama essa função uma vez
+para cada doce, e o resultado aparece no painel como dois parágrafos com a classe
+<code>cartao</code>.</p>
+
+<p>Este formato — <code>children</code> como função — é o mesmo padrão com outra roupa. A vantagem é de
+leitura: o desenho fica onde você procuraria por ele, embaixo do componente que o usa. A desvantagem é
+que só existe um <code>children</code>: se você precisar de dois desenhos diferentes na mesma chamada,
+volta a usar props com nome.</p>
+
+<p>Na aula de <a href="children.html">O children</a>, o conteúdo entre as tags era um parágrafo. Aqui é
+uma função. O React não liga: para ele, <code>children</code> é só mais uma prop, e o valor pode ser
+texto, elemento, lista de elementos ou função. Quem decide o que fazer com esse valor é o componente que
+o recebe.</p>
+
+<p>Quer ver com os próprios olhos que a função roda uma vez por item? Ponha um
+<code>console.log</code> dentro do laço, antes de chamar <code>children</code>:</p>
+
+<pre class="file" data-file="Vitrine.jsx">function Vitrine({ itens, children }) {
+  return (
+    &lt;div&gt;
+      {itens.map((p) =&gt; {
+        console.log("desenhando " + p.nome);
+        return &lt;Fragment key={p.id}&gt;{children(p)}&lt;/Fragment&gt;;
+      })}
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Com os dois doces da caixa e esse log no lugar, o painel mostra as duas linhas, na ordem do array:</p>
+
+<pre class="term">console: desenhando Pão de queijo
+console: desenhando Bolo de fubá</pre>
+
+<p>Duas linhas, dois itens: o <code>map</code> passou duas vezes e sua função foi chamada duas vezes.
+Se o console mostra uma linha só, o array tem um item — ou o <code>map</code> está no lugar errado. Se
+mostra mais linhas do que itens, alguém está chamando a função fora do laço.</p>
+
+<h2>5. Onde a função é chamada (e onde não é)</h2>
+
+<p>Este é o ponto em que quase todo mundo tropeça, e o sintoma é sempre o mesmo: um pedaço da tela que
+não aparece, sem erro. A confusão nasce porque <code>desenhar</code> é uma função, e em JSX função
+aparece de três jeitos com resultados bem diferentes. Vale desenhar os três lado a lado.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você escreveu</th><th>O que o React faz</th><th>O que aparece</th></tr>
+<tr><td><code>{desenhar(p)}</code></td><td>chama a função e recebe o JSX</td><td>o item desenhado</td></tr>
+<tr><td><code>{desenhar}</code></td><td>tenta desenhar a função como conteúdo</td><td>nada: função não é elemento</td></tr>
+<tr><td><code>&lt;desenhar /&gt;</code></td><td>letra minúscula: lê como tag desconhecida do HTML</td><td>um elemento vazio, invisível</td></tr>
+</table>
+</div>
+
+<p>A terceira linha é a mais traiçoeira, porque parece elegante. O React separa componente de tag pela
+primeira letra do nome — a mesma regra da primeira aula. <code>&lt;desenhar /&gt;</code> começa com
+minúscula, então vira uma tag qualquer, que o navegador aceita e desenha vazia. Nada acontece, nada
+reclama. Se a sua função de desenho tem nome minúsculo e você quiser usá-la como componente, ela precisa
+ser outra coisa: uma função que devolve um componente, como no HOC da aula de
+<a href="hocs.html">Higher-Order Components</a>.</p>
+
+<p>Para saber o que chegou, um <code>console.log</code> resolve mais rápido do que reler o arquivo:</p>
+
+<pre class="file" data-file="App.jsx">function Lista({ itens, desenhar }) {
+  console.log("typeof desenhar: " + typeof desenhar);
+  console.log("quantos itens: " + itens.length);
+  return &lt;ul&gt;{itens.map((p) =&gt; &lt;Fragment key={p.id}&gt;{desenhar(p)}&lt;/Fragment&gt;)}&lt;/ul&gt;;
+}</pre>
+
+<p>Com dois pães, o console do navegador mostra:</p>
+
+<pre class="term">typeof desenhar: function
+quantos itens: 2</pre>
+
+<p>Esse hábito — imprimir o tipo antes de suspeitar do JSX — economiza muito tempo. Se o console diz
+<code>typeof desenhar: undefined</code>, o problema está na chamada, não no componente. Se diz
+<code>object</code>, você passou um elemento onde o componente espera uma função, e a tela vai ficar
+vazia no lugar daquele trecho.</p>
+
+<h2>6. A vantagem de verdade: o estado fica no componente</h2>
+
+<p>Até aqui a render prop economizou código. O ganho grande aparece quando o componente tem
+<strong>estado</strong>. Aí a divisão fica clara: o componente guarda o número e a regra de mudar; a
+página decide onde o número aparece e onde fica o botão. O componente não sabe se existe botão. A página
+não sabe como o número muda.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:3 pães na bandeja">
+  <p class="try-task">A <code>Fornada</code> guarda o total e entrega, para a função de desenho, o
+  número e a ação de assar mais um. Mostre um botão "Assar mais um" que chame essa ação.</p>
+  <pre class="jsx">function Fornada({ children }) {
+  const [paes, setPaes] = useState(2);
+
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Fornada&lt;/h2&gt;
+      {children(paes, () =&gt; setPaes(paes + 1))}
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return &lt;Fornada&gt;{(total) =&gt; &lt;p&gt;{total} pães na bandeja&lt;/p&gt;}&lt;/Fornada&gt;;
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h2&gt;Fornada&lt;/h2&gt;
+  &lt;p&gt;2 pães na bandeja&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Fornada({ children }) {
+  const [paes, setPaes] = useState(2);
+
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Fornada&lt;/h2&gt;
+      {children(paes, () =&gt; setPaes(paes + 1))}
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;Fornada&gt;
+      {(total, assar) =&gt; (
+        &lt;div&gt;
+          &lt;p&gt;{total} pães na bandeja&lt;/p&gt;
+          &lt;button onClick={assar}&gt;Assar mais um&lt;/button&gt;
+        &lt;/div&gt;
+      )}
+    &lt;/Fornada&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique no botão e o painel passa a mostrar três pães. O clique não tocou no estado da
+<code>Fornada</code> diretamente: chamou a função que ela entregou, e essa função chamou
+<code>setPaes</code>. O estado continua morando dentro do componente — a página só recebeu a chave.</p>
+
+<p>Por que não deixar a página guardar o estado? Porque aí cada página que quisesse uma fornada
+reescreveria a regra, e a regra é justamente o que se quer reaproveitar. Esse é o tipo de componente
+que bibliotecas chamam de <em>headless</em>: ele não tem visual próprio. Ele entrega dados e
+comportamento; o visual é seu.</p>
+
+<p>Uma armadilha de hooks vale o aviso: nunca chame <code>useState</code> dentro da função de desenho. A
+função não é um componente — o React não abre um espaço de estado para ela. Hooks só no começo de
+componentes e de hooks próprios — uma regra que o guia destrincha na parte de hooks, quando chegar a
+vez dela.</p>
+
+<h2>7. Render props × hooks: por que hoje se usa menos</h2>
+
+<p>Vale saber a história, porque ela explica por que você vê pouco esse padrão em código novo. Antes de
+2019, não existia <code>useState</code>. A única forma de reaproveitar lógica com estado era um
+componente que guardava o estado e entregava os valores para uma função de desenho. Quase toda
+biblioteca da época tinha uma API assim. O React Router tinha a prop <code>render</code> da
+<code>Route</code>; as animações do react-motion entregavam valores interpolados por função.</p>
+
+<p>Com os hooks, a mesma conta ficou direta. Se você quer um contador, escreva <code>useState</code> no
+seu componente. Não precisa de um componente de fora segurando o número. Por isso as render props
+encolheram: viraram ferramenta de caso específico, não o jeito padrão de compartilhar lógica.</p>
+
+<p>Onde elas continuam boas? Quando o componente precisa controlar <em>quando</em> e <em>com que
+dados</em> a função é chamada, e você precisa do controle total do desenho. Uma lista virtualizada que
+só desenha as linhas visíveis, um medidor que entrega a largura medida do elemento, um campo de busca
+que entrega o resultado pronto e deixa você montar cada sugestão. Nesses casos, a função de desenho é
+mais expressiva do que uma pilha de props.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Eu quero…</th><th>Use</th><th>Por quê</th></tr>
+<tr><td>reaproveitar um cálculo simples</td><td>uma função comum no arquivo</td><td>não precisa de componente nem de hook</td></tr>
+<tr><td>reaproveitar estado e efeito</td><td>um hook próprio</td><td>o estado fica no seu componente, sem camada extra</td></tr>
+<tr><td>deixar o componente decidir os dados e eu o desenho</td><td>render prop</td><td>o componente chama a sua função item por item</td></tr>
+<tr><td>reservar um lugar fixo no meio do visual</td><td><code>children</code> com elemento</td><td>o conteúdo já está pronto; ninguém precisa chamar nada</td></tr>
+</table>
+</div>
+
+<p>A última linha é a distinção que mais confunde: <code>children</code> com <em>elemento</em> serve para
+conteúdo fixo; <code>children</code> com <em>função</em> serve para conteúdo que o componente ainda vai
+produzir, um por item. As duas coisas usam a mesma prop e parecem iguais de longe. A diferença está em
+quem chama.</p>
+
+<h2>8. Os tropeços</h2>
+
+<p><strong>Chamar a função cedo demais.</strong> Se o <code>App</code> chama
+<code>desenhar(paes[0])</code> e passa o resultado, a lista recebe um elemento só e desenha o mesmo em
+todas as linhas. A função tem de ser chamada <em>pelo componente</em>, dentro do laço, com o item
+daquele momento.</p>
+
+<p><strong>Usar chaves no lugar de parênteses.</strong> Uma seta com chaves precisa de
+<code>return</code>. Sem ele, a função devolve <code>undefined</code> e a lista fica vazia:</p>
+
+<pre class="file" data-file="App.jsx">// errado: as chaves escondem o JSX
+desenhar={(p) =&gt; { &lt;li&gt;{p.nome}&lt;/li&gt; }}
+
+// certo: parênteses devolvem o JSX
+desenhar={(p) =&gt; (&lt;li&gt;{p.nome}&lt;/li&gt;)}
+
+// certo também: return explícito
+desenhar={(p) =&gt; { return &lt;li&gt;{p.nome}&lt;/li&gt;; }}</pre>
+
+<p><strong>Devolver mais de um elemento.</strong> A função de desenho devolve <em>um</em> elemento, como
+qualquer componente. Se o cartão tem título, preço e botão, embrulhe tudo em uma
+<code>&lt;div&gt;</code> ou em um <code>Fragment</code>. Um <code>return</code> com dois irmãos soltos
+não compila, e a mensagem fala em elementos adjacentes.</p>
+
+<p><strong>Repassar a key para dentro da função.</strong> A key não chega ao componente como prop. Quem
+percorre a lista é quem coloca a key, no elemento que o <code>map</code> devolve — por isso o
+<code>Fragment</code> em volta de <code>{desenhar(p)}</code>. Se você deixar a key para a função de
+desenho, o React reclama no console de desenvolvimento e o estado das linhas passa a se misturar. A
+história completa está em <a href="a-key.html">A key</a>.</p>
+
+<p><strong>Recriar a função e culpar o componente.</strong> Cada desenho do <code>App</code> cria uma
+função nova, e isso é normal. Só vira problema quando o componente é embrulhado em <code>memo</code> e
+você espera que ele pare de redesenhar: a função nova invalida a comparação. Se um dia precisar, a
+saída é <code>useCallback</code>, assunto de desempenho mais adiante.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a lista aparece vazia</h3>
+<p>A Ana trocou <code>desenhar={...}</code> por <code>desenhar={Cartao}</code> para "ficar mais
+curto". O componente passou a chamar <code>desenhar(p)</code> — e <code>Cartao</code> é um componente,
+que espera um objeto de props, não um pão solto. O resultado foi uma tela em branco. Componente e função
+de desenho têm assinaturas diferentes: um recebe props, o outro recebe o que o componente decidir
+mandar. Se você tem um componente e quer usá-lo por item, escreva
+<code>desenhar={(p) =&gt; &lt;Cartao pao={p} /&gt;}</code>.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o botão aparece no lugar errado</h3>
+<p>Ela queria o botão "Adicionar" embaixo do preço, mas ele ficou antes do nome. Isso não é problema de
+estado: é o lugar onde ela escreveu, dentro da função de desenho. A ordem dos elementos é exatamente a
+ordem do seu JSX. O botão em si continua funcionando porque a ação vem de fora, pela função entregue
+pelo componente — e essa parte ela não precisa reescrever quando muda o desenho.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: dois desenhos na mesma tela</h3>
+<p>Na página de encomendas ela quer uma lista de cartões e, embaixo, a mesma lista em tabela. Com
+<code>children</code> só cabe um desenho por chamada. A saída é usar duas props com nome —
+<code>desenharCartao</code> e <code>desenharLinha</code> — ou chamar o componente duas vezes, uma para
+cada formato. Props com nome existem justamente para quando um slot não basta; a aula de
+<a href="slots-com-children.html">Slots com children</a> aprofunda essa escolha.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que é uma render prop?</p>
+<label><input type="radio" name="rp1"> uma prop que já vem preenchida pelo React</label>
+<label><input type="radio" name="rp1"> uma prop cujo valor é uma função que devolve JSX</label>
+<label><input type="radio" name="rp1"> um método obrigatório de todo componente de lista</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O componente fez <code>{desenhar}</code>, sem chamar a
+função. O que aparece na tela?</p>
+<label><input type="radio" name="rp2"> o item desenhado uma vez</label>
+<label><input type="radio" name="rp2"> um erro de compilação</label>
+<label><input type="radio" name="rp2"> nada: uma função não é conteúdo que o React desenhe</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Quem deve chamar a função de desenho?</p>
+<label><input type="radio" name="rp3"> o componente, uma vez para cada item</label>
+<label><input type="radio" name="rp3"> a página, antes de passar a prop</label>
+<label><input type="radio" name="rp3"> o próprio React, automaticamente, em todo componente</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o contador da fornada</h2>
+<p>Complete a chamada para que o componente entregue, à função de desenho, o total de pães e a ação de
+assar mais um. Depois responda: como se chama a prop que recebe uma função que devolve JSX?</p>
+<div class="ex-code">{<input aria-label="resposta 1" data-answer="children" placeholder="...">(total, assar)}</div>
+<p class="ex-dica">Dica: é a prop que carrega o que você escreve entre a tag de abertura e a de
+fechamento do componente — e o nome tem oito letras.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Render prop é uma prop cujo valor é uma função que devolve JSX. O componente percorre os dados e
+chama essa função item por item, passando o que ele sabe; a página decide o desenho com o que recebe. O
+laço, a key e o estado ficam no componente; o visual, fora dele. O mesmo padrão aparece com
+<code>children</code> quando a função é escrita entre as tags.</p>
+
+<p>O que faz esse arranjo funcionar é uma coisa só: em JavaScript, função é um valor como outro
+qualquer. Pode ir dentro de um objeto de props, pode ser guardada em uma variável, pode ser chamada
+depois. O React não inventou nada disso — só escolheu chamar a sua função no momento certo do desenho.
+Quando você entende que <code>{desenhar(p)}</code> executa e <code>{desenhar}</code> só entrega, a
+maioria dos "não apareceu nada" deixa de ser mistério.</p>
+
+<p>Hoje os hooks cobrem boa parte do que as render props faziam: estado compartilhado virou
+<code>useState</code>, e lógica repetida virou hook próprio. O padrão continua útil quando o componente
+precisa mandar no quando — listas grandes, medidas, bibliotecas que dão controle do desenho. E continua
+ótimo para aprender: ele mostra, de forma crua, a divisão entre dado, comportamento e desenho que
+sustenta todo o resto do React.</p>
+
+<p>Guarde também o critério de escolha: se o conteúdo já está pronto, passe um elemento; se o componente
+precisa produzir um pedaço por item, passe uma função; se são vários lugares reservados, use props com
+nome. Três perguntas, três respostas diferentes — e nenhuma delas exige decorar nome de API.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Render prop é uma prop que recebe função; a função devolve JSX.</li>
+<li>O componente chama a função uma vez por item, com o item como argumento.</li>
+<li><code>children</code> também pode ser função: <code>&lt;Lista&gt;{(p) =&gt; ...}&lt;/Lista&gt;</code>.</li>
+<li><code>{desenhar(p)}</code> chama; <code>{desenhar}</code> não desenha nada; <code>&lt;desenhar /&gt;</code> vira tag vazia.</li>
+<li>A key fica no elemento que o <code>map</code> devolve, não dentro da função de desenho.</li>
+<li>A função de desenho é pura: sem hook, sem efeito colateral, sem buscar dados.</li>
+<li>Seta com chaves precisa de <code>return</code>; com parênteses, o JSX volta sozinho.</li>
+<li>Estado e comportamento ficam no componente; o desenho fica em quem chama.</li>
+<li>Um slot só: <code>children</code>. Dois ou mais: props com nome.</li>
+<li>Hooks cobrem a maior parte dos casos; render props continuam valendo quando o componente manda no quando.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atualização Otimista | Guia React</title>
+<meta name="description" content="Atualização otimista no React: mostrar o resultado antes da confirmação do servidor, marcar como enviando e desfazer quando o pedido falha.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Atualização <span class="hl">otimista</span></h1>
+<p class="intro">O botão “encomendar” do site da Ana demora três segundos para responder. Nesses três
+segundos não acontece nada na tela: ninguém sabe se o clique funcionou, e a Ana já viu cliente clicando três
+vezes e recebendo três pães de queijo. O servidor estava certo; a tela é que ficava muda esperando a
+confirmação. Nesta aula a lista mostra a encomenda <em>na hora</em> e confirma depois — e, quando o envio
+falha, desfaz com elegância.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é atualização otimista e por que ela melhora a sensação de velocidade.</li>
+  <li>A ordem certa: pintar agora, enviar, confirmar depois.</li>
+  <li>Como marcar um item como “enviando” e trocar por “confirmado”.</li>
+  <li>Como desfazer quando o servidor recusa, voltando à lista anterior.</li>
+  <li>O que fazer com o identificador provisório do item que ainda não existe no servidor.</li>
+  <li>Quando <em>não</em> ser otimista: dinheiro, estoque, exclusão.</li>
+  <li>Os tropeços que deixam item fantasma na tela.</li>
+</ul>
+</div>
+
+<h2>1. A cena: três segundos de tela parada</h2>
+
+<p>A versão atual do botão é a mais honesta que existe: espera. Ela manda o pedido, fica com o botão
+desligado, e só acrescenta a encomenda à lista quando o servidor confirma. Se a rede é rápida, o atraso é
+imperceptível. Se a rede é a do 3G da feira, são três segundos em que a tela não muda.</p>
+
+<pre class="file" data-file="App.jsx">async function encomendar() {
+  setEnviando(true);
+  const resposta = await fetch("https://loja.test/api/encomendas", {
+    method: "POST",
+    body: JSON.stringify({ pao: "pão de queijo", qtd: 2 })
+  });
+  const salva = await resposta.json();
+  setEncomendas([...encomendas, salva]);
+  setEnviando(false);
+}</pre>
+
+<p>Três segundos de silêncio produzem três comportamentos previsíveis. O primeiro: a pessoa clica de novo,
+achando que o primeiro clique não pegou. O segundo: ela sai da página no meio. O terceiro: ela pergunta no
+WhatsApp se o pedido entrou. Nenhum dos três é problema de código — é problema de expectativa, e a tela é
+quem cria a expectativa.</p>
+
+<p>A atualização otimista resolve isso mudando a ordem das coisas. Em vez de esperar a confirmação para
+mostrar o resultado, a tela mostra o resultado <em>imediatamente</em> e envia o pedido em paralelo. A
+aposta é que vai dar certo — e, quando não dá, a tela desfaz. “Otimista” é literalmente isso: assumir o
+melhor e ter um plano para o pior.</p>
+
+<h2>2. A ideia: pintar antes de confirmar</h2>
+
+<p>Vale separar duas coisas que costumam andar juntas na cabeça de quem está começando: o dado que está no
+servidor e o dado que está na tela. No modo tradicional, os dois mudam no mesmo instante — a tela só muda
+depois que o servidor respondeu. No modo otimista, a tela muda primeiro e o servidor alcança depois.</p>
+
+<p>Essa diferença de ordem tem uma consequência prática: durante alguns instantes, a tela mostra algo que
+ainda não é verdade. Isso é aceitável quando o dado é “a sua encomenda entrou na lista”, e não é aceitável
+quando é “seu pagamento foi aprovado”. A escolha é de produto, não de código.</p>
+
+<dl class="anatomy">
+<dt>otimista</dt>
+<dd>Atualização que acontece na tela antes da confirmação do servidor, na aposta de que a operação vai
+funcionar.</dd>
+<dt>pendente</dt>
+<dd>O estado do item entre o clique e a resposta. A tela mostra o item, mas marcado — “enviando…” —, para
+ninguém achar que está tudo confirmado.</dd>
+<dt>confirmar</dt>
+<dd>Trocar o item pendente pelo que o servidor devolveu, que é a versão oficial do dado, com identificador
+de verdade.</dd>
+<dt>desfazer</dt>
+<dd>Voltar ao estado anterior quando a operação falha. Sem desfazer, otimismo vira item fantasma na
+lista.</dd>
+<dt>provisório</dt>
+<dd>Identificador temporário do item que ainda não existe no servidor. Serve para achar o item na lista
+enquanto a resposta não chega.</dd>
+</dl>
+
+<h2>3. Pintar agora, confirmar depois</h2>
+
+<p>O primeiro passo é a lista mostrar o item antes de qualquer resposta. A caixa usa um servidor controlado
+por você: o pedido fica pendurado até o botão “servidor aceita”, e assim dá para ver os dois momentos sem
+correr contra o relógio.</p>
+
+<div class="tryreact" data-goal="clique:#pedir;;conta:.pedidos li=1;;texto:enviando;;clique:#ok;;texto:confirmado">
+  <p class="try-task">Hoje a encomenda só entra na lista depois da resposta. Acrescente o pão ao estado
+  <code>pedidos</code> <strong>antes</strong> de esperar o servidor, marcado com
+  <code>pendente: true</code> — e, quando a resposta chegar, marque como confirmada.</p>
+  <pre class="jsx">let responder = null;
+
+function enviarPedido(pao) {
+  return new Promise((ok) =&gt; {
+    responder = () =&gt; ok({ id: 42, pao: pao });
+  });
+}
+
+function App() {
+  const [pedidos, setPedidos] = useState([]);
+
+  async function encomendar() {
+    const salvo = await enviarPedido("pão de queijo");
+    setPedidos([...pedidos, { id: salvo.id, pao: salvo.pao, pendente: false }]);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button id="pedir" onClick={encomendar}&gt;encomendar pão de queijo&lt;/button&gt;
+      &lt;button id="ok" onClick={() =&gt; responder &amp;&amp; responder()}&gt;servidor aceita&lt;/button&gt;
+      &lt;ul className="pedidos"&gt;
+        {pedidos.map((p) =&gt; (
+          &lt;li key={p.id}&gt;{p.pao} — {p.pendente ? "enviando" : "confirmado"}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="pedir"&gt;encomendar pão de queijo&lt;/button&gt;
+  &lt;button id="ok"&gt;servidor aceita&lt;/button&gt;
+  &lt;ul class="pedidos"&gt;&lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">let responder = null;
+
+function enviarPedido(pao) {
+  return new Promise((ok) =&gt; {
+    responder = () =&gt; ok({ id: 42, pao: pao });
+  });
+}
+
+function App() {
+  const [pedidos, setPedidos] = useState([]);
+
+  async function encomendar() {
+    setPedidos([...pedidos, { id: "temp-1", pao: "pão de queijo", pendente: true }]);
+
+    const salvo = await enviarPedido("pão de queijo");
+    setPedidos((lista) =&gt;
+      lista.map((p) =&gt; (p.id === "temp-1" ? { ...salvo, pendente: false } : p))
+    );
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button id="pedir" onClick={encomendar}&gt;encomendar pão de queijo&lt;/button&gt;
+      &lt;button id="ok" onClick={() =&gt; responder &amp;&amp; responder()}&gt;servidor aceita&lt;/button&gt;
+      &lt;ul className="pedidos"&gt;
+        {pedidos.map((p) =&gt; (
+          &lt;li key={p.id}&gt;{p.pao} — {p.pendente ? "enviando" : "confirmado"}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Duas linhas fazem o serviço. A primeira acrescenta o item provisório com <code>pendente: true</code> —
+ela roda antes do <code>await</code>, então a tela pinta na hora. A segunda, depois da resposta, troca o
+provisório pela versão do servidor usando <code>map</code> e comparação por identificador: o item de
+<code>id</code> <code>"temp-1"</code> vira o item de <code>id</code> <code>42</code> que veio de lá.</p>
+
+<p>Repare no <code>setPedidos((lista) =&gt; ...)</code> com função. A lista anterior entrou numa variável
+fechada no clique, e quando a resposta chega ela pode estar desatualizada — outra encomenda pode ter entrado
+no meio. A forma funcional recebe a lista do momento, que é exatamente o que se quer para trocar um item.</p>
+
+<h2>4. Quando dá errado: desfazer</h2>
+
+<p>Ser otimista sem plano de desfazer é o erro mais comum do assunto. A tela mostra a encomenda, o servidor
+recusa (pão esgotado, por exemplo), e o item fica ali para sempre, como se existisse. Pior: a pessoa acha
+que encomendou e aparece na padaria esperando o pão.</p>
+
+<p>O plano tem duas partes: guardar a lista anterior antes de mexer nela e devolvê-la no
+<code>catch</code>. Como o item provisório foi criado por você, não é preciso procurar nada — basta voltar
+ao estado de antes.</p>
+
+<div class="tryreact" data-goal="clique:#pedir;;clique:#recusar;;conta:.pedidos li=0;;texto:Pedido não enviado">
+  <p class="try-task">O item é acrescentado na hora, mas quando o servidor recusa ele fica na lista como se
+  existisse. Guarde a lista anterior antes de acrescentar, devolva no erro e mostre a mensagem
+  <strong>Pedido não enviado</strong>.</p>
+  <pre class="jsx">let recusar = null;
+
+function enviarPedido(pao) {
+  return new Promise((ok, erro) =&gt; {
+    recusar = () =&gt; erro(new Error("sem estoque"));
+  });
+}
+
+function App() {
+  const [pedidos, setPedidos] = useState([]);
+  const [aviso, setAviso] = useState("");
+
+  async function encomendar() {
+    setPedidos([...pedidos, { id: "temp-1", pao: "pão de queijo", pendente: true }]);
+
+    try {
+      await enviarPedido("pão de queijo");
+    } catch (e) {
+      setAviso("nada");
+    }
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button id="pedir" onClick={encomendar}&gt;encomendar&lt;/button&gt;
+      &lt;button id="recusar" onClick={() =&gt; recusar &amp;&amp; recusar()}&gt;servidor recusa&lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;ul className="pedidos"&gt;
+        {pedidos.map((p) =&gt; &lt;li key={p.id}&gt;{p.pao}&lt;/li&gt;)}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="pedir"&gt;encomendar&lt;/button&gt;
+  &lt;button id="recusar"&gt;servidor recusa&lt;/button&gt;
+  &lt;p&gt;&lt;/p&gt;
+  &lt;ul class="pedidos"&gt;&lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">let recusar = null;
+
+function enviarPedido(pao) {
+  return new Promise((ok, erro) =&gt; {
+    recusar = () =&gt; erro(new Error("sem estoque"));
+  });
+}
+
+function App() {
+  const [pedidos, setPedidos] = useState([]);
+  const [aviso, setAviso] = useState("");
+
+  async function encomendar() {
+    const anterior = pedidos;
+    setPedidos([...pedidos, { id: "temp-1", pao: "pão de queijo", pendente: true }]);
+
+    try {
+      await enviarPedido("pão de queijo");
+    } catch (e) {
+      setPedidos(anterior);
+      setAviso("Pedido não enviado");
+    }
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button id="pedir" onClick={encomendar}&gt;encomendar&lt;/button&gt;
+      &lt;button id="recusar" onClick={() =&gt; recusar &amp;&amp; recusar()}&gt;servidor recusa&lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;ul className="pedidos"&gt;
+        {pedidos.map((p) =&gt; &lt;li key={p.id}&gt;{p.pao}&lt;/li&gt;)}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p><code>const anterior = pedidos;</code> parece bobo, porque é só uma referência. E é justamente por ser
+referência que funciona: como o React nunca altera a lista antiga, guardar “a lista de antes” custa nada e
+devolve exatamente o que estava na tela. Se o código usasse <code>push</code> na lista, o tal anterior já
+estaria modificado e o desfazer não desfaria nada.</p>
+
+<h2>5. O item provisório e o definitivo</h2>
+
+<p>Todo item otimista nasce sem identificador de verdade. O servidor é quem numera; na tela, você inventa um
+provisório — <code>"temp-1"</code>, <code>"temp-2"</code> — só para conseguir achá-lo depois. Quando a
+resposta chega, o provisório é substituído pelo definitivo. Essa troca é a parte que mais confunde, porque
+envolve três coisas ao mesmo tempo: sumir com o provisório, guardar o definitivo e não duplicar a linha.</p>
+
+<div class="tryreact" data-goal="clique:#pedir;;clique:#ok;;conta:.pedidos li=1;;texto:salvo">
+  <p class="try-task">A resposta do servidor é acrescentada como item novo, então a lista acaba com dois
+  pães de queijo. Troque o item provisório pelo que o servidor devolveu, sem duplicar: a lista tem de ficar
+  com <strong>um</strong> item, mostrando <strong>salvo</strong>.</p>
+  <pre class="jsx">let responder = null;
+
+function enviarPedido(pao) {
+  return new Promise((ok) =&gt; {
+    responder = () =&gt; ok({ id: 42, pao: "pão de queijo (2 un)" });
+  });
+}
+
+function App() {
+  const [pedidos, setPedidos] = useState([]);
+
+  async function encomendar() {
+    setPedidos([...pedidos, { id: "temp-1", pao: "pão de queijo", pendente: true }]);
+    const salvo = await enviarPedido("pão de queijo");
+    setPedidos((lista) =&gt; [...lista, { ...salvo, pendente: false }]);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button id="pedir" onClick={encomendar}&gt;encomendar&lt;/button&gt;
+      &lt;button id="ok" onClick={() =&gt; responder &amp;&amp; responder()}&gt;servidor aceita&lt;/button&gt;
+      &lt;ul className="pedidos"&gt;
+        {pedidos.map((p) =&gt; (
+          &lt;li key={p.id}&gt;{p.pao} — {p.pendente ? "enviando" : "salvo"}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="pedir"&gt;encomendar&lt;/button&gt;
+  &lt;button id="ok"&gt;servidor aceita&lt;/button&gt;
+  &lt;ul class="pedidos"&gt;&lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">let responder = null;
+
+function enviarPedido(pao) {
+  return new Promise((ok) =&gt; {
+    responder = () =&gt; ok({ id: 42, pao: "pão de queijo (2 un)" });
+  });
+}
+
+function App() {
+  const [pedidos, setPedidos] = useState([]);
+
+  async function encomendar() {
+    setPedidos([...pedidos, { id: "temp-1", pao: "pão de queijo", pendente: true }]);
+    const salvo = await enviarPedido("pão de queijo");
+    setPedidos((lista) =&gt;
+      lista.map((p) =&gt; (p.id === "temp-1" ? { ...salvo, pendente: false } : p))
+    );
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button id="pedir" onClick={encomendar}&gt;encomendar&lt;/button&gt;
+      &lt;button id="ok" onClick={() =&gt; responder &amp;&amp; responder()}&gt;servidor aceita&lt;/button&gt;
+      &lt;ul className="pedidos"&gt;
+        {pedidos.map((p) =&gt; (
+          &lt;li key={p.id}&gt;{p.pao} — {p.pendente ? "enviando" : "salvo"}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A troca tem um detalhe de <code>key</code>: o item provisório tinha <code>key="temp-1"</code> e passa a
+ter <code>key={42}</code>. Para o React, é outro elemento — o antigo sai, o novo entra. Isso é o correto: são
+dados diferentes. O que não pode é o novo entrar sem o antigo sair, que é o que produz a linha duplicada da
+caixa.</p>
+
+<p>Um detalhe que evita susto: a lista pode ficar com dois itens iguais por alguns instantes, se a mesma
+encomenda for feita duas vezes. Não é bug do otimismo, é o servidor devolvendo duas encomendas de verdade. O
+que separa um caso do outro é o identificador: duas linhas com <code>"temp-1"</code> são um erro de código;
+duas linhas com ids <code>41</code> e <code>42</code> são dois pedidos que existem.</p>
+
+<h2>6. Os três estados de um item otimista</h2>
+
+<p>Um item otimista passa por até três estados, e a tela precisa saber desenhar os três. Esquecer o terceiro
+é o que deixa a lista com um item eternamente “enviando”.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Estado</th><th>O que a tela mostra</th><th>O que acontece depois</th></tr>
+<tr><td>pendente</td><td>o item, marcado “enviando…”</td><td>ou confirma, ou falha</td></tr>
+<tr><td>confirmado</td><td>o item com os dados do servidor, sem marca</td><td>nada: é a versão oficial</td></tr>
+<tr><td>falhou</td><td>o item sai e aparece a mensagem de erro</td><td>a pessoa tenta de novo</td></tr>
+</table>
+</div>
+
+<p>Há duas formas de desenhar o “falhou”. A primeira é tirar o item da lista e mostrar um aviso — é o que a
+seção 4 fez, e é a mais simples. A segunda é deixar o item na lista marcado como “não enviado”, com um botão
+de tentar de novo. A segunda é melhor quando o texto digitado é longo: ninguém quer redigitar um pedido
+porque a rede caiu. O que não serve é o silêncio.</p>
+
+<p>O marcador de pendente também rende um detalhe de acessibilidade: ele deve estar no texto, e não só numa
+cor. “Enviando…” escrito à mão é lido por leitor de tela; uma bolinha amarela não é. E quem está no
+computador do balcão, com sol na tela, também agradece.</p>
+
+<p>Um efeito colateral bom do otimismo é que ele obriga a pensar no erro. Quem escreve o caminho feliz
+apenas, nunca precisou decidir o que a tela faz quando o servidor diz não — e é justamente aí que o usuário
+fica sem saber o que aconteceu. Escrever o desfazer primeiro, antes do caminho bonito, costuma render um
+componente mais honesto.</p>
+
+<h2>7. Otimista demais</h2>
+
+<p>Atualização otimista é uma aposta, e aposta tem lugar. A regra prática: seja otimista quando o dado é seu
+e o erro é reversível; seja conservador quando o dado envolve dinheiro, estoque ou outra pessoa.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Otimista?</th><th>Por quê</th></tr>
+<tr><td>acrescentar encomenda à própria lista</td><td>sim</td><td>se falhar, o desfazer devolve a lista anterior e nada se perde</td></tr>
+<tr><td>marcar um recado como lido</td><td>sim</td><td>o custo do erro é baixo e o gesto parece instantâneo</td></tr>
+<tr><td>“curtir” um pão do dia</td><td>sim</td><td>o número pode voltar sozinho se falhar</td></tr>
+<tr><td>confirmar pagamento</td><td>não</td><td>mostrar “pago” e depois desfazer destrói a confiança</td></tr>
+<tr><td>baixar estoque</td><td>não</td><td>dois balcões podem vender o último pão ao mesmo tempo</td></tr>
+<tr><td>excluir uma conta</td><td>não</td><td>a ação é irreversível e o aviso precisa vir antes</td></tr>
+</table>
+</div>
+
+<p>Existe um caso intermediário que resolve muita coisa: otimista no que a pessoa vê, conservador no que ela
+confirma por escrito. A lista mostra a encomenda na hora, o item diz “enviando”, e a confirmação com número
+de pedido aparece quando o servidor responde. A pessoa não espera para ver o efeito do clique, mas também não
+recebe como certo o que ainda não é.</p>
+
+<h2>8. Os tropeços de quem é otimista</h2>
+
+<p>O primeiro tropeço é esquecer o <code>catch</code>. Sem ele, a falha não chega em lugar nenhum, o item
+provisório fica na lista para sempre e o console registra um erro que ninguém leu. O segundo é desfazer
+errado: em vez de voltar à lista anterior, o código tenta remover o item pelo índice, e se outra encomenda
+entrou no meio o índice aponta para o pão errado.</p>
+
+<p>O terceiro é duplicar: acrescentar a resposta do servidor como item novo, sem tirar o provisório. O
+sintoma é uma lista que cresce com pares de pão de queijo. O quarto é usar a lista fechada do clique dentro
+do <code>catch</code> — quase sempre funciona, mas quando duas encomendas entram juntas, a segunda desfaz a
+primeira. A cura é sempre a mesma: forma funcional no <code>set</code>.</p>
+
+<pre class="term">console: pedido provisório criado: temp-1</pre>
+
+<p>Essa linha, escrita logo antes do <code>await</code>, mostra o item nascendo com identificador inventado.
+É o par dela que fecha o ciclo:</p>
+
+<pre class="term">console: pedido confirmado: 42</pre>
+
+<p>Quando as duas aparecem no console, o caminho otimista inteiro rodou: provisório criado, resposta aceita,
+item trocado. Quando só a primeira aparece, o pedido ficou pendurado — ou o <code>await</code> nunca voltou,
+ou o <code>catch</code> engoliu o erro sem avisar ninguém.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você vê</th><th>Causa provável</th><th>Conserto</th></tr>
+<tr><td>item fica “enviando” para sempre</td><td>falta o <code>catch</code> ou falta desmarcar o pendente</td><td>tratar o erro e trocar o item no sucesso</td></tr>
+<tr><td>dois itens iguais na lista</td><td>resposta acrescentada sem remover o provisório</td><td>trocar com <code>map</code> por identificador</td></tr>
+<tr><td>item errado desaparece no desfazer</td><td>remoção por índice em lista que mudou</td><td>voltar à lista guardada antes</td></tr>
+<tr><td>lista da tela e lista do servidor diferentes</td><td>otimismo sem confirmação</td><td>usar a resposta do servidor como versão oficial</td></tr>
+</table>
+</div>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: os três pães de queijo</h3>
+<p>A cliente clicou três vezes porque a tela demorava. O servidor registrou três encomendas, a Ana assou seis
+pães de queijo e dois sobraram. Depois da atualização otimista, o item aparece no primeiro clique e o botão
+se desabilita enquanto o pedido está pendente: um clique, um pedido, e ninguém fica no escuro.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o pão que acabou no meio do caminho</h3>
+<p>O pão de queijo acabou às dez da manhã e a cliente encomendou pelo site às dez e um. Com o desfazer, o
+item desapareceu da lista e a mensagem “Pedido não enviado” explicou o motivo. A Ana prefere assim: a tela
+errou por dois segundos e se corrigiu, em vez de prometer um pão que não existe.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o recado que não queria perder</h3>
+<p>No formulário de recado, o texto digitado é longo e a rede do balcão cai. Em vez de tirar o item da
+lista, a tela passou a deixá-lo marcado como “não enviado”, com um botão de tentar de novo. A atualização
+otimista continua, e o trabalho de digitar não se perde.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Qual é a ordem da atualização otimista?</p>
+<label><input type="radio" name="q1"> enviar, esperar a resposta, acrescentar à lista</label>
+<label><input type="radio" name="q1"> acrescentar à lista marcado como pendente, enviar, confirmar ou desfazer</label>
+<label><input type="radio" name="q1"> acrescentar à lista e nunca confirmar</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O servidor recusou o pedido. O que a tela precisa
+fazer?</p>
+<label><input type="radio" name="q2"> nada: o item já está na lista e vai ficar</label>
+<label><input type="radio" name="q2"> recarregar a página inteira</label>
+<label><input type="radio" name="q2"> voltar à lista anterior e avisar que não deu</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Por que o item provisório recebe um id inventado, como
+<code>"temp-1"</code>?</p>
+<label><input type="radio" name="q3"> para achar e trocar aquele item quando a resposta chegar</label>
+<label><input type="radio" name="q3"> porque o React exige id numérico em <code>key</code></label>
+<label><input type="radio" name="q3"> para o servidor recusar identificador repetido</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o desfazer que faltou</h2>
+
+<p>O envio está otimista, mas a falha não volta a lista ao que era. Complete o bloco que trata o erro:</p>
+
+<div class="ex-code">const anterior = pedidos;
+setPedidos([...pedidos, { id: "temp-1", pao: "brioche", pendente: true }]);
+
+try {
+  await enviarPedido("brioche");
+} <input aria-label="resposta 1" data-answer="catch" placeholder="..."> (e) {
+  setPedidos(anterior);
+}</div>
+
+<p class="ex-dica">Dica: é a palavra que acompanha o <code>try</code> quando o assunto é erro — a mesma das
+aulas de tratamento de erro, que pega o problema em vez de deixar a tela muda.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Atualização otimista é mostrar o resultado antes da confirmação e desfazer se o servidor recusar. A ordem
+é sempre: guarde a lista anterior, acrescente o item marcado como pendente, envie, e no sucesso troque o
+provisório pela versão do servidor; no erro, volte à lista guardada e avise.</p>
+
+<p>O item provisório precisa de um identificador inventado para ser encontrado depois, e a troca é feita com
+<code>map</code> comparando <code>id</code>. Seja otimista no que é reversível e conservador em dinheiro,
+estoque e exclusão. E nunca deixe um item em “enviando” para sempre: pendente é estado de passagem, não
+destino.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Otimista = tela primeiro, servidor depois, desfazer se falhar.</li>
+<li>Guarde a lista anterior antes de acrescentar.</li>
+<li>Marque o item com <code>pendente: true</code> e troque por “confirmado” na resposta.</li>
+<li>Identificador provisório (<code>"temp-1"</code>) serve para achar o item depois.</li>
+<li>Troque com <code>map</code> e <code>id</code>; nunca acrescente a resposta como item novo.</li>
+<li>No erro: <code>setPedidos(anterior)</code> e uma mensagem visível.</li>
+<li>Desabilite o botão enquanto pendente: evita clique triplo.</li>
+<li>Dinheiro, estoque e exclusão pedem confirmação antes da tela.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O useId | Guia React</title>
+<meta name="description" content="O useId do React: ids únicos e estáveis para ligar rótulo e campo, dica e descrição, sem números repetidos e sem quebrar a hidratação do servidor.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O <span class="hl">useId</span></h1>
+<p class="intro">A Ana montou um componente de campo de e-mail e usou o mesmo componente nos dois
+formulários do site: o cadastro do cliente e o cadastro do fornecedor. Cada campo tem o seu rótulo
+clicável, e clicar no rótulo do segundo formulário leva o cursor para o campo do primeiro. O culpado é uma
+linha só: os dois campos saíram com <code>id="email"</code>, porque o componente é o mesmo. Nesta aula a
+Ana aprende o <code>useId</code>, o hook que dá a cada cópia do componente um identificador só dela — e
+aprende também para que esse identificador serve, e para o que ele não serve.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Para que serve o <code>id</code> de um campo e o que ele liga no HTML.</li>
+  <li>Por que um componente reutilizado gera ids repetidos e o que isso quebra.</li>
+  <li>Como o <code>useId</code> resolve, com uma linha e sem contador global.</li>
+  <li>Que o id devolvido é estável entre desenhos e único por cópia do componente.</li>
+  <li>Como ligar uma dica ou uma mensagem de erro ao campo com <code>aria-describedby</code>.</li>
+  <li>Por que o id precisa nascer antes de o campo aparecer na tela.</li>
+  <li>Por que <code>Math.random()</code> e contador global dão problema, e o que o <code>useId</code>
+  não é.</li>
+</ul>
+</div>
+
+<h2>1. A cena: dois formulários, o mesmo id</h2>
+
+<p>O site da Ana tem dois formulários parecidos: um para o cliente entrar na lista de novidades e outro
+para o fornecedor mandar o preço do dia. Ela escreveu um componente <code>CampoDeEmail</code> e usou nos
+dois lugares — decisão certa, é para isso que componente serve. O componente devolve um
+<code>&lt;label htmlFor="email"&gt;</code> e um <code>&lt;input id="email"&gt;</code>.</p>
+
+<p>Uma cópia funciona. Duas cópias produzem duas tags com o mesmo <code>id</code> no mesmo documento, e o
+HTML não permite isso: o id tem de ser único na página. O navegador não reclama, não escreve nada no
+console, não pinta a borda de vermelho. Ele simplesmente obedece à primeira: quando você clica no rótulo do
+segundo formulário, o foco vai para o campo do primeiro. Para quem usa leitor de tela, é pior — o rótulo
+anunciado pode ser o do outro campo.</p>
+
+<p>Esse é o tipo de defeito que sobrevive a meses de uso, porque nada quebra de forma visível. A pessoa
+só percebe se clicar no rótulo e reparar que o cursor foi para o lugar errado. É exatamente o motivo de o
+React ter um hook dedicado a isso: gerar um identificador único para cada cópia de um componente, sem
+sorteio e sem contador.</p>
+
+<h2>2. Para que serve um id, afinal</h2>
+
+<p>O <code>id</code> é o nome de um elemento dentro do documento. Duas coisas dependem dele: o
+<code>&lt;label for="..."&gt;</code>, que aponta para o campo que ele descreve, e os atributos
+<code>aria-*</code>, que dizem ao leitor de tela onde estão a dica e a mensagem de erro. Sem id, o rótulo é
+só um texto ao lado — não é clicável e não é anunciado junto com o campo.</p>
+
+<dl class="anatomy">
+<dt>id</dt>
+<dd>O nome único de um elemento na página: <code>&lt;input id="email-1"&gt;</code>. Tem de ser diferente de
+todos os outros ids do documento.</dd>
+<dt>htmlFor</dt>
+<dd>No JSX, o <code>for</code> do rótulo. Recebe o id do campo: <code>&lt;label htmlFor="email-1"&gt;</code>.
+No HTML gerado, sai como <code>for</code>.</dd>
+<dt>label</dt>
+<dd>O rótulo do campo. Clicar nele leva o foco para o campo cujo id combina — e é o que o leitor de tela
+anuncia.</dd>
+<dt>aria-describedby</dt>
+<dd>Aponta para o id do texto que <em>descreve</em> o campo: a dica, o formato esperado, a regra de
+senha.</dd>
+<dt>aria-labelledby</dt>
+<dd>Aponta para o id do texto que <em>nomeia</em> o campo quando não existe <code>label</code>, como um
+título acima de um grupo de campos.</dd>
+<dt>useId</dt>
+<dd>O hook que devolve um id único para aquela cópia do componente e estável entre desenhos:
+<code>const id = useId()</code>.</dd>
+</dl>
+
+<p>Guarde a diferença entre os dois atributos <code>aria</code>, porque ela confunde: <code>aria-labelledby</code>
+dá o <strong>nome</strong> do campo (o que ele é), e <code>aria-describedby</code> dá a
+<strong>descrição</strong> (o que ele espera). Um campo pode ter os dois. Na prática, o
+<code>aria-labelledby</code> só aparece quando não há um <code>&lt;label&gt;</code> possível; o
+<code>aria-describedby</code> aparece sempre que existe uma dica.</p>
+
+<p>Quando o campo é único na página, escrever o id à mão é perfeitamente bom: <code>id="busca"</code>,
+<code>htmlFor="busca"</code>. O problema começa quando o campo mora dentro de um componente que pode ser
+usado duas, três, dez vezes. Aí o id não pode ser uma constante do arquivo: ele precisa ser diferente em
+cada cópia.</p>
+
+<h2>3. A caixa: o mesmo componente, dois ids</h2>
+
+<p>O caso do começo da aula, reduzido ao osso. O <code>CampoDeEmail</code> é usado duas vezes e as duas
+cópias saem com <code>id="email"</code>. O painel mostra os dois blocos iguais — e é aí que está o defeito:
+dois elementos com o mesmo nome.</p>
+
+<div class="tryreact" data-goal="conta:input[id^=email-]=2;;conta:label[for^=email-]=2;;conta:[id=email]=0">
+  <p class="try-task">Dentro de <code>CampoDeEmail</code>, chame <code>const id = useId()</code> e use
+  <code>id={"email-" + id}</code> no campo e <code>htmlFor={"email-" + id}</code> no rótulo. As duas cópias
+  precisam sair com ids diferentes.</p>
+  <pre class="jsx">function CampoDeEmail() {
+  return (
+    &lt;p&gt;
+      &lt;label htmlFor="email"&gt;E-mail&lt;/label&gt;
+      &lt;input id="email" type="email" /&gt;
+    &lt;/p&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;form&gt;
+      &lt;h1&gt;Dois cadastros&lt;/h1&gt;
+      &lt;CampoDeEmail /&gt;
+      &lt;CampoDeEmail /&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;form&gt;
+  &lt;h1&gt;Dois cadastros&lt;/h1&gt;
+  &lt;p&gt;
+    &lt;label for="email"&gt;E-mail&lt;/label&gt;
+    &lt;input id="email" type="email"&gt;
+  &lt;/p&gt;
+  &lt;p&gt;
+    &lt;label for="email"&gt;E-mail&lt;/label&gt;
+    &lt;input id="email" type="email"&gt;
+  &lt;/p&gt;
+&lt;/form&gt;
+</pre>
+  <pre class="solucao">function CampoDeEmail() {
+  const id = useId();
+  return (
+    &lt;p&gt;
+      &lt;label htmlFor={"email-" + id}&gt;E-mail&lt;/label&gt;
+      &lt;input id={"email-" + id} type="email" /&gt;
+    &lt;/p&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;form&gt;
+      &lt;h1&gt;Dois cadastros&lt;/h1&gt;
+      &lt;CampoDeEmail /&gt;
+      &lt;CampoDeEmail /&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+</div>
+
+<p>Rode e compare o painel antes e depois. Antes, os dois blocos mostram <code>id="email"</code>. Depois,
+cada um tem um id próprio, terminado em algo diferente, e o <code>for</code> do rótulo acompanha. O prefixo
+<code>email-</code> não é exigência do React: é para você abrir o inspetor do navegador e saber de que campo
+aquele id veio. O React só garante a parte única.</p>
+
+<p>Repare também no que o <code>useId</code> não faz. Ele não altera o texto do rótulo, não muda o
+comportamento do campo e não resolve o problema de dois formulários idênticos na tela. Ele só devolve uma
+string. Quem liga rótulo e campo é o par <code>htmlFor</code> + <code>id</code>, e é você quem escreve os
+dois.</p>
+
+<h2>4. O que o useId devolve</h2>
+
+<p>A chamada é <code>const id = useId()</code>, sem argumento. O que volta é uma string que serve como id:
+única naquela página, estável entre os desenhos do mesmo componente, e diferente para cada cópia. Duas coisas
+importantes vêm daí.</p>
+
+<p><strong>Primeira: é estável.</strong> Digitar no campo, marcar um checkbox, trocar um estado — nada disso
+muda o id. O React guarda o valor na posição do hook, como faz com o <code>useState</code>. Se o id mudasse a
+cada desenho, o rótulo perderia o campo no meio da digitação, e o leitor de tela perderia a referência. No
+console do seu projeto, com um <code>console.log(id)</code> no corpo do componente, você vê a mesma linha em
+cada desenho:</p>
+
+<pre class="term">id do campo: _r_0_
+id do campo: _r_0_
+id do campo: _r_0_</pre>
+
+<p><strong>Segunda: é único por cópia.</strong> Duas chamadas de <code>&lt;CampoDeEmail /&gt;</code> são dois
+componentes diferentes, e cada um ganha o seu id. É por isso que o <code>useId</code> resolve o problema da
+caixa anterior sem que você precise passar um id por prop. E se você chamar <code>useId</code> duas vezes no
+mesmo componente, ganha dois ids diferentes — útil quando um componente tem dois campos.</p>
+
+<p>O formato do texto não é contrato. Nesta versão do React, na caixa, ele sai como <code>_r_0_</code>; em
+outras versões você pode ver <code>:r0:</code> ou <code>«r0»</code>. Não escreva código que dependa disso,
+não use o id em teste automatizado e não tente adivinhar o próximo. Trate o valor como uma senha: você
+repassa, não inspeciona.</p>
+
+<p>Um detalhe prático que vale desde já: o id devolvido pode conter caracteres que não funcionam bem em
+seletor de CSS. Se você precisar estilizar o campo, use uma classe; o id é para o HTML e para os atributos
+<code>aria-*</code>, não para <code>#email-_r_0_</code> no CSS.</p>
+
+<h2>5. Rótulo, dica e mensagem de erro</h2>
+
+<p>Campo de senha é o exemplo onde tudo aparece junto: o rótulo diz o que é, a dica diz o que se espera e a
+mensagem de erro diz o que deu errado. Os três precisam estar ligados ao campo — e o campo é um só. A
+convenção mais comum é chamar <code>useId</code> uma vez e montar os ids derivados com prefixo.</p>
+
+<div class="tryreact" data-goal="conta:input[aria-describedby^=ajuda-]=1;;conta:small[id^=ajuda-]=1;;conta:label[for^=senha-]=1">
+  <p class="try-task">O campo e o rótulo já usam o id. Falta ligar a dica: chame
+  <code>const id = useId()</code> (já está lá), dê ao <code>&lt;small&gt;</code> o
+  <code>id={"ajuda-" + id}</code> e ponha <code>aria-describedby={"ajuda-" + id}</code> no
+  <code>&lt;input&gt;</code>.</p>
+  <pre class="jsx">function CampoDeSenha() {
+  const id = useId();
+  return (
+    &lt;p&gt;
+      &lt;label htmlFor={"senha-" + id}&gt;Senha&lt;/label&gt;
+      &lt;input id={"senha-" + id} type="password" /&gt;
+      &lt;small&gt;Mínimo de 8 caracteres.&lt;/small&gt;
+    &lt;/p&gt;
+  );
+}
+
+function App() {
+  return &lt;CampoDeSenha /&gt;;
+}</pre>
+  <pre class="out">
+&lt;p&gt;
+  &lt;label for="senha-_r_0_"&gt;Senha&lt;/label&gt;
+  &lt;input id="senha-_r_0_" type="password"&gt;
+  &lt;small&gt;Mínimo de 8 caracteres.&lt;/small&gt;
+&lt;/p&gt;
+</pre>
+  <pre class="solucao">function CampoDeSenha() {
+  const id = useId();
+  return (
+    &lt;p&gt;
+      &lt;label htmlFor={"senha-" + id}&gt;Senha&lt;/label&gt;
+      &lt;input id={"senha-" + id} type="password" aria-describedby={"ajuda-" + id} /&gt;
+      &lt;small id={"ajuda-" + id}&gt;Mínimo de 8 caracteres.&lt;/small&gt;
+    &lt;/p&gt;
+  );
+}
+
+function App() {
+  return &lt;CampoDeSenha /&gt;;
+}</pre>
+</div>
+
+<p>No painel, o <code>aria-describedby</code> do campo e o <code>id</code> do <code>small</code> terminam com
+o mesmo sufixo. É essa combinação que faz o leitor de tela anunciar “Senha, campo de texto, mínimo de 8
+caracteres” em vez de só “Senha”. Sem a ligação, a dica continua visível na tela e invisível para quem não
+vê a tela.</p>
+
+<p>Se o componente tiver dois campos independentes, você tem duas opções honestas: chamar
+<code>useId</code> duas vezes, uma por campo, ou chamar uma vez e derivar dois prefixos. A primeira é mais
+fácil de ler; a segunda deixa claro que os ids andam juntos. Nenhuma das duas é errada — o que não vale é
+escrever <code>id="senha"</code> em um componente que pode aparecer duas vezes.</p>
+
+<p>Vale o mesmo para a mensagem de erro. Quando a validação falha, o campo ganha
+<code>aria-describedby</code> apontando para o parágrafo do erro, e o erro ganha um id. Assim o leitor de
+tela anuncia o problema junto com o campo, em vez de deixar a pessoa procurando texto vermelho pela
+página.</p>
+
+<h2>6. O id precisa existir antes de o campo aparecer</h2>
+
+<p>Agora o caso que separa quem entendeu de quem decorou: o campo que só aparece depois de um clique. A Ana
+põe um checkbox “Quero nota fiscal” e, quando ele é marcado, o campo de CNPJ aparece. O id desse campo tem
+de ser gerado com <code>useId</code> — e o <code>useId</code> tem de ficar no topo do componente, junto dos
+outros hooks, não dentro do trecho que só desenha às vezes.</p>
+
+<p>O motivo é o de sempre: hooks são identificados pela ordem das chamadas. Se o <code>useId</code> só
+rodasse quando o campo aparece, a lista de hooks mudaria de tamanho entre um desenho e outro, e o React
+perderia a conta. Gerar o id sempre, mesmo sem usar, custa nada.</p>
+
+<div class="tryreact" data-goal="clique:input[type=checkbox];;conta:input[id^=cnpj-]=1;;conta:label[for^=cnpj-]=1">
+  <p class="try-task">Marque “Quero nota fiscal”: o campo CNPJ aparece sem rótulo ligado. Ponha
+  <code>const id = useId()</code> no topo do <code>App</code> e ligue o rótulo ao campo com
+  <code>htmlFor={"cnpj-" + id}</code> e <code>id={"cnpj-" + id}</code>.</p>
+  <pre class="jsx">function App() {
+  const [nota, setNota] = useState(false);
+
+  return (
+    &lt;div&gt;
+      &lt;label&gt;
+        &lt;input
+          type="checkbox"
+          checked={nota}
+          onChange={(e) =&gt; setNota(e.target.checked)}
+        /&gt;
+        Quero nota fiscal
+      &lt;/label&gt;
+
+      {nota &amp;&amp; (
+        &lt;p&gt;
+          &lt;label&gt;CNPJ&lt;/label&gt;
+          &lt;input /&gt;
+        &lt;/p&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label&gt;
+    &lt;input type="checkbox"&gt;
+    Quero nota fiscal
+  &lt;/label&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nota, setNota] = useState(false);
+  const id = useId();
+
+  return (
+    &lt;div&gt;
+      &lt;label&gt;
+        &lt;input
+          type="checkbox"
+          checked={nota}
+          onChange={(e) =&gt; setNota(e.target.checked)}
+        /&gt;
+        Quero nota fiscal
+      &lt;/label&gt;
+
+      {nota &amp;&amp; (
+        &lt;p&gt;
+          &lt;label htmlFor={"cnpj-" + id}&gt;CNPJ&lt;/label&gt;
+          &lt;input id={"cnpj-" + id} /&gt;
+        &lt;/p&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel prova as duas coisas de uma vez: o campo aparece depois do clique e já sai com id e rótulo
+ligados. Se você mover o <code>useId</code> para dentro do <code>if</code>, a caixa quebra — o painel não
+muda mais ao marcar e desmarcar o checkbox, porque o React abortou o desenho. É a regra dos hooks cobrando
+o seu preço, e ela tem aula própria em <a href="regras-dos-hooks.html">As Regras dos Hooks</a>.</p>
+
+<p>Uma variante do mesmo caso: o campo de CNPJ só aparece quando <code>nota</code> é verdadeiro, mas o hook
+está no topo desde o primeiro desenho. O id é gerado, guardado e usado no desenho em que o campo entra. Nada
+se perde, nada é gerado duas vezes.</p>
+
+<h2>7. Por que não Math.random() nem contador global</h2>
+
+<p>Antes do <code>useId</code>, a gambiarra clássica era <code>id={"campo-" + Math.random()}</code>. Ela
+funciona em uma tela simples e quebra em três situações: o id muda a cada desenho (e o rótulo perde o
+campo), dois desenhos podem sortear o mesmo número (raro, mas acontece) e, num projeto que renderiza no
+servidor, o número sorteado no servidor é diferente do sorteado no navegador. Aí você vê o aviso mais
+chato do React:</p>
+
+<pre class="term">Warning: Prop `id` did not match. Server: "campo-0.7314" Client: "campo-0.2981"</pre>
+
+<p>Um contador global do tipo <code>let proximo = 0; const id = "campo-" + (proximo++)</code> parece mais
+organizado, e é pior: em desenvolvimento o React desenha duas vezes para ajudar a achar problemas, e o
+contador anda o dobro; no servidor, cada requisição começa do zero e os ids se repetem entre páginas. O
+<code>useId</code> existe justamente porque essas duas tentativas falham.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Como você gera o id</th><th>Ao redesenhar</th><th>Com renderização no servidor</th><th>Veredito</th></tr>
+<tr><td><code>useId()</code></td><td>o mesmo id</td><td>o mesmo id nos dois lados</td><td>é o certo</td></tr>
+<tr><td>texto fixo, <code>"email"</code></td><td>o mesmo id</td><td>o mesmo id em todas as cópias</td><td>só serve para campo único</td></tr>
+<tr><td><code>Math.random()</code></td><td>id novo a cada desenho</td><td>ids diferentes: aviso de hidratação</td><td>nunca</td></tr>
+<tr><td>contador global</td><td>id novo a cada desenho</td><td>recomeça do zero no servidor</td><td>nunca</td></tr>
+<tr><td><code>Date.now()</code></td><td>muda a cada milissegundo</td><td>diferente nos dois lados</td><td>nunca</td></tr>
+</table>
+</div>
+
+<p>“Renderização no servidor” é o nome do arranjo em que o HTML da página é montado no servidor e depois o
+React assume no navegador, conferindo se o que chegou combina com o que ele desenharia. Esse encontro é a
+hidratação. Ids que não combinam quebram a conferência. Este guia não usa servidor — a caixa roda no seu
+navegador —, mas frameworks como o Next.js usam, e é por isso que a documentação do React insiste no
+<code>useId</code> em vez de “um contador serve”.</p>
+
+<h2>8. O que o useId não é</h2>
+
+<p>Três confusões aparecem sempre que o assunto é <code>useId</code>. Vale desfazer cada uma, porque as três
+levam a código que parece certo e não é.</p>
+
+<p>A primeira: <strong>não é para <code>key</code></strong>. O <code>key</code> de uma lista diz ao React
+qual item é qual, e precisa vir do dado — o id do produto, o número do pedido. Usar <code>useId</code> ali
+daria um id novo para cada item da lista a cada mudança de ordem, e o React recriaria todos os elementos. Se
+o seu item não tem id, veja <a href="listas-com-map.html">Listas com map</a>.</p>
+
+<p>A segunda: <strong>não é para seletor de CSS</strong>. O texto devolvido pode ter caracteres que atrapalham
+<code>querySelector</code> e <code>#id</code>. Para estilo, use classe; para teste, use
+<code>aria-label</code> ou texto visível; para o HTML, use o id.</p>
+
+<p>A terceira: <strong>não gera id para elemento que você não desenha</strong>. Se o alvo é uma âncora
+<code>href="#contato"</code> para pular até uma seção, o id é fixo e escrito à mão — ele faz parte do
+endereço e alguém vai digitar isso na barra do navegador. Id gerado por hook é para uso interno da página.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Necessidade</th><th>Use</th><th>Por quê</th></tr>
+<tr><td>ligar rótulo e campo num componente reutilizado</td><td><code>useId()</code></td><td>único por cópia e estável</td></tr>
+<tr><td>apontar a dica ou o erro para o campo</td><td><code>useId()</code> com prefixo</td><td>um id por texto ligado</td></tr>
+<tr><td>identificar item de lista</td><td>o id do dado, no <code>key</code></td><td>a identidade vem do conteúdo</td></tr>
+<tr><td>âncora de navegação (<code>#contato</code>)</td><td>id fixo, escrito à mão</td><td>o endereço precisa ser previsível</td></tr>
+<tr><td>estilo de um campo</td><td><code>className</code></td><td>id não é gancho de CSS</td></tr>
+</table>
+</div>
+
+<p>Há ainda um detalhe de escopo que economiza dúvida: o id gerado vale para a página inteira, não para o
+componente. Dois componentes diferentes nunca recebem o mesmo <code>useId</code>, e é por isso que ele serve
+como id de documento. Se você montar duas cópias da mesma aplicação na mesma página, elas precisam de
+prefixos diferentes — e isso é configuração de raiz, não do hook.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o rótulo que focava o campo errado</h3>
+<p>A Ana clicou em “E-mail” no formulário do fornecedor e o cursor foi para o campo do cliente. Os dois
+componentes tinham <code>id="email"</code>. Ela chamou <code>useId</code> dentro do componente e montou
+<code>{"email-" + id}</code> no rótulo e no campo. O clique passou a ir para o lugar certo sem que nenhum
+dos dois formulários soubesse que o outro existia.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o leitor de tela lia a dica do vizinho</h3>
+<p>Dois campos de senha na mesma tela, os dois com <code>aria-describedby="ajuda"</code>. O leitor de tela
+anunciava sempre a mesma dica, mesmo quando a regra de cada campo era diferente. Com um <code>useId</code>
+por componente e o prefixo <code>ajuda-</code>, cada campo passou a apontar para o seu próprio texto. O
+conserto foi de duas linhas, e a diferença só aparece para quem usa leitor de tela — o que é exatamente o
+motivo de fazer certo desde o começo.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o campo que aparecia depois do clique</h3>
+<p>No formulário de encomenda, o campo de observação só aparece quando a Ana marca “é para festa”. O id
+estava sendo gerado dentro do trecho condicional, e o componente quebrava ao marcar e desmarcar. Mover o
+<code>useId</code> para o topo, junto do <code>useState</code>, resolveu — e é a mesma regra que vale para
+todos os hooks.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que o <code>useId</code> devolve?</p>
+<label><input type="radio" name="q1"> o próximo número da lista de campos do formulário</label>
+<label><input type="radio" name="q1"> uma string única para aquela cópia do componente, estável entre desenhos</label>
+<label><input type="radio" name="q1"> o id do elemento que está com o foco</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que dois campos com <code>id="email"</code> são um
+problema?</p>
+<label><input type="radio" name="q2"> porque o React recusa desenhar o segundo</label>
+<label><input type="radio" name="q2"> porque o navegador apaga o primeiro</label>
+<label><input type="radio" name="q2"> porque o id tem de ser único: o rótulo e o leitor de tela passam a
+achar o campo errado</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Onde o <code>useId</code> deve ser chamado?</p>
+<label><input type="radio" name="q3"> no topo do componente, junto dos outros hooks, mesmo que o campo só
+apareça depois</label>
+<label><input type="radio" name="q3"> dentro do <code>if</code> que mostra o campo</label>
+<label><input type="radio" name="q3"> dentro do <code>onClick</code> do botão que revela o campo</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o rótulo do telefone</h2>
+<p>Complete o componente para que o rótulo aponte para o campo, com um id único por cópia:</p>
+<div class="ex-code">const id = <input aria-label="resposta 1" data-answer="useId()" placeholder="...">;
+return (
+  &lt;label htmlFor={"telefone-" + id}&gt;Telefone&lt;/label&gt;
+  &lt;input id={<input aria-label="resposta 2" data-answer='"telefone-" + id|`telefone-${id}`' placeholder="...">} /&gt;
+);</div>
+<p class="ex-dica">Dica: a segunda resposta monta o mesmo texto da primeira. Se o <code>htmlFor</code> e o
+<code>id</code> não forem iguais, o clique no rótulo não leva a lugar nenhum.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O <code>useId</code> é o hook dos identificadores: devolve uma string única para cada cópia do componente,
+estável entre desenhos e igual no servidor e no navegador. Ele resolve o caso do componente reutilizado, em
+que um id fixo no arquivo produz duas tags com o mesmo nome e o rótulo passa a apontar para o campo errado.
+O uso típico é uma linha no topo, um prefixo legível e o par <code>htmlFor</code> + <code>id</code> ligado
+nas duas pontas.</p>
+
+<p>O mesmo id ainda serve para amarrar a dica e a mensagem de erro: <code>aria-describedby</code> no campo,
+<code>id</code> no texto. Chamar <code>useId</code> uma vez e derivar dois prefixos é o padrão mais comum,
+mas duas chamadas também valem. E o hook fica sempre no topo, porque o campo pode aparecer só depois de um
+clique — o id precisa existir antes.</p>
+
+<p>O que não fazer: sortear com <code>Math.random()</code> (muda a cada desenho e quebra a hidratação),
+contar com variável global (anda duas vezes em desenvolvimento e recomeça no servidor) ou usar o id gerado
+como <code>key</code> de lista e como seletor de CSS. O id do hook é para o HTML e para o leitor de tela;
+para o resto, existe o instrumento certo.</p>
+
+<p>Por último, uma questão de bom senso: se o campo é único na página e você tem certeza disso, um id escrito
+à mão é mais simples e mais fácil de achar no código. O <code>useId</code> entra quando o campo vira
+componente — porque aí a segunda cópia é só uma questão de tempo.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>const id = useId()</code>: sem argumento, no topo do componente.</li>
+<li>O id é único por cópia e estável entre desenhos — não muda ao digitar.</li>
+<li>O formato do texto é interno (<code>_r_0_</code> nesta versão): não dependa dele.</li>
+<li>Ligue rótulo e campo com <code>htmlFor={"nome-" + id}</code> e <code>id={"nome-" + id}</code>.</li>
+<li>Dica e erro vão em <code>aria-describedby</code>, apontando para o id do texto.</li>
+<li><code>aria-labelledby</code> nomeia; <code>aria-describedby</code> descreve.</li>
+<li>O hook vem antes do <code>if</code>: o id pode ser gerado mesmo quando o campo está escondido.</li>
+<li><code>Math.random()</code>, <code>Date.now()</code> e contador global quebram a hidratação.</li>
+<li>Id de <code>key</code> vem do dado; id de âncora é fixo e escrito à mão.</li>
+<li>Campo único na página pode ter id escrito à mão, sem hook.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

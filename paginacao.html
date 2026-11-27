@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paginação | Guia React</title>
+<meta name="description" content="Paginação no React: fatiar a lista com slice, calcular o total de páginas, botões anterior e próximo, números de página e o que fazer quando o filtro encolhe a lista.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Paginação</span></h1>
+<p class="intro">A lista de encomendas da Ana passou de sete para quarenta e dois itens, e a página virou um
+rolo de papel higiênico: ninguém chega ao fim, ninguém acha a encomenda de ontem. Ela quer mostrar de três
+em três, com um botão para avançar e outro para voltar — como um caderno com páginas numeradas. Nesta aula
+ela aprende a fatiar uma lista no React, calcular quantas páginas existem e não se perder quando a lista
+muda de tamanho.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que a paginação faz com a lista: fatias, não listas novas.</li>
+  <li>Como calcular o primeiro e o último índice de cada página.</li>
+  <li>O <code>slice</code>, o último índice exclusivo e a fórmula do início.</li>
+  <li>Quantas páginas existem: <code>Math.ceil</code> e a lista vazia.</li>
+  <li>Botões Anterior e Próximo com <code>disabled</code> nos limites.</li>
+  <li>Os números das páginas e a <code>key</code> de cada botão.</li>
+  <li>O que fazer quando um filtro encolhe a lista e a página atual deixa de existir.</li>
+</ul>
+</div>
+
+<h2>1. A cena: quarenta e dois pedidos numa página só</h2>
+
+<p>A Ana começou com uma lista de encomendas curta: três linhas, tudo visível. O negócio cresceu e a
+lista virou quarenta e dois itens. No celular, isso dá uma rolagem de tela e meia; no computador, dá uma
+página comprida demais para achar qualquer coisa. O problema não é o tamanho dos dados — é quanto deles a
+tela mostra de uma vez.</p>
+
+<p>A ideia da paginação é simples: divida a lista em pedaços do mesmo tamanho e mostre um pedaço por vez.
+Três por página, por exemplo. A pessoa vê os três primeiros, clica em “Próxima” e vê os três seguintes.
+Embaixo, um aviso diz onde ela está: “Página 2 de 14”.</p>
+
+<p>Repare no que <strong>não</strong> muda: o array de encomendas continua inteiro, na ordem original. A
+página não é um estado da lista; é um recorte dela. Você não cria catorze arrays, nem move itens de um
+lado para o outro — apenas escolhe onde começar a ler e onde parar.</p>
+
+<p>Quem faz esse recorte é o <code>slice</code>. Ele existe em todo array, recebe dois números e devolve
+uma cópia do pedaço entre eles. Sem mexer no original, como o <code>filter</code> da aula
+<a href="buscar.html">Buscar</a>.</p>
+
+<h2>2. Fatiar é escolher um pedaço</h2>
+
+<p>O <code>slice</code> recebe dois índices: onde começa e onde termina. O começo entra na fatia; o fim
+<strong>não</strong> entra. Isso confunde no começo e é a chave de toda a conta:</p>
+
+<pre class="term">&gt; [1, 2, 3, 4, 5].slice(0, 3)
+[1, 2, 3]
+&gt; [1, 2, 3, 4, 5].slice(3, 6)
+[4, 5]
+&gt; Math.ceil(10 / 3)
+4</pre>
+
+<p>A primeira linha pega as posições 0, 1 e 2 — o 3 fica de fora. A segunda começa na posição 3 e tenta
+ir até a 6; como o array acaba antes, vem só o que existe. Essa tolerância é útil: a última página quase
+sempre é menor, e o <code>slice</code> não reclama. Já o <code>Math.ceil</code> arredonda para cima: dez
+itens em páginas de três dão 3,33 páginas, e a última precisa existir, então são quatro.</p>
+
+<p>No React, a fatia é calculada no render, entre o array e o <code>map</code>. A ordem das operações
+continua a mesma das outras listas: filtrar (se houver busca), ordenar (se houver escolha), fatiar (a
+página) e só então desenhar. Se você esquecer alguma etapa, a tela mostra itens a mais ou na ordem
+errada — e o culpado está sempre na etapa que faltou.</p>
+
+<p>Há um erro comum aqui: tentar fatiar no estado. “Vou guardar os três itens da página no estado e trocar
+quando clicar.” Funciona até a lista mudar: um item novo entra, e a fatia guardada fica velha. Guarde a
+página, não a fatia. A fatia é conta.</p>
+
+<h2>3. A página é um estado, a fatia é uma conta</h2>
+
+<p>O estado da paginação é um número só: a página atual. Ela começa em 1, porque é assim que as pessoas
+contam. O código, que gosta de começar em 0, converte na hora de calcular.</p>
+
+<pre class="file" data-file="Encomendas.jsx">const [pagina, setPagina] = useState(1);
+const porPagina = 3;
+
+const inicio = (pagina - 1) * porPagina;
+const fim = inicio + porPagina;
+const visiveis = encomendas.slice(inicio, fim);</pre>
+
+<p>Leia a fórmula do <code>inicio</code> em voz alta: “página menos um, vezes o tamanho da página”. Na
+página 1, <code>(1 - 1) * 3</code> dá 0 e a fatia começa no primeiro item. Na página 2, dá 3 e a fatia
+começa no quarto item, porque as posições 0, 1 e 2 já foram mostradas. Na página 3, dá 6, e assim por
+diante.</p>
+
+<p>O <code>fim</code> é <code>inicio + porPagina</code>, sem subtrair um — porque o <code>slice</code> já
+trata o fim como exclusivo. Essa é a razão de a fórmula ser tão curta: as duas convenções (fim exclusivo e
+contagem a partir de 1) se encaixam quando você converte a página para índice.</p>
+
+<p>Se você preferir contar páginas a partir de 0, pode — mas então o texto da tela precisa converter de
+volta para 1 na hora de mostrar, e você vai escrever <code>pagina + 1</code> em três lugares. Para quem
+está começando, guardar 1 e converter uma vez é menos oportunidades de erro.</p>
+
+<div class="tryreact" data-goal="conta:li.item=3;;texto:Página 1 de 4">
+  <p class="try-task">A tela mostra as doze encomendas de uma vez. Use <code>slice</code> para mostrar só
+  as três da página atual e escreva o aviso “Página 1 de 4” — o estado <code>pagina</code> e o
+  <code>porPagina</code> já existem.</p>
+  <pre class="jsx">const encomendas = [
+  "Pão francês", "Sonho", "Brioche", "Croissant",
+  "Pão de queijo", "Broa de fubá", "Rosca doce", "Pão integral",
+  "Baguete", "Pão doce", "Torta de frango", "Cuca"
+];
+
+function App() {
+  const [pagina, setPagina] = useState(1);
+  const porPagina = 3;
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Página 1 de 4&lt;/p&gt;
+      &lt;ul&gt;
+        {encomendas.map((item) =&gt; (
+          &lt;li className="item" key={item}&gt;{item}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Página 1 de 4&lt;/p&gt;
+  &lt;ul&gt;
+    &lt;li class="item"&gt;Pão francês&lt;/li&gt;
+    &lt;li class="item"&gt;Sonho&lt;/li&gt;
+    &lt;li class="item"&gt;Brioche&lt;/li&gt;
+    &lt;li class="item"&gt;Croissant&lt;/li&gt;
+    &lt;li class="item"&gt;Pão de queijo&lt;/li&gt;
+    &lt;li class="item"&gt;Broa de fubá&lt;/li&gt;
+    &lt;li class="item"&gt;Rosca doce&lt;/li&gt;
+    &lt;li class="item"&gt;Pão integral&lt;/li&gt;
+    &lt;li class="item"&gt;Baguete&lt;/li&gt;
+    &lt;li class="item"&gt;Pão doce&lt;/li&gt;
+    &lt;li class="item"&gt;Torta de frango&lt;/li&gt;
+    &lt;li class="item"&gt;Cuca&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const encomendas = [
+  "Pão francês", "Sonho", "Brioche", "Croissant",
+  "Pão de queijo", "Broa de fubá", "Rosca doce", "Pão integral",
+  "Baguete", "Pão doce", "Torta de frango", "Cuca"
+];
+
+function App() {
+  const [pagina, setPagina] = useState(1);
+  const porPagina = 3;
+  const inicio = (pagina - 1) * porPagina;
+  const visiveis = encomendas.slice(inicio, inicio + porPagina);
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Página {pagina} de {Math.ceil(encomendas.length / porPagina)}&lt;/p&gt;
+      &lt;ul&gt;
+        {visiveis.map((item) =&gt; (
+          &lt;li className="item" key={item}&gt;{item}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Quando a fatia entra, o painel passa a mostrar três itens em vez de doze. A conta do texto também muda:
+“Página 1 de 4” vira uma expressão, <code>{pagina}</code> mais o total calculado. Se o seu total der 12, você
+dividiu pelo número errado — provavelmente usou <code>encomendas.length</code> sem dividir por
+<code>porPagina</code>.</p>
+
+<h2>4. Quantas páginas existem?</h2>
+
+<p>O total de páginas é o tamanho da lista dividido pelo tamanho da página, arredondado para cima. Doze
+itens, três por página: quatro páginas. Dez itens, três por página: 3,33, que arredonda para quatro — e a
+última página fica com um item só.</p>
+
+<pre class="file" data-file="Encomendas.jsx">const totalPaginas = Math.ceil(encomendas.length / porPagina);</pre>
+
+<p>Por que não <code>Math.round</code>? Porque 3,33 arredondado dá 3, e o décimo item ficaria sem página —
+invisível para sempre. Por que não <code>Math.floor</code>? Pelo mesmo motivo, com mais força. O
+<code>Math.ceil</code> é o único que garante que todo item caiba em alguma página.</p>
+
+<p>Existe um caso de borda que vale conhecer: lista vazia. Zero dividido por três dá 0, e
+<code>Math.ceil(0)</code> é 0. A tela mostraria “Página 1 de 0”, que é uma frase sem sentido. A correção é
+proteger o mínimo:</p>
+
+<pre class="file" data-file="Encomendas.jsx">const totalPaginas = Math.max(1, Math.ceil(encomendas.length / porPagina));</pre>
+
+<p>Com isso, uma lista vazia mostra “Página 1 de 1” e uma área vazia — que ainda não é a melhor resposta,
+mas pelo menos é uma frase verdadeira. A aula de Estados Vazios trata do conteúdo; aqui o assunto é a
+contagem não explodir.</p>
+
+<dl class="anatomy">
+<dt>página</dt>
+<dd>O número da fatia que está sendo mostrada. É o único estado da paginação: começa em 1.</dd>
+<dt>porPagina</dt>
+<dd>Quantos itens cabem em cada fatia. Uma constante do componente, não um estado — a não ser que a pessoa
+possa escolher.</dd>
+<dt>slice</dt>
+<dd>Método de array que devolve uma cópia do pedaço entre dois índices. O índice final não entra na
+fatia.</dd>
+<dt>índice inicial</dt>
+<dd>A posição do primeiro item da página: <code>(pagina - 1) * porPagina</code>. Na página 1 é 0.</dd>
+<dt>total de páginas</dt>
+<dd><code>Math.ceil(total / porPagina)</code>: o menor número de páginas que caberia todos os itens.</dd>
+<dt>clamp</dt>
+<dd>Prender um valor dentro de um intervalo. <code>Math.min(pagina, totalPaginas)</code> impede página
+fora do fim.</dd>
+</dl>
+
+<h2>5. Anterior, Próximo e o botão desligado</h2>
+
+<p>Os dois botões não são complicados: um soma, outro subtrai. O detalhe que separa o amador do cuidadoso é
+o limite. Na página 1, “Anterior” não tem para onde ir; na última, “Próximo” também não. Em vez de deixar o
+clique fazer nada — o que parece um botão quebrado —, desligue o botão com <code>disabled</code>:</p>
+
+<pre class="file" data-file="Encomendas.jsx">&lt;button
+  className="anterior"
+  onClick={() =&gt; setPagina(pagina - 1)}
+  disabled={pagina === 1}
+&gt;
+  Anterior
+&lt;/button&gt;
+
+&lt;button
+  className="proxima"
+  onClick={() =&gt; setPagina(pagina + 1)}
+  disabled={pagina === totalPaginas}
+&gt;
+  Próxima
+&lt;/button&gt;</pre>
+
+<p><code>disabled</code> é um atributo booleano do HTML: quando a condição é verdadeira, o botão fica
+apagado e não recebe clique. O React aceita uma expressão dentro das chaves, então a regra fica no próprio
+elemento. É melhor do que esconder o botão, porque a pessoa continua vendo que existe um caminho — só não
+pode usá-lo agora.</p>
+
+<p>Repare que os botões atualizam o estado com o valor atual mais um. Isso funciona porque o valor vem do
+render: cada clique redesenha, e o próximo clique já parte do número novo. Quando a atualização depende do
+valor anterior e pode acontecer várias vezes seguidas, a forma segura é a função:
+<code>setPagina((p) =&gt; p + 1)</code>. O guia volta nisso na aula de atualização de estado; aqui as duas
+funcionam, porque um clique por vez é o caso normal.</p>
+
+<div class="tryreact" data-goal="clique:button.proxima;;texto:Página 2 de 4;;conta:li.item=3">
+  <p class="try-task">Os botões já trocam o estado <code>pagina</code>, mas a lista e o aviso estão fixos
+  na página 1. Faça a fatia e o texto acompanharem o estado, e desligue o “Anterior” na primeira
+  página.</p>
+  <pre class="jsx">const encomendas = [
+  "Pão francês", "Sonho", "Brioche", "Croissant",
+  "Pão de queijo", "Broa de fubá", "Rosca doce", "Pão integral",
+  "Baguete", "Pão doce"
+];
+
+function App() {
+  const [pagina, setPagina] = useState(1);
+  const porPagina = 3;
+  const totalPaginas = Math.ceil(encomendas.length / porPagina);
+  const visiveis = encomendas;
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Página 1 de 4&lt;/p&gt;
+      &lt;ul&gt;
+        {visiveis.map((item) =&gt; (
+          &lt;li className="item" key={item}&gt;{item}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+      &lt;button className="anterior" onClick={() =&gt; setPagina(pagina - 1)}&gt;Anterior&lt;/button&gt;
+      &lt;button className="proxima" onClick={() =&gt; setPagina(pagina + 1)}&gt;Próxima&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Página 1 de 4&lt;/p&gt;
+  &lt;ul&gt;
+    &lt;li class="item"&gt;Pão francês&lt;/li&gt;
+    &lt;li class="item"&gt;Sonho&lt;/li&gt;
+    &lt;li class="item"&gt;Brioche&lt;/li&gt;
+    &lt;li class="item"&gt;Croissant&lt;/li&gt;
+    &lt;li class="item"&gt;Pão de queijo&lt;/li&gt;
+    &lt;li class="item"&gt;Broa de fubá&lt;/li&gt;
+    &lt;li class="item"&gt;Rosca doce&lt;/li&gt;
+    &lt;li class="item"&gt;Pão integral&lt;/li&gt;
+    &lt;li class="item"&gt;Baguete&lt;/li&gt;
+    &lt;li class="item"&gt;Pão doce&lt;/li&gt;
+  &lt;/ul&gt;
+  &lt;button class="anterior"&gt;Anterior&lt;/button&gt;
+  &lt;button class="proxima"&gt;Próxima&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const encomendas = [
+  "Pão francês", "Sonho", "Brioche", "Croissant",
+  "Pão de queijo", "Broa de fubá", "Rosca doce", "Pão integral",
+  "Baguete", "Pão doce"
+];
+
+function App() {
+  const [pagina, setPagina] = useState(1);
+  const porPagina = 3;
+  const totalPaginas = Math.ceil(encomendas.length / porPagina);
+  const inicio = (pagina - 1) * porPagina;
+  const visiveis = encomendas.slice(inicio, inicio + porPagina);
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Página {pagina} de {totalPaginas}&lt;/p&gt;
+      &lt;ul&gt;
+        {visiveis.map((item) =&gt; (
+          &lt;li className="item" key={item}&gt;{item}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+      &lt;button
+        className="anterior"
+        onClick={() =&gt; setPagina(pagina - 1)}
+        disabled={pagina === 1}
+      &gt;
+        Anterior
+      &lt;/button&gt;
+      &lt;button
+        className="proxima"
+        onClick={() =&gt; setPagina(pagina + 1)}
+        disabled={pagina === totalPaginas}
+      &gt;
+        Próxima
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em Verificar: a conferência clica em “Próxima” e espera o aviso da página 2 com três itens. Se o
+aviso mudar e a lista não, o <code>slice</code> ficou de fora; se a lista mudar e o aviso não, falta a
+expressão <code>{pagina}</code> no texto. Os dois sintomas são comuns e fáceis de distinguir no painel.</p>
+
+<h2>6. Os números das páginas</h2>
+
+<p>Anterior e Próximo bastam para navegar, mas não dizem onde a pessoa está nem quantas páginas existem de
+fato. Os números resolvem isso e são fáceis de gerar: um array de 1 até o total.</p>
+
+<pre class="file" data-file="Encomendas.jsx">const numeros = Array.from({ length: totalPaginas }, (_, i) =&gt; i + 1);
+
+{numeros.map((n) =&gt; (
+  &lt;button
+    key={n}
+    className={n === pagina ? "pagina atual" : "pagina"}
+    onClick={() =&gt; setPagina(n)}
+    aria-current={n === pagina ? "page" : undefined}
+  &gt;
+    {n}
+  &lt;/button&gt;
+))}</pre>
+
+<p><code>Array.from</code> recebe um objeto com <code>length</code> e uma função que monta cada item. O
+primeiro parâmetro dela é o item — que não existe, por isso o <code>_</code> —, e o segundo é o índice,
+que começa em 0. Somando 1, sai <code>[1, 2, 3, 4]</code>. É o mesmo raciocínio de sempre: gere os dados,
+depois desenhe com <code>map</code>.</p>
+
+<p>O <code>key={n}</code> é obrigatório e aqui é honesto: cada número é uma página, e o número é estável.
+Já a classe <code>atual</code> marca onde a pessoa está, e o <code>aria-current="page"</code> faz o mesmo
+para leitores de tela. Dois atributos, nenhum custo.</p>
+
+<p>Em listas muito grandes, quarenta botões viram uma faixa ilegível. Aí entram reticências e janelas de
+páginas —“1 … 7 8 9 … 40”. É refinamento de interface; a lógica por baixo é a mesma que você acabou de
+escrever.</p>
+
+<h2>7. Quando a lista encolhe embaixo dos pés</h2>
+
+<p>O bug clássico da paginação aparece quando a lista muda de tamanho. A Ana está na página 4 de 4 e
+filtra “só os doces”. Sobram dois itens, ou seja, uma página. A página 4 não existe mais — e o
+<code>slice</code> de uma página inexistente devolve um array vazio. A tela mostra “Página 4 de 1” e nada
+embaixo.</p>
+
+<pre class="term">&gt; [1, 2, 3].slice(6, 9)
+[]
+&gt; Math.ceil(0 / 3)
+0</pre>
+
+<p>O <code>slice</code> além do fim não dá erro: devolve array vazio. É por isso que a tela fica em branco
+sem nenhuma mensagem — e por isso o conserto precisa ser na conta da página, não no <code>slice</code>.</p>
+
+<p>Duas correções possíveis. A mais simples: sempre que o filtro ou a busca mudar, volte para a página 1.
+Faz sentido para quem usa — a pessoa acabou de mudar a pergunta, então começa a ler do começo. A outra:
+limitar a página ao total, com <code>Math.min(pagina, totalPaginas)</code>, para nunca ficar fora do
+intervalo.</p>
+
+<pre class="file" data-file="Encomendas.jsx">function filtrarDoces() {
+  setFiltro("doces");
+  setPagina(1);
+}</pre>
+
+<p>A primeira é mais previsível e é a que a maioria dos sites usa. A segunda é útil quando a página vem da
+URL, porque aí você não controla o clique: alguém pode abrir um link direto para a página 9 de uma lista
+que hoje tem 3. Nesse caso, limitar é obrigatório — e, de preferência, mostrar a última página em vez de
+uma tela vazia.</p>
+
+<div class="tryreact" data-goal="clique:button.proxima;;clique:button.proxima;;clique:button.doces;;texto:Página 1 de 1;;conta:li.item=2">
+  <p class="try-task">Avance até a página 3 e clique em “Só os doces”. A lista encolhe para dois itens, mas
+  a página continua 3 e a tela fica vazia. Faça o filtro voltar para a página 1.</p>
+  <pre class="jsx">const encomendas = [
+  { nome: "Pão francês", doce: false },
+  { nome: "Sonho", doce: true },
+  { nome: "Brioche", doce: false },
+  { nome: "Croissant", doce: false },
+  { nome: "Rosca doce", doce: true },
+  { nome: "Pão integral", doce: false },
+  { nome: "Baguete", doce: false }
+];
+
+function App() {
+  const [pagina, setPagina] = useState(1);
+  const [soDoces, setSoDoces] = useState(false);
+  const porPagina = 3;
+  const lista = soDoces
+    ? encomendas.filter((item) =&gt; item.doce)
+    : encomendas;
+  const totalPaginas = Math.max(1, Math.ceil(lista.length / porPagina));
+  const inicio = (pagina - 1) * porPagina;
+  const visiveis = lista.slice(inicio, inicio + porPagina);
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Página {pagina} de {totalPaginas}&lt;/p&gt;
+      &lt;button className="doces" onClick={() =&gt; setSoDoces(true)}&gt;Só os doces&lt;/button&gt;
+      &lt;ul&gt;
+        {visiveis.map((item) =&gt; (
+          &lt;li className="item" key={item.nome}&gt;{item.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+      &lt;button className="anterior" onClick={() =&gt; setPagina(pagina - 1)}&gt;Anterior&lt;/button&gt;
+      &lt;button className="proxima" onClick={() =&gt; setPagina(pagina + 1)}&gt;Próxima&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Página 1 de 3&lt;/p&gt;
+  &lt;button class="doces"&gt;Só os doces&lt;/button&gt;
+  &lt;ul&gt;
+    &lt;li class="item"&gt;Pão francês&lt;/li&gt;
+    &lt;li class="item"&gt;Sonho&lt;/li&gt;
+    &lt;li class="item"&gt;Brioche&lt;/li&gt;
+  &lt;/ul&gt;
+  &lt;button class="anterior"&gt;Anterior&lt;/button&gt;
+  &lt;button class="proxima"&gt;Próxima&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const encomendas = [
+  { nome: "Pão francês", doce: false },
+  { nome: "Sonho", doce: true },
+  { nome: "Brioche", doce: false },
+  { nome: "Croissant", doce: false },
+  { nome: "Rosca doce", doce: true },
+  { nome: "Pão integral", doce: false },
+  { nome: "Baguete", doce: false }
+];
+
+function App() {
+  const [pagina, setPagina] = useState(1);
+  const [soDoces, setSoDoces] = useState(false);
+  const porPagina = 3;
+  const lista = soDoces
+    ? encomendas.filter((item) =&gt; item.doce)
+    : encomendas;
+  const totalPaginas = Math.max(1, Math.ceil(lista.length / porPagina));
+  const inicio = (pagina - 1) * porPagina;
+  const visiveis = lista.slice(inicio, inicio + porPagina);
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Página {pagina} de {totalPaginas}&lt;/p&gt;
+      &lt;button
+        className="doces"
+        onClick={() =&gt; {
+          setSoDoces(true);
+          setPagina(1);
+        }}
+      &gt;
+        Só os doces
+      &lt;/button&gt;
+      &lt;ul&gt;
+        {visiveis.map((item) =&gt; (
+          &lt;li className="item" key={item.nome}&gt;{item.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+      &lt;button className="anterior" onClick={() =&gt; setPagina(pagina - 1)}&gt;Anterior&lt;/button&gt;
+      &lt;button className="proxima" onClick={() =&gt; setPagina(pagina + 1)}&gt;Próxima&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Aqui o botão faz duas atualizações no mesmo clique: muda o filtro e volta para a página 1. O React junta
+as duas num único desenho — é o assunto de “atualizações em lote”, e o efeito prático é que a tela nunca
+mostra um estado intermediário esquisito. Você não precisa de <code>useEffect</code> para isso; o
+<code>useEffect</code> apareceria só se a página fosse consequência de algo que muda fora do seu
+controle.</p>
+
+<p>Se o filtro viesse de outro componente, ou da URL, aí sim valeria limitar a página no render:
+<code>const paginaSegura = Math.min(pagina, totalPaginas)</code>, e usar <code>paginaSegura</code> no
+<code>slice</code> e no texto. Uma linha, e nenhuma tela vazia por acidente.</p>
+
+<h2>8. Paginação, “carregar mais” ou rolagem infinita</h2>
+
+<p>Paginar é uma escolha de produto, não uma obrigação. As três alternativas resolvem o mesmo problema —
+lista grande demais — e têm custos diferentes:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Abordagem</th><th>Como funciona</th><th>Quando faz sentido</th></tr>
+<tr><td>paginação</td><td>fatias fixas, com controles de navegação</td><td>listas que a pessoa precisa comparar e voltar, como encomendas e relatórios</td></tr>
+<tr><td>carregar mais</td><td>um botão acrescenta a próxima leva ao fim da lista</td><td>catálogos em que a pessoa explora sem saber o que procura</td></tr>
+<tr><td>rolagem infinita</td><td>a próxima leva chega quando a rolagem chega ao fim</td><td>redes sociais e galerias; ruim quando o rodapé importa</td></tr>
+</table>
+</div>
+
+<p>A paginação ganha quando o número de páginas é informação: “42 encomendas, 14 páginas” diz algo sobre o
+tamanho do trabalho. Perde quando a pessoa não sabe em que página está o item que procura — e é por isso
+que ela quase sempre vem acompanhada de busca e ordenação, como você viu nas duas aulas anteriores.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Grandeza</th><th>Fórmula</th><th>Exemplo com 10 itens e 3 por página</th></tr>
+<tr><td>total de páginas</td><td><code>Math.ceil(total / porPagina)</code></td><td>4</td></tr>
+<tr><td>primeiro índice</td><td><code>(pagina - 1) * porPagina</code></td><td>página 2 começa em 3</td></tr>
+<tr><td>último índice</td><td><code>inicio + porPagina</code> (exclusivo)</td><td>página 2 termina em 6</td></tr>
+<tr><td>itens na página</td><td><code>slice(inicio, inicio + porPagina)</code></td><td>3 itens, 1 na última</td></tr>
+</table>
+</div>
+
+<p>Vale decorar essa tabela. Ela é a mesma em qualquer biblioteca de tabela, em qualquer framework, em
+qualquer linguagem: página, tamanho, índice inicial, fatia. O que muda é o nome do botão.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: “Página 3 de 1”</h3>
+<p>A Ana filtrou a lista e a página continuou 3. O total virou 1, o <code>slice</code> devolveu vazio e a
+tela ficou em branco. Sempre que o conjunto de dados mudar — filtro, busca, ordenação que troca o
+conteúdo —, volte para a página 1 ou limite a página ao total. É a correção mais comum desta aula.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o botão Próxima avança duas páginas</h3>
+<p>Ela escreveu <code>setPagina(pagina + 1)</code> dentro de um <code>useEffect</code> que observa
+<code>pagina</code>, e cada atualização dispara outra. O efeito não é necessário: o clique já é o evento.
+Atualize o estado no <code>onClick</code> e deixe o efeito para o que vem de fora do componente.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: a última página mostra dois itens e “de 3”</h3>
+<p>É o esperado: dez itens em páginas de três dão 4, 4, 2. O aviso “Página 4 de 4” está certo; o que
+engana é a expectativa de que toda página tenha três. Se quiser mostrar o intervalo, use “9–10 de 10” —
+mais informativo do que “3 por página” e igualmente simples de calcular.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que a paginação guarda no estado?</p>
+<label><input type="radio" name="q1"> a fatia de itens da página atual</label>
+<label><input type="radio" name="q1"> o número da página atual</label>
+<label><input type="radio" name="q1"> a lista inteira dividida em arrays</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Na página 2, com 3 itens por página, a fatia começa em qual índice?</p>
+<label><input type="radio" name="q2"> 2</label>
+<label><input type="radio" name="q2"> 6</label>
+<label><input type="radio" name="q2"> 3</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Por que usar <code>Math.ceil</code> no total de páginas?</p>
+<label><input type="radio" name="q3"> porque a última página pode ficar incompleta e precisa existir</label>
+<label><input type="radio" name="q3"> porque o <code>slice</code> exige números inteiros</label>
+<label><input type="radio" name="q3"> porque o React arredonda os números sozinho</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a conta do início</h2>
+<p>Complete a expressão que calcula o índice do primeiro item da página atual, com 3 itens por página.</p>
+<div class="ex-code">const inicio = <input aria-label="resposta 1" data-answer="(pagina - 1) * 3" placeholder="...">;</div>
+<p class="ex-dica">Dica: a página 1 começa no índice 0, então subtraia um antes de multiplicar pelo tamanho
+da página.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Página é um número no estado; a fatia é uma conta no render. O <code>slice(inicio, inicio +
+porPagina)</code> devolve o pedaço, sem tocar na lista original, e o <code>Math.ceil(total / porPagina)</code>
+diz quantas páginas existem — com <code>Math.max(1, …)</code> para a lista vazia não virar “Página 1 de
+0”.</p>
+
+<p>Os controles são dois botões que somam e subtraem, desligados nos limites com <code>disabled</code>. Os
+números das páginas saem de um <code>Array.from</code> e um <code>map</code>, com <code>key</code> e
+<code>aria-current</code>. Nada disso precisa de efeito: clique é evento, estado muda, tela redesenha.</p>
+
+<p>O ponto que mais dá bug é a lista mudando de tamanho. Filtro novo, busca nova, item removido: sempre que
+o conjunto mudar, volte para a página 1 ou limite a página ao total. E lembre que paginar é uma escolha:
+“carregar mais” e rolagem infinita resolvem o mesmo problema com outros custos.</p>
+
+<p>Se você chegou até aqui, já tem as três peças que fazem uma lista de verdade: ordenar, buscar e paginar.
+Elas se combinam na mesma ordem do render — filtrar, ordenar, fatiar, desenhar —, e cada uma tem seu
+próprio estado pequeno. É esse desenho que a próxima aula coloca dentro de uma tabela.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Página atual no estado; fatia calculada no render.</li>
+<li><code>slice(inicio, fim)</code>: o fim não entra na fatia.</li>
+<li><code>inicio = (pagina - 1) * porPagina</code>.</li>
+<li><code>totalPaginas = Math.ceil(total / porPagina)</code>.</li>
+<li>Lista vazia: <code>Math.max(1, …)</code> para evitar “Página 1 de 0”.</li>
+<li>Anterior e Próximo desligados nos limites com <code>disabled</code>.</li>
+<li>Números de página: <code>Array.from({ length: total }, (_, i) =&gt; i + 1)</code>.</li>
+<li>Filtro ou busca novos pedem <code>setPagina(1)</code>.</li>
+<li><code>Math.min(pagina, totalPaginas)</code> protege páginas vindas da URL.</li>
+<li>A última página pode ter menos itens: isso é normal.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

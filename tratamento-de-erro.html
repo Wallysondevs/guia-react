@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tratamento de Erro | Guia React</title>
+<meta name="description" content="Tratamento de erro que ajuda o usuário: as famílias de falha, o catch que engole, a diferença entre mensagem humana e detalhe técnico, e retentativa com limite.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Tratamento de <span class="hl">Erro</span></h1>
+
+<p class="intro">A mensagem que a Ana colocou na tela era honesta e inútil: "TypeError: Failed to fetch".
+O cliente não sabia o que era fetch, nem o que fazer com aquilo. Nas aulas anteriores o erro apareceu e ganhou
+um lugar na tela; agora o assunto é o conteúdo dele. Um erro bem tratado responde três perguntas: o que
+aconteceu, o que a pessoa pode fazer e onde está o detalhe técnico para quem for consertar. Nesta aula a
+Ana aprende a separar essas três coisas — e a não cometer o pecado silencioso de engolir o erro.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>As famílias de falha e como reconhecer cada uma.</li>
+  <li>Por que alguns erros nunca chegam no <code>catch</code>.</li>
+  <li>O perigo do <code>catch</code> vazio, que transforma falha em "nada encontrado".</li>
+  <li>A mensagem humana e o detalhe técnico no mesmo lugar.</li>
+  <li>Retentativa com limite, em vez de tentar para sempre.</li>
+  <li>O que registrar no console e o que nunca mostrar.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o erro que fala grego</h2>
+
+<p>O cliente digitou "brioche", o servidor não respondeu e a tela mostrou a mensagem crua do navegador.
+Tecnicamente correta, praticamente inútil: ninguém sabe o que fazer com um nome de tipo em inglês. A Ana
+percebeu que o erro tinha três públicos ao mesmo tempo — quem usa o site, quem dá suporte e quem programa —
+e que cada um precisava de uma informação diferente.</p>
+
+<p>Quem usa quer saber se foi culpa dele e se vale tentar de novo. Quem dá suporte quer um jeito de
+identificar o problema sem abrir o código. Quem programa quer a mensagem original, com o máximo de detalhe,
+no console e nos registros. Uma tela que mostra só o primeiro caso é confusa; uma que mostra só o terceiro é
+hostil.</p>
+
+<p>Tratar erro, então, é traduzir sem perder o original. É isso que separa "deu erro" de "não consegui falar
+com a padaria; verifique sua conexão e tente de novo" — com a mensagem técnica guardada num canto,
+disponível para quem precisa.</p>
+
+<h2>2. O que chega no <code>catch</code></h2>
+
+<p>O <code>catch</code> recebe uma coisa só, e essa coisa pode ser de vários tipos. Na maioria dos casos é um
+objeto <code>Error</code>, com duas propriedades que interessam: <code>name</code>, que diz a família, e
+<code>message</code>, que diz o detalhe. Alguns erros carregam mais: o <code>status</code> de uma resposta
+HTTP, por exemplo, se você anexar.</p>
+
+<pre class="term">&gt; const e = new Error("Falha de rede")
+undefined
+&gt; e.message
+'Falha de rede'
+&gt; e.name
+'Error'
+&gt; e instanceof Error
+true</pre>
+
+<p>Duas armadilhas moram aqui. A primeira: nem tudo que é lançado é um <code>Error</code> — dá para lançar
+texto (<code>throw "deu ruim"</code>), e aí <code>e.message</code> é <code>undefined</code>. A segunda: a
+mensagem pode vir vazia, e uma tarja vermelha em branco é pior que nenhuma. Por isso o código de tratamento
+costuma normalizar antes de usar:</p>
+
+<pre class="file" data-file="erro.js">function textoDoErro(e) {
+  if (e instanceof Error) return e.message || e.name;
+  return String(e);
+}</pre>
+
+<dl class="anatomy">
+<dt><code>Error</code></dt>
+<dd>O tipo base dos erros do JavaScript. Tem <code>name</code>, <code>message</code> e
+<code>stack</code>.</dd>
+<dt><code>name</code></dt>
+<dd>A família: <code>"Error"</code>, <code>"TypeError"</code>, <code>"SyntaxError"</code>,
+<code>"AbortError"</code>, <code>"TimeoutError"</code>.</dd>
+<dt><code>message</code></dt>
+<dd>O detalhe, em texto. Boa para o console e para o suporte; ruim para a tela do cliente.</dd>
+<dt><code>cause</code></dt>
+<dd>O erro original, quando você embrulha um erro em outro para dar contexto.</dd>
+<dt><code>throw</code></dt>
+<dd>Lançar um erro. Interrompe o fluxo e leva o controle para o <code>catch</code> mais próximo.</dd>
+<dt>error boundary</dt>
+<dd>Componente especial que captura erros de render. Sem ele, um erro de render derruba a árvore.</dd>
+</dl>
+
+<h2>3. As famílias de falha</h2>
+
+<p>Nem todo erro quer dizer a mesma coisa, e a mensagem certa depende da família. Uma tabela resolve a
+maioria dos casos que aparecem em tela que busca dados.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Família</th><th>Como reconhecer</th><th>O que dizer</th></tr>
+<tr><td>sem rede</td><td><code>TypeError: Failed to fetch</code></td><td>"Verifique sua conexão e tente de novo"</td></tr>
+<tr><td>resposta 4xx</td><td><code>resposta.ok</code> falso, status 404</td><td>"Não encontramos esse pão"</td></tr>
+<tr><td>resposta 5xx</td><td><code>resposta.ok</code> falso, status 500</td><td>"A padaria está com problema; tente em instantes"</td></tr>
+<tr><td>corpo inválido</td><td><code>SyntaxError</code> no <code>json()</code></td><td>"Resposta inesperada" + registro no console</td></tr>
+<tr><td>cancelado</td><td><code>e.name === "AbortError"</code></td><td>nada: foi decisão do usuário</td></tr>
+<tr><td>tempo esgotado</td><td><code>e.name === "TimeoutError"</code></td><td>"Demorou demais; tente de novo"</td></tr>
+<tr><td>erro do seu código</td><td><code>TypeError</code> ao ler propriedade de <code>undefined</code></td><td>"Algo deu errado" + registro completo</td></tr>
+</table>
+</div>
+
+<p>Repare que a coluna do meio é técnica e a da direita é humana. O trabalho do tratamento é exatamente essa
+tradução — e ela nunca deve apagar o original. O console continua sendo o lugar do detalhe, e o
+<code>console.error</code> é o instrumento: ele aparece em vermelho, com a pilha de chamadas, e é o que
+alguém vai procurar quando o suporte abrir o caso.</p>
+
+<h2>4. Os erros que não passam pelo <code>catch</code></h2>
+
+<p>Existe uma família que nunca chega no <code>catch</code> e engana muita gente: a resposta HTTP de erro.
+Um 404 ou um 500 não rejeita a promessa do <code>fetch</code>; a resposta chega normalmente, e quem decide
+que aquilo é falha é o seu código, olhando <code>resposta.ok</code>. Se você esquecer essa conferência,
+nenhum <code>try</code>/<code>catch</code> vai ajudar.</p>
+
+<p>Como o <code>fetch</code> não faz isso por você, o costume é transformar a resposta ruim em erro
+lançado, logo depois do primeiro <code>await</code>: um <code>if (!resposta.ok) throw new Error("Status "
++ resposta.status)</code>. A partir dali, 404 passa a cair no mesmo <code>catch</code> dos outros problemas,
+e o tratamento fica em um lugar só. É a ponte entre as duas famílias.</p>
+
+<p>O outro caso é o erro de render. Se o componente quebra durante o desenho — um
+<code>undefined.map</code>, por exemplo —, o <code>catch</code> do efeito não vê nada: o erro acontece
+depois, na hora de desenhar. Quem captura isso é um <em>error boundary</em>, um componente especial que
+existe justamente para mostrar uma tela de reserva quando a árvore quebra. É assunto para outra aula, mas
+vale saber que a fronteira existe, porque o sintoma — tela vazia sem mensagem — costuma ser confundido com
+erro de dados.</p>
+
+<p>E há o erro silencioso por excelência, que é o assunto da próxima seção: o <code>catch</code> que
+existe, roda, e não faz nada com a informação.</p>
+
+<h2>5. O <code>catch</code> que engole</h2>
+
+<p>Engolir um erro é fácil de escrever e difícil de descobrir. O código abaixo faz o pedido, o pedido falha,
+o <code>catch</code> limpa a lista — e a tela mostra "Nenhum pão por hoje". Para o cliente, a padaria não
+tem pão; para o programador, está tudo certo, porque não há erro no console. É o pior dos dois mundos.</p>
+
+<div class="tryreact" data-goal="texto:Não consegui carregar o cardápio">
+  <p class="try-task">O pedido falhou, o <code>catch</code> limpou a lista e a tela diz que não há pão. Use
+  o estado <code>erro</code>: no <code>catch</code>, mostre <code>"Não consegui carregar o
+  cardápio"</code> e esconda a mensagem de lista vazia.</p>
+  <pre class="jsx">function buscarCardapio() {
+  return new Promise((ok, falha) =&gt; {
+    setTimeout(() =&gt; falha(new Error("Falha de rede")), 10);
+  });
+}
+
+function App() {
+  const [lista, setLista] = useState([]);
+  const [erro, setErro] = useState("");
+
+  useEffect(() =&gt; {
+    buscarCardapio()
+      .then((dados) =&gt; setLista(dados))
+      .catch((e) =&gt; {
+        setLista([]);
+      });
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Cardápio&lt;/h1&gt;
+      {erro &amp;&amp; &lt;p className="falha"&gt;{erro}&lt;/p&gt;}
+      {!erro &amp;&amp; lista.length === 0 &amp;&amp; &lt;p&gt;Nenhum pão por hoje&lt;/p&gt;}
+      &lt;ul&gt;
+        {lista.map((p) =&gt; (
+          &lt;li key={p}&gt;{p}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Cardápio&lt;/h1&gt;
+  &lt;p&gt;Nenhum pão por hoje&lt;/p&gt;
+  &lt;ul&gt;&lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscarCardapio() {
+  return new Promise((ok, falha) =&gt; {
+    setTimeout(() =&gt; falha(new Error("Falha de rede")), 10);
+  });
+}
+
+function App() {
+  const [lista, setLista] = useState([]);
+  const [erro, setErro] = useState("");
+
+  useEffect(() =&gt; {
+    buscarCardapio()
+      .then((dados) =&gt; setLista(dados))
+      .catch((e) =&gt; {
+        setErro("Não consegui carregar o cardápio");
+      });
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Cardápio&lt;/h1&gt;
+      {erro &amp;&amp; &lt;p className="falha"&gt;{erro}&lt;/p&gt;}
+      {!erro &amp;&amp; lista.length === 0 &amp;&amp; &lt;p&gt;Nenhum pão por hoje&lt;/p&gt;}
+      &lt;ul&gt;
+        {lista.map((p) =&gt; (
+          &lt;li key={p}&gt;{p}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A correção tem duas partes, e as duas importam. A primeira é dizer que falhou: o estado
+<code>erro</code> deixa de ser decorativo e passa a ser preenchido. A segunda é não mostrar "Nenhum pão por
+hoje" quando houve falha — a condição <code>!erro</code> faz isso. Sem a segunda, a tela mostraria as duas
+mensagens ao mesmo tempo, dizendo "não consegui carregar" e "não há pão" na mesma respiração.</p>
+
+<p>Um detalhe que parece firula e não é: a variável <code>e</code> do <code>catch</code> não é usada na
+solução. Isso é aceitável quando o erro é sempre o mesmo e o registro fica no console. Mas o hábito saudável
+é nunca descartar sem olhar — um <code>console.error(e)</code> antes da mensagem amigável guarda o detalhe
+para quem for investigar, sem poluir a tela de quem está comprando pão.</p>
+
+<h2>6. Mensagem humana e detalhe técnico</h2>
+
+<p>A solução completa mostra as duas camadas. Em cima, uma frase que qualquer pessoa entende e que sugere o
+que fazer. Embaixo, um bloco recolhido com a mensagem original, para quem precisa copiar e mandar no
+suporte. O elemento <code>details</code> do HTML faz isso sem uma linha de JavaScript: fechado por padrão,
+abre no clique.</p>
+
+<div class="tryreact" data-goal="texto:Não deu para falar com a padaria;;conta:details=1">
+  <p class="try-task">A tela mostra a mensagem crua do erro. Troque por "Não deu para falar com a padaria" e
+  coloque a mensagem original dentro de um <code>&lt;details&gt;</code>, com um
+  <code>&lt;summary&gt;</code>.</p>
+  <pre class="jsx">function buscarHorario() {
+  return new Promise((ok, falha) =&gt; {
+    setTimeout(() =&gt; falha(new Error("Falha de rede")), 10);
+  });
+}
+
+function App() {
+  const [erro, setErro] = useState("");
+
+  useEffect(() =&gt; {
+    buscarHorario()
+      .then((h) =&gt; setErro(""))
+      .catch((e) =&gt; setErro(e.message));
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Horário&lt;/h1&gt;
+      {erro &amp;&amp; &lt;p className="falha"&gt;{erro}&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Horário&lt;/h1&gt;
+  &lt;p class="falha"&gt;Falha de rede&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscarHorario() {
+  return new Promise((ok, falha) =&gt; {
+    setTimeout(() =&gt; falha(new Error("Falha de rede")), 10);
+  });
+}
+
+function App() {
+  const [erro, setErro] = useState("");
+
+  useEffect(() =&gt; {
+    buscarHorario()
+      .then((h) =&gt; setErro(""))
+      .catch((e) =&gt; setErro(e.message));
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Horário&lt;/h1&gt;
+      {erro &amp;&amp; (
+        &lt;div&gt;
+          &lt;p className="falha"&gt;Não deu para falar com a padaria&lt;/p&gt;
+          &lt;details&gt;
+            &lt;summary&gt;Detalhes técnicos&lt;/summary&gt;
+            &lt;p&gt;{erro}&lt;/p&gt;
+          &lt;/details&gt;
+        &lt;/div&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Esse arranjo resolve o conflito das três plateias em um pedaço de tela. Quem só quer saber se o pão vem
+lê a primeira linha. Quem vai abrir um chamado abre o detalhe e copia. E o texto técnico não desaparece, o
+que também serve para você: quando o erro chega por foto no WhatsApp, a foto tem a informação que importa.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Camada</th><th>Para quem</th><th>Exemplo</th></tr>
+<tr><td>frase principal</td><td>quem está comprando</td><td>"Não deu para falar com a padaria"</td></tr>
+<tr><td>próximo passo</td><td>quem está comprando</td><td>"Confira sua conexão e tente de novo"</td></tr>
+<tr><td>detalhe recolhido</td><td>quem dá suporte</td><td><code>TypeError: Failed to fetch</code></td></tr>
+<tr><td>registro completo</td><td>quem programa</td><td><code>console.error</code> com a pilha</td></tr>
+<tr><td>identificador</td><td>todo mundo</td><td>"pedido 7 — tentativa 3"</td></tr>
+</table>
+</div>
+
+<p>O que nunca serve: mostrar a pilha de chamadas inteira na cara do cliente, culpar o usuário ("você
+digitou errado") ou prometer algo que você não sabe ("já estamos consertando"). A mensagem certa descreve o
+que falhou, sem julgar ninguém, e oferece um próximo passo concreto.</p>
+
+<h2>7. Tentar de novo, com limite</h2>
+
+<p>Rede instável melhora sozinha em segundos, então tentar de novo é uma boa ideia. Tentar para sempre, não.
+Sem limite, um servidor fora do ar recebe pedidos sem parar, o navegador fica ocupado e a tela nunca sai do
+"tentando". O limite é o que separa insistência de teimosia.</p>
+
+<div class="tryreact" data-goal="texto:Desisti depois de 3 tentativas">
+  <p class="try-task">O componente tenta de novo sem parar. Limite a três tentativas e, na terceira falha,
+  mostre <code>"Desisti depois de 3 tentativas"</code>.</p>
+  <pre class="jsx">function buscar() {
+  return new Promise((ok, falha) =&gt; {
+    setTimeout(() =&gt; falha(new Error("Falha de rede")), 1);
+  });
+}
+
+function App() {
+  const [tentativa, setTentativa] = useState(1);
+  const [recado, setRecado] = useState("Tentando de novo...");
+
+  useEffect(() =&gt; {
+    buscar()
+      .then(() =&gt; setRecado("Pronto"))
+      .catch(() =&gt; {
+        setTentativa(tentativa + 1);
+        setRecado("Tentando de novo...");
+      });
+  }, [tentativa]);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Horário&lt;/h1&gt;
+      &lt;p&gt;{recado}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Horário&lt;/h1&gt;
+  &lt;p&gt;Tentando de novo...&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscar() {
+  return new Promise((ok, falha) =&gt; {
+    setTimeout(() =&gt; falha(new Error("Falha de rede")), 1);
+  });
+}
+
+function App() {
+  const [tentativa, setTentativa] = useState(1);
+  const [recado, setRecado] = useState("Tentando de novo (1)...");
+
+  useEffect(() =&gt; {
+    buscar()
+      .then(() =&gt; setRecado("Pronto"))
+      .catch(() =&gt; {
+        if (tentativa &lt; 3) {
+          setTentativa(tentativa + 1);
+          setRecado("Tentando de novo (" + (tentativa + 1) + ")...");
+        } else {
+          setRecado("Desisti depois de 3 tentativas");
+        }
+      });
+  }, [tentativa]);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Horário&lt;/h1&gt;
+      &lt;p&gt;{recado}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Quando ninguém trata, o navegador conta a história sozinho — e é essa a mensagem que o cliente
+acaba vendo se você deixar o erro escapar:</p>
+
+<pre class="term">Uncaught (in promise) TypeError: Failed to fetch
+    at buscarHorario (App.jsx:9:9)</pre>
+
+<p>Três detalhes fazem a diferença nesse padrão. Primeiro, o contador é estado, porque precisa sobreviver
+entre tentativas. Segundo, a condição vem antes do incremento, senão o componente tenta uma vez a mais do
+que você queria. Terceiro, a mensagem final diz o que aconteceu e sugere o caminho — "desisti depois de 3
+tentativas" é honesto, e fica melhor ainda acompanhada de um botão "tentar de novo" que zera o
+contador.</p>
+
+<p>Em código de produção, vale espaçar as tentativas: 200 milissegundos, depois 400, depois 800. O nome
+disso é <em>backoff</em>, e a razão é simples: se o servidor está sobrecarregado, insistir na mesma
+velocidade só piora. O espaçamento dá tempo para o outro lado respirar.</p>
+
+<p>Vale uma distinção que evita código confuso: retentar é diferente de reenviar. Retentar é perguntar de
+novo, o que é seguro em leitura. Reenviar é repetir uma ação que talvez tenha acontecido — criar o pedido
+duas vezes, cobrar duas vezes. Para escrita, tentar de novo exige uma proteção do lado do servidor, um
+identificador único por envio, que a aula de POST discute. Na dúvida, em escrita, prefira mostrar o erro e
+deixar a pessoa decidir.</p>
+
+<h2>8. Registrar sem vazar</h2>
+
+<p>O <code>console.error</code> é o lugar do detalhe, mas ele não é privado: em produção, ferramentas de
+monitoramento recolhem esses registros, e qualquer pessoa com o console aberto vê o que está lá. Nunca
+registre o que não pode circular — senha, token de cartão, endereço completo com telefone, dado de saúde.
+Registre o identificador do pedido, o status e a mensagem; o resto não.</p>
+
+<p>Quando o erro original não diz o suficiente, você pode embrulhar em outro com contexto e guardar o
+primeiro em <code>cause</code>. O novo erro aparece com a sua mensagem, e o original continua acessível
+para quem for investigar — o melhor dos dois mundos.</p>
+
+<pre class="file" data-file="pedido.js">try {
+  await enviarPedido(pedido);
+} catch (e) {
+  const erro = new Error("Não consegui enviar o pedido " + pedido.id);
+  erro.cause = e;
+  console.error(erro);
+  setFalha("Não conseguimos enviar seu pedido. Tente de novo.");
+}</pre>
+
+<p>Uma última armadilha, e é de sintaxe: <code>catch (e) { }</code> com as chaves vazias não gera aviso
+nenhum. O código compila, roda, e o erro desaparece em silêncio. Se a intenção é ignorar de propósito, vale
+escrever o motivo em um comentário — o próximo a ler o código, muitas vezes você mesmo em três meses, vai
+agradecer.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: "não há pão" quando havia</h3>
+<p>O servidor caiu por dez minutos e a tela dizia "Nenhum pão por hoje". Nenhum cliente reclamou, porque
+todos acreditaram. O <code>catch</code> limpava a lista e seguia como se a resposta tivesse sido vazia. O
+conserto foi separar os dois casos — lista vazia é resposta legítima, falha é falha — e mostrar mensagens
+diferentes. Erro engolido é mentira contada com boa intenção.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a retentativa que virou ataque</h3>
+<p>Ela colocou uma retentativa automática e testou com a rede boa: funcionou. No dia em que o servidor
+ficou fora, o site passou a martelar o endereço a cada 100 milissegundos, de cada cliente aberto, e o
+servidor só piorou. A correção foi limite de três tentativas com espaçamento crescente. Insistir é útil
+quando o problema é passageiro; com o servidor no chão, é combustível.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o token no console</h3>
+<p>Um erro de envio registrava o objeto do pedido inteiro, com o cartão dentro. Durante uma semana, cada
+falha deixou o número do cartão em um log que outras pessoas acessavam. Depois do susto, o registro passou a
+levar só o identificador e o status. A regra é fácil de lembrar se você pensar no log como um lugar público:
+se não pode ser lido por qualquer um, não vai para lá.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. O que o <code>catch</code> recebe?</p>
+<label><input type="radio" name="q1"> o código de status da resposta</label>
+<label><input type="radio" name="q1"> a lista de dados que falhou</label>
+<label><input type="radio" name="q1"> o erro lançado, quase sempre um objeto <code>Error</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. O que há de errado em um <code>catch</code> que só limpa a
+lista?</p>
+<label><input type="radio" name="q2"> ele transforma falha em "nada encontrado", sem avisar ninguém</label>
+<label><input type="radio" name="q2"> ele deixa o código mais lento</label>
+<label><input type="radio" name="q2"> nada: é o padrão recomendado</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. Para que serve o <code>&lt;details&gt;</code> na mensagem
+de erro?</p>
+<label><input type="radio" name="q3"> para esconder o erro do usuário</label>
+<label><input type="radio" name="q3"> para guardar o detalhe técnico recolhido, sem poluir a tela</label>
+<label><input type="radio" name="q3"> para reenviar o pedido automaticamente</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a mensagem que o cliente lê</h2>
+<p>Complete o bloco que mostra a mensagem amigável quando o pedido falha:</p>
+<div class="ex-code">buscarHorario()
+  .then((h) =&gt; setHora(h))
+  .<input aria-label="resposta 1" data-answer="catch" placeholder="...">((e) =&gt; setFalha("Não deu para falar com a padaria"));</div>
+<p class="ex-dica">Dica: é o método da Promise que recebe o erro — o mesmo nome do bloco do
+<code>try</code>. Sem ele, a rejeição vira erro não capturado no console.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O <code>catch</code> recebe o erro, e quase sempre é um <code>Error</code> com <code>name</code> e
+<code>message</code>. Nem toda falha passa por ali: resposta 404 ou 500 chega como sucesso e depende de
+<code>resposta.ok</code>; erro de render é assunto de <em>error boundary</em>. E o pior tratamento é o
+<code>catch</code> que engole — ele transforma falha em "nada encontrado" e ninguém fica sabendo.</p>
+
+<p>Uma tela boa mostra duas camadas: a frase humana, que diz o que aconteceu e o que fazer, e o detalhe
+técnico recolhido num <code>&lt;details&gt;</code>. O registro completo vai para o
+<code>console.error</code>, sem senha, sem token, sem dado pessoal. Retentativa é bem-vinda com limite e com
+espaçamento crescente; sem limite, ela vira parte do problema.</p>
+
+<p>Na próxima aula o outro lado da rede: enviar dados com POST, com corpo em JSON, cabeçalho certo e o
+cuidado de não mandar o mesmo pedido duas vezes.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>name</code> diz a família; <code>message</code> diz o detalhe.</li>
+<li>404 e 500 não vão para o <code>catch</code>: confira <code>resposta.ok</code>.</li>
+<li><code>catch</code> vazio esconde a falha e mente para o usuário.</li>
+<li>Frase humana em cima, detalhe técnico no <code>&lt;details&gt;</code>.</li>
+<li><code>console.error</code> para o detalhe; nunca dado sensível.</li>
+<li>Retentativa com limite e com <em>backoff</em>.</li>
+<li>Lista vazia e falha são casos diferentes.</li>
+<li>Embrulhe com <code>cause</code> para não perder o erro original.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

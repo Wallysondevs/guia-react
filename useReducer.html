@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O useReducer | Guia React</title>
+<meta name="description" content="O useReducer no React 19: a função que recebe estado e ação, o dispatch, ações com dados, a pureza do reducer e quando ele é melhor que o useState.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O <span class="hl">useReducer</span></h1>
+<p class="intro">O painel de pedidos da Ana tinha três <code>useState</code> para descrever o mesmo pedido:
+o status, se estava pago e quem ia entregar. Funcionava até o dia em que um pedido apareceu como
+"entregue" com <code>pago: false</code> — três estados que deviam mudar juntos, mas mudavam em momentos
+diferentes. Nesta aula ela junta os três num estado só e aprende a mudá-lo por <strong>ações</strong>:
+"pagar", "preparar", "entregar". Quem decide o que cada ação faz é uma função separada, o
+<strong>reducer</strong> — e é ela que garante que o pedido nunca fique pela metade.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um reducer: uma função que recebe o estado e uma ação e devolve o estado novo.</li>
+  <li>Como usar <code>useReducer</code> e o que o <code>dispatch</code> faz.</li>
+  <li>Como montar ações com <code>type</code> e dados.</li>
+  <li>Por que o reducer precisa ser puro — e o que acontece quando ele muta o estado.</li>
+  <li>Como trocar vários <code>useState</code> por uma transição só.</li>
+  <li>Quando o <code>useReducer</code> é melhor que o <code>useState</code>, e quando não é.</li>
+  <li>Os erros clássicos: mutação, ação sem <code>type</code> e dispatch no meio do render.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o pedido com três verdades</h2>
+
+<p>O painel da padaria tinha três estados: <code>status</code> (novo, em preparo, pronto, entregue),
+<code>pago</code> (verdadeiro ou falso) e <code>entregador</code> (o nome de quem levou). Cada botão mexia
+em um deles. O botão "Pagar" chamava <code>setPago(true)</code>. O botão "Entregar" chamava
+<code>setStatus("entregue")</code> e <code>setEntregador("João")</code>.</p>
+
+<p>Um dia, um pedido apareceu como entregue e não pago. Ninguém tinha feito nada de errado: alguém clicou
+em "Entregar" sem clicar em "Pagar", e o código não impedia. As três informações eram verdades separadas,
+e ninguém garantia que elas continuassem coerentes. A Ana passou a manhã procurando o bug nos botões,
+quando o problema era o desenho: o pedido é <strong>uma coisa</strong>, não três.</p>
+
+<p>A ideia do reducer é essa: juntar os campos que mudam juntos num objeto só, e mudar todos eles numa
+única transição. Em vez de três setters espalhados, uma função que recebe o pedido de agora e a ação que
+aconteceu, e devolve o pedido novo — inteiro, coerente, do jeito que você escreveu.</p>
+
+<h2>2. O que é um reducer</h2>
+
+<p>Um reducer é uma função com dois parâmetros e um retorno: recebe o <strong>estado</strong> atual,
+recebe a <strong>ação</strong> que aconteceu, e devolve o <strong>estado novo</strong>. Nada mais. Ele não
+desenha, não busca dados, não chama setter. É uma calculadora de estados.</p>
+
+<pre class="file" data-file="pedido.js">function reducer(estado, acao) {
+  if (acao.type === "pagar") {
+    return { ...estado, pago: true, status: "pago" };
+  }
+  if (acao.type === "entregar") {
+    return { ...estado, status: "entregue", entregador: acao.entregador };
+  }
+  return estado;
+}</pre>
+
+<p>Repare em três coisas. A primeira: o retorno é um objeto novo, montado com <code>...</code> para
+copiar o que não mudou. A segunda: o estado antigo nunca é alterado — ele é lido e descartado. A terceira:
+toda ação tem um <code>type</code>, um texto que diz o que aconteceu, e pode trazer dados junto, como o
+nome do entregador.</p>
+
+<dl class="anatomy">
+<dt>reducer</dt>
+<dd>A função <code>(estado, acao) =&gt; novoEstado</code>. Pura: mesmo estado e mesma ação, mesmo
+resultado.</dd>
+<dt>ação</dt>
+<dd>Um objeto que descreve o que aconteceu: <code>{ type: "pagar" }</code>,
+<code>{ type: "entregar", entregador: "João" }</code>.</dd>
+<dt><code>dispatch</code></dt>
+<dd>A função que entrega a ação ao React. É estável entre renders e pode ir como prop sem medo.</dd>
+<dt>transição</dt>
+<dd>A passagem de um estado para outro. No reducer, cada <code>if</code> é uma transição possível.</dd>
+<dt>estado inicial</dt>
+<dd>O objeto com que o componente começa: <code>{ status: "novo", pago: false, entregador: "" }</code>.</dd>
+</dl>
+
+<p>Quem chama o reducer é o React, não você. O componente pede uma mudança com
+<code>dispatch(acao)</code>, o React chama o reducer com o estado atual e a ação, e usa o retorno como
+estado novo. Você nunca chama o reducer diretamente — e não precisa: ele é uma função comum, fácil de
+testar fora do React, porque não depende de nada além dos dois parâmetros.</p>
+
+<h2>3. O primeiro useReducer</h2>
+
+<p>A assinatura é <code>const [estado, dispatch] = useReducer(reducer, estadoInicial)</code>. O React
+guarda o estado, como no <code>useState</code>; a diferença é que você não recebe um setter com o valor
+novo, e sim o <code>dispatch</code>, que entrega uma ação para o reducer decidir o que fazer.</p>
+
+<pre class="file" data-file="Pedido.jsx">const inicial = { paes: 0, total: 0 };
+
+function reducer(estado, acao) {
+  if (acao.type === "somar") {
+    return { paes: estado.paes + 1, total: estado.total + 2.5 };
+  }
+  if (acao.type === "zerar") {
+    return { paes: 0, total: 0 };
+  }
+  return estado;
+}
+
+function Pedido() {
+  const [pedido, dispatch] = useReducer(reducer, inicial);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;pães: {pedido.paes}&lt;/p&gt;
+      &lt;p&gt;total: {pedido.total}&lt;/p&gt;
+      &lt;button onClick={() =&gt; dispatch({ type: "somar" })}&gt;Somar um&lt;/button&gt;
+      &lt;button onClick={() =&gt; dispatch({ type: "zerar" })}&gt;Zerar&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>O reducer fica fora do componente, e isso não é estilo: ele não usa nada de dentro do componente, então
+não precisa ser recriado a cada render. Fora, ele é uma função estável, fácil de ler e de testar. Dentro,
+seria mais uma função nova a cada desenho, com os problemas de identidade da aula de
+<a href="useCallback.html">useCallback</a>.</p>
+
+<p>Agora a missão. O reducer tem a ação <code>somar</code> pronta, mas a ação
+<code>zerar</code> devolve o estado como está — o botão Zerar não faz nada.</p>
+
+<div class="tryreact" data-goal="clique:#somar;;clique:#somar;;clique:#zerar;;texto:pães: 0">
+  <p class="try-task">Complete a transição <code>zerar</code> devolvendo <code>{ paes: 0, total: 0 }</code>.
+  Some dois pães, clique em Zerar e confira <strong>pães: 0</strong>.</p>
+  <pre class="jsx">const inicial = { paes: 0, total: 0 };
+
+function reducer(estado, acao) {
+  if (acao.type === "somar") {
+    return { paes: estado.paes + 1, total: estado.total + 2.5 };
+  }
+  if (acao.type === "zerar") {
+    return estado;
+  }
+  return estado;
+}
+
+function App() {
+  const [pedido, dispatch] = useReducer(reducer, inicial);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;pães: {pedido.paes}&lt;/p&gt;
+      &lt;p&gt;total: {pedido.total}&lt;/p&gt;
+      &lt;button id="somar" onClick={() =&gt; dispatch({ type: "somar" })}&gt;
+        Somar um
+      &lt;/button&gt;
+      &lt;button id="zerar" onClick={() =&gt; dispatch({ type: "zerar" })}&gt;
+        Zerar
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;pães: 0&lt;/p&gt;
+  &lt;p&gt;total: 0&lt;/p&gt;
+  &lt;button id="somar"&gt;Somar um&lt;/button&gt;
+  &lt;button id="zerar"&gt;Zerar&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const inicial = { paes: 0, total: 0 };
+
+function reducer(estado, acao) {
+  if (acao.type === "somar") {
+    return { paes: estado.paes + 1, total: estado.total + 2.5 };
+  }
+  if (acao.type === "zerar") {
+    return { paes: 0, total: 0 };
+  }
+  return estado;
+}
+
+function App() {
+  const [pedido, dispatch] = useReducer(reducer, inicial);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;pães: {pedido.paes}&lt;/p&gt;
+      &lt;p&gt;total: {pedido.total}&lt;/p&gt;
+      &lt;button id="somar" onClick={() =&gt; dispatch({ type: "somar" })}&gt;
+        Somar um
+      &lt;/button&gt;
+      &lt;button id="zerar" onClick={() =&gt; dispatch({ type: "zerar" })}&gt;
+        Zerar
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No código inicial, os dois cliques em Somar levam o total a 5; o clique em Zerar não muda nada, porque
+a ação chega ao reducer e ele devolve o mesmo objeto. Na solução, o reducer devolve um objeto novo com os
+dois campos zerados e o painel acompanha. Repare que a soma do total acontece <em>dentro</em> do reducer:
+os dois campos sempre mudam juntos, e não existe momento em que um subiu e o outro não.</p>
+
+<p>Essa é a diferença prática em relação a dois <code>useState</code>. Com dois setters, cada clique
+provoca uma atualização separada; se um deles falhar, o estado fica pela metade. Com o reducer, cada ação
+produz um estado completo — e o React desenha uma vez, com o objeto inteiro coerente.</p>
+
+<h2>4. A ação: o que aconteceu, não o que fazer</h2>
+
+<p>Uma ação bem escrita descreve o fato, não a instrução. <code>{ type: "pagar" }</code> diz que o
+pagamento aconteceu; o reducer decide que isso significa <code>pago: true</code> e
+<code>status: "pago"</code>. Se amanhã a regra mudar — pagamento aprovado só depois de conferir o
+comprovante —, você mexe no reducer e todos os botões continuam funcionando, porque nenhum deles sabe
+como o pagamento funciona.</p>
+
+<p>O <code>type</code> é o nome do fato, sempre no mesmo formato combinado. Escolha um padrão e siga:
+verbos no infinitivo (<code>"adicionar"</code>, <code>"remover"</code>) ou no particípio
+(<code>"pago"</code>, <code>"adicionado"</code>). O importante é não misturar. Dados extras vão como
+campos do mesmo objeto, ao lado do <code>type</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ação</th><th>O que o reducer faz</th><th>Quem dispara</th></tr>
+<tr><td><code>{ type: "pagar" }</code></td><td>marca <code>pago: true</code> e <code>status: "pago"</code></td><td>o botão Pagar</td></tr>
+<tr><td><code>{ type: "preparar" }</code></td><td>muda o status para <code>"em preparo"</code></td><td>a cozinha, ao começar</td></tr>
+<tr><td><code>{ type: "entregar", entregador: "João" }</code></td><td>marca <code>status: "entregue"</code> e guarda o nome</td><td>o botão Entregar</td></tr>
+<tr><td><code>{ type: "cancelar" }</code></td><td>volta ao estado inicial e limpa o entregador</td><td>o botão Cancelar</td></tr>
+</table>
+</div>
+
+<p>Essa lista de ações é a documentação do componente. Quem chega depois lê os quatro nomes e entende o
+que o pedido pode fazer; no reducer, vê o que cada um muda. Comparado a três setters espalhados por seis
+botões, é outra categoria de legibilidade.</p>
+
+<p>Agora a missão com dados na ação. O carrinho abaixo adiciona o pão certo, mas o <code>dispatch</code>
+esqueceu de mandar o nome: o reducer recebe <code>acao.nome</code> como <code>undefined</code> e a lista
+ganha a palavra "undefined".</p>
+
+<div class="tryreact" data-goal="digite:#nome=rosquinha;;clique:#add;;texto:itens: pão francês, rosquinha">
+  <p class="try-task">Mande o nome digitado junto com a ação: <code>dispatch({ type: "adicionar", nome: nome })</code>.
+  Digite <strong>rosquinha</strong>, clique em Adicionar e confira a lista.</p>
+  <pre class="jsx">const inicial = { itens: ["pão francês"] };
+
+function reducer(estado, acao) {
+  if (acao.type === "adicionar") {
+    return { itens: [...estado.itens, acao.nome] };
+  }
+  return estado;
+}
+
+function App() {
+  const [carrinho, dispatch] = useReducer(reducer, inicial);
+  const [nome, setNome] = useState("");
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Pão&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;button id="add" onClick={() =&gt; dispatch({ type: "adicionar" })}&gt;
+        Adicionar
+      &lt;/button&gt;
+      &lt;p&gt;itens: {carrinho.itens.join(", ")}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="nome"&gt;Pão&lt;/label&gt;
+  &lt;input id="nome" value=""&gt;
+  &lt;button id="add"&gt;Adicionar&lt;/button&gt;
+  &lt;p&gt;itens: pão francês&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const inicial = { itens: ["pão francês"] };
+
+function reducer(estado, acao) {
+  if (acao.type === "adicionar") {
+    return { itens: [...estado.itens, acao.nome] };
+  }
+  return estado;
+}
+
+function App() {
+  const [carrinho, dispatch] = useReducer(reducer, inicial);
+  const [nome, setNome] = useState("");
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Pão&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;button
+        id="add"
+        onClick={() =&gt; dispatch({ type: "adicionar", nome: nome })}
+      &gt;
+        Adicionar
+      &lt;/button&gt;
+      &lt;p&gt;itens: {carrinho.itens.join(", ")}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No código inicial, a lista vira "pão francês, undefined" porque o reducer recebeu a ação sem o dado. O
+estado continua sendo uma coisa só — o carrinho —, e a função que decide como ele muda é uma só. O nome
+digitado é estado do componente e entra na ação na hora do clique, exatamente como os valores entram no
+objeto do pedido na aula de <a href="envio-de-formulario.html">envio de formulário</a>.</p>
+
+<h2>5. O reducer precisa ser puro</h2>
+
+<p>Puro, aqui, quer dizer: o reducer não altera o que recebeu e não faz nada além de devolver o estado
+novo. Nada de <code>push</code>, nada de atribuir em <code>estado.algo</code>, nada de
+<code>console.log</code> com efeito, nada de chamar <code>setAlgo</code>. Ele lê, calcula e devolve.</p>
+
+<p>Quando o reducer muta o objeto e devolve o mesmo objeto, o React compara e conclui que nada mudou — e
+não desenha. O estado até está diferente por dentro; a tela, não. É o mesmo problema da aula de
+<a href="estado-com-objeto.html">estado com objeto</a>, agora dentro de uma função que parece mais
+"oficial" e por isso engana mais.</p>
+
+<div class="tryreact" data-goal="clique:#add;;texto:itens: pão francês, rosca">
+  <p class="try-task">O reducer faz <code>push</code> no array e devolve o mesmo objeto, então a tela não
+  muda. Devolva um objeto novo com <code>[...estado.itens, acao.nome]</code> e clique em Adicionar
+  rosca.</p>
+  <pre class="jsx">const inicial = { itens: ["pão francês"], total: 1 };
+
+function reducer(estado, acao) {
+  if (acao.type === "adicionar") {
+    estado.itens.push(acao.nome);
+    estado.total = estado.total + 1;
+    return estado;
+  }
+  return estado;
+}
+
+function App() {
+  const [carrinho, dispatch] = useReducer(reducer, inicial);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;itens: {carrinho.itens.join(", ")}&lt;/p&gt;
+      &lt;p&gt;total: {carrinho.total}&lt;/p&gt;
+      &lt;button
+        id="add"
+        onClick={() =&gt; dispatch({ type: "adicionar", nome: "rosca" })}
+      &gt;
+        Adicionar rosca
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;itens: pão francês&lt;/p&gt;
+  &lt;p&gt;total: 1&lt;/p&gt;
+  &lt;button id="add"&gt;Adicionar rosca&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const inicial = { itens: ["pão francês"], total: 1 };
+
+function reducer(estado, acao) {
+  if (acao.type === "adicionar") {
+    return {
+      itens: [...estado.itens, acao.nome],
+      total: estado.total + 1,
+    };
+  }
+  return estado;
+}
+
+function App() {
+  const [carrinho, dispatch] = useReducer(reducer, inicial);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;itens: {carrinho.itens.join(", ")}&lt;/p&gt;
+      &lt;p&gt;total: {carrinho.total}&lt;/p&gt;
+      &lt;button
+        id="add"
+        onClick={() =&gt; dispatch({ type: "adicionar", nome: "rosca" })}
+      &gt;
+        Adicionar rosca
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No inicial, o clique não muda o painel: o array foi alterado por dentro, mas o objeto é o mesmo e o
+React não vê motivo para desenhar. Pior: o estado guardado agora está diferente do que a tela mostra, e
+qualquer render posterior (um clique em outro botão, por exemplo) mostra o array já com a rosca — o
+famoso "só aparece depois de clicar duas vezes". Na solução, cada ação cria um objeto novo e o React
+desenha na hora.</p>
+
+<p>Uma consequência prática: nunca mute o <code>inicial</code>. Se o reducer dá <code>push</code> dentro
+de <code>estado.itens</code> e o estado inicial é a constante de fora, a constante muda junto — e a
+próxima montagem do componente começa com dados que não devia ter. Trate o estado como somente leitura e
+crie objetos novos.</p>
+
+<h2>6. Uma ação, vários campos</h2>
+
+<p>Voltando ao pedido da Ana: com o estado junto, cada transição atualiza o que precisa de uma vez. Não
+existe mais o botão que muda só o status e esquece o pagamento, porque quem decide é o reducer.</p>
+
+<pre class="file" data-file="Pedido.jsx">const inicial = {
+  status: "novo",
+  pago: false,
+  entregador: ""
+};
+
+function reducer(estado, acao) {
+  if (acao.type === "pagar") {
+    return { ...estado, pago: true, status: "pago" };
+  }
+  if (acao.type === "preparar") {
+    return { ...estado, status: "em preparo" };
+  }
+  if (acao.type === "entregar") {
+    return {
+      ...estado,
+      status: "entregue",
+      entregador: acao.entregador
+    };
+  }
+  if (acao.type === "cancelar") {
+    return inicial;
+  }
+  return estado;
+}</pre>
+
+<p>O <code>...</code> espalha o estado atual e as propriedades seguintes sobrescrevem o que mudou. É o
+mesmo spread da aula de estado com objeto, e a regra é a mesma: copiar e sobrescrever, nunca alterar. Cada
+<code>if</code> é uma transição possível; tudo que não é ação conhecida devolve o estado como está,
+nenhum erro.</p>
+
+<p>Com <code>dispatch</code>, o registro do que aconteceu fica fácil. Dá para colocar um
+<code>console.log</code> na hora de disparar e ver a sequência de estados sem tocar no reducer:</p>
+
+<pre class="file" data-file="Pedido.jsx">function pagar() {
+  dispatch({ type: "pagar" });
+  console.log("status: pago, pago: true");
+}</pre>
+
+<pre class="term">status: pago, pago: true, entregador: ""
+status: em preparo, pago: true, entregador: ""
+status: entregue, pago: true, entregador: "João"</pre>
+
+<p>Uma linha por transição, sempre com os três campos coerentes. Se um dia o pedido não puder ser entregue
+sem estar pago, a regra vai para dentro do reducer — <code>if (!estado.pago) return estado;</code> — e
+vale para todo botão que dispara <code>entregar</code>, hoje e amanhã. É aí que o reducer ganha o
+salário: a regra mora num lugar só.</p>
+
+<p>O <code>dispatch</code> é estável entre renders, o que é uma vantagem prática: você pode passá-lo como
+prop para um filho embrulhado em <code>memo</code> sem precisar de <code>useCallback</code>. Se um botão
+distante precisa mudar o pedido, mande o <code>dispatch</code> e a ação; o filho não precisa saber como o
+estado é montado.</p>
+
+<h2>7. useState ou useReducer?</h2>
+
+<p>O <code>useReducer</code> não substitui o <code>useState</code>. Ele é melhor quando o estado tem
+regras, quando várias propriedades mudam juntas ou quando a próxima situação depende da anterior. Para um
+contador simples ou um campo de texto, o <code>useState</code> é mais curto e mais claro.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Ferramenta</th><th>Por quê</th></tr>
+<tr><td>um número, um texto, um booleano</td><td><code>useState</code></td><td>o setter resolve em uma linha</td></tr>
+<tr><td>um objeto com três campos que mudam juntos</td><td><code>useReducer</code></td><td>a transição fica num lugar só</td></tr>
+<tr><td>próximo estado depende do anterior (passos, fila)</td><td><code>useReducer</code></td><td>a regra cabe na função</td></tr>
+<tr><td>vários botões mudam o mesmo dado</td><td><code>useReducer</code></td><td>as ações documentam o que pode acontecer</td></tr>
+<tr><td>valor que o filho muda com um setter simples</td><td><code>useState</code></td><td>não há regra para centralizar</td></tr>
+<tr><td>estado que precisa ser registrado para depurar</td><td><code>useReducer</code></td><td>cada mudança é uma ação nomeada</td></tr>
+</table>
+</div>
+
+<p>Um sinal de que chegou a hora: você tem três ou mais <code>useState</code> que mudam no mesmo clique.
+Outro sinal: você já escreveu uma regra do tipo "se <code>status</code> for entregue, então
+<code>pago</code> precisa ser verdadeiro" em mais de um lugar. Regra repetida é regra que vai divergir.</p>
+
+<p>Não exagere no outro sentido: começar todo componente com um reducer é complicação. O caminho normal é
+começar com <code>useState</code> e migrar quando a bagunça aparecer — o que é fácil, porque a tela quase
+não muda: os nomes dos campos continuam iguais, só a forma de mudar é que passa a ser por ação.</p>
+
+<h2>8. Os erros clássicos</h2>
+
+<p><strong>Chamar <code>dispatch</code> no meio do render.</strong> Um
+<code>dispatch({ type: "somar" })</code> solto no corpo do componente dispara uma atualização a cada
+render, que gera outro render, que dispara de novo. O React interrompe com um erro de profundidade
+máxima. <code>dispatch</code> é para evento e efeito, como qualquer mudança de estado.</p>
+
+<p><strong>Esquecer o <code>type</code>.</strong> Um <code>dispatch()</code> sem ação nenhuma produz a
+mensagem mais confusa do assunto:</p>
+
+<pre class="term">TypeError: Cannot read properties of undefined (reading 'type')</pre>
+
+<p>A leitura é literal: alguém tentou ler <code>acao.type</code> e <code>acao</code> é
+<code>undefined</code>. A causa é quase sempre um <code>dispatch</code> chamado sem argumento, ou uma ação
+montada com outro nome de campo (<code>{ tipo: "somar" }</code> em vez de
+<code>{ type: "somar" }</code>), que também cai no <code>undefined</code>.</p>
+
+<p><strong>Devolver <code>undefined</code>.</strong> Um reducer com <code>if</code> sem
+<code>return</code> final devolve <code>undefined</code> para as ações que não casam, e o próximo render
+quebra ao ler <code>estado.algo</code>. O <code>return estado;</code> no fim não é enfeite: é o caminho
+para toda ação desconhecida.</p>
+
+<p><strong>Ler o estado logo depois do dispatch.</strong> <code>dispatch(...)</code> não muda a variável
+<code>pedido</code> daquele render; ela só agenda a mudança. Se você precisar do valor novo, calcule-o
+antes ou derive na renderização seguinte. É a mesma lógica do <code>useState</code>, e a aula de
+<a href="batching.html">batching</a> explica o porquê.</p>
+
+<p><strong>Guardar coisa que não é estado.</strong> Reducer é para estado: o que a tela mostra e a pessoa
+altera. O id de um timer, o elemento do DOM e "já enviei" continuam sendo assunto de
+<a href="useRef.html">useRef</a>.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o pedido entregue e não pago</h3>
+<p>Três setters independentes deixavam qualquer combinação acontecer, inclusive as impossíveis. Com um
+reducer, entregar sem pagar é uma regra que você escreve uma vez: se não está pago, a ação não muda nada.
+O estado deixa de ser um conjunto de campos soltos e passa a ser o retrato de uma situação válida.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a lista que só mudava no segundo clique</h3>
+<p>O reducer dava <code>push</code> e devolvia o mesmo objeto. O React comparava, via o mesmo objeto, e
+não desenhava. No clique seguinte, outro render mostrava a lista já alterada — daí a impressão de atraso.
+O conserto é criar objeto novo: <code>{ itens: [...estado.itens, novo] }</code>.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o botão que não fazia nada</h3>
+<p>O botão disparava <code>{ type: "zera" }</code> e o reducer esperava <code>"zerar"</code>. A ação
+chegava, nenhum <code>if</code> casava, o reducer devolvia o estado como estava e a tela não mudava — sem
+erro nenhum. Um <code>console.log(acao)</code> temporário no reducer mostra o nome errado em segundos.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que um reducer recebe e devolve?</p>
+<label><input type="radio" name="q1"> recebe o estado e devolve um setter</label>
+<label><input type="radio" name="q1"> recebe o estado e a ação, e devolve o estado novo</label>
+<label><input type="radio" name="q1"> recebe a ação e devolve o JSX</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que o <code>dispatch</code> faz?</p>
+<label><input type="radio" name="q2"> muda o estado na hora e devolve o valor novo</label>
+<label><input type="radio" name="q2"> chama o reducer e desenha o resultado dentro da mesma função</label>
+<label><input type="radio" name="q2"> entrega uma ação ao React, que chama o reducer com o estado atual</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Por que o reducer não pode alterar o estado que
+recebeu?</p>
+<label><input type="radio" name="q3"> porque o React compara o objeto e, se for o mesmo, não desenha</label>
+<label><input type="radio" name="q3"> porque o JavaScript proíbe alterar objetos em funções</label>
+<label><input type="radio" name="q3"> porque o <code>dispatch</code> apaga as alterações depois</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o campo que diz o que aconteceu</h2>
+<p>O reducer decide o que fazer comparando o campo da ação com um texto. Complete o nome do campo que toda
+ação usa:</p>
+<div class="ex-code">if (acao.<input aria-label="resposta 1" data-answer="type" placeholder="..."> === "pagar") { return { ...estado, pago: true }; }</div>
+<p class="ex-dica">Dica: é o campo que também aparece no <code>dispatch</code>:
+<code>dispatch({ type: "pagar" })</code>. Sem ele, o reducer não sabe o que aconteceu.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O <code>useReducer</code> troca o par valor/setter por um par estado/dispatch. O estado é um objeto só,
+com os campos que mudam juntos; o dispatch entrega uma ação, um objeto com <code>type</code> e, quando
+precisa, dados. O React chama o reducer com o estado atual e a ação, e usa o retorno como estado novo. O
+reducer é uma função pura, fora do componente, que devolve sempre um objeto novo — nunca altera o que
+recebeu — e termina com <code>return estado;</code> para as ações que não conhece.</p>
+
+<p>A vantagem aparece quando o estado tem regras: uma ação muda vários campos de uma vez, a regra mora num
+lugar só e o estado nunca fica pela metade. A desvantagem é cerimônia: para um contador ou um campo de
+texto, o <code>useState</code> é mais direto. Comece simples e migre quando os estados começarem a
+precisar uns dos outros.</p>
+
+<p>E os erros que você vai reconhecer de longe: mutação no reducer (a tela não muda), ação sem
+<code>type</code> (o erro de <code>undefined</code>), reducer sem <code>return</code> final e
+<code>dispatch</code> no meio do render. Com o estado no lugar certo e as transições nomeadas, o painel da
+Ana parou de mostrar pedido impossível — e a próxima vez que a regra mudar, ela mexe em um
+<code>if</code>.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Reducer é <code>(estado, acao) =&gt; novoEstado</code>, uma função pura.</li>
+<li><code>useReducer(reducer, inicial)</code> devolve <code>[estado, dispatch]</code>.</li>
+<li>A ação descreve o que aconteceu: <code>{ type: "pagar" }</code>.</li>
+<li>Dados extras vão na ação: <code>{ type: "entregar", entregador: "João" }</code>.</li>
+<li>O reducer devolve objeto novo; mutar o estado não redesenha a tela.</li>
+<li>Escreva o reducer fora do componente: ele não usa nada de dentro.</li>
+<li><code>return estado;</code> no fim cobre as ações desconhecidas.</li>
+<li><code>dispatch</code> é estável e pode ir como prop sem <code>useCallback</code>.</li>
+<li>Não chame <code>dispatch</code> no corpo do componente.</li>
+<li>Vários <code>useState</code> que mudam juntos são o sinal para migrar.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

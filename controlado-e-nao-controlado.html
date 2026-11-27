@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controlado e Não Controlado | Guia React</title>
+<meta name="description" content="Campo controlado e não controlado lado a lado: defaultValue, name, FormData, o total que acompanha a digitação e a key que reinicia o formulário sem estado.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Controlado e <span class="hl">Não Controlado</span></h1>
+<p class="intro">No formulário de encomenda da Ana há um campo para o nome do cliente e outro para a
+observação. Ela converteu os dois em controlados, com estado e <code>onChange</code>, porque era assim que
+sabia fazer — e agora o telefone dela engasga a cada letra da observação, que só é usada no fim, quando o
+botão é clicado. Nesta aula a Ana aprende que existem dois jeitos de um campo guardar o que foi digitado, que
+os dois convivem no mesmo formulário e que a escolha certa depende de uma pergunta só: alguém precisa desse
+valor antes do envio?</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Quem guarda o texto em cada um dos dois estilos: o navegador ou o estado.</li>
+  <li>Como ler um campo não controlado com <code>FormData</code> no envio, e por que o <code>name</code> é obrigatório.</li>
+  <li>Como um valor controlado alimenta outra parte da tela na mesma tecla.</li>
+  <li>Os dois estilos no mesmo formulário, cada um no seu lugar.</li>
+  <li>Como reiniciar um formulário não controlado com a <code>key</code>, sem um estado por campo.</li>
+  <li>O que quebra ao trocar de um estilo para o outro no meio da vida do componente.</li>
+  <li>Os casos em que não controlado é a única opção, como o campo de arquivo.</li>
+</ul>
+</div>
+
+<h2>1. A cena: dois campos, duas necessidades</h2>
+
+<p>O nome do cliente e a observação são campos de texto iguais na aparência e diferentes no uso. O nome é
+usado três vezes enquanto a pessoa digita: o cabeçalho cumprimenta, o resumo da encomenda mostra
+"Cliente: …" e o botão muda de cor quando o campo tem mais de duas letras. A observação, ao contrário, só
+importa no instante do envio: "sem açúcar", "deixar na portaria", "cortar em fatias". Ninguém precisa dela
+durante a digitação.</p>
+
+<p>A Ana fez os dois com estado porque é o estilo que ela aprendeu primeiro, e o resultado tem um custo que
+não aparece em tela pequena: cada tecla na observação provoca um desenho do componente inteiro, com validação,
+formatação e uma lista de produtos na mesma árvore. Num notebook não se nota; num telefone simples, o campo
+trava de vez em quando. E a observação nem precisava disso.</p>
+
+<p>A regra que resolve o caso é curta: <strong>se alguém precisa do valor enquanto a pessoa digita, o estado
+é o dono; se o valor só é lido no envio, o navegador é o dono.</strong> As duas formas têm nome e você já viu
+a primeira na aula de <a href="entrada-controlada.html">entrada controlada</a>. Agora vamos ver a segunda com
+calma, porque ela é mais antiga que o React e continua sendo a certa em vários casos.</p>
+
+<h2>2. Dois donos para o mesmo texto</h2>
+
+<p>Todo campo de texto tem um valor, e esse valor mora em algum lugar. No estilo <strong>não
+controlado</strong>, mora dentro do próprio elemento do DOM: o navegador guarda o texto, cuida do cursor e da
+seleção. O React só descobre o que está lá quando alguém vai buscar. No estilo <strong>controlado</strong>, o
+valor mora no estado do componente, e o elemento é um espelho que não tem memória própria.</p>
+
+<dl class="anatomy">
+<dt>controlado</dt>
+<dd>O estado é o dono: <code>value={texto}</code> mostra e <code>onChange</code> devolve cada tecla para o
+estado. O React sabe tudo, a cada instante.</dd>
+<dt>não controlado</dt>
+<dd>O DOM é o dono: você escreve <code>defaultValue</code> (ou nada) e o campo cuida de si. O React só lê
+quando precisa.</dd>
+<dt>defaultValue</dt>
+<dd>O valor <em>inicial</em> de um campo não controlado. Ele é aplicado quando o elemento é criado e não muda
+o que a pessoa digita depois.</dd>
+<dt>name</dt>
+<dd>O nome do campo dentro do formulário. É a chave com que o envio lê o valor: sem <code>name</code>, o
+campo não existe para o formulário.</dd>
+<dt>FormData</dt>
+<dd>A leitura de todos os campos de um formulário de uma vez, na hora do <code>onSubmit</code>:
+<code>new FormData(evento.target)</code>.</dd>
+<dt>key</dt>
+<dd>A identidade de um elemento para o React. Trocar a <code>key</code> joga o elemento fora e cria outro,
+com o valor de fábrica.</dd>
+</dl>
+
+<p>Nenhum dos dois é o jeito "certo" em geral. O controlado dá controle — validação ao vivo, máscara, botão
+que só habilita com o formulário completo, limpar com um clique. O não controlado dá leveza — menos estado,
+menos desenho, menos código. O erro é escolher por hábito em vez de escolher pela necessidade, e é isso que a
+aula conserta.</p>
+
+<h2>3. O campo que o navegador guarda</h2>
+
+<p>O primeiro caso é o formulário de encomenda com um campo de nome. Ele não tem <code>value</code> nem
+<code>onChange</code>: no envio, o código lê o formulário inteiro com <code>FormData</code> e pega o campo pelo
+nome. No código inicial, o campo está sem <code>name</code>, então o formulário não tem o que procurar e o
+recado sai "Encomenda de null". A missão é dar nome ao campo.</p>
+
+<div class="tryreact" data-goal="digite:input=Maria;;clique:button;;texto:Encomenda de Maria">
+  <p class="try-task">O campo não tem <code>name</code>, e o <code>FormData</code> não consegue achá-lo.
+  Acrescente <code>name="nome"</code> ao <code>input</code>, digite <strong>Maria</strong> e clique em
+  "Encomendar".</p>
+  <pre class="jsx">function App() {
+  const [enviado, setEnviado] = useState("Nada enviado");
+
+  function aoEnviar(evento) {
+    evento.preventDefault();
+    const dados = new FormData(evento.target);
+    setEnviado("Encomenda de " + dados.get("nome"));
+  }
+
+  return (
+    &lt;form onSubmit={aoEnviar}&gt;
+      &lt;input placeholder="Nome do cliente" /&gt;
+      &lt;button type="submit"&gt;Encomendar&lt;/button&gt;
+      &lt;p&gt;{enviado}&lt;/p&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;form&gt;
+  &lt;input placeholder="Nome do cliente"&gt;
+  &lt;button type="submit"&gt;Encomendar&lt;/button&gt;
+  &lt;p&gt;Nada enviado&lt;/p&gt;
+&lt;/form&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [enviado, setEnviado] = useState("Nada enviado");
+
+  function aoEnviar(evento) {
+    evento.preventDefault();
+    const dados = new FormData(evento.target);
+    setEnviado("Encomenda de " + dados.get("nome"));
+  }
+
+  return (
+    &lt;form onSubmit={aoEnviar}&gt;
+      &lt;input name="nome" placeholder="Nome do cliente" /&gt;
+      &lt;button type="submit"&gt;Encomendar&lt;/button&gt;
+      &lt;p&gt;{enviado}&lt;/p&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+</div>
+
+<p>Repare no que o componente <em>não</em> tem: nenhum estado para o texto, nenhum <code>onChange</code>,
+nenhum desenho por tecla. O que ele tem é um caminho de leitura no momento certo. O
+<code>evento.preventDefault()</code> impede o envio de verdade do formulário — no navegador comum ele
+recarregaria a página — e o <code>FormData</code> monta uma lista de pares nome/valor com todos os campos que
+têm <code>name</code>.</p>
+
+<p>A utilidade do <code>name</code> não é um detalhe do React: é o mesmo atributo que o HTML usa desde sempre
+para enviar formulários. Um campo sem <code>name</code> não é enviado, e é por isso que
+<code>dados.get("nome")</code> devolve <code>null</code>. Se o seu campo não controlado "não chega", a
+primeira coisa a conferir é o nome; a segunda, se ele está dentro do <code>&lt;form&gt;</code>.</p>
+
+<p>Uma armadilha de leitura: <code>dados.get()</code> devolve sempre texto, mesmo em campo numérico. Se você
+precisa de número, converta com <code>Number(...)</code> e trate o caso vazio, porque <code>Number("")</code>
+é zero e some com a diferença entre "não preencheu" e "preencheu zero". A aula de
+<a href="envio-de-formulario.html">envio de formulário</a> mostra o formulário completo, com vários campos e
+o resumo depois do envio.</p>
+
+<h2>4. O campo que vive no estado</h2>
+
+<p>O segundo caso é a quantidade de pães. Aqui o valor precisa aparecer fora do campo, no total, e precisa
+aparecer <em>enquanto</em> a pessoa digita. Não há como fazer isso com um campo que só conta o valor no fim:
+o total tem de ser recalculado a cada mudança, e para o React recalcular ele precisa saber que algo mudou.
+Estado é o mecanismo que avisa.</p>
+
+<div class="tryreact" data-goal="digite:input=3;;texto:Total: R$ 6,00">
+  <p class="try-task">O campo é não controlado e o total é um texto fixo. Ligue o campo a um estado
+  <code>qtd</code> (com <code>value</code> e <code>onChange</code>) e calcule
+  <code>Number(qtd) * 2</code> para o total. Digite <strong>3</strong> no campo.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;div&gt;
+      &lt;label&gt;Pães &lt;input id="qtd" defaultValue="1" /&gt;&lt;/label&gt;
+      &lt;p&gt;Total: R$ 2,00&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label&gt;
+    Pães
+    &lt;input id="qtd" value="1"&gt;
+  &lt;/label&gt;
+  &lt;p&gt;Total: R$ 2,00&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [qtd, setQtd] = useState("1");
+  const total = Number(qtd) * 2;
+
+  return (
+    &lt;div&gt;
+      &lt;label&gt;Pães &lt;input value={qtd} onChange={(e) =&gt; setQtd(e.target.value)} /&gt;&lt;/label&gt;
+      &lt;p&gt;Total: R$ {total.toFixed(2).replace(".", ",")}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O total não é um estado: é uma conta feita no desenho, a partir de <code>qtd</code>. Guardar o total num
+segundo <code>useState</code> funcionaria hoje e criaria duas verdades amanhã — a aula de
+<a href="estado-derivado.html">estado derivado</a> é toda sobre isso. A regra é: guarde o que só existe porque
+a pessoa fez algo; calcule o que pode ser calculado.</p>
+
+<p>Vale notar o que o <code>defaultValue</code> fazia e não faz. Ele põe um valor inicial no elemento, uma vez.
+Se você mudar o estado e o elemento for não controlado, o texto na tela não muda — e é aí que o iniciante
+conclui que "o React não atualiza o campo". Não é bug: é o navegador cuidando do que é dele. Para o React
+mandar no que aparece, o campo precisa receber <code>value</code>.</p>
+
+<h2>5. Os dois no mesmo formulário</h2>
+
+<p>A decisão não é do formulário, é de cada campo. O formulário de encomenda da Ana termina com os dois
+estilos lado a lado, e o código abaixo é o que roda hoje no site dela: a observação não controlada, lida no
+envio, e a quantidade controlada, que alimenta o total ao vivo. Um único estado, o do total, para os dois
+campos que precisam dele.</p>
+
+<pre class="file" data-file="FormularioEncomenda.jsx">function FormularioEncomenda() {
+  const [qtd, setQtd] = useState("1");
+  const [obs, setObs] = useState("");
+  const total = Number(qtd) * 2;
+
+  function aoEnviar(evento) {
+    evento.preventDefault();
+    const dados = new FormData(evento.target);
+    console.log("qtd: " + dados.get("qtd"));
+    console.log("obs: " + (dados.get("obs") || "(vazio)"));
+  }
+
+  return (
+    &lt;form onSubmit={aoEnviar}&gt;
+      &lt;input name="qtd" value={qtd} onChange={(e) =&gt; setQtd(e.target.value)} /&gt;
+      &lt;p&gt;Total: R$ {total.toFixed(2)}&lt;/p&gt;
+
+      &lt;input name="obs" placeholder="Observação" /&gt;
+      &lt;button type="submit"&gt;Encomendar&lt;/button&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+
+<p>Aqui está a graça do <code>FormData</code>: ele não liga para quem controla o campo. No envio, ele lê o
+valor atual dos dois — o que o React mantém em <code>qtd</code> e o que o navegador mantém em
+<code>obs</code> — e devolve tudo junto, pelo <code>name</code>. Você pode misturar os estilos sem criar uma
+exceção no envio. A diferença fica no meio do caminho: o controlado passou pelo estado a cada tecla, o outro
+não.</p>
+
+<p>O <code>console.log</code> com o resultado do envio é o jeito mais rápido de descobrir por que um campo
+chega vazio. Se o nome aparece no log, o campo está certo e o problema está depois; se aparece
+<code>null</code>, o campo está fora do formulário ou sem <code>name</code>. No navegador do dia a dia isso
+sai no console do DevTools, com a tecla <code>F12</code>:</p>
+
+<pre class="term">qtd: 3
+obs: (vazio)</pre>
+
+<p>Duas notas sobre esta mistura. A primeira: o campo controlado também precisa de <code>name</code> se você
+for ler o formulário no envio — o React não muda essa regra do HTML. A segunda: o estado <code>obs</code> do
+exemplo existe só para mostrar que ele seria inútil; tirando a linha, o componente fica menor e faz a mesma
+coisa. Código que não serve para nada é código que alguém vai manter.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>A pergunta</th><th>Não controlado</th><th>Controlado</th></tr>
+<tr><td>alguém usa o valor antes do envio?</td><td>não</td><td>sim</td></tr>
+<tr><td>onde mora o texto</td><td>no elemento do DOM</td><td>no estado do componente</td></tr>
+<tr><td>como se escreve</td><td><code>defaultValue</code> + <code>name</code></td><td><code>value</code> + <code>onChange</code></td></tr>
+<tr><td>como se lê</td><td><code>FormData</code> no <code>onSubmit</code>, ou <code>ref</code></td><td>direto na variável de estado</td></tr>
+<tr><td>quantos desenhos por tecla</td><td>nenhum</td><td>um do componente que tem o estado</td></tr>
+<tr><td>limpar depois de enviar</td><td><code>reset()</code> do formulário ou trocar a <code>key</code></td><td><code>setTexto("")</code></td></tr>
+</table>
+</div>
+
+<p>Quando o campo é controlado, o desenho por tecla não é desperdício — é o que permite a validação ao vivo.
+O problema é o tamanho do que redesenha: se o estado mora no topo de uma árvore grande, cada tecla custa caro.
+Um jeito de amenizar é deixar o estado no menor componente possível, perto do campo, e mandar para cima só o
+que interessa. É o assunto da aula de <a href="elevando-estado.html">elevar o estado</a>.</p>
+
+<h2>6. Reiniciar sem estado: a chave</h2>
+
+<p>Falta o problema do fim do formulário: depois de enviar, o campo tem de voltar ao ponto de partida. No
+campo controlado, um <code>setTexto("")</code> resolve. No não controlado, não existe estado para zerar — e é
+aí que entra o <code>key</code>, aquela prop que você já viu em listas e que aqui faz um trabalho diferente:
+dizer ao React que aquele elemento é outro elemento.</p>
+
+<p>Quando a <code>key</code> muda, o React não atualiza o elemento: ele joga fora e cria de novo, do zero.
+Um elemento novo, com <code>defaultValue</code> de fábrica, começa vazio. Na caixa, a Ana já contava os
+envios e já tinha o número na mão; faltou usar como <code>key</code> do campo.</p>
+
+<div class="tryreact" data-goal="digite:input=Ana;;clique:button;;texto:Encomenda de Ana;;clique:button;;texto:Encomenda de (vazio)">
+  <p class="try-task">Depois do primeiro envio, o campo continua com "Ana" e um segundo clique manda o mesmo
+  nome de novo. Ponha <code>key={envios}</code> no <code>input</code>, digite <strong>Ana</strong> e clique em
+  "Encomendar" duas vezes.</p>
+  <pre class="jsx">function App() {
+  const [envios, setEnvios] = useState(0);
+  const [recado, setRecado] = useState("Nada enviado");
+
+  function aoEnviar(evento) {
+    evento.preventDefault();
+    const dados = new FormData(evento.target);
+    const nome = dados.get("nome");
+    setRecado("Encomenda de " + (nome || "(vazio)"));
+    setEnvios(envios + 1);
+  }
+
+  return (
+    &lt;form onSubmit={aoEnviar}&gt;
+      &lt;input name="nome" placeholder="Nome do cliente" /&gt;
+      &lt;button type="submit"&gt;Encomendar&lt;/button&gt;
+      &lt;p&gt;{recado}&lt;/p&gt;
+      &lt;p&gt;Envios: {envios}&lt;/p&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;form&gt;
+  &lt;input placeholder="Nome do cliente" name="nome"&gt;
+  &lt;button type="submit"&gt;Encomendar&lt;/button&gt;
+  &lt;p&gt;Nada enviado&lt;/p&gt;
+  &lt;p&gt;Envios: 0&lt;/p&gt;
+&lt;/form&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [envios, setEnvios] = useState(0);
+  const [recado, setRecado] = useState("Nada enviado");
+
+  function aoEnviar(evento) {
+    evento.preventDefault();
+    const dados = new FormData(evento.target);
+    const nome = dados.get("nome");
+    setRecado("Encomenda de " + (nome || "(vazio)"));
+    setEnvios(envios + 1);
+  }
+
+  return (
+    &lt;form onSubmit={aoEnviar}&gt;
+      &lt;input key={envios} name="nome" placeholder="Nome do cliente" /&gt;
+      &lt;button type="submit"&gt;Encomendar&lt;/button&gt;
+      &lt;p&gt;{recado}&lt;/p&gt;
+      &lt;p&gt;Envios: {envios}&lt;/p&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+</div>
+
+<p>O segundo clique é a prova: sem a <code>key</code>, o campo ainda tem "Ana" e o recado repete o nome; com
+ela, o campo é outro e o formulário manda vazio. Esse truque tem um preço e vale conhecê-lo: o elemento novo
+perde o foco, perde a seleção, perde a posição do cursor e perde qualquer mensagem de erro que estivesse
+pendurada nele. Para reiniciar um formulário inteiro depois do envio, é exatamente o que se quer; para
+"atualizar" um campo no meio da digitação, é um desastre.</p>
+
+<p>Existe uma alternativa nativa para o formulário todo: chamar <code>evento.target.reset()</code> no
+<code>onSubmit</code>. Ele devolve os campos aos valores de fábrica e não troca elementos, então o foco
+continua onde está. A <code>key</code> é mais útil quando você quer reiniciar <em>uma parte</em> — um campo,
+um grupo, um subformulário — e não o formulário inteiro. As duas soluções são válidas; a diferença é o
+tamanho do que se quer jogar fora.</p>
+
+<h2>7. A migração: o que quebra ao trocar de estilo</h2>
+
+<p>Trocar de não controlado para controlado é uma decisão de uma linha e um erro clássico: deixar o
+<code>defaultValue</code> no lugar e acrescentar o <code>value</code>, ou pôr o <code>value</code> e esquecer
+o <code>onChange</code>. O primeiro caso dá um campo que "não obedece"; o segundo, um campo que não aceita
+digitação nenhuma, porque o estado nunca muda e o campo é desenhado sempre com o mesmo texto.</p>
+
+<p>Existe um terceiro caso, mais sutil, que só aparece em desenvolvimento: o valor começa
+<code>undefined</code> e depois vira texto. No primeiro desenho o campo é não controlado; no segundo, vira
+controlado. O React avisa, porque a mudança de natureza no meio da vida do elemento confunde o navegador:</p>
+
+<pre class="term">Warning: A component is changing an uncontrolled input to be controlled. This is likely caused by the value changing from undefined to a defined value.</pre>
+
+<p>Esse aviso não aparece nas caixas deste guia, que rodam build de produção — é um recado do modo de
+desenvolvimento. Mas ele aparece no seu projeto, e a leitura é direta: comece o estado com uma string, mesmo
+vazia. <code>useState("")</code> em vez de <code>useState()</code>. Se o dado pode faltar, o valor do campo
+pode ser <code>""</code>, e a diferença entre "não preenchido" e "preenchido" fica numa variável separada.</p>
+
+<p>O caminho contrário, de controlado para não controlado, é mais raro e tem um erro próprio: manter o estado
+e o <code>onChange</code> "só para não quebrar". Aí você tem o custo dos dois estilos e o benefício de
+nenhum. Se ninguém lê o valor durante a digitação, apague o estado, o <code>onChange</code> e o
+<code>value</code> — e ponha <code>defaultValue</code> e <code>name</code>.</p>
+
+<h2>8. Os casos que só existem de um jeito</h2>
+
+<p>Alguns campos não têm escolha. O campo de arquivo (<code>type="file"</code>) é sempre não controlado: por
+segurança, o navegador não deixa o JavaScript definir o arquivo escolhido. Você lê o que está lá com
+<code>evento.target.files</code> ou com <code>FormData</code>, e não existe <code>value=</code> para ele. Quem
+tenta controlar um campo de arquivo recebe um aviso e um campo que ignora o valor.</p>
+
+<p>O mesmo vale para campos que só são lidos no envio por natureza: busca de CEP, upload, assinatura em
+canvas, leitor de código de barras. Nesses, o estado ao vivo não agrega nada. Já o oposto — o campo que
+precisa de máscara enquanto digita, como telefone e CPF — é caso de controlado, sempre, porque a formatação
+acontece a cada tecla e o cursor precisa ser respeitado. A aula de
+<a href="input-controlado.html">input controlado</a> entra nesse detalhe.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você vê</th><th>Causa provável</th><th>Conserto</th></tr>
+<tr><td>o campo digita e nada aparece</td><td><code>value</code> sem <code>onChange</code></td><td>acrescentar o <code>onChange</code> que grava no estado</td></tr>
+<tr><td><code>FormData</code> devolve <code>null</code></td><td>campo sem <code>name</code> ou fora do <code>form</code></td><td>dar um <code>name</code> e conferir a árvore</td></tr>
+<tr><td>o texto inicial volta a cada tecla</td><td><code>value</code> fixo e nenhum estado</td><td>usar <code>defaultValue</code> ou ligar o estado</td></tr>
+<tr><td>o formulário não limpa depois do envio</td><td>campo não controlado sem <code>reset()</code> nem <code>key</code></td><td>chamar <code>evento.target.reset()</code> ou trocar a <code>key</code></td></tr>
+<tr><td>aviso de uncontrolled para controlled</td><td>estado começou <code>undefined</code></td><td><code>useState("")</code></td></tr>
+</table>
+</div>
+
+<p>Vale também desconfiar do <code>useRef</code> como atalho. Ele funciona para ler o campo no clique —
+<code>busca.current.value</code> —, e é o mesmo mecanismo do <code>FormData</code>, só que para um campo. O
+problema é que essa leitura não avisa ninguém: se outra parte da tela depende do valor, ela não vai saber que
+ele mudou. Use <code>ref</code> quando o valor é usado uma vez, no mesmo instante, e estado quando ele
+precisa circular.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o cupom de desconto</h3>
+<p>O campo de cupom é lido só quando o cliente clica em "Aplicar". Não há nada para validar enquanto ele
+digita: o código é conferido no servidor. Não controlado, com <code>name="cupom"</code> e
+<code>FormData</code> no envio, resolve com três linhas e nenhum estado. Se depois a Ana quiser aplicar o
+cupom automaticamente ao sair do campo, aí a leitura passa a acontecer em outro evento — e continua sem
+precisar de estado.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o CPF com máscara</h3>
+<p>O CPF precisa aparecer formatado enquanto o cliente digita, com pontos e traço. Isso é transformação a
+cada tecla: estado, <code>value</code> e <code>onChange</code>, com a função de máscara no meio. Controlado é
+a única opção viável, e o cuidado é não mover o cursor para o começo quando o texto muda de tamanho — um
+detalhe chato, mas com receita conhecida.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: a lista de ingredientes do bolo</h3>
+<p>O cliente escolhe até cinco ingredientes e vê a lista se montando na tela. Aqui cada escolha muda outra
+parte da tela imediatamente, então o estado é necessário — mas o estado pode morar no componente da lista, e
+não na página inteira. Quanto menor o componente que guarda, menos coisa redesenha por tecla, e o formulário
+continua leve mesmo com dez campos controlados.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. Num campo não controlado, quem guarda o texto digitado?</p>
+<label><input type="radio" name="q1"> o estado do componente</label>
+<label><input type="radio" name="q1"> a prop <code>defaultValue</code>, que muda a cada tecla</label>
+<label><input type="radio" name="q1"> o próprio elemento do DOM, dentro do navegador</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. O que o <code>defaultValue</code> faz?</p>
+<label><input type="radio" name="q2"> define o valor inicial do campo, uma vez, quando ele é criado</label>
+<label><input type="radio" name="q2"> mantém o campo sincronizado com o estado</label>
+<label><input type="radio" name="q2"> impede o envio do formulário</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. Quando o campo precisa ser controlado?</p>
+<label><input type="radio" name="q3"> sempre que houver um formulário na página</label>
+<label><input type="radio" name="q3"> quando alguém usa o valor antes do envio, a cada tecla</label>
+<label><input type="radio" name="q3"> quando o campo é do tipo <code>file</code></label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: ler o formulário no envio</h2>
+<p>Complete a linha que lê o valor do campo <code>nome</code> no momento do envio, sabendo que
+<code>dados</code> já é o <code>FormData</code> do formulário:</p>
+<div class="ex-code">const nome = dados.<input aria-label="resposta 1" data-answer="get" placeholder="...">("nome");</div>
+<p class="ex-dica">Dica: é o método que busca o valor pela chave, ou seja, pelo <code>name</code> do campo.
+Não é <code>querySelector</code> — o <code>FormData</code> não conhece o DOM.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Controlado e não controlado respondem à mesma pergunta com donos diferentes: quem guarda o texto que a
+pessoa digitou. No controlado, o estado guarda, o campo mostra <code>value</code> e cada tecla volta pelo
+<code>onChange</code> — o React sabe de tudo e pode reagir na hora. No não controlado, o navegador guarda, o
+componente escreve <code>defaultValue</code> uma vez e lê o valor quando precisa, com <code>FormData</code>
+ou com uma <code>ref</code>.</p>
+
+<p>A escolha não é de gosto: é "alguém usa esse valor antes do envio?". Se sim, controlado — validação ao
+vivo, máscara, total que acompanha, botão que habilita. Se não, não controlado — menos estado, menos desenho,
+menos código. Os dois convivem no mesmo formulário, porque o <code>FormData</code> lê os dois pelo
+<code>name</code>, e é comum um formulário ter os dois estilos em campos vizinhos.</p>
+
+<p>Para reiniciar, cada estilo tem sua ferramenta: estado zerado no controlado, <code>reset()</code> ou
+<code>key</code> nova no não controlado. E a migração tem duas regras que evitam quase todo bug: nunca
+<code>value</code> sem <code>onChange</code>, e nunca começar o estado com <code>undefined</code>. Com essas
+duas, o campo obedece; sem elas, você passa a tarde achando que o React está quebrado.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Controlado: <code>value</code> + <code>onChange</code>; o estado é o dono.</li>
+<li>Não controlado: <code>defaultValue</code> + <code>name</code>; o DOM é o dono.</li>
+<li><code>FormData</code> lê todos os campos no <code>onSubmit</code>, pelo <code>name</code>.</li>
+<li>Campo sem <code>name</code> não entra no <code>FormData</code>.</li>
+<li><code>defaultValue</code> vale uma vez; não sincroniza com o estado.</li>
+<li>Controlado desenha a cada tecla: guarde o estado perto do campo.</li>
+<li>Total, contagem e validação são contas — calcule no render, não guarde em outro estado.</li>
+<li><code>key</code> nova joga o elemento fora e o recria vazio; perde foco e seleção.</li>
+<li><code>evento.target.reset()</code> limpa o formulário sem trocar elementos.</li>
+<li>Campo de arquivo é sempre não controlado.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

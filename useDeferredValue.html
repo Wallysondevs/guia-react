@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O useDeferredValue | Guia React</title>
+<meta name="description" content="O useDeferredValue do React 19: manter o campo urgente e adiar a lista grande, o valor inicial do primeiro desenho e por que ele não substitui debounce.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O <span class="hl">useDeferredValue</span></h1>
+<p class="intro">A Ana comprou um componente de busca pronto — uma caixa de texto que já vem com o seu
+próprio estado e devolve só o texto digitado. O componente é bom e ela não quer mexer nele. O problema é que
+a lista de dois mil pães, do lado de fora, filtra a cada letra e trava a digitação. Sem poder mudar o estado
+de dentro do componente, ela não tem como usar o <code>useTransition</code>. Nesta aula a Ana conhece o
+<code>useDeferredValue</code>: o hook que recebe um valor e devolve uma versão atrasada dele — a mesma
+ideia de prioridade, olhando pelo lado do valor em vez do lado da atualização.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um valor adiado e quando ele chega.</li>
+  <li>Por que o React desenha duas vezes: uma urgente e uma adiada.</li>
+  <li>O valor inicial do <code>useDeferredValue</code>, no React 19.</li>
+  <li>Como usar o valor adiado no filtro de uma lista grande.</li>
+  <li>Por que ele não substitui debounce nem cache.</li>
+  <li>Como mostrar na tela que a lista está desatualizada.</li>
+  <li>Quando escolher <code>useDeferredValue</code> em vez de <code>useTransition</code>.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o valor que chega pronto de fora</h2>
+
+<p>O componente de busca da Ana é uma caixinha fechada: ela recebe o texto por prop e desenha o campo, com o
+<code>useState</code> dele lá dentro. O <code>App</code> só sabe o texto que chega. Para usar
+<code>useTransition</code>, ela precisaria do <code>setState</code> na mão — e não tem.</p>
+
+<p>É aqui que entra o <code>useDeferredValue</code>. Ele recebe um valor qualquer e devolve uma cópia que
+pode ficar para trás: no primeiro momento, a cópia é o valor antigo; logo depois, o React desenha de novo com
+o valor novo. Quem usa a cópia — a lista grande, o gráfico, a tabela — espera. Quem usa o valor original — o
+campo, o título, o contador — responde na hora.</p>
+
+<p>Repare que o hook não pergunta de onde veio o valor nem quem o mudou. Ele só precisa do valor. É por isso
+que ele funciona com prop, com resultado de contexto, com item de lista, com qualquer expressão. O
+<code>useTransition</code> precisa da função que muda o estado; o <code>useDeferredValue</code> precisa só do
+valor.</p>
+
+<h2>2. O que é um valor adiado</h2>
+
+<p>“Adiado” aqui não quer dizer errado nem velho para sempre: quer dizer que ele pode ficar atrás por alguns
+milissegundos, o tempo de o React preparar o desenho mais caro. Se nada urgente acontecer no meio, o atraso é
+imperceptível. Se a pessoa continuar digitando, o valor adiado persegue o atual e a lista pode ficar um pouco
+para trás — de propósito.</p>
+
+<dl class="anatomy">
+<dt>useDeferredValue</dt>
+<dd>O hook que devolve o valor adiado: <code>const atrasado = useDeferredValue(texto)</code>. Vem do React e,
+nas caixas, já está no escopo.</dd>
+<dt>valor adiado</dt>
+<dd>A cópia que o React entrega no desenho urgente enquanto prepara o desenho caro. Pode ser o valor
+anterior por um instante.</dd>
+<dt>desenho urgente</dt>
+<dd>O primeiro, com o valor novo no campo. É o que a pessoa vê primeiro e é o que não pode esperar.</dd>
+<dt>desenho adiado</dt>
+<dd>O segundo, com o valor adiado atualizado. É onde a lista, a tabela ou o gráfico são recalculados.</dd>
+<dt>valor inicial</dt>
+<dd>No React 19, o segundo argumento: <code>useDeferredValue(texto, "carregando")</code>. É o que aparece no
+primeiro desenho, antes de o valor de verdade existir.</dd>
+<dt>atraso visível</dt>
+<dd>Quando o valor adiado é diferente do atual: <code>atrasado !== texto</code>. Serve para esmaecer a lista
+ou mostrar “atualizando…”.</dd>
+</dl>
+
+<p>A comparação com o <code>useTransition</code> ajuda a fixar. O
+<code>useTransition</code> diz “esta atualização pode esperar”; o <code>useDeferredValue</code> diz “este
+valor pode chegar atrasado”. O primeiro age no momento em que o estado muda; o segundo age no momento em que
+o valor é usado. Os dois produzem o mesmo efeito na tela — o React faz um desenho urgente e um adiado — e a
+escolha entre eles é sobre onde você tem controle.</p>
+
+<h2>3. A caixa: dois desenhos, dois valores</h2>
+
+<p>A primeira caixa é um experimento, não uma tela bonita. O componente escreve no console o número do
+desenho e o valor adiado que recebeu. Sem o segundo argumento, o React desenharia duas vezes com o mesmo
+valor e não haveria nada para ver. Com <code>"carregando"</code> como valor inicial, o primeiro desenho
+mostra uma coisa e o segundo mostra outra — e o painel deixa os dois registros à vista.</p>
+
+<div class="tryreact" data-goal="console:desenho 1: carregando;;console:desenho 2: Pão de queijo;;texto:Lista: Pão de queijo">
+  <p class="try-task">Passe <code>"carregando"</code> como segundo argumento:
+  <code>useDeferredValue(texto, "carregando")</code>. Rode e olhe o console do painel: ele mostra os dois
+  desenhos.</p>
+  <pre class="jsx">let desenhos = 0;
+
+function App() {
+  const [texto] = useState("Pão de queijo");
+  const atrasado = useDeferredValue(texto);
+  desenhos = desenhos + 1;
+  console.log("desenho " + desenhos + ": " + atrasado);
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Texto: {texto}&lt;/p&gt;
+      &lt;p&gt;Lista: {atrasado}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Texto: Pão de queijo&lt;/p&gt;
+  &lt;p&gt;Lista: Pão de queijo&lt;/p&gt;
+&lt;/div&gt;
+console: desenho 1: Pão de queijo
+</pre>
+  <pre class="solucao">let desenhos = 0;
+
+function App() {
+  const [texto] = useState("Pão de queijo");
+  const atrasado = useDeferredValue(texto, "carregando");
+  desenhos = desenhos + 1;
+  console.log("desenho " + desenhos + ": " + atrasado);
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Texto: {texto}&lt;/p&gt;
+      &lt;p&gt;Lista: {atrasado}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra o HTML final — “Texto: Pão de queijo”, “Lista: Pão de queijo” — e, embaixo, as duas linhas
+de console. A primeira diz <code>carregando</code>; a segunda, o valor de verdade. Isso é o React fazendo dois
+desenhos: o urgente, com o texto e o valor inicial; o adiado, com a lista atualizada.</p>
+
+<p>Uma nota sobre o contador: ele é uma variável fora do componente, incrementada dentro do corpo. Em código
+de produção você não faz isso — é um truque de aula para mostrar quantas vezes o componente foi desenhado.
+Se quiser repetir o experimento no seu projeto, use um <code>console.log</code> no corpo e olhe a aba
+Console: cada par de linhas é uma atualização.</p>
+
+<p>O que o HTML final <em>não</em> mostra é o instante do meio. Numa lista grande, é justamente esse instante
+que importa: a pessoa vê o campo com a letra nova e a lista ainda com o resultado anterior. Se você quiser
+avisar que a lista está velha, compare os dois valores:</p>
+
+<pre class="file" data-file="ListaDePaes.jsx">const atrasado = useDeferredValue(texto);
+const desatualizada = atrasado !== texto;
+return (
+  &lt;ul className={desatualizada ? "lista apagada" : "lista"}&gt;
+    ...
+  &lt;/ul&gt;
+);</pre>
+
+<p>Essa comparação é simples e funciona: enquanto a lista mostra o texto antigo, a classe muda e o CSS pode
+deixar o bloco mais claro. É o mesmo papel do <code>pendente</code> no <code>useTransition</code>, com a
+vantagem de não precisar de nenhum estado extra.</p>
+
+<h2>4. A caixa: a lista que espera</h2>
+
+<p>Agora o caso de verdade. O campo é controlado e atualiza o texto na hora; a lista grande deveria filtrar
+com o valor adiado. Na versão inicial, a lista mostra os três pães sempre — ninguém filtra nada — e a linha
+de resultados acompanha o texto. A missão é fazer o filtro e a linha usarem o valor adiado.</p>
+
+<div class="tryreact" data-goal="digite:input=queijo;;texto:Resultados para: queijo;;conta:li=1">
+  <p class="try-task">Crie <code>const filtrados = paes.filter((p) =&gt; p.toLowerCase().includes(atrasado.toLowerCase()))</code>,
+  desenhe <code>filtrados</code> no lugar de <code>paes</code> e troque a linha de resultados para
+  <code>Resultados para: {atrasado}</code>.</p>
+  <pre class="jsx">function App() {
+  const [texto, setTexto] = useState("");
+  const atrasado = useDeferredValue(texto);
+  const paes = ["Pão francês", "Pão de queijo", "Baguete"];
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="busca"&gt;Buscar pão&lt;/label&gt;
+      &lt;input
+        id="busca"
+        value={texto}
+        onChange={(e) =&gt; setTexto(e.target.value)}
+      /&gt;
+      &lt;p&gt;Resultados para: {texto}&lt;/p&gt;
+      &lt;ul&gt;
+        {paes.map((p) =&gt; (
+          &lt;li key={p}&gt;{p}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="busca"&gt;Buscar pão&lt;/label&gt;
+  &lt;input id="busca" value=""&gt;
+  &lt;p&gt;Resultados para:&lt;/p&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Pão francês&lt;/li&gt;
+    &lt;li&gt;Pão de queijo&lt;/li&gt;
+    &lt;li&gt;Baguete&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [texto, setTexto] = useState("");
+  const atrasado = useDeferredValue(texto);
+  const paes = ["Pão francês", "Pão de queijo", "Baguete"];
+  const filtrados = paes.filter((p) =&gt;
+    p.toLowerCase().includes(atrasado.toLowerCase())
+  );
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="busca"&gt;Buscar pão&lt;/label&gt;
+      &lt;input
+        id="busca"
+        value={texto}
+        onChange={(e) =&gt; setTexto(e.target.value)}
+      /&gt;
+      &lt;p&gt;Resultados para: {atrasado}&lt;/p&gt;
+      &lt;ul&gt;
+        {filtrados.map((p) =&gt; (
+          &lt;li key={p}&gt;{p}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Digite “queijo” e o painel mostra a linha “Resultados para: queijo” e uma lista com um item. Com três
+pães, o resultado é o mesmo que você teria filtrando pelo texto urgente; com dois mil, não é. A diferença é
+que, no desenho urgente, o React entrega o valor adiado antigo — a lista não é recalculada naquele instante —
+e a digitação não espera.</p>
+
+<p>Esse detalhe tem uma consequência que confunde: a lista pode mostrar o resultado de um texto que já não
+está no campo. É o comportamento desejado. Se você mostrar “Resultados para: {atrasado}”, a frase conta a
+verdade sobre o que está na lista; se mostrar o texto atual, a frase mente por alguns milissegundos. Escolha
+uma das duas e seja coerente.</p>
+
+<p>E o campo continua com <code>value={texto}</code>, não com <code>value={atrasado}</code>. Essa troca é o
+erro mais comum do hook: o campo passa a mostrar o valor adiado, e a pessoa sente a digitação travada — que é
+exatamente o que o hook deveria evitar.</p>
+
+<h2>5. O valor inicial do React 19</h2>
+
+<p>O segundo argumento é novidade do React 19 e resolve um problema específico: o primeiro desenho de um
+componente que ainda não tem o dado. Antes, o único jeito de o valor adiado diferir do atual era uma
+atualização; no primeiro desenho, os dois eram iguais. Agora você pode dizer o que aparece antes:</p>
+
+<pre class="file" data-file="Painel.jsx">function Painel({ texto }) {
+  const atrasado = useDeferredValue(texto, "carregando");
+  return &lt;p&gt;Lista: {atrasado}&lt;/p&gt;;
+}</pre>
+
+<p>Esse valor inicial aparece <strong>uma vez</strong>, no primeiro desenho, e depois é substituído pelo
+valor de verdade. É útil quando o dado chega por uma leitura cara e você prefere mostrar um marcador em vez
+de uma lista vazia. Não é um estado de carregamento: não volta a aparecer se o valor mudar depois. Para
+carregamento de verdade, o caminho continua sendo um estado próprio, como em
+<a href="carregando-e-erro.html">Carregando e Erro</a>.</p>
+
+<p>Se você escrever <code>useDeferredValue(texto, "")</code>, o primeiro desenho mostra a string vazia e o
+segundo mostra o texto. Isso evita o “pisca” de uma lista grande desenhada com o valor final antes de o
+navegador estar pronto. É um detalhe pequeno, e é a diferença entre uma tela que aparece e uma tela que
+aparece e se mexe.</p>
+
+<h2>6. Por que ele não substitui debounce nem cache</h2>
+
+<p>Aqui está o mal-entendido que mais custa caro. O <code>useDeferredValue</code> não reduz a quantidade de
+trabalho: ele só muda a prioridade. Cada letra digitada continua gerando um desenho urgente e um desenho
+adiado. Se há uma consulta ao servidor dentro de um efeito que depende do valor adiado, ela roda em toda
+letra — uma por letra.</p>
+
+<p>A caixa seguinte conta as consultas. O <code>useEffect</code> depende de <code>atrasado</code> e soma um
+no contador a cada mudança. Digite “que” e veja o número: o contador começa em zero, o efeito soma um assim que a tela aparece e mais um a cada letra nova — quatro no total.
+É a prova de que adiar não é agrupar.</p>
+
+<div class="tryreact" data-goal="digite:input=q;;digite:input=qu;;digite:input=que;;texto:Consultas: 4">
+  <p class="try-task">Faça o contador acompanhar o valor adiado: crie
+  <code>useEffect(() =&gt; { setBuscas((n) =&gt; n + 1) }, [atrasado])</code> no corpo do componente e
+  digite “que” no campo, letra por letra.</p>
+  <pre class="jsx">function App() {
+  const [texto, setTexto] = useState("");
+  const atrasado = useDeferredValue(texto);
+  const [buscas, setBuscas] = useState(0);
+
+  return (
+    &lt;div&gt;
+      &lt;input value={texto} onChange={(e) =&gt; setTexto(e.target.value)} /&gt;
+      &lt;p&gt;Consultas: {buscas}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input value=""&gt;
+  &lt;p&gt;Consultas: 0&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [texto, setTexto] = useState("");
+  const atrasado = useDeferredValue(texto);
+  const [buscas, setBuscas] = useState(0);
+
+  useEffect(() =&gt; {
+    setBuscas((n) =&gt; n + 1);
+  }, [atrasado]);
+
+  return (
+    &lt;div&gt;
+      &lt;input value={texto} onChange={(e) =&gt; setTexto(e.target.value)} /&gt;
+      &lt;p&gt;Consultas: {buscas}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No console do projeto, com um <code>console.log</code> dentro do efeito, a sequência deixa a diferença
+clara. Primeiro com o valor adiado, uma consulta por letra:</p>
+
+<pre class="term">consulta 1: ""
+consulta 2: "q"
+consulta 3: "qu"
+consulta 4: "que"</pre>
+
+<p>Agora com debounce — um <code>setTimeout</code> que só dispara quando a digitação para, cancelado a cada
+tecla nova. As três letras viram uma consulta:</p>
+
+<pre class="term">consulta 1: "que"</pre>
+
+<p>São ferramentas diferentes para problemas diferentes. O <code>useDeferredValue</code> cuida da
+<em>prioridade do desenho</em>; o debounce cuida do <em>volume de chamadas</em>. Um não substitui o outro, e
+o código que usa os dois é comum em busca de verdade: o valor adiado alimenta a lista, e o debounce decide
+quando perguntar ao servidor.</p>
+
+<pre class="file" data-file="BuscaDePaes.jsx">useEffect(() =&gt; {
+  const id = setTimeout(() =&gt; {
+    fetch("/api/paes?q=" + encodeURIComponent(texto))
+      .then((r) =&gt; r.json())
+      .then(setResultados);
+  }, 300);
+
+  return () =&gt; clearTimeout(id);
+}, [texto]);</pre>
+
+<p>Nas caixas deste guia não há rede: <code>fetch</code> não funciona dentro do quadro. Quando o assunto for
+buscar dados, a espera é simulada com <code>Promise</code> mais <code>setTimeout</code>, e o código com
+<code>fetch</code> aparece no <code>pre.file</code>, como acima. O comportamento que importa — quantas vezes
+a função roda — é o mesmo.</p>
+
+<h2>7. useDeferredValue ou useTransition?</h2>
+
+<p>Os dois existem porque os dois lados do problema existem. A pergunta prática é uma só: você tem a função
+que muda o estado na mão?</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você tem…</th><th>useDeferredValue</th><th>useTransition</th></tr>
+<tr><td>o valor, mas não o <code>setState</code></td><td>é o caso dele</td><td>não alcança</td></tr>
+<tr><td>o <code>setState</code> na mão</td><td>funciona, com uma variável a mais</td><td>é o caso dele</td></tr>
+<tr><td>uma ação que espera o servidor</td><td>não cobre o <code>await</code></td><td>o <code>pendente</code> cobre</td></tr>
+<tr><td>um pedaço da tela que recebe texto</td><td>passe o valor adiado e pronto</td><td>precisa subir o estado</td></tr>
+<tr><td>um aviso de “está desatualizado”</td><td><code>atrasado !== texto</code></td><td><code>pendente</code></td></tr>
+</table>
+</div>
+
+<p>Na prática, os dois aparecem juntos no mesmo projeto. O <code>useTransition</code> nas ações que você
+escreve — enviar encomenda, trocar de filtro salvo — e o <code>useDeferredValue</code> nos valores que
+chegam prontos e alimentam listas grandes. Trocar um pelo outro dá trabalho e não melhora nada.</p>
+
+<p>Um critério de desempate: se o valor precisa ser lido por um componente que você não controla ou que
+recebe o dado por prop, o <code>useDeferredValue</code> é o único que funciona sem refatorar a árvore. É
+exatamente a situação da Ana no começo da aula.</p>
+
+<h2>8. Os cuidados que valem a pena</h2>
+
+<p>Quatro erros concentram as reclamações sobre este hook. Nenhum deles dá erro no console: todos aparecem
+como “não mudou nada” ou “ficou mais lento”.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você fez</th><th>O que acontece</th><th>O conserto</th></tr>
+<tr><td>usou o valor adiado no <code>value</code> do campo</td><td>a digitação fica atrasada</td><td>o campo usa o valor urgente</td></tr>
+<tr><td>esperava menos consultas ao servidor</td><td>continua uma por mudança</td><td>debounce no efeito</td></tr>
+<tr><td>adiou um valor que alimenta pouca coisa</td><td>dois desenhos para nada</td><td>tirar o hook</td></tr>
+<tr><td>usou o hook dentro de um <code>if</code></td><td>a ordem dos hooks muda</td><td>chamar sempre no topo</td></tr>
+</table>
+</div>
+
+<p>A terceira linha é a que menos aparece nas conversas e a que mais importa. Adiar custa: o componente é
+desenhado duas vezes, e o React guarda trabalho para depois. Se o pedaço caro é pequeno, o custo do
+mecanismo é maior que o ganho. O hook compensa quando há uma lista longa, um gráfico, uma tabela com
+cálculo — não para um parágrafo com três itens.</p>
+
+<p>A quarta linha é a regra de sempre, e vale repetir porque o hábito escapa: <code>useDeferredValue</code> é
+hook como os outros, no topo do componente, sem condição. Se você precisa decidir se adia ou não, adie
+sempre e escolha o que fazer com o resultado no JSX. A aula
+<a href="regras-dos-hooks.html">As Regras dos Hooks</a> explica o mecanismo por trás disso.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a caixa de busca que veio pronta</h3>
+<p>O componente de busca da Ana guardava o texto por dentro e devolvia por callback. Ela não podia usar
+<code>useTransition</code> porque não tinha o <code>setState</code>. Passou o texto por
+<code>useDeferredValue</code> e alimentou a lista com o valor adiado. O campo continuou instantâneo, e a
+lista passou a esperar.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a tabela que piscava</h3>
+<p>A tabela de preços redesenha duzentas linhas a cada mudança de filtro, e a tela piscava. Com o valor
+adiado mais o valor inicial <code>[]</code>, o primeiro desenho saiu com a tabela vazia e o segundo com o
+resultado — sem pisca e sem travar. O ganho veio da combinação: prioridade no desenho e um estado inicial
+honesto.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o contador de consultas que não baixou</h3>
+<p>Ela adiou o valor e esperou ver menos requisições no painel do servidor. Continuou vendo uma por letra. A
+explicação está na seção 6: adiar não agrupa. Ela pôs um <code>setTimeout</code> com <code>clearTimeout</code>
+no efeito e manteve o valor adiado para a lista. As duas coisas juntas resolveram os dois problemas
+diferentes.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que o <code>useDeferredValue(texto)</code> devolve?</p>
+<label><input type="radio" name="q1"> sempre o texto atual</label>
+<label><input type="radio" name="q1"> uma versão do texto que pode ficar atrás enquanto o React desenha o
+resto</label>
+<label><input type="radio" name="q1"> uma cópia congelada do primeiro valor recebido</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Qual valor o campo de texto deve usar no <code>value</code>?</p>
+<label><input type="radio" name="q2"> o valor adiado</label>
+<label><input type="radio" name="q2"> tanto faz</label>
+<label><input type="radio" name="q2"> o valor urgente, para a digitação não atrasar</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que o <code>useDeferredValue</code> faz com as
+requisições ao servidor?</p>
+<label><input type="radio" name="q3"> nada: continua uma por mudança de valor; para agrupar é preciso
+debounce</label>
+<label><input type="radio" name="q3"> junta todas em uma chamada só</label>
+<label><input type="radio" name="q3"> cancela a chamada anterior automaticamente</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a lista que espera</h2>
+<p>Complete o hook e a comparação que esmaece a lista velha:</p>
+<div class="ex-code">const atrasado = <input aria-label="resposta 1" data-answer="useDeferredValue(texto)" placeholder="...">;
+const desatualizada = <input aria-label="resposta 2" data-answer="atrasado !== texto" placeholder="...">;</div>
+<p class="ex-dica">Dica: o hook recebe o valor urgente e devolve o adiado. A comparação é entre os dois, com
+<code>!==</code>.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O <code>useDeferredValue</code> recebe um valor e devolve uma versão que pode ficar para trás. O React
+desenha primeiro com o valor urgente — o campo, o título, o que a pessoa está mexendo — e depois com o valor
+adiado, que é onde a lista grande, a tabela e o gráfico são recalculados. Como não precisa da função que muda
+o estado, ele funciona com prop, com valor de contexto e com qualquer expressão.</p>
+
+<p>No React 19, o segundo argumento define o valor do primeiro desenho: <code>useDeferredValue(texto,
+"carregando")</code>. É útil para evitar o pisca de uma lista montada com o valor final, e não substitui um
+estado de carregamento de verdade. Para saber se a lista está velha, compare <code>atrasado !== texto</code>
+e use isso no estilo ou na mensagem.</p>
+
+<p>O hook não reduz trabalho: ele muda prioridade. Cada letra continua gerando um desenho urgente e um
+adiado, e cada mudança do valor adiado continua disparando os efeitos que dependem dele. Debounce, cache e
+cancelamento de requisição são outros assuntos, com outras ferramentas. E, como todo hook, ele fica no topo
+do componente — nunca dentro de um <code>if</code>.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>const atrasado = useDeferredValue(texto)</code>, no topo do componente.</li>
+<li>O desenho urgente usa o valor atual; o adiado pode usar o anterior.</li>
+<li>O campo de texto usa o valor urgente; a lista grande usa o adiado.</li>
+<li>React 19: <code>useDeferredValue(texto, "carregando")</code> define o primeiro desenho.</li>
+<li><code>atrasado !== texto</code> avisa que a lista está desatualizada.</li>
+<li>Não é debounce: não reduz consultas nem agrupa chamadas.</li>
+<li>Não é cache: o valor adiado continua mudando a cada letra.</li>
+<li>Funciona com valor que vem de prop, onde o <code>useTransition</code> não alcança.</li>
+<li>Adiar custa dois desenhos: use onde o trabalho é grande de verdade.</li>
+<li>Hook no topo, sem condição, como todos os outros.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

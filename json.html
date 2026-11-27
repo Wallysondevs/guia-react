@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JSON | Guia React</title>
+<meta name="description" content="JSON na prática: o texto que carrega dados, as regras da sintaxe, JSON.parse, JSON.stringify, o aninhado e o .json() da resposta.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>JSON: os dados em <span class="hl">texto</span></h1>
+<p class="intro">A Ana clicou em “preços” no painel da padaria e viu uma parede de texto na tela do
+navegador: <code>{"nome":"Pão francês","preco":1.2}</code>. Ela tentou <code>dados.nome</code> no
+console e recebeu <code>undefined</code>. O texto <em>parece</em> um objeto, tem chaves e valores e até
+aspas — mas é uma string, e string não tem propriedade. Para virar objeto de verdade, esse texto precisa
+passar por uma função que o traduz. Essa tradução, e o caminho de volta, é o assunto desta aula.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que os dados de uma API chegam como texto, e não como objeto.</li>
+  <li>As regras da sintaxe JSON — as que quebram o programa quando violadas.</li>
+  <li><code>JSON.parse</code>: de texto para objeto.</li>
+  <li><code>JSON.stringify</code>: de objeto para texto, para mandar de volta.</li>
+  <li>Como ler JSON aninhado, com listas dentro de objetos.</li>
+  <li>O que <code>resposta.json()</code> faz e por que ele precisa de <code>await</code>.</li>
+  <li>As mensagens de erro mais comuns e o que cada uma aponta.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o pedido que chegou como texto</h2>
+
+<p>Na aula de <a href="buscando-dados.html">buscar dados</a>, a Ana aprendeu a pedir a lista de preços e
+guardar a resposta no estado. Funcionou. Semana depois, ela quis mostrar o nome do primeiro pão e
+escreveu <code>dados[0].nome</code> — e a tela ficou em branco. No console, <code>console.log(dados)</code>
+imprimiu uma linha enorme, cheia de chaves, que ela confundiu com um objeto:</p>
+
+<pre class="file" data-file="console do navegador">{"cliente":"Ana","itens":[{"pao":"brioche","qtd":2}],"total":9}</pre>
+
+<p>Só que aquilo é texto. A pista está nas aspas que envolvem tudo, nas chaves entre aspas e na ausência
+de espaços decorativos. Um objeto JavaScript impresso no console aparece como <code>{ cliente: 'Ana', ... }</code>,
+com aspas apenas nos textos e sem aspas nos nomes das chaves. A diferença parece cosmética e é
+fundamental: <code>dados.cliente</code> funciona no segundo caso e devolve <code>undefined</code> no
+primeiro.</p>
+
+<p>Esse formato tem nome: <strong>JSON</strong>, sigla de <em>JavaScript Object Notation</em>. Ele existe
+porque dois programas escritos em linguagens diferentes não conseguem passar objeto um para o outro
+diretamente — mas conseguem passar texto. Então a regra é sempre a mesma: quem envia transforma o objeto
+em texto JSON; quem recebe transforma o texto de volta em objeto. No meio do caminho, tudo é texto.</p>
+
+<p>Vale dizer o que JSON <em>não</em> é, porque a confusão aparece cedo. Ele não é um banco de dados, não
+é um protocolo e não é uma biblioteca: é só um jeito de escrever dados em texto, com regras fixas. Um
+arquivo <code>.json</code> no projeto é exatamente isso — texto salvo em disco. E o nome tem “JavaScript”
+porque a sintaxe foi inspirada na linguagem, não porque só o JavaScript entende: Python, PHP, Go e
+praticamente tudo que conversa com servidor lê e escreve JSON.</p>
+
+<h2>2. JSON é texto, não é objeto</h2>
+
+<p>Vale fixar a ideia com duas linhas lado a lado. A primeira é JavaScript, com um objeto de verdade. A
+segunda é a mesma informação em JSON — perceba as aspas em volta dos nomes das chaves:</p>
+
+<pre class="file" data-file="App.jsx">const paoObjeto = { nome: "Pão francês", preco: 1.2 };
+
+const paoTexto = '{"nome": "Pão francês", "preco": 1.2}';</pre>
+
+<p><code>paoObjeto</code> nasceu objeto: dá para acessar <code>paoObjeto.nome</code>, mudar
+<code>paoObjeto.preco</code>, passar em prop. <code>paoTexto</code> nasceu string: dá para medir o tamanho,
+procurar um pedaço com <code>includes</code>, cortar com <code>slice</code> — e nada mais. Ele tem
+<code>{</code> e <code>}</code>, mas para o JavaScript são só caracteres, do mesmo jeito que um desenho de
+pão numa folha não se come.</p>
+
+<p>Por isso a leitura de qualquer API tem sempre dois passos, e é comum ver gente travada no primeiro
+achando que já fez o segundo. Passo um: buscar o texto. Passo dois: transformar o texto em objeto. Na
+aula de busca, o <code>.json()</code> já fazia o passo dois escondido — é o que a seção 7 detalha. Antes
+disso, vale conhecer as duas funções que fazem a tradução à mão, porque é com elas que você vai depurar
+qualquer resposta estranha.</p>
+
+<dl class="anatomy">
+<dt>JSON</dt>
+<dd>Formato de texto para trocar dados entre programas. Nasceu do JavaScript, mas é lido por todas as
+linguagens — é por isso que ele existe.</dd>
+<dt>parse</dt>
+<dd>“Traduzir para a estrutura da linguagem”. <code>JSON.parse</code> recebe texto e devolve objeto, array,
+número, booleano ou <code>null</code>.</dd>
+<dt>stringify</dt>
+<dd>O caminho de volta: <code>JSON.stringify</code> recebe valor JavaScript e devolve o texto JSON.</dd>
+<dt>serializar</dt>
+<dd>O nome técnico dos dois sentidos: transformar estrutura em sequência de caracteres (e desserializar, ao
+contrário).</dd>
+<dt>Response</dt>
+<dd>O objeto que o <code>fetch</code> devolve. Tem <code>.json()</code>, <code>.text()</code>,
+<code>.status</code> e o corpo ainda não lido.</dd>
+</dl>
+
+<h2>3. As regras da sintaxe</h2>
+
+<p>JSON é um formato pequeno: sete tipos de valor e quatro regras. Os valores são texto (entre aspas
+duplas), número, <code>true</code>, <code>false</code>, <code>null</code>, objeto (pares de chave e valor)
+e array (lista ordenada). Não existe função, não existe <code>undefined</code>, não existe comentário, não
+existe data — data vai como texto, geralmente no formato <code>"2026-03-14"</code>.</p>
+
+<p>As regras que mais derrubam iniciante são as de pontuação. Toda chave é texto, com aspas duplas
+obrigatórias. Todo texto usa aspas duplas — aspas simples são erro. Vírgula separa itens e nunca sobra
+depois do último. E o arquivo inteiro é um valor só: não dá para ter dois objetos soltos lado a lado.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Em JavaScript</th><th>Em JSON</th><th>Por quê</th></tr>
+<tr><td><code>{ nome: "Pão" }</code></td><td><code>{"nome": "Pão"}</code></td><td>em JSON, chave é sempre texto entre aspas duplas</td></tr>
+<tr><td><code>{ nome: 'Pão' }</code></td><td><code>{"nome": "Pão"}</code></td><td>aspas simples não existem em JSON</td></tr>
+<tr><td><code>{ a: 1, }</code></td><td><code>{"a": 1}</code></td><td>vírgula sobrando depois do último item é erro</td></tr>
+<tr><td><code>{ a: 1, /* nota */ b: 2 }</code></td><td><code>{"a": 1, "b": 2}</code></td><td>JSON não tem comentário</td></tr>
+<tr><td><code>{ nome: undefined }</code></td><td><code>{}</code></td><td>chave com <code>undefined</code> desaparece; <code>null</code> continua e vira <code>null</code></td></tr>
+<tr><td><code>{ quando: new Date() }</code></td><td><code>{"quando": "2026-03-14T09:00:00.000Z"}</code></td><td>data vira texto; para voltar a ser data, é preciso converter</td></tr>
+<tr><td><code>[1, undefined, 3]</code></td><td><code>[1, null, 3]</code></td><td>dentro de array não há como sumir com a posição: vira <code>null</code></td></tr>
+</table>
+</div>
+
+<p>Repare na linha do <code>undefined</code>: é a única em que o JSON “perde” informação sem reclamar. Se
+um campo obrigatório desaparece do texto, muitas vezes a causa está no objeto de origem, com
+<code>undefined</code> em vez de um valor. E repare também que JSON não tem tipo para data: o
+<code>new Date()</code> virou uma string ISO, e quem recebe precisa saber disso para exibir a data.</p>
+
+<h2>4. Do texto ao objeto: JSON.parse</h2>
+
+<p>A função que traduz texto JSON em objeto chama-se <code>JSON.parse</code>. Ela recebe uma string e
+devolve o valor que a string descreve. O caso abaixo tem a resposta de uma API que a Ana colou no arquivo
+para testar o componente sem depender de rede:</p>
+
+<div class="tryreact" data-goal="texto:Pão francês — R$ 1,20;;conta:p.preco=1">
+  <p class="try-task">O parágrafo mostra o texto cru, porque <code>resposta</code> é string. Use
+  <code>JSON.parse</code> para virar objeto e mostre o nome e o preço no formato
+  <strong>Pão francês — R$ 1,20</strong> (duas casas decimais, vírgula no lugar do ponto).</p>
+  <pre class="jsx">const resposta = '{"nome": "Pão francês", "preco": 1.2}';
+
+function App() {
+  return (
+    &lt;p className="preco"&gt;{resposta}&lt;/p&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;p class="preco"&gt;{"nome": "Pão francês", "preco": 1.2}&lt;/p&gt;
+</pre>
+  <pre class="solucao">const resposta = '{"nome": "Pão francês", "preco": 1.2}';
+
+function App() {
+  const pao = JSON.parse(resposta);
+  return (
+    &lt;p className="preco"&gt;{pao.nome} — R$ {pao.preco.toFixed(2).replace(".", ",")}&lt;/p&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois do <code>JSON.parse</code>, <code>pao</code> é objeto: <code>pao.nome</code> funciona,
+<code>pao.preco</code> é número e aceita <code>toFixed</code>. O <code>toFixed(2)</code> garante duas casas
+decimais e o <code>replace(".", ",")</code> troca o ponto decimal pela vírgula brasileira — detalhe de
+formatação, não de JSON, mas que aparece em toda vitrine.</p>
+
+<p>A função também serve para valores soltos, não só para objetos: <code>JSON.parse("42")</code> devolve o
+número 42, <code>JSON.parse("true")</code> devolve o booleano, <code>JSON.parse('"pão"')</code> devolve o
+texto (sim, com aspas dentro da string), e <code>JSON.parse("null")</code> devolve <code>null</code>. Isso
+importa porque uma API pode responder só <code>null</code> para dizer “não achei”.</p>
+
+<p>Um detalhe que engana: <code>JSON.parse</code> não sabe nada sobre o seu componente. Ele não devolve
+JSX, não sabe de estado, não avisa a tela. Ele só converte um valor em outro, e é por isso que ele cabe numa
+linha antes do <code>return</code> — ou, melhor ainda, fora do componente, quando o texto é fixo, para não
+repetir a conversão a cada desenho.</p>
+
+<p>E o que acontece quando o texto está quebrado? <code>JSON.parse</code> não devolve
+<code>undefined</code> nem tenta consertar: ele <strong>lança um erro</strong>. Isso é bom, porque um erro
+tem mensagem. A seção 8 mostra as duas mensagens que você vai encontrar mais.</p>
+
+<h2>5. Aninhado: listas dentro de objetos</h2>
+
+<p>Resposta de API raramente é plana. O pedido da padaria, por exemplo, tem um cliente, uma lista de itens
+e cada item tem nome e quantidade:</p>
+
+<pre class="file" data-file="resposta.json">{
+  "cliente": "Ana",
+  "itens": [
+    { "pao": "brioche", "qtd": 2 },
+    { "pao": "sonho", "qtd": 1 }
+  ]
+}</pre>
+
+<p>Depois do <code>parse</code>, esse objeto tem a mesma forma do JSON: <code>pedido.itens</code> é um
+array, <code>pedido.itens[0]</code> é um objeto, <code>pedido.itens[0].pao</code> é texto. O caminho é
+lido da esquerda para a direita, ponto por ponto — e a lista é percorrida com
+<a href="listas-com-map.html">map</a>, como qualquer array. Não há nada de especial em JSON aninhado: o
+aninhamento é só a forma do dado.</p>
+
+<div class="tryreact" data-goal="conta:.itens li=2;;texto:2× brioche">
+  <p class="try-task">O componente já tem o pedido em objeto, mas só mostra a quantidade de itens.
+  Desenhe a lista <code>ul.itens</code> com um <code>li</code> por item, no formato
+  <strong>2× brioche</strong>.</p>
+  <pre class="jsx">const texto = '{"cliente": "Ana", "itens": [{"pao": "brioche", "qtd": 2}, {"pao": "sonho", "qtd": 1}]}';
+
+function App() {
+  const pedido = JSON.parse(texto);
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Pedido de {pedido.cliente}&lt;/h2&gt;
+      &lt;p&gt;itens: {pedido.itens.length}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h2&gt;Pedido de Ana&lt;/h2&gt;
+  &lt;p&gt;itens: 2&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const texto = '{"cliente": "Ana", "itens": [{"pao": "brioche", "qtd": 2}, {"pao": "sonho", "qtd": 1}]}';
+
+function App() {
+  const pedido = JSON.parse(texto);
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Pedido de {pedido.cliente}&lt;/h2&gt;
+      &lt;ul className="itens"&gt;
+        {pedido.itens.map((item) =&gt; &lt;li key={item.pao}&gt;{item.qtd}× {item.pao}&lt;/li&gt;)}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Quando o aninhamento fica fundo, a leitura fica frágil: um <code>?.pedido?.itens?</code> cheio de
+interrogações é sinal de que você não sabe se aquele pedaço existe. Nesse ponto vale dividir: uma função
+que recebe o JSON e devolve só o que a tela precisa, achatado. O componente fica simples e a tradução fica
+num lugar só.</p>
+
+<h2>6. Do objeto ao texto: JSON.stringify</h2>
+
+<p>O caminho de volta é <code>JSON.stringify</code>. Ele recebe um objeto (ou array, ou número) e devolve o
+texto JSON correspondente. É o que acontece quando você envia um pedido para o servidor: o corpo do
+<code>POST</code> é texto JSON, não é objeto.</p>
+
+<div class="tryreact" data-goal="texto:&quot;cliente&quot;: &quot;Ana&quot;;;texto:&quot;paes&quot;: 2">
+  <p class="try-task">O <code>pre</code> mostra <code>[object Object]</code>, porque objeto não vira texto
+  sozinho. Troque por <code>JSON.stringify(pedido, null, 2)</code> para o JSON aparecer indentado, com
+  <code>"cliente": "Ana"</code> e <code>"paes": 2</code>.</p>
+  <pre class="jsx">function App() {
+  const pedido = { cliente: "Ana", paes: 2, obs: undefined };
+  return &lt;pre className="json"&gt;{String(pedido)}&lt;/pre&gt;;
+}</pre>
+  <pre class="out">
+&lt;pre class="json"&gt;[object Object]&lt;/pre&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const pedido = { cliente: "Ana", paes: 2, obs: undefined };
+  return &lt;pre className="json"&gt;{JSON.stringify(pedido, null, 2)}&lt;/pre&gt;;
+}</pre>
+</div>
+
+<p>O nome “stringify” vem de <em>string</em>, texto: a função devolve uma string. Por isso ela é a
+parceira obrigatória do envio de dados. Quando a Ana for implementar o botão de enviar o pedido, o corpo da
+requisição vai ser <code>JSON.stringify(pedido)</code> — não o objeto. Mandar o objeto direto faz o
+navegador converter para algo inútil como <code>[object Object]</code>, que é exatamente o que o
+<code>pre</code> da caixa mostra antes da correção.</p>
+
+<p>O segundo argumento é o “substituto” e fica <code>null</code> quando você não quer filtrar chaves. O
+terceiro é o espaçamento: <code>2</code> usa dois espaços por nível e deixa o texto legível;
+<code>JSON.stringify(pedido)</code> sem ele devolve tudo numa linha só, que é o formato econômico para
+viajar pela rede. Repare também que a prop <code>obs</code> com <code>undefined</code> sumiu do texto — a
+mesma regra da tabela da seção 3.</p>
+
+<pre class="term">console: {"nome":"Ana"}</pre>
+
+<p>Essa linha saiu de <code>console.log(JSON.stringify({ nome: "Ana", obs: undefined, f: () =&gt; 1 }))</code>:
+o objeto tinha três chaves e o JSON ficou com uma. Função também desaparece, porque JSON não tem tipo
+função. Saber disso economiza meia hora de depuração quando um campo “não chega no servidor”.</p>
+
+<h2>7. resposta.json(): o parse que já vem feito</h2>
+
+<p>Voltando ao começo: se o <code>fetch</code> devolve texto, por que o código da aula de busca nunca
+chamou <code>JSON.parse</code>? Porque o objeto que o <code>fetch</code> devolve, a <code>Response</code>,
+tem um método que faz isso: <code>.json()</code>. Ele lê o corpo da resposta e devolve o valor já
+traduzido — com uma diferença importante: como a leitura do corpo leva tempo, <code>.json()</code>
+devolve uma <strong>Promise</strong>.</p>
+
+<pre class="file" data-file="App.jsx">useEffect(() =&gt; {
+  async function carregar() {
+    const resposta = await fetch("https://loja.test/api/paes");
+    const dados = await resposta.json();
+    setPaes(dados);
+  }
+  carregar();
+}, []);</pre>
+
+<p>Os dois <code>await</code> são obrigatórios e cada um resolve um problema diferente. O primeiro espera a
+resposta chegar. O segundo espera o corpo ser lido e traduzido. Sem o segundo, <code>dados</code> é uma
+Promise: <code>dados.map</code> não existe, e a tela fica vazia com o painel reclamando que o componente
+não desenhou nada. É o tropeço número um de quem está começando com rede.</p>
+
+<p>Um jeito de não esquecer: conte os <code>await</code> como conta os tempos da frase. “Vou buscar a
+resposta” (primeiro <code>await</code>) e “vou ler o corpo dela” (segundo <code>await</code>). São duas
+esperas porque são duas coisas diferentes acontecendo em momentos diferentes — o servidor primeiro responde
+o cabeçalho, depois manda o corpo. Em respostas pequenas quase sempre chegam juntos, e é justamente por
+isso que o erro de esquecer o segundo passa despercebido em teste rápido e aparece em produção.</p>
+
+<p>Existe também <code>resposta.text()</code>, para quando o corpo não é JSON — um recibo em texto puro, um
+CSV, uma página HTML de erro. Nesse caso você recebe a string e faz o que quiser. Se o servidor responde
+HTML em vez de JSON (acontece quando a URL está errada e o servidor devolve a página de “não encontrado”),
+<code>.json()</code> falha com erro de sintaxe — e a mensagem parece um problema do seu código, quando o
+problema é a URL.</p>
+
+<h2>8. Os tropeços com JSON</h2>
+
+<p>O tropeço mais comum é a vírgula sobrando. Ela é permitida em objeto JavaScript desde sempre e é erro
+em JSON. A mensagem do navegador aponta a posição exata:</p>
+
+<pre class="term">Expected double-quoted property name in JSON at position 23 (line 1 column 24)</pre>
+
+<p>Traduzindo: “esperava um nome de propriedade entre aspas duplas na posição 23”. Se você contar 23
+caracteres no texto, vai cair justamente no <code>}</code> que veio depois da vírgula. A mensagem é feia,
+mas é precisa — e sempre aponta o caractere onde o parser desistiu, não o começo do JSON. O segundo tropeço
+é o par de aspas simples, que dá uma mensagem parecida:</p>
+
+<pre class="file" data-file="erro no console">Expected property name or '}' in JSON at position 1 (line 1 column 2)</pre>
+
+<p>A posição 1 é o começo do objeto: o <code>'</code> depois da chave. Trocar por aspas duplas resolve.
+O terceiro tropeço não dá erro nenhum: é chamar <code>JSON.parse</code> num valor que já é objeto. O
+parser espera texto, recebe objeto, e reclama de um token inesperado — o famoso
+<code>Unexpected token o</code>. Se a resposta já veio com <code>.json()</code>, não há o que parsear de
+novo.</p>
+
+<p>Há ainda um quarto tropeço, mais sutil: confiar no JSON para carregar o que ele não carrega. Datas
+viram texto, <code>undefined</code> desaparece, número grande perde precisão em casos extremos e
+<code>Map</code> ou <code>Set</code> viram <code>{}</code>. Na dúvida, imprima o texto cru com
+<code>console.log(texto)</code> antes de parsear: ver o que chegou é metade do conserto.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você vê</th><th>Causa provável</th><th>Conserto</th></tr>
+<tr><td><code>Expected double-quoted property name</code></td><td>vírgula sobrando depois do último item</td><td>apagar a vírgula final</td></tr>
+<tr><td><code>Expected property name or '}'</code></td><td>aspas simples em chave ou valor</td><td>usar aspas duplas</td></tr>
+<tr><td><code>Unexpected token o in JSON</code></td><td><code>JSON.parse</code> recebeu objeto em vez de texto</td><td>usar o objeto direto, sem parse</td></tr>
+<tr><td>campo que “não chega” no servidor</td><td>valor <code>undefined</code> ou função, que somem no <code>stringify</code></td><td>usar <code>null</code> ou conferir o valor de origem</td></tr>
+<tr><td><code>dados.map is not a function</code></td><td>faltou <code>await</code> no <code>resposta.json()</code></td><td>esperar a Promise antes de usar o valor</td></tr>
+</table>
+</div>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o preço que aparecia como texto</h3>
+<p>A Ana recebeu <code>{"preco": "1.20"}</code> — note as aspas no número — e a conta de três pães saiu
+como <code>1.202.202.20</code>: string somada com string concatena. O conserto foi no servidor, que passou a
+mandar número; no componente, uma defesa simples é <code>Number(pao.preco)</code> antes de calcular. JSON
+não garante tipo: quem envia decide se o número vai com aspas ou sem.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o pedido que chegou pela metade</h3>
+<p>Um campo opcional do pedido vinha <code>undefined</code> e o servidor recebia o JSON sem ele, gravava
+nulo e a nota saía sem o endereço de entrega. Depois de entender que <code>undefined</code> some no
+<code>stringify</code>, ela passou a mandar <code>null</code> explícito para “vazio de propósito”, e o
+servidor começou a distinguir “não enviado” de “enviado vazio”.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o JSON guardado no navegador</h3>
+<p>A lista de encomendas fica também no <code>localStorage</code>, que só aceita texto. Por isso o
+<code>JSON.stringify</code> aparece de novo lá, na aula de
+<a href="localStorage.html">localStorage</a>: gravar é objeto para texto, ler é texto para objeto. Mesmo
+par de funções, mesmo cuidado com aspas e com datas.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Uma API devolveu <code>{"nome":"Pão"}</code> dentro de
+uma variável. O que <code>dados.nome</code> devolve?</p>
+<label><input type="radio" name="q1"> <code>"Pão"</code>, porque o formato é o mesmo do objeto</label>
+<label><input type="radio" name="q1"> <code>undefined</code>, porque <code>dados</code> é texto e texto não tem propriedades</label>
+<label><input type="radio" name="q1"> um erro de sintaxe</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Qual destes é JSON válido?</p>
+<label><input type="radio" name="q2"> <code>{ nome: 'Pão', }</code></label>
+<label><input type="radio" name="q2"> <code>{"nome": "Pão",}</code></label>
+<label><input type="radio" name="q2"> <code>{"nome": "Pão"}</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que <code>JSON.stringify</code> faz com uma chave
+cujo valor é <code>undefined</code>?</p>
+<label><input type="radio" name="q3"> remove a chave do texto, sem avisar</label>
+<label><input type="radio" name="q3"> grava <code>null</code> no lugar</label>
+<label><input type="radio" name="q3"> lança erro de sintaxe</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o texto que precisa virar objeto</h2>
+
+<p>A resposta da API está guardada numa constante de texto, e o componente precisa mostrar o nome do
+primeiro pão. Complete a chamada que transforma o texto em objeto:</p>
+
+<div class="ex-code">const resposta = '{"paes": [{"nome": "brioche"}]}';
+
+function App() {
+  const dados = JSON.<input aria-label="resposta 1" data-answer="parse" placeholder="...">(resposta);
+  return &lt;p&gt;Primeiro pão: {dados.paes[0].nome}&lt;/p&gt;;
+}</div>
+
+<p class="ex-dica">Dica: o caminho de ida (objeto para texto) tem o nome que lembra “string”, e o de volta
+tem o nome que lembra “parsear”. Aqui o texto já existe e você quer o objeto.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>JSON é texto com formato combinado, e é assim que dados viajam entre programas. Ele aceita texto,
+número, booleano, <code>null</code>, objeto e array — nada de função, comentário, aspas simples ou vírgula
+sobrando. <code>JSON.parse</code> transforma texto em objeto; <code>JSON.stringify</code> faz o contrário e
+é o que se envia num <code>POST</code>.</p>
+
+<p>Resposta de API chega como texto, e o <code>.json()</code> da <code>Response</code> faz o parse por
+você, devolvendo uma Promise — daí o <code>await</code>. Aninhamento é só a forma do dado: ponto para
+descer, <code>map</code> para percorrer. E quando o parse falha, a mensagem aponta a posição exata do
+caractere problemático: leia a posição, não o começo da mensagem.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>JSON é string; objeto é objeto. <code>dados.nome</code> só funciona no segundo.</li>
+<li>Chave e texto sempre com aspas duplas; sem vírgula sobrando; sem comentário.</li>
+<li><code>JSON.parse(texto)</code> devolve objeto; <code>JSON.stringify(objeto)</code> devolve texto.</li>
+<li><code>stringify(objeto, null, 2)</code> deixa o JSON indentado e legível.</li>
+<li><code>undefined</code> e função somem no <code>stringify</code>; em array viram <code>null</code>.</li>
+<li><code>resposta.json()</code> já parseia: precisa de <code>await</code>.</li>
+<li>Erro de parse aponta posição e coluna: é lá que está o caractere errado.</li>
+<li>Número com aspas é texto: <code>"1.20"</code> concatena em vez de somar.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

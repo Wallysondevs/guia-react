@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Abortar um Pedido | Guia React</title>
+<meta name="description" content="Cancelar um pedido de verdade com AbortController: o sinal, o abort(), o motivo do cancelamento, o tempo limite com AbortSignal.timeout e o que fazer com o erro que aparece.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Abortar um <span class="hl">Pedido</span></h1>
+
+<p class="intro">A cliente pediu dois pães, o atendente foi ao forno e ela desistiu: virou as costas e
+saiu. Na padaria isso é natural — ninguém continua assando o pão para quem já foi embora. Na web também:
+quando o leitor troca de tela, cancela a busca ou fica impaciente, o pedido que ele fez não interessa mais.
+Nesta aula a Ana aprende a avisar o navegador que o pedido foi abandonado, com o
+<code>AbortController</code> — e a lidar com o erro que aparece quando isso acontece, sem mostrar "deu
+errado" para quem simplesmente mudou de ideia.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que são o <code>AbortController</code>, o <code>signal</code> e o <code>abort()</code>.</li>
+  <li>Como um botão Cancelar interrompe um pedido em andamento.</li>
+  <li>O erro de cancelamento: <code>AbortError</code> e <code>signal.reason</code>.</li>
+  <li>Como definir o motivo do cancelamento em vez de mostrar a mensagem técnica.</li>
+  <li>Tempo limite: <code>AbortSignal.timeout</code> e o <code>TimeoutError</code>.</li>
+  <li>Quando cancelar e quando não vale a pena.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o pedido que ninguém vai buscar</h2>
+
+<p>O cardápio da Ana tem uma busca: a pessoa digita "queijo" e o site pede ao servidor a lista de pães que
+combinam. Se ela digitar mais uma letra antes da resposta chegar, o pedido anterior está perdido — a
+resposta que vier não interessa mais. Mas ele continua viajando: o servidor procura, monta a lista, manda
+de volta. O navegador recebe, o código do site processa e, se ninguém tomou cuidado, sobrescreve a tela com
+resultado velho.</p>
+
+<p>Existe uma forma de parar isso no meio do caminho, e ela é do navegador, não do React: o
+<strong>AbortController</strong>. Ele é um controle remoto com um botão só. Você entrega ao
+<code>fetch</code> um cartão que esse controle assinou; quando aperta o botão, todo pedido que estiver
+segurando aquele cartão é interrompido na hora, com a conexão fechada.</p>
+
+<p>São três objetos que aparecem sempre juntos. O controle, que é quem manda cancelar. O sinal, que é o
+cartão entregue ao pedido. E o pedido, que avisa o controle quando é interrompido. Guarde os nomes:
+<code>controle</code>, <code>signal</code>, <code>abort</code>.</p>
+
+<h2>2. As três linhas do cancelamento</h2>
+
+<p>Não há mistério na montagem. Cria-se o controle, passa-se o sinal nas opções do <code>fetch</code> e,
+quando for preciso, chama-se o <code>abort</code>. É a mesma ordem em qualquer lugar do código.</p>
+
+<pre class="file" data-file="busca.js">const controle = new AbortController();
+
+fetch("https://loja.test/api/paes", { signal: controle.signal })
+  .then((resposta) =&gt; resposta.json())
+  .then((lista) =&gt; setPaes(lista));
+
+// quando quiser cancelar:
+controle.abort();</pre>
+
+<p>Repare que o <code>signal</code> vai dentro do objeto de opções, junto com <code>method</code> ou
+<code>headers</code> quando existirem. Não é um argumento separado. E repare também que o
+<code>abort()</code> não devolve nada: ele apenas avisa a todos os pedidos que estão usando aquele sinal.
+Se não houver nenhum, nada acontece — e não é erro.</p>
+
+<dl class="anatomy">
+<dt><code>AbortController</code></dt>
+<dd>O controle remoto. Cada pedido que você quer poder cancelar precisa de um controle só dele.</dd>
+<dt><code>signal</code></dt>
+<dd>O cartão do controle, entregue ao <code>fetch</code> nas opções. É por ele que o pedido sabe que foi
+cancelado.</dd>
+<dt><code>abort()</code></dt>
+<dd>O botão. Fecha a conexão e rejeita a promessa do pedido com um erro de cancelamento.</dd>
+<dt><code>AbortError</code></dt>
+<dd>O nome do erro que aparece no <code>catch</code> quando o pedido é interrompido.</dd>
+<dt><code>signal.aborted</code></dt>
+<dd>Verdadeiro depois do <code>abort()</code>. Serve para perguntar "já cancelou?" sem esperar o erro.</dd>
+<dt><code>signal.reason</code></dt>
+<dd>O motivo do cancelamento. Por padrão, um objeto técnico em inglês; você pode definir o seu.</dd>
+</dl>
+
+<h2>3. O botão que cancela de verdade</h2>
+
+<p>A primeira tentativa da Ana foi mudar o estado do componente quando o botão fosse clicado. A tela dizia
+"Cancelar" e, ao clicar, ela via o texto voltar para carregando — mas o pedido continuava vivo, e quando a
+resposta chegava o componente desenhava a lista como se nada tivesse acontecido. Mudar estado não cancela
+nada: quem cancela é o <code>abort()</code>.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Pedido cancelado">
+  <p class="try-task">O controle está guardado em <code>controle.current</code> e o pedido está esperando.
+  Faça o botão cancelar de verdade: chame <code>controle.current.abort()</code> na função
+  <code>cancelar</code>.</p>
+  <pre class="jsx">function buscar(sinal) {
+  return new Promise((ok, falha) =&gt; {
+    const id = setTimeout(() =&gt; ok(["Pão francês", "Croissant"]), 400);
+    sinal.addEventListener("abort", () =&gt; {
+      clearTimeout(id);
+      falha(sinal.reason);
+    });
+  });
+}
+
+function App() {
+  const [lista, setLista] = useState([]);
+  const [estado, setEstado] = useState("carregando");
+  const controle = useRef(null);
+
+  useEffect(() =&gt; {
+    controle.current = new AbortController();
+    buscar(controle.current.signal)
+      .then((dados) =&gt; {
+        setLista(dados);
+        setEstado("pronto");
+      })
+      .catch((e) =&gt; {
+        if (e.name === "AbortError") setEstado("cancelado");
+      });
+    return () =&gt; controle.current.abort();
+  }, []);
+
+  function cancelar() {
+    setEstado("carregando");
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      {estado === "carregando" &amp;&amp; &lt;p&gt;Carregando...&lt;/p&gt;}
+      {estado === "cancelado" &amp;&amp; &lt;p&gt;Pedido cancelado&lt;/p&gt;}
+      {estado === "pronto" &amp;&amp; (
+        &lt;ul&gt;
+          {lista.map((p) =&gt; (
+            &lt;li key={p}&gt;{p}&lt;/li&gt;
+          ))}
+        &lt;/ul&gt;
+      )}
+      &lt;button onClick={cancelar}&gt;Cancelar pedido&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Carregando...&lt;/p&gt;
+  &lt;button&gt;Cancelar pedido&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscar(sinal) {
+  return new Promise((ok, falha) =&gt; {
+    const id = setTimeout(() =&gt; ok(["Pão francês", "Croissant"]), 400);
+    sinal.addEventListener("abort", () =&gt; {
+      clearTimeout(id);
+      falha(sinal.reason);
+    });
+  });
+}
+
+function App() {
+  const [lista, setLista] = useState([]);
+  const [estado, setEstado] = useState("carregando");
+  const controle = useRef(null);
+
+  useEffect(() =&gt; {
+    controle.current = new AbortController();
+    buscar(controle.current.signal)
+      .then((dados) =&gt; {
+        setLista(dados);
+        setEstado("pronto");
+      })
+      .catch((e) =&gt; {
+        if (e.name === "AbortError") setEstado("cancelado");
+      });
+    return () =&gt; controle.current.abort();
+  }, []);
+
+  function cancelar() {
+    controle.current.abort();
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      {estado === "carregando" &amp;&amp; &lt;p&gt;Carregando...&lt;/p&gt;}
+      {estado === "cancelado" &amp;&amp; &lt;p&gt;Pedido cancelado&lt;/p&gt;}
+      {estado === "pronto" &amp;&amp; (
+        &lt;ul&gt;
+          {lista.map((p) =&gt; (
+            &lt;li key={p}&gt;{p}&lt;/li&gt;
+          ))}
+        &lt;/ul&gt;
+      )}
+      &lt;button onClick={cancelar}&gt;Cancelar pedido&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois do clique, o pedido é interrompido, a promessa é rejeitada e o <code>catch</code> roda — com um
+erro cujo nome é <code>AbortError</code>. É por isso que o <code>catch</code> testa o nome antes de decidir
+o que fazer: cancelamento não é falha do sistema, é decisão do usuário. Se você tratar os dois igual, quem
+muda de ideia vê "erro de conexão".</p>
+
+<p>E note o detalhe do <code>useRef</code>: o controle precisa sobreviver entre renders, porque a função do
+botão é recriada a cada render e precisa do mesmo controle que o efeito criou. Guardar em variável comum
+não funciona; guardar em estado também não, porque guardar o controle é guardar uma instância, não um dado
+para desenhar.</p>
+
+<h2>4. O que acontece de verdade quando o pedido é cancelado</h2>
+
+<p>O <code>abort()</code> não é um <code>setState</code> disfarçado. Ele fecha a conexão de rede. Se a
+resposta ainda não começou a chegar, o servidor pode até parar de preparar; se já começou, o navegador
+descarta o que vier. O ganho é de banda, de bateria e de trabalho no servidor — e, principalmente, de
+clareza: nenhum código seu vai receber dado que não pediu mais.</p>
+
+<p>Do lado do JavaScript, o efeito é imediato: a promessa do <code>fetch</code> é rejeitada com uma
+<code>DOMException</code> cujo <code>name</code> é <code>"AbortError"</code>. Ela cai no
+<code>.catch</code> (ou no <code>catch</code> do <code>try</code>) como qualquer outro erro. E o sinal
+passa a responder verdadeiro para <code>aborted</code>:</p>
+
+<pre class="term">&gt; const controle = new AbortController();
+undefined
+&gt; controle.signal.aborted
+false
+&gt; controle.abort()
+undefined
+&gt; controle.signal.aborted
+true
+&gt; controle.signal.reason
+DOMException: The user aborted a request.</pre>
+
+<p>Essas cinco linhas explicam tudo o que dá errado com cancelamento. Antes do <code>abort</code>, o sinal
+está limpo. Depois, ele fica marcado para sempre: um controle abortado não volta atrás. Se você precisa
+disparar outro pedido cancelável, cria outro <code>new AbortController()</code> — não tenta reaproveitar o
+antigo.</p>
+
+<p>Uma ressalva honesta, que vale antes de você confiar demais no cancelamento: ele interrompe a
+<em>conversa</em>, não o trabalho do servidor. Se o pedido já chegou ao outro lado e a rotina começou a
+rodar — gravar um pedido, debitar um cartão —, desistir do lado do navegador não desfaz nada disso. Por isso
+cancelar é seguro para leitura (buscar lista, buscar preço) e delicado para escrita: um POST cancelado no
+meio do caminho pode ter sido executado. A aula de POST volta a esse ponto.</p>
+
+<p>Repare também na última linha: existe um <em>motivo</em> no sinal, e o motivo padrão é um objeto
+técnico com mensagem em inglês. É desse motivo que vem a mensagem que o seu <code>catch</code> recebe.
+Mostrar isso ao cliente é o mesmo que mostrar um erro de compilador.</p>
+
+<h2>5. O motivo do cancelamento</h2>
+
+<p>O <code>abort()</code> aceita um argumento: o motivo. O que você passar ali vira
+<code>signal.reason</code> e é o que o pedido recebe como erro. Isso permite separar dois cancelamentos que
+pareciam iguais — o usuário desistiu, o termo de busca mudou, a tela foi fechada — e mostrar a mensagem
+certa em cada caso.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:O cliente desistiu do pedido">
+  <p class="try-task">Ao cancelar, a tela mostra o motivo padrão do navegador, em inglês. Passe um motivo
+  seu: <code>controle.current.abort(new DOMException("O cliente desistiu do pedido", "AbortError"))</code>.</p>
+  <pre class="jsx">function buscar(sinal) {
+  return new Promise((ok, falha) =&gt; {
+    const id = setTimeout(() =&gt; ok(["Pão francês"]), 400);
+    sinal.addEventListener("abort", () =&gt; {
+      clearTimeout(id);
+      falha(sinal.reason);
+    });
+  });
+}
+
+function App() {
+  const [estado, setEstado] = useState("carregando");
+  const [motivo, setMotivo] = useState("");
+  const controle = useRef(null);
+
+  useEffect(() =&gt; {
+    controle.current = new AbortController();
+    buscar(controle.current.signal)
+      .then(() =&gt; setEstado("pronto"))
+      .catch((e) =&gt; {
+        setEstado("cancelado");
+        setMotivo(e.message);
+      });
+    return () =&gt; controle.current.abort();
+  }, []);
+
+  function cancelar() {
+    controle.current.abort();
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Pedido da Ana&lt;/h1&gt;
+      &lt;p&gt;Estado: {estado}&lt;/p&gt;
+      {estado === "cancelado" &amp;&amp; &lt;p&gt;Motivo: {motivo}&lt;/p&gt;}
+      &lt;button onClick={cancelar}&gt;Desistir&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Pedido da Ana&lt;/h1&gt;
+  &lt;p&gt;Estado: carregando&lt;/p&gt;
+  &lt;button&gt;Desistir&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscar(sinal) {
+  return new Promise((ok, falha) =&gt; {
+    const id = setTimeout(() =&gt; ok(["Pão francês"]), 400);
+    sinal.addEventListener("abort", () =&gt; {
+      clearTimeout(id);
+      falha(sinal.reason);
+    });
+  });
+}
+
+function App() {
+  const [estado, setEstado] = useState("carregando");
+  const [motivo, setMotivo] = useState("");
+  const controle = useRef(null);
+
+  useEffect(() =&gt; {
+    controle.current = new AbortController();
+    buscar(controle.current.signal)
+      .then(() =&gt; setEstado("pronto"))
+      .catch((e) =&gt; {
+        setEstado("cancelado");
+        setMotivo(e.message);
+      });
+    return () =&gt; controle.current.abort();
+  }, []);
+
+  function cancelar() {
+    controle.current.abort(new DOMException("O cliente desistiu do pedido", "AbortError"));
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Pedido da Ana&lt;/h1&gt;
+      &lt;p&gt;Estado: {estado}&lt;/p&gt;
+      {estado === "cancelado" &amp;&amp; &lt;p&gt;Motivo: {motivo}&lt;/p&gt;}
+      &lt;button onClick={cancelar}&gt;Desistir&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O <code>DOMException</code> é o mesmo tipo de erro que o navegador usa, e por isso ele mantém o
+<code>name</code> igual a <code>"AbortError"</code> — importante, porque é esse nome que o código costuma
+testar. Você pode passar qualquer valor, inclusive uma string simples; nesse caso, o
+<code>signal.reason</code> é a string, e o seu <code>catch</code> precisa saber com o que está lidando.</p>
+
+<p>Uma consequência prática que vale anotar: se você personaliza o motivo, não teste apenas
+<code>e.name === "AbortError"</code>. A string que você passou não tem <code>name</code>. O teste mais
+confiável é <code>controle.signal.aborted</code> ou <code>e.name === "AbortError" || typeof e === "string"</code>.
+Simples é passar sempre um <code>DOMException</code> com nome de <code>AbortError</code>, como na caixa.</p>
+
+<h2>6. Tempo limite: o servidor que não responde</h2>
+
+<p>Tem um caso em que ninguém aperta botão nenhum: o servidor simplesmente não responde. O
+<code>fetch</code> não tem tempo limite embutido — ele espera para sempre, e a tela fica em "Carregando"
+até o fim dos tempos. Para resolver isso sem criar um controle na mão, existe o
+<code>AbortSignal.timeout</code>: ele devolve um sinal que se cancela sozinho depois do tempo dado, em
+milissegundos.</p>
+
+<div class="tryreact" data-goal="texto:Demorou demais">
+  <p class="try-task">O servidor nunca responde e a tela fica em "Carregando". Passe um sinal de tempo
+  limite: <code>buscarLento(AbortSignal.timeout(20))</code>. O erro que chega tem
+  <code>name</code> igual a <code>"TimeoutError"</code>.</p>
+  <pre class="jsx">function buscarLento(sinal) {
+  return new Promise((ok, falha) =&gt; {
+    const id = setTimeout(() =&gt; ok(["Pão francês"]), 5000);
+    if (sinal) {
+      sinal.addEventListener("abort", () =&gt; {
+        clearTimeout(id);
+        falha(sinal.reason);
+      });
+    }
+  });
+}
+
+function App() {
+  const [estado, setEstado] = useState("Carregando...");
+
+  useEffect(() =&gt; {
+    buscarLento()
+      .then(() =&gt; setEstado("Pão a caminho"))
+      .catch((e) =&gt; setEstado(e.name === "TimeoutError" ? "Demorou demais" : "Deu erro"));
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Pedido da Ana&lt;/h1&gt;
+      &lt;p&gt;{estado}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Pedido da Ana&lt;/h1&gt;
+  &lt;p&gt;Carregando...&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscarLento(sinal) {
+  return new Promise((ok, falha) =&gt; {
+    const id = setTimeout(() =&gt; ok(["Pão francês"]), 5000);
+    if (sinal) {
+      sinal.addEventListener("abort", () =&gt; {
+        clearTimeout(id);
+        falha(sinal.reason);
+      });
+    }
+  });
+}
+
+function App() {
+  const [estado, setEstado] = useState("Carregando...");
+
+  useEffect(() =&gt; {
+    buscarLento(AbortSignal.timeout(20))
+      .then(() =&gt; setEstado("Pão a caminho"))
+      .catch((e) =&gt; setEstado(e.name === "TimeoutError" ? "Demorou demais" : "Deu erro"));
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Pedido da Ana&lt;/h1&gt;
+      &lt;p&gt;{estado}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Vinte milissegundos é um tempo absurdo de curto, escolhido só para a caixa responder rápido. No projeto
+de verdade, o valor fica entre três e dez segundos — o tempo que o seu usuário aceita esperar antes de
+preferir uma mensagem de erro. E o erro que chega não é <code>AbortError</code>: é
+<code>TimeoutError</code>, com nome próprio, justamente para você poder dizer "demorou demais" em vez de
+"cancelado".</p>
+
+<pre class="term">Uncaught (in promise) DOMException: signal timed out</pre>
+
+<p>Essa mensagem aparece no console quando o sinal de tempo limite cancela e ninguém trata. Tratar é o que
+a caixa faz com o <code>catch</code> e a comparação de <code>name</code>. Se você quiser dois motivos de
+cancelamento no mesmo pedido — o botão do usuário e o tempo limite —, existe o
+<code>AbortSignal.any([sinal1, sinal2])</code>, que dispara quando qualquer um dos dois dispara.</p>
+
+<h2>7. Quando cancelar (e quando não vale a pena)</h2>
+
+<p>Cancelar tem custo de código, e não é sempre que compensa. A tabela abaixo é o resumo das situações em
+que o ganho é claro.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Cancelar o quê</th><th>Como</th></tr>
+<tr><td>busca enquanto digita</td><td>o pedido anterior, a cada letra</td><td><code>abort()</code> na limpeza do efeito</td></tr>
+<tr><td>tela trocada ou fechada</td><td>todos os pedidos daquela tela</td><td><code>abort()</code> na limpeza</td></tr>
+<tr><td>botão "desistir"</td><td>o pedido em andamento</td><td><code>abort()</code> no <code>onClick</code></td></tr>
+<tr><td>servidor lento</td><td>o pedido que passou do tempo</td><td><code>AbortSignal.timeout(ms)</code></td></tr>
+<tr><td>um pedido que já terminou</td><td>nada</td><td>o <code>abort()</code> não tem efeito</td></tr>
+</table>
+</div>
+
+<p>A última linha é tranquilizadora: chamar <code>abort()</code> depois de a resposta ter chegado não
+quebra nada. O pedido já foi, o sinal só fica marcado. Do mesmo jeito, chamar <code>abort()</code> duas
+vezes seguidas é inofensivo — o segundo não faz nada. Isso permite escrever a limpeza sem medo: ela roda
+em toda troca, mesmo quando não há nada pendente.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que chegou no <code>catch</code></th><th><code>e.name</code></th><th>O que fazer</th></tr>
+<tr><td>cancelamento do usuário</td><td><code>"AbortError"</code></td><td>não mostrar erro; voltar ao estado inicial</td></tr>
+<tr><td>tempo limite</td><td><code>"TimeoutError"</code></td><td>mensagem de demora e opção de tentar de novo</td></tr>
+<tr><td>motivo personalizado</td><td>o que você passou</td><td>usar <code>signal.aborted</code> para reconhecer</td></tr>
+<tr><td>falha de rede</td><td><code>"TypeError"</code></td><td>mensagem de conexão</td></tr>
+<tr><td>resposta 500</td><td>não é do <code>catch</code></td><td>conferir <code>resposta.ok</code> no <code>.then</code></td></tr>
+</table>
+</div>
+
+<p>Uma armadilha que fecha a seção: cancelar não é o mesmo que ignorar. Se o código só ignora a resposta
+que chega (com uma variável de controle, como a aula de limpeza mostrou), o pedido continua viajando e o
+servidor continua trabalhando. O <code>abort()</code> é a única forma de parar o trabalho no meio. Os dois
+podem conviver — um economiza a rede, o outro protege o estado —, mas o <code>abort()</code> sozinho já
+resolve a maior parte dos casos.</p>
+
+<h2>8. Detalhes que economizam depuração</h2>
+
+<p>Primeiro: um controle, um pedido. Se você usar o mesmo <code>AbortController</code> para três pedidos e
+abortar, os três param juntos — o que às vezes é exatamente o que se quer (cancelar a tela inteira). Mas se
+cada pedido precisa da sua própria vida, cada um tem o seu controle.</p>
+
+<p>Segundo: um controle abortado não é reutilizável. Depois do <code>abort()</code>, o sinal fica
+permanentemente marcado; um <code>fetch</code> novo com esse sinal falha imediatamente. Por isso o efeito
+cria um <code>new AbortController()</code> a cada execução, e não guarda um global.</p>
+
+<p>Terceiro: o momento do <code>abort()</code> importa. Se ele acontece antes de o <code>fetch</code>
+começar, a promessa já nasce rejeitada, e o <code>catch</code> roda do mesmo jeito. Isso é útil em
+formulário que valida primeiro: se o campo está vazio, cancele antes de pedir.</p>
+
+<p>Quarto: não confunda cancelar com desmontar. O React desmonta o componente quando a tela sai; a limpeza
+do efeito roda nessa hora e é o lugar natural do <code>abort()</code>. Mas o cancelamento também pode
+acontecer com a tela viva — no clique do botão, na troca do termo de busca. As duas coisas usam o mesmo
+mecanismo, e é isso que torna o <code>AbortController</code> tão útil.</p>
+
+<p>Quinto, e o mais fácil de esquecer: depois de cancelar, alguém precisa arrumar a tela. O
+<code>catch</code> do <code>AbortError</code> é o único lugar que sabe que o pedido foi cancelado, então é
+ele que deve devolver o componente ao estado inicial — "nada buscado", lista vazia, botão habilitado. Se o
+<code>catch</code> só faz <code>return</code>, o "Carregando..." fica na tela para sempre e o leitor
+conclui que o site travou.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o botão que só mudava de cor</h3>
+<p>A Ana fez o botão Cancelar trocar o estado para "cancelado" e considerou o assunto resolvido. Três
+segundos depois, a lista aparecia na tela — o pedido nunca foi interrompido e o <code>.then</code> rodou
+depois, sobrescrevendo tudo. O conserto foi chamar <code>controle.current.abort()</code> e tratar o
+<code>AbortError</code> no <code>catch</code>. Estado não fecha conexão; só o <code>abort()</code>
+fecha.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: "erro de conexão" para quem só desistiu</h3>
+<p>O cancelamento funcionava, mas a tela mostrava uma tarja vermelha dizendo que a internet tinha caído
+sempre que alguém clicava em Desistir. O <code>catch</code> tratava todo erro igual. A correção foi olhar
+<code>e.name</code> antes de decidir: <code>AbortError</code> volta para o estado inicial em silêncio;
+o resto vira mensagem. Quem cancelou sabe o que fez — não precisa ser informado de um erro que não
+existe.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o controle reaproveitado</h3>
+<p>Ela guardou o <code>AbortController</code> fora do efeito, para não criar um novo a cada busca. A
+primeira busca funcionou, o primeiro cancelamento também; da segunda em diante, todo pedido falhava na
+hora. O sinal estava marcado desde o primeiro <code>abort()</code>. A regra é simples: um controle por
+pedido, criado no mesmo lugar onde o pedido nasce.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Qual objeto é entregue ao <code>fetch</code> para
+permitir o cancelamento?</p>
+<label><input type="radio" name="q1"> o <code>AbortController</code> inteiro</label>
+<label><input type="radio" name="q1"> o <code>controle.signal</code></label>
+<label><input type="radio" name="q1"> a função <code>abort</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que acontece com o pedido quando o sinal é
+abortado?</p>
+<label><input type="radio" name="q2"> a promessa se cumpre com uma lista vazia</label>
+<label><input type="radio" name="q2"> nada: o pedido continua até o fim</label>
+<label><input type="radio" name="q2"> a promessa é rejeitada com um erro de cancelamento</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Qual é o nome do erro quando o tempo limite do
+<code>AbortSignal.timeout</code> estoura?</p>
+<label><input type="radio" name="q3"> <code>"TimeoutError"</code></label>
+<label><input type="radio" name="q3"> <code>"AbortError"</code></label>
+<label><input type="radio" name="q3"> <code>"NetworkError"</code></label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: entregando o sinal</h2>
+<p>Complete a opção do <code>fetch</code> que permite cancelar o pedido depois:</p>
+<div class="ex-code">const controle = new AbortController();
+fetch("/api/paes", { <input aria-label="resposta 1" data-answer="signal" placeholder="...">: controle.signal });</div>
+<p class="ex-dica">Dica: é a propriedade do controle que carrega o aviso de cancelamento — a mesma que
+responde <code>.aborted</code>. Depois, o cancelamento é <code>controle.abort()</code>.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Cancelar um pedido é criar um <code>AbortController</code>, passar <code>controle.signal</code> nas
+opções do <code>fetch</code> e chamar <code>controle.abort()</code> quando não interessar mais. O pedido é
+interrompido na rede, a promessa é rejeitada e o erro chega ao <code>catch</code> com
+<code>name</code> igual a <code>"AbortError"</code> — que não deve virar mensagem de erro para o
+usuário.</p>
+
+<p>O <code>abort()</code> aceita um motivo, que vira <code>signal.reason</code> e chega no erro. O motivo
+padrão é técnico e em inglês; definir o seu é o que permite mostrar "O cliente desistiu do pedido" em vez
+de "The user aborted a request". Para servidor lento, <code>AbortSignal.timeout(ms)</code> cria um sinal
+que se cancela sozinho, e o erro tem <code>name</code> <code>"TimeoutError"</code>.</p>
+
+<p>Três regras fecham a aula: um controle por pedido, criado onde o pedido nasce; um controle abortado não
+se reaproveita; e cancelar não é o mesmo que ignorar — só o <code>abort()</code> fecha a conexão. Na
+próxima aula, o que a tela mostra enquanto o pedido está no ar: estados de carregamento que não piscam nem
+mentem.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>new AbortController()</code> cria o controle; <code>.signal</code> é o que vai no <code>fetch</code>.</li>
+<li><code>abort()</code> fecha a conexão e rejeita a promessa.</li>
+<li>O erro tem <code>name</code> <code>"AbortError"</code>: não é falha, é desistência.</li>
+<li><code>abort(motivo)</code> define <code>signal.reason</code>.</li>
+<li><code>AbortSignal.timeout(ms)</code> cancela sozinho, com <code>"TimeoutError"</code>.</li>
+<li>Um controle por pedido; depois de abortado, não serve mais.</li>
+<li>Abortar duas vezes, ou depois do fim, não causa erro.</li>
+<li>Cancelar economiza rede; ignorar só economiza estado.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

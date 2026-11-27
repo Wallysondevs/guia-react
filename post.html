@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enviar Dados (POST) | Guia React</title>
+<meta name="description" content="Enviar dados com POST no React: corpo em JSON com JSON.stringify, cabeçalho Content-Type, o que o servidor responde com 201 e como ler o motivo quando a resposta é 400.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Enviar Dados <span class="hl">(POST)</span></h1>
+
+<p class="intro">Até agora o site da Ana só perguntava: qual o preço, tem pão, que horas abre. Enviar é
+outro tipo de conversa — a encomenda precisa chegar completa do outro lado, com o nome do pão, a quantidade
+e o endereço, e o servidor precisa conseguir ler tudo isso. No <code>fetch</code>, enviar quer dizer POST
+com corpo, e o corpo tem de ser texto no formato certo, com um cabeçalho avisando que formato é esse. Nesta
+aula a Ana monta a encomenda, vê o servidor recusar duas vezes por motivos diferentes e aprende a ler a
+resposta de erro que explica o que faltou.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que muda entre um GET e um POST.</li>
+  <li>Por que o corpo precisa de <code>JSON.stringify</code>.</li>
+  <li>O papel do cabeçalho <code>Content-Type</code>.</li>
+  <li>Os status de um envio: 201, 400, 415, 500.</li>
+  <li>Como ler o motivo da recusa no corpo da resposta.</li>
+  <li>Como evitar mandar o mesmo pedido duas vezes.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a encomenda no papel</h2>
+
+<p>No balcão, a encomenda é uma folha com campos preenchidos. Se faltar o nome, o atendente não adivinha; se
+o campo quantidade vier rabiscado, ele pergunta de novo. O servidor funciona igual: recebe um corpo com
+campos, confere se estão todos lá e no formato combinado, e responde dizendo se guardou ou se faltou
+alguma coisa.</p>
+
+<p>A diferença é que, no HTTP, o corpo é sempre uma sequência de bytes. O navegador não sabe que aquele
+texto é um objeto JavaScript com nome e preço — ele só sabe mandar texto. Quem transforma objeto em texto é
+o <code>JSON.stringify</code>; quem avisa o servidor de que aquele texto é JSON é o cabeçalho
+<code>Content-Type</code>. Sem os dois, a encomenda chega ilegível.</p>
+
+<p>E é por isso que os dois erros mais comuns de quem começa a enviar dados são exatamente esses: mandar o
+objeto cru e esquecer o cabeçalho. A boa notícia é que os dois têm sintoma claro — e as caixas desta aula
+mostram cada um.</p>
+
+<h2>2. GET pergunta, POST entrega</h2>
+
+<p>O método é o verbo da requisição. GET pede alguma coisa e não leva corpo: todos os dados vão na URL. POST
+entrega alguma coisa e leva corpo: os dados vão no corpo, e a URL só diz para onde enviar. PUT e PATCH também
+levam corpo; a diferença entre eles é de intenção, e a API da padaria usa POST para criar pedido.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método</th><th>Para que serve</th><th>Leva corpo?</th></tr>
+<tr><td><code>GET</code></td><td>pedir dados, sem alterar nada</td><td>não</td></tr>
+<tr><td><code>POST</code></td><td>criar algo novo (pedido, cadastro)</td><td>sim</td></tr>
+<tr><td><code>PUT</code></td><td>substituir um registro inteiro</td><td>sim</td></tr>
+<tr><td><code>PATCH</code></td><td>alterar só alguns campos</td><td>sim</td></tr>
+<tr><td><code>DELETE</code></td><td>apagar um registro</td><td>por convenção, não</td></tr>
+</table>
+</div>
+
+<p>A escolha do método não é estilo: é contrato. Ferramentas de cache, proxies e navegadores tratam GET
+como seguro para repetir e POST como não — e é por isso que um GET repetido não cria pedidos duplicados e um
+POST repetido cria.</p>
+
+<dl class="anatomy">
+<dt>método</dt>
+<dd>O verbo no objeto de opções: <code>method: "POST"</code>. Sem ele, o <code>fetch</code> usa
+GET.</dd>
+<dt>corpo</dt>
+<dd>O conteúdo enviado: <code>body</code>. Precisa ser texto (ou binário), nunca objeto.</dd>
+<dt><code>Content-Type</code></dt>
+<dd>O cabeçalho que diz o formato do corpo. Para JSON, <code>application/json</code>.</dd>
+<dt><code>JSON.stringify</code></dt>
+<dd>A função que transforma objeto em texto JSON.</dd>
+<dt>status 201</dt>
+<dd>"Criado": o servidor guardou e normalmente devolve o recurso com o id novo.</dd>
+<dt>idempotência</dt>
+<dd>A propriedade de repetir a mesma chamada sem criar duplicata. POST não é idempotente por
+natureza.</dd>
+</dl>
+
+<p>Um detalhe que confunde no começo: o POST que "dá certo" costuma devolver status 201, não 200. É o
+servidor dizendo "criei uma coisa nova". O 200 é resposta de leitura, quando nada foi criado. Se o seu
+código trata sucesso como "status === 200", ele vai considerar erro um envio bem-sucedido — o teste certo é
+<code>resposta.ok</code>, como sempre.</p>
+
+<h2>3. O corpo viaja como texto</h2>
+
+<p>A primeira tentativa da Ana mandou o objeto direto no corpo. O servidor respondeu 400 e a tela mostrou
+"Deu erro 400". O motivo: o <code>fetch</code> não converte objeto em JSON por você — ele transforma em
+texto do jeito pobre, com <code>"[object Object]"</code>, e o servidor não consegue ler nada ali.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Pão salvo">
+  <p class="try-task">O <code>body</code> recebeu o objeto <code>dados</code> e o servidor recusou com 400.
+  Converta para texto: <code>body: JSON.stringify(dados)</code>.</p>
+  <pre class="jsx">const dados = { pao: "brioche", quantidade: 2 };
+
+function enviarPedido(opcoes) {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; {
+      const cabecalhos = opcoes.headers || {};
+      if (cabecalhos["Content-Type"] !== "application/json") {
+        return ok({
+          ok: false,
+          status: 415,
+          json: () =&gt; Promise.resolve({ erro: "Content-Type precisa ser application/json" })
+        });
+      }
+      if (typeof opcoes.body !== "string") {
+        return ok({
+          ok: false,
+          status: 400,
+          json: () =&gt; Promise.resolve({ erro: "O corpo não é JSON" })
+        });
+      }
+      const recebido = JSON.parse(opcoes.body);
+      if (!recebido.pao) {
+        return ok({
+          ok: false,
+          status: 400,
+          json: () =&gt; Promise.resolve({ erro: "O nome do pão é obrigatório" })
+        });
+      }
+      ok({ ok: true, status: 201, json: () =&gt; Promise.resolve({ id: 7, pao: recebido.pao }) });
+    }, 10);
+  });
+}
+
+function App() {
+  const [recado, setRecado] = useState("");
+
+  function salvar() {
+    enviarPedido({
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: dados
+    }).then((r) =&gt; {
+      if (r.ok) setRecado("Pão salvo");
+      else setRecado("Deu erro " + r.status);
+    });
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Encomenda&lt;/h1&gt;
+      &lt;button onClick={salvar}&gt;Salvar&lt;/button&gt;
+      {recado &amp;&amp; &lt;p&gt;{recado}&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Encomenda&lt;/h1&gt;
+  &lt;button&gt;Salvar&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const dados = { pao: "brioche", quantidade: 2 };
+
+function enviarPedido(opcoes) {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; {
+      const cabecalhos = opcoes.headers || {};
+      if (cabecalhos["Content-Type"] !== "application/json") {
+        return ok({
+          ok: false,
+          status: 415,
+          json: () =&gt; Promise.resolve({ erro: "Content-Type precisa ser application/json" })
+        });
+      }
+      if (typeof opcoes.body !== "string") {
+        return ok({
+          ok: false,
+          status: 400,
+          json: () =&gt; Promise.resolve({ erro: "O corpo não é JSON" })
+        });
+      }
+      const recebido = JSON.parse(opcoes.body);
+      if (!recebido.pao) {
+        return ok({
+          ok: false,
+          status: 400,
+          json: () =&gt; Promise.resolve({ erro: "O nome do pão é obrigatório" })
+        });
+      }
+      ok({ ok: true, status: 201, json: () =&gt; Promise.resolve({ id: 7, pao: recebido.pao }) });
+    }, 10);
+  });
+}
+
+function App() {
+  const [recado, setRecado] = useState("");
+
+  function salvar() {
+    enviarPedido({
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(dados)
+    }).then((r) =&gt; {
+      if (r.ok) setRecado("Pão salvo");
+      else setRecado("Deu erro " + r.status);
+    });
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Encomenda&lt;/h1&gt;
+      &lt;button onClick={salvar}&gt;Salvar&lt;/button&gt;
+      {recado &amp;&amp; &lt;p&gt;{recado}&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Com o texto no lugar do objeto, o servidor recebe algo assim no corpo:
+<code>{"pao":"brioche","quantidade":2}</code>. É a mesma informação, em um formato que qualquer linguagem
+consegue ler. Repare que o <code>JSON.stringify</code> não "manda o objeto": ele produz uma string, e é a
+string que viaja.</p>
+
+<p>O caminho de volta é o <code>json()</code>, que a aula de fetch mostrou: texto do corpo vira objeto de
+novo. Enviar e ler são operações espelhadas, e as duas são conversão de formato, não mágica.</p>
+
+<h2>4. O cabeçalho que diz o que é</h2>
+
+<p>Texto no corpo pode ser JSON, formulário, XML ou uma poesia. O servidor não adivinha: ele confia no
+cabeçalho <code>Content-Type</code>. Sem esse cabeçalho, uma API cuidadosa responde 415 — "tipo de mídia
+não suportado" —, mesmo que o corpo esteja perfeito.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Pão salvo">
+  <p class="try-task">O corpo já vai como JSON, mas falta avisar o formato: o servidor respondeu 415.
+  Acrescente <code>headers: { "Content-Type": "application/json" }</code> nas opções.</p>
+  <pre class="jsx">function enviarPedido(opcoes) {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; {
+      const cabecalhos = opcoes.headers || {};
+      if (cabecalhos["Content-Type"] !== "application/json") {
+        return ok({
+          ok: false,
+          status: 415,
+          json: () =&gt; Promise.resolve({ erro: "Content-Type precisa ser application/json" })
+        });
+      }
+      if (typeof opcoes.body !== "string") {
+        return ok({
+          ok: false,
+          status: 400,
+          json: () =&gt; Promise.resolve({ erro: "O corpo não é JSON" })
+        });
+      }
+      const recebido = JSON.parse(opcoes.body);
+      if (!recebido.pao) {
+        return ok({
+          ok: false,
+          status: 400,
+          json: () =&gt; Promise.resolve({ erro: "O nome do pão é obrigatório" })
+        });
+      }
+      ok({ ok: true, status: 201, json: () =&gt; Promise.resolve({ id: 7, pao: recebido.pao }) });
+    }, 10);
+  });
+}
+
+function App() {
+  const [recado, setRecado] = useState("");
+
+  function salvar() {
+    enviarPedido({
+      method: "POST",
+      body: JSON.stringify({ pao: "brioche" })
+    }).then((r) =&gt; {
+      if (r.ok) setRecado("Pão salvo");
+      else setRecado("Deu erro " + r.status);
+    });
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Encomenda&lt;/h1&gt;
+      &lt;button onClick={salvar}&gt;Salvar&lt;/button&gt;
+      {recado &amp;&amp; &lt;p&gt;{recado}&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Encomenda&lt;/h1&gt;
+  &lt;button&gt;Salvar&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function enviarPedido(opcoes) {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; {
+      const cabecalhos = opcoes.headers || {};
+      if (cabecalhos["Content-Type"] !== "application/json") {
+        return ok({
+          ok: false,
+          status: 415,
+          json: () =&gt; Promise.resolve({ erro: "Content-Type precisa ser application/json" })
+        });
+      }
+      if (typeof opcoes.body !== "string") {
+        return ok({
+          ok: false,
+          status: 400,
+          json: () =&gt; Promise.resolve({ erro: "O corpo não é JSON" })
+        });
+      }
+      const recebido = JSON.parse(opcoes.body);
+      if (!recebido.pao) {
+        return ok({
+          ok: false,
+          status: 400,
+          json: () =&gt; Promise.resolve({ erro: "O nome do pão é obrigatório" })
+        });
+      }
+      ok({ ok: true, status: 201, json: () =&gt; Promise.resolve({ id: 7, pao: recebido.pao }) });
+    }, 10);
+  });
+}
+
+function App() {
+  const [recado, setRecado] = useState("");
+
+  function salvar() {
+    enviarPedido({
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pao: "brioche" })
+    }).then((r) =&gt; {
+      if (r.ok) setRecado("Pão salvo");
+      else setRecado("Deu erro " + r.status);
+    });
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Encomenda&lt;/h1&gt;
+      &lt;button onClick={salvar}&gt;Salvar&lt;/button&gt;
+      {recado &amp;&amp; &lt;p&gt;{recado}&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>As duas exigências andam juntas e o nome é o mesmo: o <code>Content-Type</code> é
+<code>application/json</code> e o corpo é JSON de verdade. Mandar um sem o outro é como escrever a carta e
+esquecer o envelope com o endereço.</p>
+
+<p>Existem outros formatos, e cada um tem o seu cabeçalho. Formulário tradicional vai como
+<code>multipart/form-data</code> (é o que o <code>FormData</code> produz, e o navegador monta o cabeçalho
+sozinho). Arquivo binário vai como <code>application/octet-stream</code>. Texto puro, como
+<code>text/plain</code>. Se você usa <code>FormData</code>, nunca defina o <code>Content-Type</code> na mão:
+o navegador precisa incluir o separador entre os campos, e só ele sabe fazer isso.</p>
+
+<h2>5. O que o servidor responde</h2>
+
+<p>Um envio aceito devolve 201 e, nas APIs bem feitas, o recurso criado no corpo — com o id novo. Esse id é
+ouro: é com ele que você monta o próximo pedido ("acompanhar a encomenda 7") e é ele que o suporte vai pedir
+quando algo der errado.</p>
+
+<pre class="term">POST https://loja.test/api/pedidos   201 (Created)   12 ms</pre>
+
+<p>Um envio recusado devolve 4xx, e o corpo costuma explicar o motivo. É a parte que muita gente ignora: o
+código mostra "deu erro" e joga fora a única informação útil que o servidor mandou. No console, a recusa
+aparece assim:</p>
+
+<pre class="term">Failed to load resource: the server responded with a status of 400 (Bad Request)</pre>
+
+<p>O console diz que houve 400, mas não diz por quê. O porquê está no corpo —
+<code>{"erro":"O nome do pão é obrigatório"}</code> — e para lê-lo é preciso chamar <code>json()</code>
+mesmo quando a resposta é de erro. A caixa abaixo faz exatamente isso.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:O nome do pão é obrigatório">
+  <p class="try-task">O servidor recusou por falta do nome do pão e explicou no corpo, mas a tela só diz
+  "Deu erro 400". Leia o corpo da resposta de erro e mostre o campo <code>erro</code>.</p>
+  <pre class="jsx">function enviarPedido(opcoes) {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; {
+      const cabecalhos = opcoes.headers || {};
+      if (cabecalhos["Content-Type"] !== "application/json") {
+        return ok({
+          ok: false,
+          status: 415,
+          json: () =&gt; Promise.resolve({ erro: "Content-Type precisa ser application/json" })
+        });
+      }
+      if (typeof opcoes.body !== "string") {
+        return ok({
+          ok: false,
+          status: 400,
+          json: () =&gt; Promise.resolve({ erro: "O corpo não é JSON" })
+        });
+      }
+      const recebido = JSON.parse(opcoes.body);
+      if (!recebido.pao) {
+        return ok({
+          ok: false,
+          status: 400,
+          json: () =&gt; Promise.resolve({ erro: "O nome do pão é obrigatório" })
+        });
+      }
+      ok({ ok: true, status: 201, json: () =&gt; Promise.resolve({ id: 7, pao: recebido.pao }) });
+    }, 10);
+  });
+}
+
+function App() {
+  const [recado, setRecado] = useState("");
+
+  function salvar() {
+    enviarPedido({
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pao: "" })
+    }).then((r) =&gt; {
+      if (r.ok) setRecado("Pão salvo");
+      else setRecado("Deu erro " + r.status);
+    });
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Encomenda&lt;/h1&gt;
+      &lt;button onClick={salvar}&gt;Salvar&lt;/button&gt;
+      {recado &amp;&amp; &lt;p&gt;{recado}&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Encomenda&lt;/h1&gt;
+  &lt;button&gt;Salvar&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function enviarPedido(opcoes) {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; {
+      const cabecalhos = opcoes.headers || {};
+      if (cabecalhos["Content-Type"] !== "application/json") {
+        return ok({
+          ok: false,
+          status: 415,
+          json: () =&gt; Promise.resolve({ erro: "Content-Type precisa ser application/json" })
+        });
+      }
+      if (typeof opcoes.body !== "string") {
+        return ok({
+          ok: false,
+          status: 400,
+          json: () =&gt; Promise.resolve({ erro: "O corpo não é JSON" })
+        });
+      }
+      const recebido = JSON.parse(opcoes.body);
+      if (!recebido.pao) {
+        return ok({
+          ok: false,
+          status: 400,
+          json: () =&gt; Promise.resolve({ erro: "O nome do pão é obrigatório" })
+        });
+      }
+      ok({ ok: true, status: 201, json: () =&gt; Promise.resolve({ id: 7, pao: recebido.pao }) });
+    }, 10);
+  });
+}
+
+function App() {
+  const [recado, setRecado] = useState("");
+
+  function salvar() {
+    enviarPedido({
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pao: "" })
+    }).then((r) =&gt; {
+      if (r.ok) setRecado("Pão salvo");
+      else r.json().then((dados) =&gt; setRecado(dados.erro));
+    });
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Encomenda&lt;/h1&gt;
+      &lt;button onClick={salvar}&gt;Salvar&lt;/button&gt;
+      {recado &amp;&amp; &lt;p&gt;{recado}&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A resposta de erro tem o mesmo formato da resposta de sucesso, e é isso que permite tratá-la do mesmo
+jeito: conferir <code>ok</code>, ler o corpo, decidir. Quando o servidor devolve
+<code>{"erro": "..."}</code>, mostre esse texto — é ele que diz ao cliente que faltou o nome do pão, em vez
+de um "erro 400" que ninguém entende.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Status</th><th>Significado</th><th>O que fazer</th></tr>
+<tr><td>201</td><td>criado</td><td>mostrar sucesso e guardar o <code>id</code> devolvido</td></tr>
+<tr><td>400</td><td>dados inválidos ou incompletos</td><td>ler <code>dados.erro</code> e mostrar ao usuário</td></tr>
+<tr><td>401 / 403</td><td>não autenticado ou sem permissão</td><td>pedir login ou explicar a restrição</td></tr>
+<tr><td>409</td><td>conflito (pedido repetido)</td><td>avisar que já existe</td></tr>
+<tr><td>415</td><td>formato não suportado</td><td>conferir o <code>Content-Type</code></td></tr>
+<tr><td>500</td><td>erro no servidor</td><td>mensagem genérica e registro no console</td></tr>
+</table>
+</div>
+
+<h2>6. O formulário e a página que recarrega</h2>
+
+<p>Em React, o envio costuma sair de um formulário. Se você deixar o comportamento padrão, o navegador envia
+o formulário do jeito antigo e recarrega a página — o que apaga o estado, perde a lista e faz o componente
+começar do zero. A prevenção é uma linha:</p>
+
+<pre class="file" data-file="formulario.jsx">function enviar(evento) {
+  evento.preventDefault();
+  salvar();
+}
+
+return (
+  &lt;form onSubmit={enviar}&gt;
+    &lt;input value={pao} onChange={(e) =&gt; setPao(e.target.value)} /&gt;
+    &lt;button type="submit"&gt;Encomendar&lt;/button&gt;
+  &lt;/form&gt;
+);</pre>
+
+<p>O <code>evento.preventDefault()</code> diz ao navegador "eu cuido disso". Sem ele, a página recarrega e
+você perde o estado do componente: campos voltam vazios, a mensagem de sucesso some, e a impressão é de que
+o envio não funcionou. Também vale saber que o botão dentro do formulário precisa de
+<code>type="submit"</code> — e que um botão sem tipo dentro de um formulário já se comporta como submit, o
+que às vezes envia sem querer.</p>
+
+<p>Depois do sucesso, três coisas costumam acontecer: limpar o formulário, mostrar o número da encomenda e
+atualizar a lista. Limpar é <code>setPao("")</code>; mostrar, uma mensagem com o <code>id</code>; atualizar,
+um novo GET — ou, melhor ainda, acrescentar o que voltou do servidor à lista que já está na tela.</p>
+
+<h2>7. Não mandar duas vezes</h2>
+
+<p>POST cria coisas, e criar duas vezes é criar duas coisas. O cuidado começa na tela: desabilitar o botão
+enquanto o pedido está no ar resolve o clique duplo. Mas ele não resolve a retentativa automática, o
+navegador reenviando depois de uma queda, ou o usuário tocando duas vezes em duas abas. Contra isso existe
+uma proteção do lado do servidor, e é bom saber que ela existe:</p>
+
+<dl class="anatomy">
+<dt>chave de idempotência</dt>
+<dd>Um identificador único que o seu código manda no cabeçalho. Se o mesmo identificador chegar duas vezes,
+o servidor devolve o primeiro resultado em vez de criar outro.</dd>
+<dt>duplo envio</dt>
+<dd>Dois pedidos iguais por clique duplo ou retentativa. O sintoma é a encomenda duplicada na listagem.</dd>
+<dt>retentativa segura</dt>
+<dd>Tentar de novo só quando a operação pode ser repetida sem efeito colateral extra.</dd>
+</dl>
+
+<p>No navegador, a parte que está ao seu alcance é simples: estado de envio que desabilita o botão, e nenhuma
+retentativa automática em POST sem antes conversar com quem fez a API. Se a sua API não tem chave de
+idempotência, tentar de novo depois de um tempo limite pode duplicar o pedido — e aí o erro menor vira o
+maior.</p>
+
+<h2>8. Cancelar um envio</h2>
+
+<p>A aula de cancelamento mostrou o <code>signal</code>; em POST ele funciona igual, mas o efeito prático é
+diferente. Cancelar do lado do navegador fecha a conexão, e o servidor pode já ter gravado o pedido. Ou seja:
+cancelar não desfaz a escrita. Se o usuário desiste no meio do envio, a tela deve dizer algo honesto —
+"cancelamos o envio; se o pedido aparecer na lista, não é duplicata" — em vez de fingir que nada
+aconteceu.</p>
+
+<p>Por isso, em escrita, o cancelamento costuma ser usado em outro lugar: quando a tela é desmontada e o
+pedido não faz mais sentido, ou quando o mesmo formulário é enviado duas vezes e o primeiro pedido já não
+interessa. Na dúvida, prefira deixar terminar e perguntar depois.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a encomenda vazia</h3>
+<p>A Ana mandou o objeto cru no corpo e o servidor respondeu 400. No painel de rede, o corpo enviado aparecia
+como <code>[object Object]</code> — o navegador convertendo o objeto do jeito genérico. O conserto foi
+<code>JSON.stringify</code>; o hábito que evita é o mesmo: antes de enviar, imprima o corpo no console e veja
+se ele é texto JSON de verdade.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o pedido que chegou duas vezes</h3>
+<p>A cliente tocou duas vezes no botão, o envio demorou e dois pedidos foram criados. A tela não desabilitava
+o botão durante o envio. A correção foi <code>disabled={enviando}</code> com o rótulo "Enviando...", e a
+padaria passou a conferir duplicatas pelo nome e telefone enquanto a API não tivesse chave de
+idempotência.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o erro que não dizia nada</h3>
+<p>O servidor recusou porque o endereço não tinha número, e a tela mostrou "Deu erro 400". Ninguém sabia o
+que corrigir. A mudança foi ler o corpo da resposta de erro e exibir o campo <code>erro</code>. Vale
+lembrar: a mensagem do servidor é escrita por quem conhece a regra — use a dela antes de inventar a
+sua.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que vai no corpo de um POST?</p>
+<label><input type="radio" name="q1"> o objeto JavaScript, como está na memória</label>
+<label><input type="radio" name="q1"> texto, normalmente JSON produzido por <code>JSON.stringify</code></label>
+<label><input type="radio" name="q1"> a URL com os campos em sequência</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Qual cabeçalho avisa que o corpo é JSON?</p>
+<label><input type="radio" name="q2"> <code>Accept: json</code></label>
+<label><input type="radio" name="q2"> <code>method: "POST"</code></label>
+<label><input type="radio" name="q2"> <code>Content-Type: application/json</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Onde está o motivo de uma recusa 400?</p>
+<label><input type="radio" name="q3"> no corpo da resposta, lido com <code>json()</code></label>
+<label><input type="radio" name="q3"> no <code>.catch</code>, junto com o erro de rede</label>
+<label><input type="radio" name="q3"> no título da página</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a encomenda em texto</h2>
+<p>Complete o corpo do envio, convertendo o objeto para JSON:</p>
+<div class="ex-code">fetch("/api/pedidos", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: <input aria-label="resposta 1" data-answer="JSON.stringify" placeholder="...">(pedido)
+});</div>
+<p class="ex-dica">Dica: é a função que transforma objeto em texto JSON, com o nome em maiúsculas no começo.
+Sem ela, o servidor recebe <code>[object Object]</code>.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Enviar dados é POST com três peças: <code>method</code>, <code>headers</code> com
+<code>Content-Type: application/json</code> e <code>body</code> como texto, produzido por
+<code>JSON.stringify</code>. Objeto no corpo vira <code>[object Object]</code> e o servidor recusa; cabeçalho
+faltando vira 415.</p>
+
+<p>Sucesso costuma ser 201, com o recurso criado no corpo — guarde o <code>id</code>. Recusa é 4xx com o
+motivo no corpo: leia com <code>json()</code> e mostre o texto do servidor, porque ele explica o que faltou
+melhor do que qualquer mensagem genérica. Erro 500 é do servidor, e aí a mensagem é sua.</p>
+
+<p>No formulário, <code>evento.preventDefault()</code> evita a recarga; no botão,
+<code>disabled</code> evita o envio duplo. E cancelar não desfaz uma escrita: em POST, prefira deixar
+terminar a interromper no meio. Na próxima aula, o formato que está no meio de tudo isso: o JSON, com suas
+regras, seus erros de vírgula e o ida e volta entre texto e objeto.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>POST leva corpo; GET leva tudo na URL.</li>
+<li><code>body</code> é texto: use <code>JSON.stringify</code>.</li>
+<li><code>Content-Type: application/json</code> avisa o formato.</li>
+<li>201 é sucesso de criação; confira com <code>resposta.ok</code>.</li>
+<li>O motivo da recusa está no corpo, com <code>json()</code>.</li>
+<li><code>evento.preventDefault()</code> evita a página recarregar.</li>
+<li><code>disabled</code> no botão evita o envio duplo.</li>
+<li>Cancelar não desfaz o que o servidor já gravou.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

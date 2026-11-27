@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API Local | Guia React</title>
+<meta name="description" content="API local no React: funções que imitam o servidor, base de dados em memória, erro simulado e a troca pelo fetch de verdade sem mexer na tela.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>API <span class="hl">local</span></h1>
+<p class="intro">A Ana precisa cadastrar os pães da vitrine pelo próprio site: nome, preço, se está quente.
+O servidor da padaria só fica pronto no mês que vem — e ela tem feira no sábado. A saída não é esperar nem
+inventar dados em cada componente: é escrever, dentro do projeto, uma camada que <em>faz o papel</em> do
+servidor. Ela responde com atraso, guarda o que foi cadastrado, sabe recusar nome repetido, e tem as mesmas
+funções que a API de verdade vai ter. É a API local.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma API local e por que ela não é “dado falso”.</li>
+  <li>Como a tela pede dados sem saber de onde eles vêm.</li>
+  <li>Uma base de dados em memória, com listar e criar.</li>
+  <li>Como simular o erro que o servidor devolveria — 409, nome repetido.</li>
+  <li>Por que o atraso artificial de 10 ms faz parte do exercício.</li>
+  <li>O que muda quando a API de verdade chega: só um arquivo.</li>
+  <li>O que a API local não resolve, e é bom saber desde já.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o servidor que ainda não existe</h2>
+
+<p>Sem servidor, o caminho natural é cada componente carregar os próprios dados. A vitrine tem uma lista de
+pães escrita no arquivo; o painel tem outra; o carrinho tem uma terceira. A Ana cadastra um pão novo e
+precisa editar três lugares — e, claro, esquece um.</p>
+
+<pre class="file" data-file="App.jsx">function Vitrine() {
+  const paes = ["pão francês", "brioche"];
+  return &lt;ul&gt;{paes.map((p) =&gt; &lt;li key={p}&gt;{p}&lt;/li&gt;)}&lt;/ul&gt;;
+}
+
+function Painel() {
+  const paes = ["pão francês", "brioche", "sonho"];
+  return &lt;p&gt;{paes.length} pães cadastrados&lt;/p&gt;;
+}</pre>
+
+<p>Aqui já há um problema antes de qualquer servidor: não existe uma fonte da verdade. Cada componente tem
+a sua, e elas discordam — a vitrine mostra dois pães, o painel conta três. A API local resolve isso do jeito
+que o servidor resolveria: um lugar só guarda os dados, e todo mundo pergunta para esse lugar.</p>
+
+<h2>2. O que é uma API local</h2>
+
+<p>“API” é o conjunto de funções que um programa oferece para outros programas conversarem com ele. Quando
+o servidor existir, a vitrine vai chamar <code>fetch("https://loja.test/api/paes")</code> e receber um JSON.
+Enquanto ele não existe, a vitrine chama <code>listarPaes()</code> — uma função do próprio projeto que
+devolve os mesmos dados, no mesmo formato.</p>
+
+<p>A palavra “local” quer dizer “roda junto com o site, no navegador”, e não “falsa”. A diferença está no
+endereço: em vez de atravessar a internet, a resposta nasce dentro do arquivo <code>api.js</code>. O que
+importa é o <em>contrato</em>: quais funções existem, o que elas recebem, o que devolvem e que erros podem
+dar. Se o contrato for igual ao do servidor futuro, trocar um pelo outro é trabalho de meia hora.</p>
+
+<dl class="anatomy">
+<dt>API</dt>
+<dd>Conjunto de funções com que um sistema conversa com outro. Aqui, as funções que falam com os dados dos
+pães.</dd>
+<dt>contrato</dt>
+<dd>O que cada função promete: nome, o que recebe, o que devolve e que erro pode lançar. É o que permite
+trocar a implementação sem mexer em quem chama.</dd>
+<dt>base</dt>
+<dd>A lista de dados em memória — o array que faz o papel de tabela do banco. Vive enquanto a página
+estiver aberta.</dd>
+<dt>simular</dt>
+<dd>Reproduzir de propósito as condições do servidor: atraso, erro, validação. Sem isso, o código só é
+testado no cenário fácil.</dd>
+<dt>409</dt>
+<dd>O número que um servidor devolve quando o dado conflita com outro que já existe — nome repetido, por
+exemplo.</dd>
+</dl>
+
+<h2>3. A tela pede, a API responde</h2>
+
+<p>O primeiro passo é tirar os dados de dentro do componente. A tela deixa de saber onde os pães estão
+guardados e passa a perguntar; quem sabe é a função. Isso dá um pouco mais de código agora e muito menos
+depois.</p>
+
+<div class="tryreact" data-goal="conta:.paes li=3;;texto:pão de queijo">
+  <p class="try-task">A vitrine tem a lista escrita à mão e mostra um pão só. Use a função
+  <code>listarPaes()</code> dentro do efeito para a tela refletir a base da API local — três pães, incluindo
+  o <strong>pão de queijo</strong>.</p>
+  <pre class="jsx">const base = ["pão francês", "brioche", "pão de queijo"];
+
+function listarPaes() {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok([...base]), 0));
+}
+
+function App() {
+  const [paes, setPaes] = useState([]);
+
+  useEffect(() =&gt; {
+    setPaes(["pão francês"]);
+  }, []);
+
+  return &lt;ul className="paes"&gt;{paes.map((p) =&gt; &lt;li key={p}&gt;{p}&lt;/li&gt;)}&lt;/ul&gt;;
+}</pre>
+  <pre class="out">
+&lt;ul class="paes"&gt;
+  &lt;li&gt;pão francês&lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">const base = ["pão francês", "brioche", "pão de queijo"];
+
+function listarPaes() {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok([...base]), 0));
+}
+
+function App() {
+  const [paes, setPaes] = useState([]);
+
+  useEffect(() =&gt; {
+    listarPaes().then((lista) =&gt; setPaes(lista));
+  }, []);
+
+  return &lt;ul className="paes"&gt;{paes.map((p) =&gt; &lt;li key={p}&gt;{p}&lt;/li&gt;)}&lt;/ul&gt;;
+}</pre>
+</div>
+
+<p>Repare no <code>[...base]</code> dentro de <code>listarPaes</code>. Ele devolve uma cópia, e não o array
+original. Isso é imitação de servidor, não preciosismo: quando a resposta vem pela rede, ela é sempre uma
+cópia — mexer nela não mexe no servidor. Se a API local devolvesse o array interno, o componente poderia
+alterar a base sem pedir, e o dia da troca pelo <code>fetch</code> seria um festival de bugs.</p>
+
+<h2>4. A base em memória</h2>
+
+<p>Guardar é a segunda função do contrato. <code>criarPao(nome)</code> recebe o nome, acrescenta na base e
+devolve o pão criado, já com identificador — é o que um servidor faria. A base é um array no topo do
+arquivo, fora de qualquer componente, para que todas as telas vejam o mesmo conteúdo.</p>
+
+<div class="tryreact" data-goal="digite:#nome=croissant;;clique:#cadastrar;;conta:.paes li=2;;texto:croissant">
+  <p class="try-task">A função <code>criarPao</code> responde como se tivesse gravado, mas não grava nada.
+  Acrescente o pão na base antes de resolver a Promise: depois de cadastrar <strong>croissant</strong>, a
+  lista tem de mostrar dois pães.</p>
+  <pre class="jsx">const base = ["pão francês"];
+
+function listarPaes() {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok([...base]), 0));
+}
+
+function criarPao(nome) {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok({ nome: nome }), 0));
+}
+
+function App() {
+  const [nome, setNome] = useState("");
+  const [paes, setPaes] = useState(base);
+
+  function cadastrar() {
+    criarPao(nome).then(() =&gt; listarPaes().then((lista) =&gt; setPaes(lista)));
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;input id="nome" value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+      &lt;button id="cadastrar" onClick={cadastrar}&gt;cadastrar&lt;/button&gt;
+      &lt;ul className="paes"&gt;{paes.map((p) =&gt; &lt;li key={p}&gt;{p}&lt;/li&gt;)}&lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input id="nome" value=""&gt;
+  &lt;button id="cadastrar"&gt;cadastrar&lt;/button&gt;
+  &lt;ul class="paes"&gt;
+    &lt;li&gt;pão francês&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const base = ["pão francês"];
+
+function listarPaes() {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok([...base]), 0));
+}
+
+function criarPao(nome) {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; {
+    base.push(nome);
+    ok({ nome: nome });
+  }, 0));
+}
+
+function App() {
+  const [nome, setNome] = useState("");
+  const [paes, setPaes] = useState(base);
+
+  function cadastrar() {
+    criarPao(nome).then(() =&gt; listarPaes().then((lista) =&gt; setPaes(lista)));
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;input id="nome" value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+      &lt;button id="cadastrar" onClick={cadastrar}&gt;cadastrar&lt;/button&gt;
+      &lt;ul className="paes"&gt;{paes.map((p) =&gt; &lt;li key={p}&gt;{p}&lt;/li&gt;)}&lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A sequência do <code>cadastrar</code> é a sequência de qualquer servidor: mandar, esperar a confirmação,
+pedir a lista de novo. Poderia ser mais econômico — usar o pão devolvido e acrescentar na tela —, e seria
+ótimo para a sensação de velocidade; é exatamente o assunto da aula de
+<a href="atualizacao-otimista.html">atualização otimista</a>. Para a API local, o importante é o
+<code>listarPaes()</code> no fim: a tela fica sincronizada com a fonte da verdade, e não com o que ela acha
+que aconteceu.</p>
+
+<h2>5. Erro de propósito: a validação que o servidor faria</h2>
+
+<p>Um servidor de verdade não aceita dois pães com o mesmo nome. Ele responde 409 e a tela mostra a
+mensagem. Se a API local aceita tudo, o código de tela nunca exercita o caminho do erro — e no dia da troca
+aparece uma tela quebrada em produção.</p>
+
+<p>Simular validação é fácil: antes de gravar, olhe a base; se o nome já está lá, rejeite a Promise com um
+erro que traga a mensagem combinada. Quem chama trata com <code>catch</code>, como trataria o erro do
+<code>fetch</code>.</p>
+
+<div class="tryreact" data-goal="digite:#nome=brioche;;clique:#cadastrar;;conta:.paes li=2;;texto:409: já existe um pão com esse nome">
+  <p class="try-task">A API local aceita pão repetido. Faça <code>criarPao</code> recusar nome que já está na
+  base, rejeitando com a mensagem <strong>409: já existe um pão com esse nome</strong>. Cadastre
+  <strong>brioche</strong> e confira: a lista continua com dois pães e a mensagem aparece.</p>
+  <pre class="jsx">const base = ["pão francês", "brioche"];
+
+function listarPaes() {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok([...base]), 0));
+}
+
+function criarPao(nome) {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; {
+    base.push(nome);
+    ok({ nome: nome });
+  }, 0));
+}
+
+function App() {
+  const [nome, setNome] = useState("");
+  const [paes, setPaes] = useState(base);
+  const [aviso, setAviso] = useState("");
+
+  function cadastrar() {
+    criarPao(nome)
+      .then(() =&gt; listarPaes().then((lista) =&gt; { setPaes(lista); setAviso(""); }))
+      .catch((e) =&gt; setAviso(e.message));
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;input id="nome" value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+      &lt;button id="cadastrar" onClick={cadastrar}&gt;cadastrar&lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;ul className="paes"&gt;{paes.map((p) =&gt; &lt;li key={p}&gt;{p}&lt;/li&gt;)}&lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input id="nome" value=""&gt;
+  &lt;button id="cadastrar"&gt;cadastrar&lt;/button&gt;
+  &lt;p&gt;&lt;/p&gt;
+  &lt;ul class="paes"&gt;
+    &lt;li&gt;pão francês&lt;/li&gt;
+    &lt;li&gt;brioche&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const base = ["pão francês", "brioche"];
+
+function listarPaes() {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok([...base]), 0));
+}
+
+function criarPao(nome) {
+  return new Promise((ok, erro) =&gt; setTimeout(() =&gt; {
+    if (base.includes(nome)) {
+      erro(new Error("409: já existe um pão com esse nome"));
+      return;
+    }
+    base.push(nome);
+    ok({ nome: nome });
+  }, 0));
+}
+
+function App() {
+  const [nome, setNome] = useState("");
+  const [paes, setPaes] = useState(base);
+  const [aviso, setAviso] = useState("");
+
+  function cadastrar() {
+    criarPao(nome)
+      .then(() =&gt; listarPaes().then((lista) =&gt; { setPaes(lista); setAviso(""); }))
+      .catch((e) =&gt; setAviso(e.message));
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;input id="nome" value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+      &lt;button id="cadastrar" onClick={cadastrar}&gt;cadastrar&lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;ul className="paes"&gt;{paes.map((p) =&gt; &lt;li key={p}&gt;{p}&lt;/li&gt;)}&lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Note que o componente mudou <strong>zero</strong> linha para a validação existir. Ele já tinha o
+<code>catch</code>, já mostrava a mensagem; quem ganhou regra foi a API. Essa é a vantagem de ter o contrato
+num lugar só: o comportamento novo entra na camada de dados e a tela continua a mesma.</p>
+
+<h2>6. O atraso artificial</h2>
+
+<p>Todas as funções da API local devolvem Promise resolvida depois de um tempinho. Poderia ser instantâneo,
+e o código funcionaria — mas o aprendizado seria incompleto. Com <code>setTimeout</code> de 0 a 10
+milissegundos, você é obrigado a escrever o <code>then</code> ou o <code>await</code>, exatamente como
+escreveria com servidor de verdade.</p>
+
+<pre class="file" data-file="api.js">const ATRASO = 10;
+
+function listarPaes() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok([...base]), ATRASO);
+  });
+}</pre>
+
+<p>O valor do <code>ATRASO</code> fica numa constante com nome, e não espalhado. Na vida real de quem
+desenvolve, esse número costuma ser maior no começo do projeto: quinhentos milissegundos para você sentir a
+tela de carregando, trezentos para ver o botão desabilitado, dois segundos para descobrir que falta um
+indicador de progresso. Simular lentidão é um favor que você faz a si mesmo — e a lista de estados de
+carregamento da aula de <a href="carregando-e-erro.html">carregando e erro</a> só faz sentido se existir
+algo lento para esperar.</p>
+
+<p>Um cuidado com atraso grande: ele atrapalha os testes automáticos, que têm limite de tempo. Por isso os
+exemplos deste guia usam zero ou dez milissegundos, e o número maior é sugerido no comentário, para você
+experimentar com a mão.</p>
+
+<p>Vale também uma função de leitura por identificador, <code>buscarPao(nome)</code>, que devolve o pão ou
+<code>null</code>. Ela parece redundante com <code>listarPaes</code> e não é: o servidor de verdade vai ter
+um endpoint barato para isso, e o componente que precisa de um pão só não deve baixar a lista inteira. Cada
+função da camada é uma promessa de que aquele dado existe e é buscável — e promessa que a tela já usa hoje
+não vira surpresa amanhã.</p>
+
+<h2>7. A API local e a API de verdade</h2>
+
+<p>A graça da camada é a troca. Quando o servidor ficar pronto, o arquivo <code>api.js</code> muda por
+dentro e as funções continuam com o mesmo nome e o mesmo formato de retorno. A tabela mostra o antes e o
+depois:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Hoje, local</th><th>Amanhã, com servidor</th></tr>
+<tr><td><code>listarPaes()</code></td><td>devolve <code>[...base]</code> depois de 10 ms</td><td><code>fetch("/api/paes").then((r) =&gt; r.json())</code></td></tr>
+<tr><td><code>criarPao(nome)</code></td><td><code>base.push</code> e resolve com o pão</td><td><code>fetch</code> com <code>POST</code> e <code>JSON.stringify</code></td></tr>
+<tr><td><code>apagarPao(nome)</code></td><td><code>base.splice</code> e resolve</td><td><code>fetch</code> com <code>DELETE</code></td></tr>
+<tr><td>erro de nome repetido</td><td><code>erro(new Error("409: …"))</code></td><td>o servidor responde 409 e a tela lê a mensagem do corpo</td></tr>
+<tr><td>atraso</td><td><code>setTimeout</code> de 10 ms</td><td>o tempo da rede, que ninguém controla</td></tr>
+</table>
+</div>
+
+<p>O ponto delicado da troca é o erro. Na versão local, o erro chega como exceção (Promise rejeitada). Na
+versão real, o <code>fetch</code> <em>não</em> rejeita quando o servidor responde 409: ele resolve com uma
+resposta cujo <code>status</code> é 409, e o corpo traz a mensagem. Quem escreveu a camada com cuidado
+esconde essa diferença: a função <code>criarPao</code> do servidor real confere o <code>status</code> e
+lança o erro, para que a tela continue só com o <code>catch</code>. É por isso que a camada de dados vale a
+pena mesmo quando o servidor já existe.</p>
+
+<h2>8. O que a API local não resolve</h2>
+
+<p>A lista do que ela <em>não</em> faz é tão útil quanto a do que faz. Ela é memória de navegador: some ao
+recarregar a página, não é vista pela Ana no celular, não sobrevive a duas abas abertas ao mesmo tempo.
+Também não valida de verdade — qualquer pessoa com o console aberto pode chamar <code>base.push</code>. E
+não protege dado nenhum: não há login, não há permissão, não há registro de quem fez o quê.</p>
+
+<p>Para o que ela serve, nada disso atrapalha: desenvolver a tela antes do servidor, testar estados de erro,
+combinar o contrato com quem vai escrever o back-end, e ensinar o caminho dos dados sem depender de rede.
+Para o que não serve, é bom saber antes: não use API local para guardar o que precisa durar — para isso
+existe <a href="localStorage.html">localStorage</a>, e mesmo ele é só do navegador.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você vê</th><th>Causa provável</th><th>Conserto</th></tr>
+<tr><td>dados somem ao recarregar</td><td>base em memória, como esperado</td><td>gravar em <code>localStorage</code> ou esperar o servidor</td></tr>
+<tr><td>duas abas com listas diferentes</td><td>cada aba tem a própria base</td><td>servidor, ou sincronizar pelo <code>storage</code></td></tr>
+<tr><td>componente altera a base sem chamar a API</td><td>a API devolveu o array original</td><td>devolver cópia: <code>[...base]</code></td></tr>
+<tr><td>erro do servidor não aparece na tela</td><td><code>fetch</code> não rejeita em 409</td><td>conferir <code>resposta.ok</code> dentro da camada</td></tr>
+<tr><td>tela quebra só em produção</td><td>API local aceita tudo; nunca testou erro</td><td>simular validação e falha na versão local</td></tr>
+</table>
+</div>
+
+<pre class="term">console: lista de pães: ["pão francês","brioche"]</pre>
+
+<p>Esse log, escrito dentro de <code>listarPaes</code>, é o retrato da base no momento da chamada. É a
+primeira coisa a conferir quando a tela mostra algo estranho: se a base já está errada, o problema é de
+dados; se está certa, o problema é de desenho.</p>
+
+<pre class="term">console: erro 409: já existe um pão com esse nome</pre>
+
+<p>E esse, escrito antes de rejeitar, mostra a validação fazendo o trabalho dela. Duas linhas de log na
+camada de dados valem mais do que dez no componente, porque elas contam o que o “servidor” viu.</p>
+
+<p>Há um terceiro item nessa lista, mais sutil: a API local não tem concorrência. Dois cliques rápidos
+cadastram o mesmo pão duas vezes sem ninguém reclamar, porque não há outro cliente disputando a mesma linha
+do banco. No servidor, esse caso é tratado com transação e índice único. Enquanto você está na versão local,
+a defesa é a de sempre: desabilitar o botão enquanto a chamada está em andamento.</p>
+
+<p>Nada disso diminui a utilidade dela. Desenvolver contra uma API local é o que permite começar a tela na
+segunda-feira e ter o servidor na sexta sem reescrever componente. O que não se pode é confundir “funciona
+no meu navegador” com “pronto para produção”: a distância entre os dois é exatamente a lista acima.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a feira de sábado</h3>
+<p>O servidor só ficaria pronto no mês seguinte e a feira era no sábado. Com a API local, a Ana cadastrou os
+doze pães, ajustou preços e testou a tela de erro digitando um nome repetido. No dia da feira o site
+funcionou; na segunda, o Nando trocou o arquivo <code>api.js</code> pelas chamadas de verdade e nenhum
+componente precisou ser tocado.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o contrato combinado antes do código</h3>
+<p>Antes de o servidor existir, a Ana e o Nando escreveram juntos as quatro funções da camada:
+<code>listarPaes</code>, <code>criarPao</code>, <code>apagarPao</code> e <code>buscarPao</code>. Decidir os
+nomes e os formatos no papel evitou a discussão clássica de depois: a tela esperando <code>nome</code> e o
+servidor mandando <code>titulo</code>.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o erro que só existia em produção</h3>
+<p>Numa versão anterior, a API local aceitava qualquer coisa. No dia em que o servidor entrou no ar, o
+cadastro de pão repetido passou a devolver 409 e a tela ficou em branco — ninguém tinha escrito o caminho do
+erro. Depois disso, a regra ficou: se o servidor pode recusar, a API local recusa também, com a mesma
+mensagem.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Para que serve uma API local?</p>
+<label><input type="radio" name="q1"> para guardar dados de verdade, no lugar de um banco</label>
+<label><input type="radio" name="q1"> para a tela funcionar antes do servidor, com o mesmo contrato que ele terá</label>
+<label><input type="radio" name="q1"> para deixar o site mais rápido em produção</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que <code>listarPaes</code> devolve
+<code>[...base]</code> em vez de <code>base</code>?</p>
+<label><input type="radio" name="q2"> porque o React não aceita array dentro de Promise</label>
+<label><input type="radio" name="q2"> para ocupar menos memória</label>
+<label><input type="radio" name="q2"> para o componente não poder alterar a base sem chamar a API, como acontece com a resposta da rede</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Na troca pelo <code>fetch</code>, o que muda no jeito de
+tratar o erro?</p>
+<label><input type="radio" name="q3"> o <code>fetch</code> resolve mesmo em 409: a camada precisa conferir o status e lançar o erro</label>
+<label><input type="radio" name="q3"> nada: o <code>fetch</code> rejeita em qualquer status diferente de 200</label>
+<label><input type="radio" name="q3"> o erro passa a ser tratado com <code>if</code> dentro do JSX</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o contrato da camada</h2>
+
+<p>Toda função da API local devolve algo que pode ser esperado com <code>await</code>, igual à resposta do
+servidor. Complete o tipo de retorno que a camada usa:</p>
+
+<div class="ex-code">function listarPaes() {
+  return new <input aria-label="resposta 1" data-answer="Promise" placeholder="...">((ok) =&gt; {
+    setTimeout(() =&gt; ok([...base]), 10);
+  });
+}</div>
+
+<p class="ex-dica">Dica: é o objeto que representa “um valor que ainda não chegou” — o mesmo que o
+<code>fetch</code> devolve e o mesmo que o <code>await</code> espera.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>API local é a camada que faz o papel do servidor dentro do projeto: funções com nome, base de dados em
+memória, respostas assíncronas com atraso pequeno, erros simulados com as mesmas mensagens que o servidor
+daria. A tela deixa de conhecer os dados e passa a pedir — e todo mundo que pede vê o mesmo conteúdo.</p>
+
+<p>O valor está no contrato: quando o servidor chegar, só o arquivo da camada muda. Para isso, devolva
+cópias, use <code>setTimeout</code> para manter o código assíncrono, rejeite o que o servidor rejeitaria e
+lembre que <code>fetch</code> não rejeita sozinho em 409. E não peça à API local o que ela não pode dar:
+dados que duram, dados compartilhados entre pessoas e validação de verdade.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>API local = funções do projeto que imitam o servidor.</li>
+<li>O que importa é o contrato: nomes, entradas, saídas e erros.</li>
+<li>Base em memória fora do componente: uma fonte da verdade.</li>
+<li>Devolva cópia (<code>[...base]</code>), como a rede faria.</li>
+<li><code>setTimeout</code> pequeno mantém o código assíncrono de verdade.</li>
+<li>Simule o erro (409) — a tela precisa do caminho do erro.</li>
+<li>Na troca pelo <code>fetch</code>, confira <code>resposta.ok</code> dentro da camada.</li>
+<li>Memória some ao recarregar; para durar, é <code>localStorage</code> ou servidor.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

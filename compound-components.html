@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compound Components | Guia React</title>
+<meta name="description" content="Compound components em React: peças que moram dentro do pai, como Cartao.Titulo e Abas.Painel, o contexto interno que as liga e as armadilhas de escopo.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Compound <span class="hl">Components</span></h1>
+<p class="intro">As abas do site da Ana funcionam, mas cada pedaço foi escrito como se fosse independente: os
+botões sabem qual aba está ativa, os painéis não, e quando ela muda um, o outro continua mostrando a mesma
+coisa. Na aula de hoje ela aprende o padrão que resolve isso sem encher a tela de props: peças que moram
+<em>dentro</em> do componente pai — <code>&lt;Abas.Botao&gt;</code>, <code>&lt;Abas.Painel&gt;</code> — e
+conversam entre si por um canal que o pai cria e ninguém mais vê.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um componente composto e por que a API dele parece uma família.</li>
+  <li>Como prender subcomponentes ao pai com <code>Cartao.Titulo = Titulo</code>.</li>
+  <li>Como as peças compartilham estado por um contexto criado dentro do pai.</li>
+  <li>Por que esse contexto é privado e não deve ser exportado.</li>
+  <li>Por que uma peça usada fora do pai simplesmente não aparece.</li>
+  <li>Quando o padrão ajuda e quando ele só esconde props atrás de pontos.</li>
+  <li>Os tropeços: peça esquecida, peça fora do pai, filhos demais e listas de peças.</li>
+</ul>
+</div>
+
+<h2>1. A cena: um cartão copiado e duas abas desencontradas</h2>
+
+<p>A página de produtos da Ana tem cartões. Cada cartão é um quadrado com o nome do pão, o preço e um selinho
+"Padaria da Ana" no canto. Ela escreveu o primeiro à mão, copiou para o segundo e para o terceiro, e no dia em
+que quis mudar o selo de lugar precisou mexer em três lugares. Até aí, é a história da aula de
+<a href="componente-reutilizavel.html">componente reutilizável</a>: extraia uma função.</p>
+
+<p>O problema é que o cartão não é uma coisa só. Ele tem partes que variam de forma independente: o título
+pode ser um <code>h3</code> ou um <code>h2</code>, o corpo pode ter preço, descrição ou um botão. Se você
+transformar tudo em props — <code>&lt;Cartao titulo="Baguete" preco="2,00" descricao="..." botao="..." /&gt;</code>
+— o componente vira um formulário de opções e perde a graça. Componente composto é a terceira via: o pai
+desenha a moldura, e o leitor do componente escreve as partes por dentro.</p>
+
+<p>As abas têm o mesmo desenho e um desafio a mais. Um botão de aba e o painel correspondente são irmãos na
+árvore, e precisam concordar sobre qual aba está ativa. Irmãos não conversam por prop. No padrão composto, o
+pai — o <code>&lt;Abas&gt;</code> — guarda o estado e oferece um canal para os filhos lerem, sem que quem usa o
+componente veja esse canal.</p>
+
+<h2>2. Uma família com sobrenome</h2>
+
+<p>Um componente composto é um componente com peças acopladas. Você o usa como um bloco e escreve as partes
+internas com um ponto no nome: <code>Cartao.Titulo</code>, <code>Abas.Painel</code>. Por baixo, cada peça é um
+componente comum, preso ao pai como uma propriedade qualquer — porque em JavaScript função também tem
+propriedade.</p>
+
+<dl class="anatomy">
+<dt>componente composto</dt>
+<dd>O pai que desenha a moldura e guarda o estado compartilhado. <code>Cartao</code>, <code>Abas</code>.</dd>
+<dt>peça</dt>
+<dd>Um subcomponente preso ao pai por atribuição: <code>Cartao.Titulo = Titulo</code>. Usa-se
+<code>&lt;Cartao.Titulo&gt;</code>.</dd>
+<dt>children</dt>
+<dd>O que fica entre a abertura e o fechamento do pai. É por aí que as peças entram no desenho:
+<code>{children}</code>.</dd>
+<dt>contexto interno</dt>
+<dd>O canal criado pelo pai para as peças lerem o estado comum. Fica no mesmo arquivo e não é exportado.</dd>
+<dt>API</dt>
+<dd>O conjunto de peças e props que o componente oferece. No composto, a API é a lista de nomes depois do
+ponto.</dd>
+<dt>escopo</dt>
+<dd>A região da árvore em que o canal do pai vale. Fora dela, a peça não encontra nada — e é isso que a
+terceira caixa mostra.</dd>
+</dl>
+
+<p>A primeira vista, o ponto no nome parece decoração. Ele é informação: dizer
+<code>&lt;Cartao.Titulo&gt;</code> em vez de <code>&lt;TituloDoCartao&gt;</code> avisa que aquela peça não
+funciona sozinha. O leitor do seu componente não precisa importar quatro coisas; importa uma e encontra as
+outras dentro dela, como pastas.</p>
+
+<h2>3. As peças que moram dentro do pai</h2>
+
+<p>Vamos ao cartão. As três funções já existem no arquivo: <code>Titulo</code>, <code>Corpo</code> e
+<code>Cartao</code>. O que falta é o casamento — prender as duas primeiras ao pai — e trocar o HTML escrito à
+mão pelos componentes. No código inicial, os dois cartões são <code>div</code> com classes copiadas, e o selo
+que o <code>Cartao</code> sabe desenhar não aparece em lugar nenhum.</p>
+
+<div class="tryreact" data-goal="conta:article.cartao=2;;conta:.selo=2;;texto:Baguete">
+  <p class="try-task">Prenda as peças ao pai com <code>Cartao.Titulo = Titulo;</code> e
+  <code>Cartao.Corpo = Corpo;</code> e reescreva os dois cartões usando
+  <code>&lt;Cartao&gt;</code>, <code>&lt;Cartao.Titulo&gt;</code> e <code>&lt;Cartao.Corpo&gt;</code>. Os dois
+  cartões têm de ganhar o selo.</p>
+  <pre class="jsx">function Titulo({ children }) {
+  return &lt;h3 className="cartao-titulo"&gt;{children}&lt;/h3&gt;;
+}
+
+function Corpo({ children }) {
+  return &lt;div className="cartao-corpo"&gt;{children}&lt;/div&gt;;
+}
+
+function Cartao({ children }) {
+  return (
+    &lt;article className="cartao"&gt;
+      &lt;span className="selo"&gt;Padaria da Ana&lt;/span&gt;
+      {children}
+    &lt;/article&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;div className="cartao"&gt;
+        &lt;h3 className="cartao-titulo"&gt;Baguete&lt;/h3&gt;
+        &lt;div className="cartao-corpo"&gt;R$ 2,00&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div className="cartao"&gt;
+        &lt;h3 className="cartao-titulo"&gt;Pão de queijo&lt;/h3&gt;
+        &lt;div className="cartao-corpo"&gt;R$ 3,50&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;div class="cartao"&gt;
+    &lt;h3 class="cartao-titulo"&gt;Baguete&lt;/h3&gt;
+    &lt;div class="cartao-corpo"&gt;R$ 2,00&lt;/div&gt;
+  &lt;/div&gt;
+  &lt;div class="cartao"&gt;
+    &lt;h3 class="cartao-titulo"&gt;Pão de queijo&lt;/h3&gt;
+    &lt;div class="cartao-corpo"&gt;R$ 3,50&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Titulo({ children }) {
+  return &lt;h3 className="cartao-titulo"&gt;{children}&lt;/h3&gt;;
+}
+
+function Corpo({ children }) {
+  return &lt;div className="cartao-corpo"&gt;{children}&lt;/div&gt;;
+}
+
+function Cartao({ children }) {
+  return (
+    &lt;article className="cartao"&gt;
+      &lt;span className="selo"&gt;Padaria da Ana&lt;/span&gt;
+      {children}
+    &lt;/article&gt;
+  );
+}
+
+Cartao.Titulo = Titulo;
+Cartao.Corpo = Corpo;
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Cartao&gt;
+        &lt;Cartao.Titulo&gt;Baguete&lt;/Cartao.Titulo&gt;
+        &lt;Cartao.Corpo&gt;R$ 2,00&lt;/Cartao.Corpo&gt;
+      &lt;/Cartao&gt;
+      &lt;Cartao&gt;
+        &lt;Cartao.Titulo&gt;Pão de queijo&lt;/Cartao.Titulo&gt;
+        &lt;Cartao.Corpo&gt;R$ 3,50&lt;/Cartao.Corpo&gt;
+      &lt;/Cartao&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Repare no que o painel mostra: cada cartão virou um <code>article</code> com o selo dentro, e o título e o
+corpo continuam sendo as peças. Quem escreve o <code>App</code> não precisa saber que existe um selo; quem
+cuida do selo é o <code>Cartao</code>, num lugar só. Se amanhã a Ana quiser o selo embaixo, muda uma linha no
+pai e os dez cartões do site acompanham.</p>
+
+<p>As duas linhas de atribuição são o coração do padrão, e valem três observações. Primeira: elas ficam
+<strong>fora</strong> das funções, no nível do arquivo, e rodam uma vez, quando o módulo carrega. Segunda: a
+ordem não importa, porque as funções são declaradas com <code>function</code> e existem antes de qualquer
+linha rodar. Terceira: se você esquecer uma delas, <code>Cartao.Titulo</code> é <code>undefined</code>, e o
+React não sabe desenhar <code>undefined</code> — o componente inteiro some da tela, sem erro visível no painel.
+No console do navegador aparece a mensagem da qual a aula fala mais adiante.</p>
+
+<p>Um detalhe de organização: num projeto, cada peça pode ficar num arquivo e o pai importar todas para
+montar a API. O arquivo do pai vira o índice da família:</p>
+
+<pre class="file" data-file="Cartao.jsx">import Titulo from "./CartaoTitulo";
+import Corpo from "./CartaoCorpo";
+
+function Cartao({ children }) {
+  return &lt;article className="cartao"&gt;{children}&lt;/article&gt;;
+}
+
+Cartao.Titulo = Titulo;
+Cartao.Corpo = Corpo;
+
+export default Cartao;</pre>
+
+<p>Quem usa escreve <code>import Cartao from "./Cartao"</code> e ganha a família inteira. Quem lê o arquivo
+do pai vê, em quatro linhas, quais peças existem. Essa é a vantagem de descoberta que o ponto no nome oferece:
+o autocompletar do editor lista <code>Cartao.</code> e mostra as peças disponíveis.</p>
+
+<h2>4. O estado que as peças compartilham</h2>
+
+<p>O cartão não tem estado: as peças só desenham o que recebem. As abas têm, e é aí que o padrão mostra o
+segundo mecanismo. O <code>&lt;Abas&gt;</code> guarda qual aba está ativa; os botões precisam saber para se
+destacar, os painéis precisam saber para aparecer. Nenhum dos dois recebe essa informação por prop de quem usa
+o componente — ela vem de um contexto que o pai cria.</p>
+
+<p>No código inicial, o <code>Abas</code> tem o estado, mas não o publica: o <code>div</code> das abas é
+desenhado sem provider. As peças caem no valor padrão do contexto, que é um objeto fixo com
+<code>setAtiva</code> vazio. Resultado: os botões não trocam nada, o painel de pães fica para sempre, e clicar
+em "Salgados" não faz nada. A missão é envolver os filhos no provider.</p>
+
+<div class="tryreact" data-goal="clique:#aba-salgados;;texto:Coxinha e empada;;attr:#aba-salgados|aria-selected=true">
+  <p class="try-task">O <code>Abas</code> guarda <code>ativa</code> e não publica. Envolva
+  <code>{children}</code> em <code>&lt;AbaContexto.Provider value={{ ativa, setAtiva }}&gt;</code> e clique em
+  "Salgados".</p>
+  <pre class="jsx">const AbaContexto = createContext({ ativa: "paes", setAtiva: () =&gt; {} });
+
+function Abas({ children }) {
+  const [ativa, setAtiva] = useState("paes");
+
+  return &lt;div className="abas"&gt;{children}&lt;/div&gt;;
+}
+
+function BotaoAba({ nome, children }) {
+  const { ativa, setAtiva } = useContext(AbaContexto);
+  return (
+    &lt;button id={"aba-" + nome} aria-selected={ativa === nome} onClick={() =&gt; setAtiva(nome)}&gt;
+      {children}
+    &lt;/button&gt;
+  );
+}
+
+function PainelAba({ nome, children }) {
+  const { ativa } = useContext(AbaContexto);
+  if (ativa !== nome) return null;
+  return &lt;div className="painel"&gt;{children}&lt;/div&gt;;
+}
+
+Abas.Botao = BotaoAba;
+Abas.Painel = PainelAba;
+
+function App() {
+  return (
+    &lt;Abas&gt;
+      &lt;Abas.Botao nome="paes"&gt;Pães&lt;/Abas.Botao&gt;
+      &lt;Abas.Botao nome="salgados"&gt;Salgados&lt;/Abas.Botao&gt;
+      &lt;Abas.Painel nome="paes"&gt;Baguete e pão de queijo&lt;/Abas.Painel&gt;
+      &lt;Abas.Painel nome="salgados"&gt;Coxinha e empada&lt;/Abas.Painel&gt;
+    &lt;/Abas&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div class="abas"&gt;
+  &lt;button id="aba-paes" aria-selected="true"&gt;Pães&lt;/button&gt;
+  &lt;button id="aba-salgados" aria-selected="false"&gt;Salgados&lt;/button&gt;
+  &lt;div class="painel"&gt;Baguete e pão de queijo&lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const AbaContexto = createContext({ ativa: "paes", setAtiva: () =&gt; {} });
+
+function Abas({ children }) {
+  const [ativa, setAtiva] = useState("paes");
+
+  return (
+    &lt;div className="abas"&gt;
+      &lt;AbaContexto.Provider value={{ ativa, setAtiva }}&gt;
+        {children}
+      &lt;/AbaContexto.Provider&gt;
+    &lt;/div&gt;
+  );
+}
+
+function BotaoAba({ nome, children }) {
+  const { ativa, setAtiva } = useContext(AbaContexto);
+  return (
+    &lt;button id={"aba-" + nome} aria-selected={ativa === nome} onClick={() =&gt; setAtiva(nome)}&gt;
+      {children}
+    &lt;/button&gt;
+  );
+}
+
+function PainelAba({ nome, children }) {
+  const { ativa } = useContext(AbaContexto);
+  if (ativa !== nome) return null;
+  return &lt;div className="painel"&gt;{children}&lt;/div&gt;;
+}
+
+Abas.Botao = BotaoAba;
+Abas.Painel = PainelAba;
+
+function App() {
+  return (
+    &lt;Abas&gt;
+      &lt;Abas.Botao nome="paes"&gt;Pães&lt;/Abas.Botao&gt;
+      &lt;Abas.Botao nome="salgados"&gt;Salgados&lt;/Abas.Botao&gt;
+      &lt;Abas.Painel nome="paes"&gt;Baguete e pão de queijo&lt;/Abas.Painel&gt;
+      &lt;Abas.Painel nome="salgados"&gt;Coxinha e empada&lt;/Abas.Painel&gt;
+    &lt;/Abas&gt;
+  );
+}</pre>
+</div>
+
+<p>O ponto que faz o padrão ser composto e não só "dois componentes": quem usa não passa
+<code>ativa</code> nem <code>onMudar</code>. O <code>App</code> escreve as peças como se fossem HTML e o canal
+acontece por baixo. A informação de qual aba está ativa nunca aparece no JSX de fora — ela vive no pai, é
+publicada para as peças e morre ali dentro.</p>
+
+<p>O preço dessa conveniência é o acoplamento: as peças só funcionam dentro do pai. Isso não é um acidente, é
+o desenho. Um <code>Abas.Painel</code> solto no meio da página não tem como saber qual aba está ativa, porque
+o estado está no pai que ele não tem. Na prática, ele lê o valor padrão do contexto e obedece a ele — que é o
+que a próxima caixa mostra.</p>
+
+<h2>5. O contexto interno é privado</h2>
+
+<p>O <code>AbaContexto</code> é criado no mesmo arquivo das peças e não é exportado. Essa decisão de projeto
+tem nome — encapsulamento — e três consequências práticas. A primeira: ninguém de fora pode abastecer o canal
+por conta própria, então o estado das abas tem um dono só. A segunda: você pode mudar o formato do valor
+(incluir <code>total</code>, <code>indice</code>, o que for) sem quebrar nenhum consumidor externo, porque não
+existe consumidor externo.</p>
+
+<p>A terceira consequência é a que resolve o problema do início da aula: as peças não precisam receber
+<code>ativa</code> por prop de quem usa. Elas leem do canal. Se cada peça recebesse a prop, quem usasse o
+componente teria de repetir o valor em quatro lugares — e esquecer um deles é a receita do bug que a Ana
+tinha.</p>
+
+<p>Um hábito que vale criar: peça sempre um objeto no valor do contexto, mesmo quando há um valor só. Objeto
+permite crescer sem quebrar as peças; valor solto obriga a mudar todas as leituras no dia em que aparecer o
+segundo dado. E, como toda leitura de contexto, quem lê recebe o valor inteiro e é redesenhado quando ele muda
+de identidade — assunto da aula de <a href="contexto-introducao.html">introdução ao contexto</a>.</p>
+
+<h2>6. A peça fora do pai não aparece</h2>
+
+<p>O erro mais comum de quem usa componente composto é posto assim: o painel simplesmente não aparece. Não há
+erro vermelho, não há aviso no painel; a área fica vazia. A causa quase sempre é a mesma: a peça foi colocada
+fora do pai, e sem o pai não existe canal. Abaixo, o painel de salgados ficou <em>depois</em> do fechamento do
+<code>&lt;Abas&gt;</code>.</p>
+
+<div class="tryreact" data-goal="clique:#aba-salgados;;texto:Coxinha e empada">
+  <p class="try-task">O <code>&lt;Abas.Painel nome="salgados"&gt;</code> está fora do <code>&lt;Abas&gt;</code>
+  e nunca encontra o canal. Mova-o para dentro do <code>&lt;Abas&gt;</code> e clique em "Salgados".</p>
+  <pre class="jsx">const AbaContexto = createContext({ ativa: "paes", setAtiva: () =&gt; {} });
+
+function Abas({ children }) {
+  const [ativa, setAtiva] = useState("paes");
+
+  return (
+    &lt;div className="abas"&gt;
+      &lt;AbaContexto.Provider value={{ ativa, setAtiva }}&gt;
+        {children}
+      &lt;/AbaContexto.Provider&gt;
+    &lt;/div&gt;
+  );
+}
+
+function BotaoAba({ nome, children }) {
+  const { ativa, setAtiva } = useContext(AbaContexto);
+  return (
+    &lt;button id={"aba-" + nome} aria-selected={ativa === nome} onClick={() =&gt; setAtiva(nome)}&gt;
+      {children}
+    &lt;/button&gt;
+  );
+}
+
+function PainelAba({ nome, children }) {
+  const { ativa } = useContext(AbaContexto);
+  if (ativa !== nome) return null;
+  return &lt;div className="painel"&gt;{children}&lt;/div&gt;;
+}
+
+Abas.Botao = BotaoAba;
+Abas.Painel = PainelAba;
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Abas&gt;
+        &lt;Abas.Botao nome="paes"&gt;Pães&lt;/Abas.Botao&gt;
+        &lt;Abas.Botao nome="salgados"&gt;Salgados&lt;/Abas.Botao&gt;
+        &lt;Abas.Painel nome="paes"&gt;Baguete e pão de queijo&lt;/Abas.Painel&gt;
+      &lt;/Abas&gt;
+      &lt;Abas.Painel nome="salgados"&gt;Coxinha e empada&lt;/Abas.Painel&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;div class="abas"&gt;
+    &lt;button id="aba-paes" aria-selected="true"&gt;Pães&lt;/button&gt;
+    &lt;button id="aba-salgados" aria-selected="false"&gt;Salgados&lt;/button&gt;
+    &lt;div class="painel"&gt;Baguete e pão de queijo&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const AbaContexto = createContext({ ativa: "paes", setAtiva: () =&gt; {} });
+
+function Abas({ children }) {
+  const [ativa, setAtiva] = useState("paes");
+
+  return (
+    &lt;div className="abas"&gt;
+      &lt;AbaContexto.Provider value={{ ativa, setAtiva }}&gt;
+        {children}
+      &lt;/AbaContexto.Provider&gt;
+    &lt;/div&gt;
+  );
+}
+
+function BotaoAba({ nome, children }) {
+  const { ativa, setAtiva } = useContext(AbaContexto);
+  return (
+    &lt;button id={"aba-" + nome} aria-selected={ativa === nome} onClick={() =&gt; setAtiva(nome)}&gt;
+      {children}
+    &lt;/button&gt;
+  );
+}
+
+function PainelAba({ nome, children }) {
+  const { ativa } = useContext(AbaContexto);
+  if (ativa !== nome) return null;
+  return &lt;div className="painel"&gt;{children}&lt;/div&gt;;
+}
+
+Abas.Botao = BotaoAba;
+Abas.Painel = PainelAba;
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Abas&gt;
+        &lt;Abas.Botao nome="paes"&gt;Pães&lt;/Abas.Botao&gt;
+        &lt;Abas.Botao nome="salgados"&gt;Salgados&lt;/Abas.Botao&gt;
+        &lt;Abas.Painel nome="paes"&gt;Baguete e pão de queijo&lt;/Abas.Painel&gt;
+        &lt;Abas.Painel nome="salgados"&gt;Coxinha e empada&lt;/Abas.Painel&gt;
+      &lt;/Abas&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O sintoma é curioso porque acontece em duas etapas. Antes do clique, o painel órfão não aparece e ninguém
+sente falta — o painel de pães está lá, ocupando o espaço. Depois do clique em "Salgados", os dois painéis
+desaparecem: o de pães porque deixou de ser o ativo, o de salgados porque nunca esteve dentro. A área fica
+vazia, que é a assinatura do problema de escopo.</p>
+
+<p>Quando o problema é uma peça <code>undefined</code> — por esquecimento da atribuição —, o React reclama no
+console do navegador, e a mensagem vale conhecer:</p>
+
+<pre class="term">Warning: React.jsx: type is invalid -- expected a string (for built-in components) or a class/function (for composite components) but got: undefined.</pre>
+
+<p>Em produção, essa mesma falha aparece como "Minified React error #130" com um link para a documentação. É
+o mesmo erro: uma peça que não existe. A leitura é sempre "confira a atribuição depois das funções".</p>
+
+<p>Ao mesmo tempo, um <code>console.log</code> dentro do pai conta a história do que aconteceu antes:</p>
+
+<pre class="term">Abas desenhou: ativa = paes
+BotaoAba salgados leu: paes
+PainelAba salgados: fora do canal (valor padrão)</pre>
+
+<p>A segunda linha mostra o botão lendo "paes" — porque o pai publicava o valor padrão, não o estado. A
+terceira, o painel órfão. Duas leituras do mesmo canal, dois valores diferentes: é assim que um contexto mal
+posicionado se denuncia.</p>
+
+<h2>7. Composto ou props?</h2>
+
+<p>Os dois jeitos resolvem o mesmo problema de reúso, e a escolha depende da forma do componente. Props
+funcionam bem quando as partes são dados: <code>titulo</code>, <code>preco</code>, <code>cor</code>. Composto
+funciona bem quando as partes são <em>estrutura</em>: um pedaço de JSX que quem usa decide, com tags, classes
+e componentes próprios dentro.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Props</th><th>Composto</th></tr>
+<tr><td>o conteúdo é texto ou número</td><td>sim: <code>titulo="Baguete"</code></td><td>não vale a cerimônia</td></tr>
+<tr><td>o conteúdo é outro componente</td><td>prop de elemento, ou <code>children</code></td><td>sim: a peça é o lugar certo</td></tr>
+<tr><td>as partes precisam compartilhar estado</td><td>difícil: sobe tudo para quem usa</td><td>sim: o pai guarda e publica</td></tr>
+<tr><td>a ordem das partes varia</td><td>sim: o pai decide a ordem</td><td>sim: quem usa escreve na ordem que quer</td></tr>
+<tr><td>o componente é usado em muitas telas com formas diferentes</td><td>sim: uma prop por variação</td><td>cuidado: vira uma API grande</td></tr>
+<tr><td>a equipe não conhece o padrão</td><td>sim: é o React de sempre</td><td>documente as peças ou ninguém descobre</td></tr>
+</table>
+</div>
+
+<p>Uma heurística que funciona: se você já escreveu <code>&lt;Cartao&gt;&lt;h3&gt;…</code> no projeto, você já
+está usando composição — o composto só dá nomes às partes. E se o componente tem mais de cinco peças, ou peças
+que só fazem sentido em pares (<code>Titulo</code> obrigatório, <code>Corpo</code> obrigatório), talvez props
+sejam mais honestas: um composto com muitas regras de uso é um quebra-cabeça disfarçado de API.</p>
+
+<p>Existe um meio-termo muito comum: o pai aceita as duas formas. <code>&lt;Cartao titulo="Baguete"&gt;</code>
+para o caso simples e <code>&lt;Cartao&gt;&lt;Cartao.Titulo&gt;</code> para o caso com JSX dentro. Custa um
+<code>if</code> no pai e evita obrigar quem só quer um cartão simples a escrever quatro tags.</p>
+
+<h2>8. Os tropeços</h2>
+
+<p>O primeiro é esquecer a atribuição: você exporta <code>Titulo</code> e usa <code>Cartao.Titulo</code>, que
+não existe. O sintoma é uma tela em branco no meio de um componente que parecia certo, e o console com a
+mensagem de tipo inválido. A conferência é rápida: as linhas <code>Pai.Peça = Peça;</code> estão logo depois
+das funções?</p>
+
+<p>O segundo é usar a peça fora do pai — o caso da caixa anterior. Vale um aviso de projeto: se você perceber
+que a peça é usada fora com frequência, o padrão está errado para o seu caso; talvez o componente devesse
+receber o estado por prop e ser controlado de fora, como qualquer outro.</p>
+
+<p>O terceiro é o <code>children</code> com peças demais. O pai precisa saber separar os botões dos painéis
+para desenhar a barra e a área; se ele só faz <code>{children}</code>, a mistura fica na ordem em que você
+escreveu. Em geral isso é bom — a ordem é sua —, mas o layout fica sem controle. A saída é pedir peças de
+agrupamento (<code>&lt;Abas.Lista&gt;</code> e <code>&lt;Abas.Conteudo&gt;</code>) ou deixar o CSS resolver com
+classes nas peças.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você vê</th><th>Causa provável</th><th>Conserto</th></tr>
+<tr><td>tela em branco onde havia o componente</td><td><code>Pai.Peça</code> não foi atribuído</td><td>declarar <code>Pai.Peça = Peça;</code> fora das funções</td></tr>
+<tr><td>a peça não aparece e não dá erro</td><td>a peça está fora do pai</td><td>mover para dentro do <code>children</code> do pai</td></tr>
+<tr><td>todos os painéis aparecem juntos</td><td>o painel não filtra pelo estado do canal</td><td>comparar <code>ativa !== nome</code> e devolver <code>null</code></td></tr>
+<tr><td>o botão não muda de destaque</td><td><code>aria-selected</code> não é calculado</td><td><code>aria-selected={ativa === nome}</code></td></tr>
+<tr><td>mudar o canal quebra telas de fora</td><td>o contexto interno foi exportado</td><td>manter o contexto privado no arquivo</td></tr>
+</table>
+</div>
+
+<p>Há um quarto caso que merece um parágrafo: listas de peças. Se você desenha as abas com
+<code>map</code>, cada peça precisa de <code>key</code>, como qualquer item de lista. O <code>key</code> é da
+peça e não do pai; esquecê-lo não quebra o desenho, mas cria aquele comportamento de estado trocado entre
+itens no dia em que a ordem mudar. As duas regras se somam: <code>key</code> para o React identificar a peça,
+contexto para a peça achar o estado.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o menu de ações</h3>
+<p>A lista de pedidos tem um menu de três pontinhos em cada linha, com "Ver", "Editar" e "Cancelar". O
+<code>&lt;Menu&gt;</code> composto guarda o estado de aberto, fecha ao clicar fora e posiciona a caixa; as
+peças <code>&lt;Menu.Item&gt;</code> só recebem o <code>onClick</code>. O menu controla a si mesmo, e cada item
+é uma ação diferente escrita por quem usa. Sem props para "quais itens existem", o componente não envelhece a
+cada ação nova.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a tabela com colunas</h3>
+<p>O relatório de vendas tem <code>&lt;Tabela&gt;</code>, <code>&lt;Tabela.Cabecalho&gt;</code> e
+<code>&lt;Tabela.Linha&gt;</code>. As colunas são decididas por quem usa, com os componentes de célula que
+fizerem sentido. O pai cuida do que é chato e igual em toda tabela: borda, rolagem, alinhamento. É o caso em
+que o padrão brilha, porque as partes são estrutura e não dado.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o formulário com erro por campo</h3>
+<p><code>&lt;Campo&gt;</code>, <code>&lt;Campo.Rotulo&gt;</code> e <code>&lt;Campo.Erro&gt;</code> compartilham
+um id gerado pelo pai, para que o rótulo aponte para o campo certo e o erro seja anunciado pelo leitor de
+tela. O estado do valor, esse sim, mora em quem usa o formulário — o composto cuida da acessibilidade e da
+montagem, não do dado. Misturar os dois cuidados num componente só costuma dar confusão.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que faz <code>Cartao.Titulo = Titulo;</code>?</p>
+<label><input type="radio" name="q1"> cria um novo componente chamado <code>Titulo</code></label>
+<label><input type="radio" name="q1"> prende o componente <code>Titulo</code> como propriedade de <code>Cartao</code></label>
+<label><input type="radio" name="q1"> copia o JSX de <code>Titulo</code> para dentro de <code>Cartao</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Como as peças ficam sabendo qual aba está ativa?</p>
+<label><input type="radio" name="q2"> cada peça recebe <code>ativa</code> por prop de quem usa o componente</label>
+<label><input type="radio" name="q2"> o React adivinha pela posição das peças</label>
+<label><input type="radio" name="q2"> o pai publica o estado num contexto interno que as peças leem</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que acontece com uma peça usada fora do pai?</p>
+<label><input type="radio" name="q3"> ela não acha o canal e cai no valor padrão, quase sempre sem aparecer</label>
+<label><input type="radio" name="q3"> ela funciona normalmente, porque o contexto é global</label>
+<label><input type="radio" name="q3"> o React impede a página de carregar</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: prender a peça ao pai</h2>
+<p>O componente <code>Cartao</code> e a peça <code>Corpo</code> já existem. Complete a linha que deixa a peça
+disponível como <code>&lt;Cartao.Corpo&gt;</code>:</p>
+<div class="ex-code">Cartao.<input aria-label="resposta 1" data-answer="Corpo" placeholder="..."> = Corpo;</div>
+<p class="ex-dica">Dica: é o nome que aparece depois do ponto no JSX. Por convenção é o mesmo nome da função,
+com maiúscula.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Componente composto é um pai com peças: o pai desenha a moldura, guarda o estado comum e publica esse
+estado num contexto interno; as peças leem o canal e desenham a parte que lhes cabe. Quem usa escreve
+<code>&lt;Abas.Botao&gt;</code> e <code>&lt;Abas.Painel&gt;</code> como se fossem tags, sem passar o estado
+por prop. O ponto no nome é a assinatura do padrão: aquela peça pertence àquela família.</p>
+
+<p>As duas linhas que fazem tudo funcionar são a atribuição (<code>Pai.Peça = Peça;</code>) e o provider
+dentro do pai. Esquecer a primeira dá tela em branco com erro de tipo inválido; esquecer o segundo faz as
+peças caírem no valor padrão do canal — e o sintoma é um botão que não muda nada. Usar a peça fora do pai dá
+o sintoma mais silencioso de todos: nada aparece, e nada reclama.</p>
+
+<p>O padrão não é para tudo. Ele brilha quando as partes são estrutura e precisam compartilhar estado; atrapalha
+quando o componente é só um punhado de dados, que props resolvem melhor. E vale lembrar do custo escondido:
+uma API com muitos nomes depois do ponto é difícil de descobrir sem documentação. Se quem usa precisa abrir o
+código para saber quais peças existem, o composto virou adivinhação.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Composto = pai + peças: <code>&lt;Abas.Botao&gt;</code>, <code>&lt;Abas.Painel&gt;</code>.</li>
+<li>As peças se prendem ao pai por atribuição, fora das funções.</li>
+<li>O pai renderiza <code>{children}</code>; as peças entram por aí.</li>
+<li>O estado comum mora no pai e é publicado num contexto interno.</li>
+<li>Esse contexto não se exporta: é detalhe de implementação.</li>
+<li>Peça usada fora do pai não encontra o canal e cai no valor padrão.</li>
+<li>Peça <code>undefined</code> dá erro de tipo inválido no console.</li>
+<li>Peças em lista precisam de <code>key</code>, como qualquer item.</li>
+<li>Partes que são dados pedem props; partes que são estrutura pedem peças.</li>
+<li>Muitas peças e muitas regras: o padrão virou um quebra-cabeça.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

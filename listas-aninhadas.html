@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Listas Aninhadas | Guia React</title>
+<meta name="description" content="Listas aninhadas no React: map dentro de map, ul dentro de li, key em cada nível, totais por grupo com reduce, grupos vazios e flatMap quando a tela é uma lista só.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Listas <span class="hl">Aninhadas</span></h1>
+<p class="intro">A Ana organiza as encomendas por cliente: cada pessoa tem uma lista de pães, e cada pão tem
+preço. Na tela, isso vira uma lista dentro de outra — Maria com dois pedidos, João com um, Bia com dois. Ela
+tenta escrever um <code>map</code> dentro do outro e o resultado é uma bagunça de chaves e parâmetros com o
+mesmo nome. Nesta aula ela aprende a desenhar listas aninhadas sem se perder: onde fica cada
+<code>map</code>, onde fica cada <code>key</code> e como calcular o total de cada grupo.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como é um dado aninhado: array de objetos que contêm arrays.</li>
+  <li>Como escrever um <code>map</code> dentro de outro sem embolar os nomes.</li>
+  <li>Por que a lista interna fica dentro de um <code>&lt;li&gt;</code>, e não solta dentro do
+  <code>&lt;ul&gt;</code>.</li>
+  <li>Que cada nível precisa da sua própria <code>key</code>.</li>
+  <li>Como somar e contar por grupo com <code>reduce</code>.</li>
+  <li>O que fazer com grupo vazio e com grupo que o filtro esvaziou.</li>
+  <li>Quando achatar tudo com <code>flatMap</code>.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o caderno por cliente</h2>
+
+<p>No caderno da Ana, cada página é de um cliente. No topo, o nome; abaixo, os pães que aquela pessoa
+encomendou. Maria levou brioche e sonho. João levou pão de queijo. Bia levou croissant e broa. É uma lista de
+listas, e essa forma não é invenção do React: é como os dados chegam de qualquer sistema de pedidos.</p>
+
+<p>Na aula <a href="listas-com-map.html">Listas com map</a>, a lista era de textos e um <code>map</code>
+resolvia. Aqui cada item tem um pedaço que também é lista. Desenhar isso exige dois <code>map</code>: um
+para percorrer os clientes, outro, dentro do primeiro, para percorrer os pedidos de cada cliente.</p>
+
+<p>O resultado na tela é uma lista aninhada — e a estrutura do HTML precisa acompanhar. Um
+<code>&lt;ul&gt;</code> dentro de outro <code>&lt;ul&gt;</code> é inválido; a lista interna mora dentro do
+<code>&lt;li&gt;</code> do cliente. O navegador até “conserta” o inválido, mas o conserto dele não é o que
+você escreveu, e aí o CSS e os leitores de tela se perdem.</p>
+
+<p>O desafio real não é a sintaxe: é não se perder nos nomes. Dois <code>map</code> aninhados com o
+parâmetro chamado <code>item</code> nos dois níveis é a receita para usar o item errado. Nomes específicos
+resolvem mais do que qualquer truque.</p>
+
+<h2>2. O dado aninhado</h2>
+
+<p>Antes da tela, o dado. Cada cliente é um objeto com <code>id</code>, <code>nome</code> e uma propriedade
+<code>pedidos</code> que é um array:</p>
+
+<pre class="file" data-file="clientes.js">const clientes = [
+  { id: 1, nome: "Maria", pedidos: [
+    { id: 11, pao: "Brioche", valor: 8 },
+    { id: 12, pao: "Sonho", valor: 5 }
+  ] },
+  { id: 2, nome: "João", pedidos: [
+    { id: 21, pao: "Pão de queijo", valor: 4 }
+  ] },
+  { id: 3, nome: "Bia", pedidos: [
+    { id: 31, pao: "Croissant", valor: 7 },
+    { id: 32, pao: "Broa de fubá", valor: 6 }
+  ] }
+];</pre>
+
+<p>Três clientes, cinco pedidos no total. Repare que os <code>id</code> são diferentes em cada nível: 1, 2 e
+3 para clientes; 11, 12, 21, 31, 32 para pedidos. Essa numeração separada não é capricho — é o que permite
+usar o id como <code>key</code> sem colisão entre listas diferentes.</p>
+
+<pre class="term">&gt; clientes.length
+3
+&gt; clientes[0].pedidos.length
+2
+&gt; clientes.map((c) =&gt; c.pedidos.length)
+[2, 1, 2]</pre>
+
+<p>Três grupos e cinco pedidos: é essa a conta que o JSX precisa reproduzir. Quando o número de itens na
+tela não bate com a soma dos tamanhos, há um <code>map</code> faltando ou um array errado no lugar.</p>
+
+<p>Uma pergunta que sempre aparece: “por que não uma lista só, com o nome do cliente repetido em cada
+pedido?”. Dá para fazer, e às vezes é o formato que a API entrega. A diferença é de leitura: agrupado,
+“quanto a Maria deve” é <code>cliente.pedidos</code>; achatado, é um <code>filter</code> por nome seguido de
+uma soma. Os dois modelos funcionam, e a seção 8 mostra como converter um no outro.</p>
+
+<p>O importante agora é reconhecer o formato. Se o seu dado tem arrays dentro de arrays, você vai precisar
+de <code>map</code> aninhado — ou de um achatamento antes de desenhar.</p>
+
+<h2>3. O map dentro do map</h2>
+
+<p>Comece pelo nível de fora, como sempre. Para cada cliente, um <code>&lt;li&gt;</code> com o nome e uma
+lista interna. Dentro dessa lista interna, o segundo <code>map</code> percorre os pedidos:</p>
+
+<pre class="file" data-file="App.jsx">&lt;ul&gt;
+  {clientes.map((cliente) =&gt; (
+    &lt;li className="grupo" key={cliente.id}&gt;
+      &lt;strong&gt;{cliente.nome}&lt;/strong&gt;
+      &lt;ul&gt;
+        {cliente.pedidos.map((pedido) =&gt; (
+          &lt;li className="item" key={pedido.id}&gt;{pedido.pao}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/li&gt;
+  ))}
+&lt;/ul&gt;</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No dado</th><th>No JSX</th><th>Dentro de</th></tr>
+<tr><td><code>clientes</code> (array)</td><td><code>&lt;ul&gt;</code></td><td>o componente</td></tr>
+<tr><td><code>cliente</code> (objeto)</td><td><code>&lt;li className="grupo"&gt;</code></td><td>o <code>&lt;ul&gt;</code> externo</td></tr>
+<tr><td><code>cliente.pedidos</code> (array)</td><td><code>&lt;ul&gt;</code></td><td>o <code>&lt;li&gt;</code> do cliente</td></tr>
+<tr><td><code>pedido</code> (objeto)</td><td><code>&lt;li className="item"&gt;</code></td><td>o <code>&lt;ul&gt;</code> interno</td></tr>
+</table>
+</div>
+
+<p>Leia de fora para dentro: o primeiro <code>map</code> recebe um cliente por vez; o segundo recebe
+<code>cliente.pedidos</code>, que é o array daquele cliente. O parâmetro <code>pedido</code> existe só ali
+dentro. No fim, o HTML tem uma lista externa com três itens, e cada item carrega uma lista interna.</p>
+
+<p>A estrutura é o que garante que o navegador entenda. Se você colocar o <code>&lt;ul&gt;</code> interno
+como irmão do <code>&lt;li&gt;</code>, e não dentro dele, o HTML fica inválido e o leitor de tela perde a
+relação entre cliente e pedidos. A regra é simples: lista dentro de item, nunca lista dentro de lista
+direto.</p>
+
+<p>E por que não desenhar os pedidos como texto separado por vírgula? Para dois pães, funciona. Para dez,
+vira um parágrafo ilegível, e você perde a capacidade de dar <code>key</code>, clicar em cada pedido ou
+remover um só. A lista interna é o que mantém cada pedido sendo um pedido.</p>
+
+<div class="tryreact" data-goal="conta:li.grupo=3;;conta:li.item=5;;texto:Croissant">
+  <p class="try-task">A tela mostra só os nomes dos clientes. Desenhe, dentro de cada grupo, a lista dos
+  pedidos daquele cliente — com classe <code>item</code> em cada pedido.</p>
+  <pre class="jsx">const clientes = [
+  { id: 1, nome: "Maria", pedidos: [
+    { id: 11, pao: "Brioche", valor: 8 },
+    { id: 12, pao: "Sonho", valor: 5 }
+  ] },
+  { id: 2, nome: "João", pedidos: [
+    { id: 21, pao: "Pão de queijo", valor: 4 }
+  ] },
+  { id: 3, nome: "Bia", pedidos: [
+    { id: 31, pao: "Croissant", valor: 7 },
+    { id: 32, pao: "Broa de fubá", valor: 6 }
+  ] }
+];
+
+function App() {
+  return (
+    &lt;ul&gt;
+      {clientes.map((cliente) =&gt; (
+        &lt;li className="grupo" key={cliente.id}&gt;
+          &lt;strong&gt;{cliente.nome}&lt;/strong&gt;
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul&gt;
+  &lt;li class="grupo"&gt;&lt;strong&gt;Maria&lt;/strong&gt;&lt;/li&gt;
+  &lt;li class="grupo"&gt;&lt;strong&gt;João&lt;/strong&gt;&lt;/li&gt;
+  &lt;li class="grupo"&gt;&lt;strong&gt;Bia&lt;/strong&gt;&lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">const clientes = [
+  { id: 1, nome: "Maria", pedidos: [
+    { id: 11, pao: "Brioche", valor: 8 },
+    { id: 12, pao: "Sonho", valor: 5 }
+  ] },
+  { id: 2, nome: "João", pedidos: [
+    { id: 21, pao: "Pão de queijo", valor: 4 }
+  ] },
+  { id: 3, nome: "Bia", pedidos: [
+    { id: 31, pao: "Croissant", valor: 7 },
+    { id: 32, pao: "Broa de fubá", valor: 6 }
+  ] }
+];
+
+function App() {
+  return (
+    &lt;ul&gt;
+      {clientes.map((cliente) =&gt; (
+        &lt;li className="grupo" key={cliente.id}&gt;
+          &lt;strong&gt;{cliente.nome}&lt;/strong&gt;
+          &lt;ul&gt;
+            {cliente.pedidos.map((pedido) =&gt; (
+              &lt;li className="item" key={pedido.id}&gt;{pedido.pao}&lt;/li&gt;
+            ))}
+          &lt;/ul&gt;
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel passa a mostrar cinco itens com classe <code>item</code>, distribuídos em três grupos. Se
+aparecerem três grupos e nenhum item, o segundo <code>map</code> não foi escrito; se aparecerem quinze
+itens, você percorreu o array errado — provavelmente <code>clientes</code> de novo, em vez de
+<code>cliente.pedidos</code>.</p>
+
+<h2>4. Uma key em cada nível</h2>
+
+<p>São duas listas, então são duas <code>key</code>. A do cliente identifica o <code>&lt;li&gt;</code>
+externo; a do pedido identifica o <code>&lt;li&gt;</code> interno. Esquecer a de dentro não quebra a tela,
+mas deixa o React sem saber qual pedido é qual quando a lista muda.</p>
+
+<p>O erro clássico é usar a mesma chave para todos os níveis. Se dois clientes têm o pedido de
+<code>id</code> 1, não há problema: as chaves só precisam ser únicas <em>entre irmãos</em>. O React compara
+as chaves dentro da mesma lista; listas diferentes vivem em espaços diferentes. É por isso que a numeração
+separada do exemplo funciona.</p>
+
+<p>O segundo erro clássico é usar o índice do <code>map</code> interno. Quando a Ana remove o primeiro
+pedido da Maria, todos os índices mudam e o React reaproveita os elementos errados — o foco do teclado
+salta, a animação vai para o lugar errado. Use o id do pedido; é para isso que ele existe.</p>
+
+<p>Uma terceira opção é uma chave composta, como <code>${cliente.id}-${pedido.id}</code>, útil quando os
+ids vêm de fontes diferentes e podem coincidir dentro do mesmo nível. Se você chegou a precisar disso, o
+código já está pedindo um id único de verdade — mas funciona.</p>
+
+<h2>5. Nomes que não se perdem</h2>
+
+<p>Dois <code>map</code> aninhados com o mesmo nome de parâmetro é a fonte de metade dos bugs desta aula. Se
+os dois se chamam <code>item</code>, o de dentro esconde o de fora, e uma referência a
+<code>item.nome</code> pode estar falando do pedido em vez do cliente. O código compila, roda e mostra
+errado.</p>
+
+<p>A convenção que salva: plural no array, singular no parâmetro. <code>clientes</code> vira
+<code>cliente</code>; <code>pedidos</code> vira <code>pedido</code>. Quando os nomes são específicos, você
+lê a linha e sabe de quem está falando sem procurar onde o parâmetro foi declarado.</p>
+
+<p>Vale também nomear o nível intermediário quando o JSX cresce. Em vez de escrever tudo num
+<code>return</code> gigante, extraia um componente <code>GrupoDePedidos</code> que recebe um cliente e
+desenha o grupo. O componente de fora fica com um <code>map</code> só, e o de dentro com outro — cada um no
+seu escopo, cada um com seus nomes. O guia trata dessa divisão em
+<a href="quando-quebrar-em-componentes.html">Quando Quebrar em Componentes</a>.</p>
+
+<p>Esse movimento tem um bônus: o grupo passa a ser testável e reutilizável. A mesma lista aninhada pode
+aparecer no painel, no recibo e no e-mail de confirmação, com o mesmo componente e dados diferentes.</p>
+
+<h2>6. Contar e somar por grupo</h2>
+
+<p>Com listas aninhadas, as perguntas ficam por grupo: quantos pedidos a Maria fez? Quanto ela vai pagar?
+As duas respostas são contas sobre <code>cliente.pedidos</code>, feitas na hora de desenhar.</p>
+
+<pre class="file" data-file="App.jsx">const total = cliente.pedidos.reduce(
+  (soma, pedido) =&gt; soma + pedido.valor,
+  0
+);
+
+&lt;strong&gt;{cliente.nome} — R$ {total}&lt;/strong&gt;</pre>
+
+<pre class="term">&gt; clientes[0].pedidos.reduce((soma, p) =&gt; soma + p.valor, 0)
+13
+&gt; clientes.flatMap((c) =&gt; c.pedidos).length
+5</pre>
+
+<p>O <code>reduce</code> percorre o array e vai acumulando. O primeiro parâmetro é o acumulador — aqui,
+<code>soma</code> —; o segundo é o item; e o <code>0</code> no fim é o valor inicial. Sem o zero, o
+<code>reduce</code> começa pelo primeiro item e o resultado de uma lista vazia é um erro. Com o zero, lista
+vazia soma zero, que é a resposta honesta.</p>
+
+<p>O total é derivado: não vai para o estado. Se ele fosse guardado, cada pedido novo exigiria atualizar
+dois lugares, e mais cedo ou mais tarde um deles ficaria para trás. Calcular no render é sempre coerente,
+porque parte do mesmo array que está na tela.</p>
+
+<div class="tryreact" data-goal="texto:Maria — R$ 13;;texto:João — R$ 4;;conta:li.item=5">
+  <p class="try-task">Cada grupo mostra o nome, mas não o total. Acrescente ao nome o valor somado dos
+  pedidos, no formato “Maria — R$ 13”, usando <code>reduce</code> com valor inicial zero.</p>
+  <pre class="jsx">const clientes = [
+  { id: 1, nome: "Maria", pedidos: [
+    { id: 11, pao: "Brioche", valor: 8 },
+    { id: 12, pao: "Sonho", valor: 5 }
+  ] },
+  { id: 2, nome: "João", pedidos: [
+    { id: 21, pao: "Pão de queijo", valor: 4 }
+  ] },
+  { id: 3, nome: "Bia", pedidos: [
+    { id: 31, pao: "Croissant", valor: 7 },
+    { id: 32, pao: "Broa de fubá", valor: 6 }
+  ] }
+];
+
+function App() {
+  return (
+    &lt;ul&gt;
+      {clientes.map((cliente) =&gt; (
+        &lt;li className="grupo" key={cliente.id}&gt;
+          &lt;strong&gt;{cliente.nome}&lt;/strong&gt;
+          &lt;ul&gt;
+            {cliente.pedidos.map((pedido) =&gt; (
+              &lt;li className="item" key={pedido.id}&gt;{pedido.pao}&lt;/li&gt;
+            ))}
+          &lt;/ul&gt;
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul&gt;
+  &lt;li class="grupo"&gt;
+    &lt;strong&gt;Maria&lt;/strong&gt;
+    &lt;ul&gt;
+      &lt;li class="item"&gt;Brioche&lt;/li&gt;
+      &lt;li class="item"&gt;Sonho&lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/li&gt;
+  &lt;li class="grupo"&gt;
+    &lt;strong&gt;João&lt;/strong&gt;
+    &lt;ul&gt;
+      &lt;li class="item"&gt;Pão de queijo&lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/li&gt;
+  &lt;li class="grupo"&gt;
+    &lt;strong&gt;Bia&lt;/strong&gt;
+    &lt;ul&gt;
+      &lt;li class="item"&gt;Croissant&lt;/li&gt;
+      &lt;li class="item"&gt;Broa de fubá&lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">const clientes = [
+  { id: 1, nome: "Maria", pedidos: [
+    { id: 11, pao: "Brioche", valor: 8 },
+    { id: 12, pao: "Sonho", valor: 5 }
+  ] },
+  { id: 2, nome: "João", pedidos: [
+    { id: 21, pao: "Pão de queijo", valor: 4 }
+  ] },
+  { id: 3, nome: "Bia", pedidos: [
+    { id: 31, pao: "Croissant", valor: 7 },
+    { id: 32, pao: "Broa de fubá", valor: 6 }
+  ] }
+];
+
+function App() {
+  return (
+    &lt;ul&gt;
+      {clientes.map((cliente) =&gt; {
+        const total = cliente.pedidos.reduce(
+          (soma, pedido) =&gt; soma + pedido.valor,
+          0
+        );
+        return (
+          &lt;li className="grupo" key={cliente.id}&gt;
+            &lt;strong&gt;{cliente.nome} — R$ {total}&lt;/strong&gt;
+            &lt;ul&gt;
+              {cliente.pedidos.map((pedido) =&gt; (
+                &lt;li className="item" key={pedido.id}&gt;{pedido.pao}&lt;/li&gt;
+              ))}
+            &lt;/ul&gt;
+          &lt;/li&gt;
+        );
+      })}
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p>Aqui o <code>map</code> deixou de ter retorno implícito: como precisamos calcular o total antes do
+<code>return</code>, o callback ganhou chaves e um <code>return</code> explícito. É a armadilha do retorno
+que a aula de listas já mostrou, agora com um motivo legítimo para usar chaves. A alternativa é chamar uma
+função que calcula o total direto no JSX, sem bloco — também funciona e fica mais curto.</p>
+
+<p>Se você escrever <code>const total = pedido.valor</code> no escopo errado, o erro é “pedido is not
+defined”. O cálculo precisa estar onde <code>cliente</code> existe: antes do <code>return</code> do
+callback, ou dentro do JSX, usando <code>cliente.pedidos</code>.</p>
+
+<dl class="anatomy">
+<dt>aninhado</dt>
+<dd>Dado em que um item contém outro array. Clientes com pedidos dentro é o exemplo da aula.</dd>
+<dt>map interno</dt>
+<dd>O segundo <code>map</code>, que percorre <code>cliente.pedidos</code> e roda uma vez por grupo.</dd>
+<dt>reduce</dt>
+<dd>Percorre o array acumulando um valor: <code>reduce((soma, item) =&gt; soma + item.valor, 0)</code>.</dd>
+<dt>flatMap</dt>
+<dd>Transforma cada grupo e junta tudo num array só — o achatamento do aninhado.</dd>
+<dt>grupo vazio</dt>
+<dd>Cliente sem pedidos. Precisa de mensagem própria dentro do item, não de um espaço em branco.</dd>
+<dt>key composta</dt>
+<dd>Chave formada por dois ids, como <code>cliente.id + "-" + pedido.id</code>, quando um id só não é
+único no nível.</dd>
+</dl>
+
+<h2>7. Grupo vazio e grupo escondido</h2>
+
+<p>Um cliente sem pedidos ainda é um cliente: ele aparece na lista, com o nome e uma frase no lugar da
+lista interna. Isso é diferente de um grupo que ficou vazio porque o filtro não achou nada nele — e a
+diferença decide se o grupo aparece ou desaparece.</p>
+
+<pre class="file" data-file="App.jsx">&lt;ul&gt;
+  {cliente.pedidos.length === 0 ? (
+    &lt;li className="vazio"&gt;Sem pedidos nesta semana.&lt;/li&gt;
+  ) : (
+    cliente.pedidos.map((pedido) =&gt; (
+      &lt;li className="item" key={pedido.id}&gt;{pedido.pao}&lt;/li&gt;
+    ))
+  )}
+&lt;/ul&gt;</pre>
+
+<p>Já na busca, o comportamento esperado é outro: grupos sem nenhum pedido que combine não devem ocupar
+espaço. A solução é filtrar os clientes <em>antes</em> de desenhar, montando uma lista derivada em que cada
+cliente carrega só os pedidos que passaram no teste:</p>
+
+<pre class="file" data-file="App.jsx">const grupos = clientes
+  .map((cliente) =&gt; ({
+    ...cliente,
+    pedidos: cliente.pedidos.filter((pedido) =&gt;
+      pedido.pao.toLowerCase().includes(busca.toLowerCase())
+    )
+  }))
+  .filter((cliente) =&gt; cliente.pedidos.length &gt; 0);</pre>
+
+<p>São duas etapas de propósito: primeiro cada grupo é reduzido aos pedidos que combinam; depois os grupos
+que sobraram vazios são descartados. Inverter a ordem — filtrar clientes primeiro — não funciona, porque o
+teste é sobre o pedido, não sobre o cliente.</p>
+
+<div class="tryreact" data-goal="digite:input=queijo;;conta:li.grupo=1;;conta:li.item=1;;texto:Pão de queijo">
+  <p class="try-task">Digite “queijo”: o pedido certo aparece, mas os grupos dos outros clientes continuam
+  na tela, vazios. Filtre os grupos vazios depois de filtrar os pedidos, para sobrar só o grupo do
+  João.</p>
+  <pre class="jsx">const clientes = [
+  { id: 1, nome: "Maria", pedidos: [
+    { id: 11, pao: "Brioche", valor: 8 },
+    { id: 12, pao: "Sonho", valor: 5 }
+  ] },
+  { id: 2, nome: "João", pedidos: [
+    { id: 21, pao: "Pão de queijo", valor: 4 }
+  ] },
+  { id: 3, nome: "Bia", pedidos: [
+    { id: 31, pao: "Croissant", valor: 7 },
+    { id: 32, pao: "Broa de fubá", valor: 6 }
+  ] }
+];
+
+function App() {
+  const [busca, setBusca] = useState("");
+  return (
+    &lt;div&gt;
+      &lt;input
+        value={busca}
+        placeholder="Buscar pedido"
+        onChange={(e) =&gt; setBusca(e.target.value)}
+      /&gt;
+      &lt;ul&gt;
+        {clientes.map((cliente) =&gt; (
+          &lt;li className="grupo" key={cliente.id}&gt;
+            &lt;strong&gt;{cliente.nome}&lt;/strong&gt;
+            &lt;ul&gt;
+              {cliente.pedidos
+                .filter((pedido) =&gt;
+                  pedido.pao.toLowerCase().includes(busca.toLowerCase())
+                )
+                .map((pedido) =&gt; (
+                  &lt;li className="item" key={pedido.id}&gt;{pedido.pao}&lt;/li&gt;
+                ))}
+            &lt;/ul&gt;
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input placeholder="Buscar pedido" value=""&gt;
+  &lt;ul&gt;
+    &lt;li class="grupo"&gt;
+      &lt;strong&gt;Maria&lt;/strong&gt;
+      &lt;ul&gt;
+        &lt;li class="item"&gt;Brioche&lt;/li&gt;
+        &lt;li class="item"&gt;Sonho&lt;/li&gt;
+      &lt;/ul&gt;
+    &lt;/li&gt;
+    &lt;li class="grupo"&gt;
+      &lt;strong&gt;João&lt;/strong&gt;
+      &lt;ul&gt;
+        &lt;li class="item"&gt;Pão de queijo&lt;/li&gt;
+      &lt;/ul&gt;
+    &lt;/li&gt;
+    &lt;li class="grupo"&gt;
+      &lt;strong&gt;Bia&lt;/strong&gt;
+      &lt;ul&gt;
+        &lt;li class="item"&gt;Croissant&lt;/li&gt;
+        &lt;li class="item"&gt;Broa de fubá&lt;/li&gt;
+      &lt;/ul&gt;
+    &lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const clientes = [
+  { id: 1, nome: "Maria", pedidos: [
+    { id: 11, pao: "Brioche", valor: 8 },
+    { id: 12, pao: "Sonho", valor: 5 }
+  ] },
+  { id: 2, nome: "João", pedidos: [
+    { id: 21, pao: "Pão de queijo", valor: 4 }
+  ] },
+  { id: 3, nome: "Bia", pedidos: [
+    { id: 31, pao: "Croissant", valor: 7 },
+    { id: 32, pao: "Broa de fubá", valor: 6 }
+  ] }
+];
+
+function App() {
+  const [busca, setBusca] = useState("");
+  const grupos = clientes
+    .map((cliente) =&gt; ({
+      ...cliente,
+      pedidos: cliente.pedidos.filter((pedido) =&gt;
+        pedido.pao.toLowerCase().includes(busca.toLowerCase())
+      )
+    }))
+    .filter((cliente) =&gt; cliente.pedidos.length &gt; 0);
+  return (
+    &lt;div&gt;
+      &lt;input
+        value={busca}
+        placeholder="Buscar pedido"
+        onChange={(e) =&gt; setBusca(e.target.value)}
+      /&gt;
+      &lt;ul&gt;
+        {grupos.map((cliente) =&gt; (
+          &lt;li className="grupo" key={cliente.id}&gt;
+            &lt;strong&gt;{cliente.nome}&lt;/strong&gt;
+            &lt;ul&gt;
+              {cliente.pedidos.map((pedido) =&gt; (
+                &lt;li className="item" key={pedido.id}&gt;{pedido.pao}&lt;/li&gt;
+              ))}
+            &lt;/ul&gt;
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O <code>{...cliente}</code> copia o cliente e substitui a propriedade <code>pedidos</code> pela lista
+filtrada. É o mesmo spread das aulas anteriores, agora com objeto em vez de array. E o segundo
+<code>filter</code> é o que remove os grupos sem nenhum pedido.</p>
+
+<p>Se você digitar “queijo” e continuar vendo três grupos, falta o segundo <code>filter</code>; se a tela
+ficar sem nada, o filtro de pedidos está comparando o campo errado. E se nenhum grupo aparecer com a busca
+vazia, o segundo <code>filter</code> está olhando a lista errada — provavelmente <code>clientes</code>, que
+nunca fica vazia.</p>
+
+<h2>8. Achatar quando a tela é uma lista só</h2>
+
+<p>Nem toda tela quer o agrupamento. Às vezes você precisa de todos os pedidos numa sequência única: para
+somar o faturamento do dia, para ordenar por preço ou para mostrar um recibo. O <code>flatMap</code> faz
+isso em uma passada: transforma cada cliente no seu array de pedidos e junta tudo num array só.</p>
+
+<pre class="file" data-file="App.jsx">const todos = clientes.flatMap((cliente) =&gt; cliente.pedidos);
+
+const faturamento = todos.reduce((soma, pedido) =&gt; soma + pedido.valor, 0);</pre>
+
+<p>Cinco pedidos, um array. A partir daí valem as ferramentas de sempre: <code>filter</code> para a busca,
+<code>sort</code> para a ordem, <code>map</code> para desenhar. Se você precisar saber de quem é cada
+pedido depois do achatamento, inclua o nome no objeto antes de juntar:</p>
+
+<pre class="file" data-file="App.jsx">const todos = clientes.flatMap((cliente) =&gt;
+  cliente.pedidos.map((pedido) =&gt; ({ ...pedido, cliente: cliente.nome }))
+);</pre>
+
+<p>Esse é o caminho inverso do agrupamento: o dado achatado é melhor para somar e comparar; o agrupado é
+melhor para mostrar quem pediu o quê. Converter entre os dois é barato — e fazer isso no render, com dados
+derivados, evita manter duas versões da verdade.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método</th><th>O que devolve</th><th>Para que serve aqui</th></tr>
+<tr><td><code>map</code></td><td>array do mesmo tamanho, transformado</td><td>desenhar grupos e itens</td></tr>
+<tr><td><code>filter</code></td><td>array menor, só com os aprovados</td><td>buscar pedidos dentro do grupo</td></tr>
+<tr><td><code>reduce</code></td><td>um valor só, acumulado</td><td>somar o valor dos pedidos do grupo</td></tr>
+<tr><td><code>flatMap</code></td><td>um array só, sem os níveis</td><td>juntar todos os pedidos para somar ou ordenar</td></tr>
+<tr><td><code>some</code></td><td><code>true</code> se algum item passar no teste</td><td>saber se o grupo tem algum pedido que combina</td></tr>
+</table>
+</div>
+
+<p>Uma ressalva: achatar por achar mais simples pode custar a informação de grupo. Se a tela precisa de
+“Maria com dois pedidos”, não achate. Escolha o formato pela pergunta que a tela responde, não pela
+facilidade do código.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o HTML sai com um “ul” solto</h3>
+<p>A Ana colocou o <code>&lt;ul&gt;</code> interno como irmão do <code>&lt;li&gt;</code>, fora dele. O
+navegador reorganiza o HTML por conta própria, e o CSS deixa de encontrar a lista dentro do item. Lista
+interna mora dentro do <code>&lt;li&gt;</code> do grupo — sempre.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: todos os pedidos aparecem no primeiro cliente</h3>
+<p>Ela percorreu <code>clientes</code> no segundo <code>map</code>, em vez de
+<code>cliente.pedidos</code>. O resultado é a lista inteira repetida em cada grupo — cinco pedidos em cada
+um. O parâmetro do <code>map</code> interno deve ser o array do cliente atual.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: a busca esconde os pedidos, mas não os grupos</h3>
+<p>O filtro foi aplicado só no <code>map</code> interno, então cada cliente continua na tela, alguns com a
+lista vazia. Filtre os pedidos e depois descarte os grupos sem pedidos. O vazio que sobra é de busca, e a
+mensagem geral dele é assunto da aula <a href="estados-vazios.html">Estados Vazios</a>.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Onde fica o segundo <code>map</code>?</p>
+<label><input type="radio" name="q1"> envolvendo o primeiro <code>map</code></label>
+<label><input type="radio" name="q1"> dentro do <code>&lt;li&gt;</code> do cliente, sobre <code>cliente.pedidos</code></label>
+<label><input type="radio" name="q1"> depois do <code>&lt;/ul&gt;</code>, sobre <code>clientes</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Quantas <code>key</code> uma lista de listas precisa?</p>
+<label><input type="radio" name="q2"> uma só, no primeiro <code>li</code></label>
+<label><input type="radio" name="q2"> nenhuma, porque são listas aninhadas</label>
+<label><input type="radio" name="q2"> uma em cada <code>li</code> gerado por <code>map</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Para que serve o <code>flatMap</code> aqui?</p>
+<label><input type="radio" name="q3"> juntar os arrays de pedidos num array só</label>
+<label><input type="radio" name="q3"> ordenar cada grupo separadamente</label>
+<label><input type="radio" name="q3"> criar uma <code>key</code> composta</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o total do grupo</h2>
+<p>Complete a chamada que soma os valores dos pedidos da Maria, começando do zero.</p>
+<div class="ex-code">cliente.pedidos.<input aria-label="resposta 1" data-answer="reduce" placeholder="...">((soma, pedido) =&gt; soma + pedido.valor, 0)</div>
+<p class="ex-dica">Dica: é o método que acumula um valor percorrendo o array; o segundo argumento é o valor
+inicial.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Lista aninhada é dado aninhado, e o desenho acompanha: um <code>map</code> para os grupos e outro,
+dentro do <code>&lt;li&gt;</code> de cada grupo, para os itens. A lista interna fica dentro do item, nunca
+como irmã dele. Cada nível ganha a sua <code>key</code>, com o id daquele nível.</p>
+
+<p>Nomes específicos — <code>cliente</code>, <code>pedido</code> — evitam que um parâmetro esconda o outro.
+Totais por grupo saem de <code>reduce</code> com valor inicial zero, calculados no render: o total é
+consequência dos pedidos, não um estado separado.</p>
+
+<p>Grupo vazio de verdade mostra uma frase; grupo esvaziado pelo filtro desaparece. E quando a tela pede uma
+lista só, <code>flatMap</code> achata o aninhado — lembrando que o formato do dado deve seguir a pergunta
+da tela.</p>
+
+<p>Com isso você fechou o conjunto de listas do nível: desenhar, dar <code>key</code>, filtrar, ordenar,
+paginar e aninhar. Tabela, estado vazio e busca aparecem em cada uma delas, e sempre com a mesma ideia por
+baixo — o estado guarda o mínimo, o render calcula o resto, e a tela é consequência.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Aninhado pede <code>map</code> dentro de <code>map</code>.</li>
+<li>O <code>ul</code> interno fica dentro do <code>li</code> do grupo.</li>
+<li>Uma <code>key</code> por nível, com o id daquele nível.</li>
+<li>Plural no array, singular no parâmetro: <code>clientes</code> / <code>cliente</code>.</li>
+<li>Total do grupo: <code>reduce((soma, item) =&gt; soma + item.valor, 0)</code>.</li>
+<li>Calcule totais no render; não os guarde no estado.</li>
+<li>Grupo sem itens por natureza mostra mensagem; grupo esvaziado por filtro some.</li>
+<li>Filtre os itens e depois descarte os grupos vazios.</li>
+<li><code>flatMap</code> junta os arrays num só; use quando a tela é uma lista única.</li>
+<li>Achatar é barato, mas perde o agrupamento: escolha pelo que a tela responde.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

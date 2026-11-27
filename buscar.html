@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buscar | Guia React</title>
+<meta name="description" content="Buscar em listas no React: campo controlado, filtro com includes, maiúsculas e acentos com normalize e como procurar em mais de um campo sem perder a lista original.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Buscar</span></h1>
+<p class="intro">A Ana tem uma lista de pães no site e um cliente por dia perguntando “tem pão de queijo?”.
+Ela responde de cabeça, mas a lista cresceu: agora são broa, sonho, brioche, croissant e mais uma dúzia de
+nomes. Procurar com o dedo na tela funciona até a terceira linha. Nesta aula ela aprende a busca de verdade:
+um campo onde a pessoa digita, um filtro que decide quem fica, e a lista original intacta o tempo
+inteiro.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que a busca é um filtro da lista, e não uma lista nova guardada no estado.</li>
+  <li>Como ligar o campo ao estado e filtrar a cada letra digitada.</li>
+  <li>O que o <code>includes</code> responde e por que ele diferencia maiúsculas.</li>
+  <li>Como buscar sem tropeçar em acento: <code>normalize</code> e <code>toLowerCase</code>.</li>
+  <li>Como procurar em dois campos, como nome e código.</li>
+  <li>O que mostrar quando nenhum item casa com a busca.</li>
+  <li>Como limpar a busca e voltar à lista completa.</li>
+</ul>
+</div>
+
+<h2>1. A cena: procurar com o dedo na tela</h2>
+
+<p>O site da padaria mostra os pães em Cards, um abaixo do outro. Quando alguém pergunta por um pão
+específico, a Ana rola a página e lê os nomes. Com sete pães, isso leva dois segundos. Com trinta, leva uma
+eternidade — e ela sempre erra na terceira dobra, porque os nomes são parecidos: pão francês, pão de
+queijo, pão doce, pão integral.</p>
+
+<p>A busca resolve esse problema de um jeito que parece mágica e é bem direto: enquanto a pessoa digita, o
+site mostra só os itens que combinam com o que foi digitado. Nada é enviado para lugar nenhum, nada é
+recarregado. A cada letra, o React redesenha a lista com menos itens.</p>
+
+<p>O que confunde no começo é achar que a busca “cria” uma lista nova. Ela não cria: ela <strong>filtra</strong>
+a lista que já existe. A lista de pães continua com trinta itens; o que muda é quantos deles você manda
+desenhar. Guardar isso na cabeça evita a maior parte dos bugs desta aula — inclusive o clássico “limpei a
+busca e os pães não voltaram”.</p>
+
+<p>Então o desenho é: um estado pequeno com o texto digitado, a lista completa guardada como está, e uma
+conta feita na hora de desenhar que decide quem aparece. Três peças, nenhuma mágica.</p>
+
+<h2>2. A busca é um filtro, não uma lista nova</h2>
+
+<p>Filtrar é escolher. O método de array que faz isso é o <code>filter</code>: ele recebe uma função, roda
+essa função para cada item e devolve um array novo só com os itens em que a função devolveu
+<code>true</code>. O array original não é tocado.</p>
+
+<pre class="file" data-file="sem-react.js">const paes = ["Pão de queijo", "Broa de fubá", "Sonho"];
+
+const comQueijo = paes.filter((pao) =&gt; pao.includes("queijo"));
+
+console.log(comQueijo);</pre>
+
+<p>O resultado é <code>["Pão de queijo"]</code>. O array <code>paes</code> continua com os três itens, na
+mesma ordem. Essa é a diferença essencial entre <code>filter</code> e <code>sort</code>: o
+<code>sort</code> mexe na lista, o <code>filter</code> devolve outra. Guarde a comparação, porque ela
+explica por que a busca é segura de rodar quantas vezes for preciso.</p>
+
+<p>Dentro do componente, o filtro acontece entre o estado e o <code>map</code>. A ordem das operações é
+sempre a mesma: primeiro você decide quem fica (<code>filter</code>), depois transforma cada um em elemento
+(<code>map</code>). Se inverter, você desenha tudo e esconde depois — funciona, mas é mais trabalho e mais
+difícil de ler.</p>
+
+<p>E o <code>filter</code> precisa de uma resposta de sim ou não. É aí que entra o teste da próxima seção:
+o que exatamente significa “combina com o que foi digitado”.</p>
+
+<h2>3. O campo controlado, em duas linhas</h2>
+
+<p>Para saber o que a pessoa digitou, o campo precisa ser controlado pelo React: o valor vem do estado, e
+cada tecla avisa o estado para mudar. São duas linhas, e elas aparecem em qualquer busca do guia:</p>
+
+<pre class="file" data-file="Busca.jsx">const [busca, setBusca] = useState("");
+
+&lt;input
+  type="search"
+  value={busca}
+  placeholder="Buscar pão"
+  onChange={(e) =&gt; setBusca(e.target.value)}
+/&gt;</pre>
+
+<p><code>value={busca}</code> manda o estado para o campo. <code>onChange</code> recebe o evento e guarda
+<code>e.target.value</code> — o texto que está no campo agora — no estado. Sem o <code>onChange</code>, o
+campo fica travado e a pessoa não consegue digitar; sem o <code>value</code>, o estado e a tela podem
+discordar. A aula <a href="entrada-controlada.html">Entrada Controlada</a> destrincha esse mecanismo; aqui
+basta reconhecer o par.</p>
+
+<p>O estado inicial é uma string vazia, e isso importa: busca vazia significa “mostre tudo”. Um
+<code>filter</code> com critério vazio aceita todos os itens, porque toda string contém a string vazia.
+Essa coincidência feliz é o que faz a lista aparecer inteira antes de a pessoa digitar qualquer coisa.</p>
+
+<p>Note também o <code>type="search"</code>. Ele não muda a lógica, mas dá ao navegador a dica de que
+aquele campo é de busca: no celular, o teclado pode ganhar a tecla “buscar”; no desktop, alguns navegadores
+mostram um “x” para limpar. É detalhe de interface, não de dados — e é de graça.</p>
+
+<h2>4. includes: o teste que decide quem fica</h2>
+
+<p>Toda string tem um método <code>includes</code> que responde uma pergunta simples: “este pedaço de texto
+aparece aqui dentro?”. A resposta é <code>true</code> ou <code>false</code>, exatamente o que o
+<code>filter</code> precisa.</p>
+
+<pre class="term">&gt; "Pão de queijo".includes("queijo")
+true
+&gt; "Pão de queijo".includes("QUEIJO")
+false
+&gt; "Pão de queijo".includes("")
+true</pre>
+
+<p>A segunda linha é a que surpreende: <code>includes</code> diferencia maiúsculas de minúsculas. Quem
+digita “QUEIJO” com o Caps Lock ligado não encontra nada. E a terceira explica por que a lista inteira
+aparece antes de digitar: toda string contém a string vazia.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método</th><th>Pergunta que responde</th><th>Exemplo com “Pão de queijo”</th></tr>
+<tr><td><code>includes</code></td><td>o pedaço aparece em qualquer posição?</td><td><code>includes("queijo")</code> devolve <code>true</code></td></tr>
+<tr><td><code>startsWith</code></td><td>o texto começa com o pedaço?</td><td><code>startsWith("Pão")</code> devolve <code>true</code></td></tr>
+<tr><td><code>endsWith</code></td><td>o texto termina com o pedaço?</td><td><code>endsWith("queijo")</code> devolve <code>true</code></td></tr>
+<tr><td><code>toLowerCase</code></td><td>como fica tudo em minúsculas?</td><td><code>"PÃO".toLowerCase()</code> devolve <code>"pão"</code></td></tr>
+<tr><td><code>trim</code></td><td>como tirar os espaços das pontas?</td><td><code>"  pão ".trim()</code> devolve <code>"pão"</code></td></tr>
+</table>
+</div>
+
+<p>O conserto é padronizar os dois lados antes de comparar. Baixar tudo para minúsculas com
+<code>toLowerCase()</code> resolve a maior parte dos casos:</p>
+
+<pre class="file" data-file="Busca.jsx">const encontrados = paes.filter((pao) =&gt;
+  pao.toLowerCase().includes(busca.toLowerCase())
+);</pre>
+
+<p>Repare que o <code>toLowerCase</code> aparece duas vezes: no item e no texto buscado. Se você baixar só
+um dos lados, continua errado — é uma comparação, e os dois lados precisam falar a mesma língua. O mesmo
+vale para espaços: <code>busca.trim()</code> corta o espaço que sobra no começo e no fim, e evita que
+alguém digitando “ pão” não encontre nada.</p>
+
+<div class="tryreact" data-goal="digite:input=queijo;;conta:li.item=1;;texto:Pão de queijo">
+  <p class="try-task">O campo já guarda o que a pessoa digita, mas a lista mostra todos os pães sempre.
+  Filtre a lista com <code>includes</code>, comparando os dois lados em minúsculas, para que digitar
+  “queijo” deixe só um item.</p>
+  <pre class="jsx">const paes = ["Pão de queijo", "Broa de fubá", "Sonho"];
+
+function App() {
+  const [busca, setBusca] = useState("");
+  return (
+    &lt;div&gt;
+      &lt;input
+        type="search"
+        value={busca}
+        placeholder="Buscar pão"
+        onChange={(e) =&gt; setBusca(e.target.value)}
+      /&gt;
+      &lt;ul&gt;
+        {paes.map((pao) =&gt; (
+          &lt;li className="item" key={pao}&gt;{pao}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input placeholder="Buscar pão" type="search" value=""&gt;
+  &lt;ul&gt;
+    &lt;li class="item"&gt;Pão de queijo&lt;/li&gt;
+    &lt;li class="item"&gt;Broa de fubá&lt;/li&gt;
+    &lt;li class="item"&gt;Sonho&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const paes = ["Pão de queijo", "Broa de fubá", "Sonho"];
+
+function App() {
+  const [busca, setBusca] = useState("");
+  const encontrados = paes.filter((pao) =&gt;
+    pao.toLowerCase().includes(busca.toLowerCase())
+  );
+  return (
+    &lt;div&gt;
+      &lt;input
+        type="search"
+        value={busca}
+        placeholder="Buscar pão"
+        onChange={(e) =&gt; setBusca(e.target.value)}
+      /&gt;
+      &lt;ul&gt;
+        {encontrados.map((pao) =&gt; (
+          &lt;li className="item" key={pao}&gt;{pao}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em Verificar depois de digitar “queijo” na prévia. A conferência conta os itens da lista: com o
+filtro certo, sobra um. Se sobrarem três, o filtro não está sendo usado no <code>map</code>; se sobrar
+nenhum, provavelmente um dos lados não foi padronizado.</p>
+
+<dl class="anatomy">
+<dt>busca</dt>
+<dd>O texto que a pessoa digitou, guardado no estado. Começa como <code>""</code>, que significa “mostre
+tudo”.</dd>
+<dt>filter</dt>
+<dd>Método que devolve um array novo só com os itens aprovados pela função. Não altera o original.</dd>
+<dt>includes</dt>
+<dd>Responde se um pedaço de texto aparece dentro de outro. Diferencia maiúsculas de minúsculas.</dd>
+<dt>normalize</dt>
+<dd>Converte o texto para uma forma em que letra acentuada e letra simples podem ser comparadas. Usado com
+<code>"NFD"</code> e uma expressão que remove os acentos.</dd>
+<dt>entrada controlada</dt>
+<dd>Campo cujo valor vem do estado (<code>value</code>) e que avisa cada tecla (<code>onChange</code>).</dd>
+<dt>derivado</dt>
+<dd>A lista filtrada: calculada a partir da lista e da busca, na hora de desenhar, sem estado próprio.</dd>
+</dl>
+
+<h2>5. Acento é o teste de verdade</h2>
+
+<p>Baixar para minúsculas resolve metade. A outra metade é acento. Em português, ninguém digita acento em
+campo de busca — e “broa de fuba” precisa encontrar “Broa de fubá”. O <code>includes</code> não sabe disso:
+para ele, “á” e “a” são letras diferentes.</p>
+
+<pre class="term">&gt; "Broa de fubá".normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+Broa de fuba
+&gt; "Broa de fubá".includes("fuba")
+false</pre>
+
+<p>O <code>normalize("NFD")</code> separa a letra do acento: “á” vira “a” mais um sinal gráfico invisível.
+O <code>replace</code> com aquela expressão apaga só os sinais gráficos, e o texto volta sem acento. É
+feio de ler e funciona sempre. Vale embrulhar num nome melhor, uma vez, e usar em todo o site:</p>
+
+<pre class="file" data-file="texto.js">function semAcento(texto) {
+  return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}</pre>
+
+<p>Com isso, o filtro fica uma linha comprida, mas honesta:</p>
+
+<pre class="file" data-file="Busca.jsx">const encontrados = paes.filter((pao) =&gt;
+  semAcento(pao).toLowerCase().includes(semAcento(busca).toLowerCase())
+);</pre>
+
+<p>Há um detalhe de desempenho aqui que vale mencionar e não vale otimizar ainda: a cada tecla, o
+<code>filter</code> roda para todos os itens e normaliza o texto de cada um. Com trinta pães, isso é
+invisível. Com trinta mil, você vai querer <code>useMemo</code> ou normalizar os textos uma vez, quando os
+dados chegam. A regra é sempre a mesma: primeiro funciona, depois mede, depois otimiza.</p>
+
+<div class="tryreact" data-goal="digite:input=FUBA;;conta:li.item=1;;texto:Broa de fubá">
+  <p class="try-task">Quem digita “FUBA”, sem acento, não encontra “Broa de fubá”. Crie a função
+  <code>semAcento</code> e aplique nos dois lados da comparação, mantendo também o <code>toLowerCase</code>.</p>
+  <pre class="jsx">const paes = ["Pão de queijo", "Broa de fubá", "Sonho"];
+
+function App() {
+  const [busca, setBusca] = useState("");
+  const encontrados = paes.filter((pao) =&gt;
+    pao.toLowerCase().includes(busca.toLowerCase())
+  );
+  return (
+    &lt;div&gt;
+      &lt;input
+        value={busca}
+        placeholder="Buscar pão"
+        onChange={(e) =&gt; setBusca(e.target.value)}
+      /&gt;
+      &lt;ul&gt;
+        {encontrados.map((pao) =&gt; (
+          &lt;li className="item" key={pao}&gt;{pao}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input placeholder="Buscar pão" value=""&gt;
+  &lt;ul&gt;
+    &lt;li class="item"&gt;Pão de queijo&lt;/li&gt;
+    &lt;li class="item"&gt;Broa de fubá&lt;/li&gt;
+    &lt;li class="item"&gt;Sonho&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const paes = ["Pão de queijo", "Broa de fubá", "Sonho"];
+
+function semAcento(texto) {
+  return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function App() {
+  const [busca, setBusca] = useState("");
+  const encontrados = paes.filter((pao) =&gt;
+    semAcento(pao).toLowerCase().includes(semAcento(busca).toLowerCase())
+  );
+  return (
+    &lt;div&gt;
+      &lt;input
+        value={busca}
+        placeholder="Buscar pão"
+        onChange={(e) =&gt; setBusca(e.target.value)}
+      /&gt;
+      &lt;ul&gt;
+        {encontrados.map((pao) =&gt; (
+          &lt;li className="item" key={pao}&gt;{pao}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Se a sua solução não achar nada digitando “FUBA”, confira a ordem das operações: normalizar antes de
+baixar para minúsculas, ou depois, dá no mesmo; esquecer um dos lados, não. E cuidado com a expressão
+copiada: ela precisa das barras no começo e no fim e do <code>g</code> no final, senão o
+<code>replace</code> troca só o primeiro acento que encontra.</p>
+
+<h2>6. Buscar em mais de um campo</h2>
+
+<p>Quando o item deixa de ser texto e passa a ser objeto, a busca muda um pouco. Cada pão tem
+<code>nome</code>, <code>codigo</code> e talvez <code>categoria</code>. A pessoa pode digitar “sonho” (nome)
+ou “17” (código) — e é razoável esperar que as duas coisas funcionem.</p>
+
+<p>A receita é juntar as condições com <code>||</code>: o item fica se casa por um campo <em>ou</em> pelo
+outro. E atenção a um detalhe de tipo: <code>codigo</code> é número, e número não tem
+<code>includes</code>. Converta antes com <code>String(pao.codigo)</code>, ou compare com
+<code>==</code> depois de converter a busca. Sem isso, a busca por código simplesmente não acha.</p>
+
+<pre class="file" data-file="Busca.jsx">const encontrados = paes.filter((pao) =&gt; {
+  const texto = busca.trim().toLowerCase();
+  return (
+    pao.nome.toLowerCase().includes(texto) ||
+    String(pao.codigo).includes(texto)
+  );
+});</pre>
+
+<p>Com três ou mais campos, o código começa a ficar repetitivo. Vale a pena montar uma lista de valores e
+usar <code>some</code>, que responde “algum destes combina?”. É a mesma ideia do <code>filter</code>, um
+nível abaixo, e a aula <a href="listas-com-map.html">Listas com map</a> já mostrou que métodos de array se
+combinam.</p>
+
+<pre class="file" data-file="Busca.jsx">const encontrados = paes.filter((pao) =&gt;
+  [pao.nome, String(pao.codigo), pao.categoria]
+    .some((valor) =&gt; valor.toLowerCase().includes(texto))
+);</pre>
+
+<p>As duas versões funcionam. A primeira é mais fácil de ler quando são dois campos; a segunda escala sem
+virar uma escada de <code>||</code>. Escolha pela clareza, não pela esperteza.</p>
+
+<div class="tryreact" data-goal="digite:input=17;;conta:li.item=1;;texto:17 — Sonho;;clique:button.limpar;;conta:li.item=4">
+  <p class="try-task">A busca só olha o nome. Faça ela achar também pelo código, para que digitar “17”
+  mostre o sonho — e confira que o botão Limpar devolve os quatro pães.</p>
+  <pre class="jsx">const paes = [
+  { codigo: 12, nome: "Pão de queijo" },
+  { codigo: 17, nome: "Sonho" },
+  { codigo: 21, nome: "Broa de fubá" },
+  { codigo: 30, nome: "Brioche" }
+];
+
+function App() {
+  const [busca, setBusca] = useState("");
+  const encontrados = paes.filter((pao) =&gt;
+    pao.nome.toLowerCase().includes(busca.toLowerCase())
+  );
+  return (
+    &lt;div&gt;
+      &lt;input
+        type="search"
+        value={busca}
+        placeholder="Nome ou código"
+        onChange={(e) =&gt; setBusca(e.target.value)}
+      /&gt;
+      &lt;button className="limpar" onClick={() =&gt; setBusca("")}&gt;Limpar&lt;/button&gt;
+      &lt;ul&gt;
+        {encontrados.map((pao) =&gt; (
+          &lt;li className="item" key={pao.codigo}&gt;{pao.codigo} — {pao.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input placeholder="Nome ou código" type="search" value=""&gt;
+  &lt;button class="limpar"&gt;Limpar&lt;/button&gt;
+  &lt;ul&gt;
+    &lt;li class="item"&gt;12 — Pão de queijo&lt;/li&gt;
+    &lt;li class="item"&gt;17 — Sonho&lt;/li&gt;
+    &lt;li class="item"&gt;21 — Broa de fubá&lt;/li&gt;
+    &lt;li class="item"&gt;30 — Brioche&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const paes = [
+  { codigo: 12, nome: "Pão de queijo" },
+  { codigo: 17, nome: "Sonho" },
+  { codigo: 21, nome: "Broa de fubá" },
+  { codigo: 30, nome: "Brioche" }
+];
+
+function App() {
+  const [busca, setBusca] = useState("");
+  const texto = busca.trim().toLowerCase();
+  const encontrados = paes.filter((pao) =&gt;
+    pao.nome.toLowerCase().includes(texto) ||
+    String(pao.codigo).includes(texto)
+  );
+  return (
+    &lt;div&gt;
+      &lt;input
+        type="search"
+        value={busca}
+        placeholder="Nome ou código"
+        onChange={(e) =&gt; setBusca(e.target.value)}
+      /&gt;
+      &lt;button className="limpar" onClick={() =&gt; setBusca("")}&gt;Limpar&lt;/button&gt;
+      &lt;ul&gt;
+        {encontrados.map((pao) =&gt; (
+          &lt;li className="item" key={pao.codigo}&gt;{pao.codigo} — {pao.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O botão Limpar faz uma coisa só: devolve a busca para a string vazia. Como o filtro é derivado, a lista
+inteira volta sozinha — não há nada para “restaurar”. Esse é o teste prático de que você escolheu o desenho
+certo: limpar é uma linha, e não uma cópia de segurança da lista.</p>
+
+<h2>7. Quando nada é encontrado</h2>
+
+<p>Busca vazia mostra tudo; busca sem resultado mostra nada. E uma área em branco é a pior resposta
+possível: a pessoa não sabe se o site quebrou, se ainda está carregando ou se aquele pão não existe. A
+solução é dizer o que aconteceu, com as palavras de quem está usando:</p>
+
+<pre class="file" data-file="Busca.jsx">{encontrados.length === 0 ? (
+  &lt;p&gt;Nenhum pão encontrado para "{busca}".&lt;/p&gt;
+) : (
+  &lt;ul&gt;
+    {encontrados.map((pao) =&gt; (
+      &lt;li className="item" key={pao.codigo}&gt;{pao.nome}&lt;/li&gt;
+    ))}
+  &lt;/ul&gt;
+)}</pre>
+
+<p>Repare que a mensagem cita o que foi buscado. Isso ajuda a pessoa a perceber o próprio erro de digitação
+— “pao de quejo” — e a corrigir sem achar que o site está quebrado. Uma boa mensagem de vazio tem três
+coisas: o que não foi encontrado, o termo usado e um caminho de saída (limpar a busca, ver tudo).</p>
+
+<p>Essa diferença entre “lista vazia porque não há dados” e “lista vazia porque o filtro não achou nada” é
+o assunto da aula de Estados Vazios, mais adiante neste nível. Por enquanto, guarde a distinção: são dois
+vazios diferentes, e a mensagem de cada um deve ser diferente.</p>
+
+<p>Um cuidado de acessibilidade que vale desde já: coloque a mensagem num elemento com
+<code>role="status"</code>. Leitores de tela anunciam mudanças nesse elemento, então quem não vê a lista
+descobre que a busca não achou nada. É um atributo, não um curso.</p>
+
+<h2>8. Limpar, focar e não filtrar o estado</h2>
+
+<p>Três decisões pequenas que fazem a busca parecer profissional. A primeira: o botão de limpar deve
+devolver o foco ao campo, para a pessoa continuar digitando. Isso se faz com uma referência ao
+<code>input</code> e uma chamada de <code>focus()</code> depois de limpar — o <code>useRef</code> resolve,
+e tem aula própria mais adiante.</p>
+
+<p>A segunda: não guarde a lista filtrada no estado. Guardar <code>resultados</code> e
+<code>busca</code> ao mesmo tempo cria duas verdades que precisam ser sincronizadas em cada tecla, em cada
+item novo, em cada limpeza. Guarde só <code>busca</code>; a lista é conta. Se um dia a conta ficar cara,
+<code>useMemo</code> resolve sem mudar o desenho.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde fica a lista filtrada</th><th>Como fica o código</th><th>O que acontece</th></tr>
+<tr><td>no estado</td><td><code>setResultados(paes.filter(...))</code></td><td>a lista original se perde; o próximo filtro roda sobre o resultado</td></tr>
+<tr><td>calculada no render</td><td><code>const encontrados = paes.filter(...)</code></td><td>sempre parte da lista completa: é o jeito recomendado</td></tr>
+<tr><td>no servidor</td><td>uma requisição por busca</td><td>precisa de atraso, estado de carregamento e tratamento de erro</td></tr>
+</table>
+</div>
+
+<p>A terceira: com dados locais, não precisa de espera. Com dados de uma API, cada tecla viraria uma
+requisição, e você vai querer atrasar a chamada — <em>debounce</em> — ou usar <code>useDeferredValue</code>
+para a tela não engasgar. São assuntos de outro nível; o importante agora é saber que a busca local é
+síncrona e instantânea.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a busca acha, mas apaga o resto</h3>
+<p>A Ana salvou o resultado do filtro no mesmo estado da lista. Depois de buscar uma vez, a lista original
+“sumiu”: o próximo filtro roda sobre o resultado anterior, e a busca vira uma armadilha que só encolhe.
+Filtro é cálculo, não armazenamento. Mantenha a lista completa e derive o que aparece.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: ninguém acha nada com acento</h3>
+<p>Quem digita “fuba” não encontra “fubá”, e quem digita “Fuba” também não. São dois problemas diferentes
+no mesmo filtro: acento e maiúscula. A correção é padronizar os dois lados com <code>semAcento</code> e
+<code>toLowerCase</code>, sempre na mesma ordem. Se funcionar para um caso e não para o outro, falta
+padronizar um dos lados.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: buscar por código não retorna nada</h3>
+<p>O campo <code>codigo</code> é número, e <code>.includes</code> não existe em número. O console do
+navegador acusa “pao.codigo.includes is not a function”, e a busca inteira para. Converta para texto com
+<code>String(pao.codigo)</code> antes de comparar — e lembre que “17” como texto encontra “170” também, o
+que às vezes é desejado e às vezes não.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. Qual é o papel do estado numa busca?</p>
+<label><input type="radio" name="q1"> guardar a lista já filtrada</label>
+<label><input type="radio" name="q1"> guardar o resultado da API</label>
+<label><input type="radio" name="q1"> guardar o texto digitado; a lista filtrada é calculada</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. Por que “Fuba” não encontra “fubá” com um filtro simples?</p>
+<label><input type="radio" name="q2"> porque <code>includes</code> diferencia maiúsculas e acentos</label>
+<label><input type="radio" name="q2"> porque o <code>filter</code> ignora strings com mais de cinco letras</label>
+<label><input type="radio" name="q2"> porque o React não redesenha listas filtradas</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. O que <code>paes.filter(...)</code> faz com o array original?</p>
+<label><input type="radio" name="q3"> ordena o array no lugar</label>
+<label><input type="radio" name="q3"> deixa intacto e devolve um array novo</label>
+<label><input type="radio" name="q3"> esvazia o array depois da renderização</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a busca sem acento</h2>
+<p>Complete a função que deixa o texto pronto para comparar: separa as letras dos acentos e apaga os sinais
+gráficos.</p>
+<div class="ex-code">function semAcento(texto) { return texto.normalize("NFD").replace(<input aria-label="resposta 1" data-answer="/[\u0300-\u036f]/g" placeholder="...">, ""); }</div>
+<p class="ex-dica">Dica: é uma expressão regular com as barras, o intervalo dos sinais gráficos e a letra
+<code>g</code> no fim, para trocar todos e não só o primeiro.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Buscar é filtrar. O estado guarda o texto digitado — uma string que começa vazia —, o
+<code>filter</code> decide quem fica e o <code>map</code> transforma quem ficou em elementos. A lista
+original nunca é alterada; por isso limpar a busca é só voltar a string para <code>""</code>.</p>
+
+<p>A comparação é a parte que exige atenção. <code>includes</code> diferencia maiúsculas; para resolver,
+baixe os dois lados com <code>toLowerCase</code>. Acentos exigem <code>normalize("NFD")</code> e a remoção
+dos sinais gráficos. Com mais de um campo, junte as condições com <code>||</code> ou percorra uma lista de
+valores com <code>some</code> — e converta números com <code>String()</code> antes de comparar.</p>
+
+<p>Quando o resultado é zero, diga isso com todas as letras e ofereça uma saída. Área em branco não é
+resposta. E não guarde o resultado no estado: guarde a pergunta (a busca) e calcule a resposta (a lista
+filtrada), do mesmo jeito que a Ana guarda o critério de ordenação e calcula a ordem na aula anterior.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>A busca é um estado de texto + um filtro derivado.</li>
+<li><code>filter</code> devolve array novo; o original fica intacto.</li>
+<li><code>includes</code> diferencia maiúsculas: padronize os dois lados.</li>
+<li><code>normalize("NFD")</code> + <code>replace</code> resolve acento.</li>
+<li><code>trim()</code> corta os espaços das pontas da busca.</li>
+<li>Número não tem <code>includes</code>: use <code>String(codigo)</code>.</li>
+<li>Dois campos: <code>||</code>; muitos campos: <code>some</code> sobre uma lista.</li>
+<li>Zero resultados merece mensagem, com o termo buscado e uma saída.</li>
+<li>Limpar a busca é <code>setBusca("")</code> — nada de restaurar cópia.</li>
+<li>Busca local é síncrona; API pede atraso ou <code>useDeferredValue</code>.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

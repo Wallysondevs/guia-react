@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Polling | Guia React</title>
+<meta name="description" content="Polling no React: atualizar a tela perguntando de novo em intervalos, a função de atualizar separada do efeito, resposta fora de ordem e pausa.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Polling</span>: perguntar de novo</h1>
+<p class="intro">O painel de encomendas da Ana mostra as encomendas do dia. O problema não é mostrar: é
+manter atualizado. Quando um cliente faz um pedido pelo celular, o painel que está aberto no balcão não fica
+sabendo — e a Ana só descobre a encomenda nova porque aperta F5. Ela aperta F5 dez vezes por hora, e já
+perdeu um pedido de bolo de aniversário assim. Nesta aula o painel passa a se atualizar sozinho, de tempos
+em tempos, com a técnica mais simples que existe para isso: perguntar de novo.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é polling e por que ele existe, mesmo sendo “menos elegante” que outras técnicas.</li>
+  <li>Por que a função de atualizar fica separada do efeito que a agenda.</li>
+  <li>Como o intervalo depende de um estado — e o que acontece com as dependências.</li>
+  <li>O que fazer quando a resposta antiga chega depois da nova.</li>
+  <li>Como pausar e retomar as atualizações sem deixar intervalo solto.</li>
+  <li>Como escolher o intervalo: custo no servidor contra frescor do dado.</li>
+  <li>Quando polling é a resposta errada.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o F5 dez vezes por hora</h2>
+
+<p>O painel de encomendas é um componente que busca a lista e desenha cada pedido. Foi escrito com o que já
+sabemos: estado para a lista, efeito que busca uma vez, <code>map</code> para desenhar. Funciona — uma vez.
+Quando a página abre, a foto é daquele instante e não muda mais.</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const [encomendas, setEncomendas] = useState([]);
+
+  useEffect(() =&gt; {
+    buscarEncomendas().then((lista) =&gt; setEncomendas(lista));
+  }, []);
+
+  return &lt;ul&gt;{encomendas.map((e) =&gt; &lt;li key={e.id}&gt;{e.cliente}&lt;/li&gt;)}&lt;/ul&gt;;
+}</pre>
+
+<p>A Ana resolveu do jeito que dava: F5. E aí apareceram dois problemas. O primeiro é que apertar F5 perde a
+posição de rolagem e o que estava digitado. O segundo é que ela esquece — em dia cheio, o painel fica
+parado meia hora, e o pedido entra por telefone enquanto a tela mostra o quadro de uma hora atrás.</p>
+
+<p>O que a Ana quer é o que todo painel quer: que a tela pergunte de novo sozinha. Isso tem nome —
+<em>polling</em>, de “sondar”, “consultar repetidamente”. O programa faz a mesma pergunta em intervalos
+regulares e atualiza a tela com o que voltar. Simples, sem servidor especial, sem biblioteca nova: só a sua
+busca de sempre, repetida.</p>
+
+<h2>2. O que é polling, na prática</h2>
+
+<p>A ideia central é que ninguém avisa quando algo muda. O servidor da padaria não tem como cutucar o
+navegador da Ana dizendo “chegou pedido novo”. Sem esse aviso, resta ao navegador perguntar. Polling é isso:
+perguntar em intervalos regulares, aceitando o custo de perguntar às vezes sem novidade nenhuma.</p>
+
+<p>O desenho tem três peças e vale conhecê-las pelos nomes. Primeiro, a <strong>busca</strong>: uma função
+que pede a lista e guarda no estado. Segundo, o <strong>agendamento</strong>: um <code>setInterval</code>
+que chama essa busca de tempos em tempos. Terceiro, a <strong>rodada</strong>: um contador de quantas vezes
+já perguntamos — útil para mostrar “atualizado 3 vezes” na tela e para resolver resposta atrasada, como a
+seção 5 mostra.</p>
+
+<dl class="anatomy">
+<dt>polling</dt>
+<dd>Perguntar de novo em intervalos regulares. A tela se atualiza porque pergunta, não porque foi avisada.</dd>
+<dt>intervalo</dt>
+<dd>O tempo entre uma pergunta e a próxima: 5 segundos, 30 segundos, 5 minutos. Quanto menor, mais fresco o
+dado e maior o custo no servidor.</dd>
+<dt>rodada</dt>
+<dd>O número da pergunta atual. Serve para mostrar na tela e para descartar resposta que chegou fora de
+ordem.</dd>
+<dt>tique</dt>
+<dd>Cada disparo do intervalo. Um tique, uma busca — é o nome que se usa quando se fala de relógio.</dd>
+<dt>pausar</dt>
+<dd>Parar de agendar temporariamente, sem desmontar o componente. Serve para economizar quando a aba está
+escondida ou quando a pessoa pausou de propósito.</dd>
+</dl>
+
+<h2>3. A função que atualiza, separada do efeito</h2>
+
+<p>O primeiro passo não tem nada de intervalo: é separar a busca numa função com nome, em vez de deixá-la
+solta dentro do efeito. Essa função passa a ser a única responsável por “pegar a lista e guardar no estado”.
+Depois, quem chama essa função pode ser o efeito, um botão, um intervalo — tanto faz.</p>
+
+<div class="tryreact" data-goal="clique:#atualizar;;texto:atualizações: 2;;texto:pendências: 3">
+  <p class="try-task">O botão soma 1 no estado <code>rodada</code>, mas o efeito tem lista de dependências
+  vazia e nunca roda de novo. Faça o efeito depender de <code>rodada</code> para que a busca aconteça a cada
+  clique: o painel tem de mostrar <strong>atualizações: 2</strong> e <strong>pendências: 3</strong>.</p>
+  <pre class="jsx">function buscarPendencias(rodada) {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok(2 + rodada), 0));
+}
+
+function App() {
+  const [rodada, setRodada] = useState(0);
+  const [pendentes, setPendentes] = useState(0);
+  const [atualizacoes, setAtualizacoes] = useState(0);
+
+  useEffect(() =&gt; {
+    buscarPendencias(rodada).then((total) =&gt; {
+      setPendentes(total);
+      setAtualizacoes((n) =&gt; n + 1);
+    });
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;button id="atualizar" onClick={() =&gt; setRodada(rodada + 1)}&gt;atualizar agora&lt;/button&gt;
+      &lt;p&gt;atualizações: {atualizacoes}&lt;/p&gt;
+      &lt;p&gt;pendências: {pendentes}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="atualizar"&gt;atualizar agora&lt;/button&gt;
+  &lt;p&gt;atualizações: 1&lt;/p&gt;
+  &lt;p&gt;pendências: 2&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscarPendencias(rodada) {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok(2 + rodada), 0));
+}
+
+function App() {
+  const [rodada, setRodada] = useState(0);
+  const [pendentes, setPendentes] = useState(0);
+  const [atualizacoes, setAtualizacoes] = useState(0);
+
+  useEffect(() =&gt; {
+    buscarPendencias(rodada).then((total) =&gt; {
+      setPendentes(total);
+      setAtualizacoes((n) =&gt; n + 1);
+    });
+  }, [rodada]);
+
+  return (
+    &lt;div&gt;
+      &lt;button id="atualizar" onClick={() =&gt; setRodada(rodada + 1)}&gt;atualizar agora&lt;/button&gt;
+      &lt;p&gt;atualizações: {atualizacoes}&lt;/p&gt;
+      &lt;p&gt;pendências: {pendentes}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A diferença entre os dois códigos é um par de colchetes: <code>[]</code> virou <code>[rodada]</code>. Com
+a lista vazia, o efeito roda uma vez na vida e ignora o resto. Com <code>[rodada]</code>, ele roda quando o
+componente monta e de novo sempre que <code>rodada</code> muda. É o mesmo mecanismo da aula de efeitos,
+agora com uma consequência que interessa: um botão passa a significar “busque de novo”.</p>
+
+<p>Só que o botão é justamente o que a Ana não quer apertar. O passo seguinte é trocar o dedo dela por um
+relógio: em vez de esperar o clique, um <code>setInterval</code> incrementa a rodada a cada 30 segundos. O
+efeito, que já sabe reagir à rodada, busca sozinho. Repare na divisão de trabalho — o relógio muda o estado,
+o efeito busca. Nenhuma peça faz duas coisas.</p>
+
+<h2>4. O intervalo dentro do efeito</h2>
+
+<p>O efeito que agenda o intervalo tem três cuidados que já apareceram nas aulas de timers e de limpeza:
+agendar uma vez, chamar a busca, e desfazer o agendamento quando o componente sai da tela. O código real do
+painel fica assim:</p>
+
+<pre class="file" data-file="App.jsx">useEffect(() =&gt; {
+  const id = setInterval(() =&gt; {
+    setRodada((r) =&gt; r + 1);
+  }, 30000);
+
+  return () =&gt; clearInterval(id);
+}, []);</pre>
+
+<p>Três detalhes que parecem pequenos e não são. A lista de dependências é <code>[]</code>, porque o
+intervalo deve ser criado uma vez só — se você colocar <code>rodada</code> ali, cada busca agenda um
+intervalo novo, e em poucos minutos existem vinte relógios correndo. A atualização usa a forma funcional
+<code>(r) =&gt; r + 1</code>, porque a função do intervalo guarda o valor antigo da rodada. E o
+<code>return</code> limpa o intervalo, senão ele continua correndo depois que o painel sai da tela.</p>
+
+<p>Uma alternativa comum é fazer o intervalo chamar a busca direto, sem passar por estado:
+<code>setInterval(atualizar, 30000)</code>. Funciona no começo e começa a mentir depois: a função
+<code>atualizar</code> guardada pelo intervalo é a do primeiro desenho, com o estado daquele momento. Se
+ela usa <code>pendentes</code> ou qualquer outro valor que mudou, vai ler o valor velho. Passar por um
+contador de rodada evita esse problema de graça, porque o efeito sempre roda com os valores atuais.</p>
+
+<h2>5. A resposta que chega fora de ordem</h2>
+
+<p>Aqui está a parte que morde. Com polling, várias buscas ficam em voo ao mesmo tempo. Se a rede está
+lenta, a resposta da rodada 1 pode chegar <em>depois</em> da resposta da rodada 2 — e, se a tela aceitar
+tudo que chega, ela termina mostrando um dado mais velho do que o que já tinha. A Ana viu isso como “o
+número pisca e volta”: o total cai de 12 para 10 sozinho, e depois de trinta segundos sobe de novo.</p>
+
+<p>A defesa é a mesma em qualquer lugar do mundo: numere as perguntas e guarde o número da última resposta
+aceita. Se chegar uma resposta de rodada menor, ela é velha — descarte, mesmo que tenha chegado agora.</p>
+
+<div class="tryreact" data-goal="clique:#atualizar;;texto:mostrando a rodada 2">
+  <p class="try-task">O botão dispara duas buscas ao mesmo tempo; a rodada 1 demora 60 ms e a 2 responde na
+  hora, então a antiga chega por último e sobrescreve a nova. Guarde numa <code>useRef</code> a maior rodada
+  já recebida e ignore as respostas mais antigas: a tela tem de mostrar <strong>mostrando a rodada 2</strong>.</p>
+  <pre class="jsx">function buscar(rodada) {
+  const atraso = rodada === 1 ? 60 : 0;
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok({ rodada: rodada, total: 10 + rodada }), atraso));
+}
+
+function App() {
+  const [mostrando, setMostrando] = useState(0);
+
+  function atualizar() {
+    buscar(1).then((r) =&gt; setMostrando(r.rodada));
+    buscar(2).then((r) =&gt; setMostrando(r.rodada));
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button id="atualizar" onClick={atualizar}&gt;atualizar duas vezes&lt;/button&gt;
+      &lt;p&gt;mostrando a rodada {mostrando}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="atualizar"&gt;atualizar duas vezes&lt;/button&gt;
+  &lt;p&gt;mostrando a rodada 0&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscar(rodada) {
+  const atraso = rodada === 1 ? 60 : 0;
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok({ rodada: rodada, total: 10 + rodada }), atraso));
+}
+
+function App() {
+  const [mostrando, setMostrando] = useState(0);
+  const maiorRodada = useRef(0);
+
+  function receber(resposta) {
+    if (resposta.rodada &lt; maiorRodada.current) return;
+    maiorRodada.current = resposta.rodada;
+    setMostrando(resposta.rodada);
+  }
+
+  function atualizar() {
+    buscar(1).then(receber);
+    buscar(2).then(receber);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button id="atualizar" onClick={atualizar}&gt;atualizar duas vezes&lt;/button&gt;
+      &lt;p&gt;mostrando a rodada {mostrando}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Por que <code>useRef</code> e não outro estado? Porque a comparação precisa acontecer dentro do callback,
+que guarda os valores do desenho em que foi criado. Um estado lido ali dentro pode estar velho; a
+<code>ref</code> não, porque é sempre o mesmo objeto compartilhado. É o mesmo raciocínio do timer, aplicado
+a dado que chega de fora.</p>
+
+<h2>6. Pausar e retomar</h2>
+
+<p>Polling de trinta segundos por hora aberta é seis mil perguntas por dia por pessoa. Se a Ana minimiza a
+aba e vai atender o balcão, essas perguntas continuam. A defesa é pausar: um estado que diz se o polling
+está ligado, e um efeito que só agenda quando ele está.</p>
+
+<div class="tryreact" data-goal="clique:#pausar;;clique:#tique;;texto:status: pausado;;texto:atualizações: 1">
+  <p class="try-task">O botão “pausar” muda o estado, mas cada tique continua atualizando. Faça o efeito
+  não agendar quando <code>ligado</code> for falso e o tique parar de contar: depois de pausar e simular um
+  tique, a tela tem de mostrar <strong>status: pausado</strong> e <strong>atualizações: 1</strong>.</p>
+  <pre class="jsx">function buscar() {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok(10), 0));
+}
+
+function App() {
+  const [ligado, setLigado] = useState(true);
+  const [atualizacoes, setAtualizacoes] = useState(0);
+
+  function tique() {
+    buscar().then(() =&gt; setAtualizacoes((n) =&gt; n + 1));
+  }
+
+  useEffect(() =&gt; {
+    tique();
+    const id = setInterval(tique, 5000);
+    return () =&gt; clearInterval(id);
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;button id="pausar" onClick={() =&gt; setLigado(false)}&gt;pausar&lt;/button&gt;
+      &lt;button id="tique" onClick={tique}&gt;simular um tique&lt;/button&gt;
+      &lt;p&gt;status: {ligado ? "ligado" : "pausado"}&lt;/p&gt;
+      &lt;p&gt;atualizações: {atualizacoes}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="pausar"&gt;pausar&lt;/button&gt;
+  &lt;button id="tique"&gt;simular um tique&lt;/button&gt;
+  &lt;p&gt;status: ligado&lt;/p&gt;
+  &lt;p&gt;atualizações: 1&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscar() {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok(10), 0));
+}
+
+function App() {
+  const [ligado, setLigado] = useState(true);
+  const [atualizacoes, setAtualizacoes] = useState(0);
+
+  function tique() {
+    if (!ligado) return;
+    buscar().then(() =&gt; setAtualizacoes((n) =&gt; n + 1));
+  }
+
+  useEffect(() =&gt; {
+    if (!ligado) return;
+    tique();
+    const id = setInterval(tique, 5000);
+    return () =&gt; clearInterval(id);
+  }, [ligado]);
+
+  return (
+    &lt;div&gt;
+      &lt;button id="pausar" onClick={() =&gt; setLigado(false)}&gt;pausar&lt;/button&gt;
+      &lt;button id="tique" onClick={tique}&gt;simular um tique&lt;/button&gt;
+      &lt;p&gt;status: {ligado ? "ligado" : "pausado"}&lt;/p&gt;
+      &lt;p&gt;atualizações: {atualizacoes}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Duas guardas, e as duas são necessárias. A do efeito impede que o relógio seja criado quando está
+pausado — e, como a dependência é <code>ligado</code>, o React roda o cleanup da versão anterior assim que
+o valor muda, o que limpa o intervalo antigo na hora. A do <code>tique</code> impede que uma chamada que já
+estava no caminho continue contando. Sem a primeira, o intervalo sobrevive à pausa; sem a segunda, uma busca
+agendada antes da pausa ainda derruba o estado.</p>
+
+<p>Nas caixas deste guia o intervalo é de 5 segundos, e por isso ele nunca dispara durante o teste — o botão
+“simular um tique” faz o papel dele na hora. A chamada <code>tique()</code> logo no começo do efeito é a
+busca do primeiro desenho: sem ela, o painel abriria vazio esperando o primeiro relógio. No painel de
+verdade, com intervalo de 30 segundos, o efeito é o mesmo: cada tique é uma atualização.</p>
+
+<h2>7. De quanto em quanto tempo?</h2>
+
+<p>A escolha do intervalo não é técnica, é de produto. Ela equilibra quanto o dado pode envelhecer contra
+quanto o servidor aguenta. A tabela é um ponto de partida:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Intervalo</th><th>O dado envelhece</th><th>Custo</th><th>Faz sentido para</th></tr>
+<tr><td>1 s</td><td>quase nada</td><td>60 pedidos por minuto por pessoa</td><td>fila de atendimento em tempo real; use com cautela</td></tr>
+<tr><td>10 s</td><td>pouco</td><td>6 pedidos por minuto</td><td>painel de pedidos de uma loja pequena</td></tr>
+<tr><td>30 s</td><td>médio</td><td>2 pedidos por minuto</td><td>vitrine, estoque, status de encomenda</td></tr>
+<tr><td>5 min</td><td>bastante</td><td>12 pedidos por hora</td><td>número que muda devagar, como contagem de avaliações</td></tr>
+</table>
+</div>
+
+<p>Duas regras ajudam a decidir. A primeira: pergunte com que atraso o dado pode aparecer sem prejuízo. Se
+uma encomenda pode esperar meio minuto para aparecer no painel, o intervalo é 30 segundos — não 2. A
+segunda: cada aba aberta é uma pessoa perguntando. Cinquenta abas com intervalo de 1 segundo são 3.000
+pedidos por minuto, e esse número derruba servidor pequeno.</p>
+
+<h2>8. Os tropeços do polling</h2>
+
+<p>O tropeço número um é o intervalo que nunca para. Ele nasce dentro do efeito, o componente sai da tela e
+o relógio continua chamando <code>setState</code> num componente que já não existe. No começo não dá nada;
+depois de navegar entre páginas, o console se enche de avisos e a memória cresce. A limpeza da aula de
+cleanup existe exatamente para isso — e, se você seguir o padrão da seção 4, ela já vem de graça.</p>
+
+<p>O tropeço número dois é o intervalo com dependência errada: <code>[rodada]</code> no efeito que cria o
+relógio. A cada tique nasce um relógio novo, e o número de buscas por minuto dobra, triplica, explode. O
+sintoma é uma tela que pisca cada vez mais rápido. O terceiro é confiar que a resposta chega na ordem — o
+assunto da seção 5.</p>
+
+<pre class="term">console: rodada 1: 3 pendências
+console: rodada 2: 4 pendências</pre>
+
+<p>Duas linhas de log assim, com a rodada na frente, resolvem a maior parte da depuração de polling: você vê
+quantas perguntas estão sendo feitas e em que ordem as respostas voltaram. Se aparecer “rodada 7” antes de
+“rodada 6”, o problema não é o dado, é a ordem.</p>
+
+<pre class="term">console: resposta antiga ignorada (rodada 1)</pre>
+
+<p>Uma linha como essa, escrita no <code>return</code> antecipado da guarda, é a prova de que a defesa da
+seção 5 está funcionando. Quando ela aparece no console, ninguém precisa entender de rede: a resposta velha
+chegou e foi descartada de propósito.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você vê</th><th>Causa provável</th><th>Conserto</th></tr>
+<tr><td>tela pisca cada vez mais rápido</td><td>efeito do intervalo com dependência que muda a cada tique</td><td>lista de dependências <code>[]</code> e rodada na forma funcional</td></tr>
+<tr><td>número cai e volta sozinho</td><td>resposta antiga sobrescrevendo a nova</td><td>guardar a maior rodada em <code>useRef</code></td></tr>
+<tr><td>polling continua com a aba escondida</td><td>falta a guarda de pausa</td><td>estado <code>ligado</code> na dependência do efeito</td></tr>
+<tr><td>aviso de <code>setState</code> após desmontar</td><td>intervalo sem <code>clearInterval</code></td><td>devolver a limpeza no efeito</td></tr>
+<tr><td>servidor reclamando de carga</td><td>intervalo curto demais para o número de abas</td><td>aumentar o intervalo ou pausar quando a aba esconde</td></tr>
+</table>
+</div>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o painel do balcão</h3>
+<p>Com intervalo de 30 segundos, o painel da Ana passou a mostrar a encomenda sozinho. O atraso máximo é
+meio minuto, o que ninguém percebe no balcão. O F5 virou exceção, e o pedido de bolo que ela perdeu naquele
+sábado não se repetiu: quando o cliente enviou, o painel acendeu sozinho.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a aba esquecida</h3>
+<p>Um sábado ela deixou o painel aberto no notebook e foi para o balcão por três horas. O servidor recebeu
+360 pedidos daquela aba parada — e a fatura do serviço de hospedagem subiu. A guarda de pausa, ligada a um
+botão e ao evento de aba escondida, resolveu: com a aba minimizada, o polling dorme.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o número que voltava</h3>
+<p>No dia de entrega, o contador de encomendas pendentes caía de 12 para 10 sem ninguém despachar nada. Era
+a resposta da rodada anterior chegando atrasada e sobrescrevendo a nova. Depois da guarda com
+<code>useRef</code>, o número passou a andar só para frente — e a Ana passou a confiar no painel de novo.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Qual é o papel do <code>setInterval</code> no polling?</p>
+<label><input type="radio" name="q1"> buscar os dados uma única vez, quando a página abre</label>
+<label><input type="radio" name="q1"> disparar a atualização de tempos em tempos, sem ninguém clicar</label>
+<label><input type="radio" name="q1"> avisar o servidor de que a tela está aberta</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O efeito que cria o intervalo tem <code>[rodada]</code>
+nas dependências e a rodada muda a cada tique. O que acontece?</p>
+<label><input type="radio" name="q2"> nada: o React ignora dependências de efeito com timer</label>
+<label><input type="radio" name="q2"> o intervalo para sozinho depois do primeiro tique</label>
+<label><input type="radio" name="q2"> nasce um intervalo novo a cada tique, e as buscas se multiplicam</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. A resposta da rodada 1 chega depois da rodada 2. O que
+fazer?</p>
+<label><input type="radio" name="q3"> descartar: a rodada é menor que a última aceita</label>
+<label><input type="radio" name="q3"> aceitar: a resposta mais recente é sempre a mais nova</label>
+<label><input type="radio" name="q3"> somar as duas para não perder dado</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o relógio que precisa parar</h2>
+
+<p>O efeito abaixo agenda o intervalo do polling, mas o relógio continua rodando depois que o painel sai da
+tela. Complete o <code>return</code> com a função que desfaz o agendamento:</p>
+
+<div class="ex-code">useEffect(() =&gt; {
+  const id = setInterval(tique, 30000);
+  return () =&gt; <input aria-label="resposta 1" data-answer="clearInterval" placeholder="...">(id);
+}, []);</div>
+
+<p class="ex-dica">Dica: é a função irmã de <code>setInterval</code> — o mesmo nome, com
+<code>clear</code> no lugar de <code>set</code>. Ela recebe o identificador devolvido pelo agendamento e
+cancela a repetição.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Polling é perguntar de novo em intervalos regulares, porque o servidor não avisa quando algo muda. A
+receita tem três peças: uma função de atualizar com nome, um contador de rodada que o efeito observa, e um
+<code>setInterval</code> que incrementa a rodada. O efeito que cria o relógio leva <code>[]</code> nas
+dependências e limpa o intervalo no <code>return</code>.</p>
+
+<p>Com várias buscas em voo, resposta fora de ordem é questão de tempo: numere as perguntas e ignore o que
+chega com rodada menor, guardando a maior numa <code>useRef</code>. Pausar é uma guarda no efeito e no
+tique, ligada a um estado. E o intervalo é decisão de produto: o menor tempo que o dado pode envelhecer sem
+prejuízo, não o menor tempo possível.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Polling = busca repetida; o servidor não avisa, então o navegador pergunta.</li>
+<li>Separe a busca numa função; o efeito só agenda.</li>
+<li>O efeito do intervalo leva <code>[]</code>; a rodada sobe com a forma funcional.</li>
+<li>Numere as rodadas e descarte resposta antiga com <code>useRef</code>.</li>
+<li>Pausar exige duas guardas: no efeito e no tique.</li>
+<li>Intervalo curto custa caro: multiplique por abas e por horas.</li>
+<li><code>clearInterval</code> no <code>return</code>, sempre.</li>
+<li>Log com número de rodada é o melhor amigo da depuração.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

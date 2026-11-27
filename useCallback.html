@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O useCallback | Guia React</title>
+<meta name="description" content="O useCallback no React 19: por que toda função nasce nova a cada render, como estabilizar uma função com dependências, o valor capturado e quando não usar.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O <span class="hl">useCallback</span></h1>
+<p class="intro">A Ana montou um painel de pedidos com uma lista longa e um botão "Salvar" em cada linha.
+Cada botão é um componente separado, embrulhado em <code>memo</code> para não redesenhar à toa. Só que
+redesenha: basta a Ana digitar uma letra no campo de busca para todos os botões da lista piscarem de novo.
+O motivo não é o <code>memo</code> — é a função que ela passa como prop, que nasce nova a cada render.
+Nesta aula ela conhece o <code>useCallback</code>, que guarda a função entre renders, e descobre o preço
+disso: a função guardada enxerga o passado.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que toda função criada no componente é nova a cada render.</li>
+  <li>Como o <code>useCallback</code> devolve a mesma função enquanto as dependências não mudam.</li>
+  <li>O que é o valor capturado e por que ele causa o bug mais confuso do React.</li>
+  <li>Como a forma funcional do setter resolve sem depender do valor antigo.</li>
+  <li>A corrente completa: <code>memo</code> no filho, <code>useCallback</code> no pai, props estáveis.</li>
+  <li>Quando o <code>useCallback</code> não serve para nada.</li>
+  <li>Como escolher entre <code>memo</code>, <code>useMemo</code> e <code>useCallback</code>.</li>
+</ul>
+</div>
+
+<h2>1. A cena: os botões que piscam</h2>
+
+<p>O painel da padaria tem uma lista de pedidos e, em cada linha, um botão "Salvar". O botão é um
+componente à parte, porque ele muda de cor quando o pedido já foi salvo. Para evitar trabalho, a Ana
+embrulhou esse componente em <code>memo</code>: se as props não mudaram, ele não desenha de novo.</p>
+
+<p>Na prática, todos desenham. A Ana digitou uma letra no campo de busca e viu a lista inteira piscar. O
+<code>memo</code> estava lá, funcionando como devia — mas recebia uma prop diferente a cada render. Essa
+prop era a função <code>salvar</code>, escrita no componente pai. Toda função declarada no corpo de um
+componente é criada de novo a cada render, e uma função nova não é igual à anterior.</p>
+
+<p>Para o React, comparar funções é comparar identidade, não comportamento: duas funções com o mesmo
+código são objetos diferentes. O <code>memo</code> vê "prop nova" e desenha. O <code>useCallback</code>
+existe para resolver esse problema específico — guardar a função entre renders, como o
+<code>useMemo</code> guarda um valor.</p>
+
+<h2>2. Toda função nasce de novo</h2>
+
+<p>Um componente é uma função, e o que está dentro dela é recriado a cada chamada. Um
+<code>const salvar = () =&gt; { ... }</code> não é uma exceção: é uma função nova, com um endereço novo na
+memória, a cada render. Se ela entra nas props de um filho, o filho vê "mudou". Se ela entra no array de
+dependências de um efeito, o efeito vê "mudou" e roda de novo.</p>
+
+<pre class="file" data-file="Pedido.jsx">function Painel() {
+  const [busca, setBusca] = useState("");
+
+  function salvar(id) {                 // nova a cada render
+    console.log("salvando " + id);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;input value={busca} onChange={(e) =&gt; setBusca(e.target.value)} /&gt;
+      {PEDIDOS.map((p) =&gt; (
+        &lt;BotaoSalvar key={p.id} id={p.id} aoSalvar={salvar} /&gt;
+      ))}
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Nesse código, cada tecla no campo de busca muda o estado, o painel renderiza, e a função
+<code>salvar</code> é criada outra vez. Todos os <code>BotaoSalvar</code> recebem uma prop
+<code>aoSalvar</code> diferente da anterior. O <code>memo</code> compara e conclui que precisa desenhar —
+para todos eles. O trabalho de digitar uma letra vira o trabalho de redesenhar a lista inteira.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que está no componente</th><th>É novo a cada render?</th><th>Como estabilizar</th></tr>
+<tr><td>número, texto, booleano</td><td>não: o valor é comparado pelo conteúdo</td><td>nada a fazer</td></tr>
+<tr><td>função declarada no componente</td><td>sim</td><td><code>useCallback</code></td></tr>
+<tr><td>objeto ou array criado no componente</td><td>sim</td><td><code>useMemo</code></td></tr>
+<tr><td>elemento JSX criado no render</td><td>sim, mas o React compara o tipo e as props</td><td>nada; é o funcionamento normal</td></tr>
+<tr><td>função importada de outro arquivo</td><td>não: é sempre a mesma</td><td>nada a fazer</td></tr>
+<tr><td>valor vindo de <code>useState</code></td><td>não, até você chamar o setter</td><td>nada a fazer</td></tr>
+</table>
+</div>
+
+<p>Repare nas duas últimas linhas: nem tudo precisa de estabilização. Uma função importada de outro
+arquivo já é a mesma em todo render, e um valor de estado só muda quando você manda. O problema aparece
+quando a identidade nova atravessa a fronteira do componente — props de um filho com <code>memo</code> ou
+array de dependências de um efeito.</p>
+
+<h2>3. useCallback: a função que fica</h2>
+
+<p>A assinatura é parecida com a do <code>useMemo</code>: uma função e um array de dependências. A
+diferença é que o <code>useCallback</code> devolve a própria função, não o resultado dela. Ele é, por
+dentro, um <code>useMemo</code> que guarda a função.</p>
+
+<pre class="file" data-file="Painel.jsx">const salvar = useCallback((id) =&gt; {
+  console.log("salvando " + id);
+}, []);</pre>
+
+<p>Com o array vazio, a função é criada uma vez e reaproveitada em todos os renders seguintes. O
+<code>memo</code> do filho compara: mesma função, props iguais, não desenha. A lista para de piscar.</p>
+
+<dl class="anatomy">
+<dt><code>useCallback</code></dt>
+<dd>O hook que devolve a mesma função entre renders, enquanto as dependências não mudam.</dd>
+<dt>identidade</dt>
+<dd>Ser o mesmo objeto. Duas funções com o mesmo código são diferentes; a mesma função guardada é igual a
+si mesma.</dd>
+<dt>valor capturado</dt>
+<dd>Os valores do render em que a função foi criada. A função guardada continua enxergando aqueles
+valores.</dd>
+<dt><code>memo</code></dt>
+<dd>O embrulho do componente filho que evita render quando as props não mudam. É a outra metade da
+solução.</dd>
+<dt>forma funcional</dt>
+<dd>Passar uma função ao setter: <code>setTotal((t) =&gt; t + 1)</code>. Recebe o valor atual, então não
+precisa capturar nada.</dd>
+</dl>
+
+<p>Agora a missão. O filho já está em <code>memo</code>; falta o pai entregar sempre a mesma função.</p>
+
+<div class="tryreact" data-goal="clique:#trocar;;texto:desenho 1">
+  <p class="try-task">A função <code>salvar</code> nasce nova a cada render e derruba o <code>memo</code>
+  do botão. Envolva-a num <code>useCallback</code> com <code>[]</code>: depois de trocar o aviso, o botão
+  tem de continuar em <strong>desenho 1</strong>.</p>
+  <pre class="jsx">let desenhos = 0;
+const BotaoSalvar = memo(function BotaoSalvar({ aoSalvar }) {
+  desenhos = desenhos + 1;
+  return (
+    &lt;button onClick={aoSalvar}&gt;
+      Salvar pedido - desenho {desenhos}
+    &lt;/button&gt;
+  );
+});
+
+function App() {
+  const [aviso, setAviso] = useState("Padaria aberta");
+
+  function salvar() {
+    setAviso("pedido salvo");
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button id="trocar" onClick={() =&gt; setAviso("Forno quente")}&gt;
+        Trocar aviso
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;BotaoSalvar aoSalvar={salvar} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="trocar"&gt;Trocar aviso&lt;/button&gt;
+  &lt;p&gt;Padaria aberta&lt;/p&gt;
+  &lt;button&gt;Salvar pedido - desenho 1&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">let desenhos = 0;
+const BotaoSalvar = memo(function BotaoSalvar({ aoSalvar }) {
+  desenhos = desenhos + 1;
+  return (
+    &lt;button onClick={aoSalvar}&gt;
+      Salvar pedido - desenho {desenhos}
+    &lt;/button&gt;
+  );
+});
+
+function App() {
+  const [aviso, setAviso] = useState("Padaria aberta");
+
+  const salvar = useCallback(() =&gt; {
+    setAviso("pedido salvo");
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;button id="trocar" onClick={() =&gt; setAviso("Forno quente")}&gt;
+        Trocar aviso
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;BotaoSalvar aoSalvar={salvar} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Sem o <code>useCallback</code>, o clique em Trocar aviso cria uma função nova, o <code>memo</code> vê a
+prop mudada e o contador vai para 2. Com ele, a função é a mesma, o <code>memo</code> pula o desenho e o
+contador fica em 1. Note que o <code>setAviso</code> continua funcionando: a função guardada ainda pode
+chamar o setter, porque o setter é estável.</p>
+
+<p>O array vazio só é correto porque a função não lê nada do componente. É aí que o assunto fica
+interessante — e perigoso.</p>
+
+<h2>4. A função guarda os valores do render</h2>
+
+<p>Uma função em JavaScript carrega consigo o ambiente em que nasceu. Isso se chama
+<strong>closure</strong>, ou fechamento. Se a função lê <code>nome</code>, ela guarda o valor de
+<code>nome</code> daquele render — não o valor de agora. Enquanto a função é recriada a cada render, isso
+não incomoda: cada versão enxerga o valor do seu tempo.</p>
+
+<p>Quando você guarda a função com <code>useCallback</code>, a versão guardada continua enxergando o
+passado. Se as dependências não incluem <code>nome</code>, a função nunca é recriada e nunca vê o nome
+novo. O resultado é aquele bug clássico: a tela mostra "Maria", o botão salva "Ana".</p>
+
+<pre class="file" data-file="Pedido.jsx">const salvar = useCallback(() =&gt; {
+  setSalvo("pedido de " + nome + " salvo");
+}, []);        // falta nome: a função nunca é recriada</pre>
+
+<p>O console do navegador não reclama. O ESLint, sim:</p>
+
+<pre class="term">React Hook useCallback has a missing dependency: 'nome'.
+Either include it or remove the dependency array.
+  react-hooks/exhaustive-deps</pre>
+
+<p>A tradução: "a sua função usa <code>nome</code> e o array não lista <code>nome</code>". A correção é
+incluir — <code>[nome]</code> —, e aí a função é recriada só quando o nome muda. Parece que isso anula o
+ganho, mas não: entre um nome e outro, a identidade é estável, e o <code>memo</code> do filho só redesenha
+quando o nome muda de verdade, o que é exatamente o que se quer.</p>
+
+<div class="tryreact" data-goal="digite:#nome=Maria;;clique:#salvar;;texto:pedido de Maria salvo">
+  <p class="try-task">A função guardada com <code>[]</code> lê <code>nome</code> e nunca é recriada, então
+  salva o nome antigo. Inclua <code>nome</code> nas dependências, digite "Maria" e clique em Salvar.</p>
+  <pre class="jsx">function App() {
+  const [nome, setNome] = useState("Ana");
+  const [salvo, setSalvo] = useState("");
+
+  const salvar = useCallback(() =&gt; {
+    setSalvo("pedido de " + nome + " salvo");
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;button id="salvar" onClick={salvar}&gt;Salvar&lt;/button&gt;
+      &lt;p&gt;{salvo}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="nome"&gt;Nome&lt;/label&gt;
+  &lt;input id="nome" value="Ana"&gt;
+  &lt;button id="salvar"&gt;Salvar&lt;/button&gt;
+  &lt;p&gt;&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nome, setNome] = useState("Ana");
+  const [salvo, setSalvo] = useState("");
+
+  const salvar = useCallback(() =&gt; {
+    setSalvo("pedido de " + nome + " salvo");
+  }, [nome]);
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;button id="salvar" onClick={salvar}&gt;Salvar&lt;/button&gt;
+      &lt;p&gt;{salvo}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Dependência não é burocracia: é a lista do que a função enxerga. A regra é a mesma do
+<code>useEffect</code> e do <code>useMemo</code>, e a aula de <a href="dependencias.html">dependências</a>
+já mostrou como o React compara esse array.</p>
+
+<h2>5. O valor que a função capturou</h2>
+
+<p>O caso mais traiçoeiro não é ler um valor e esquecer de listar: é <em>atualizar</em> um valor. Veja o
+contador abaixo. A função está guardada com <code>[]</code>, e dentro dela o código lê
+<code>total</code>.</p>
+
+<pre class="file" data-file="Contador.jsx">const somar = useCallback(() =&gt; {
+  setTotal(total + 1);
+}, []);        // total fica congelado no valor do primeiro render</pre>
+
+<p>No primeiro render, <code>total</code> é 0. A função guardada enxerga esse 0 para sempre. Cada clique
+faz <code>setTotal(0 + 1)</code>, ou seja, define 1. A tela mostra 1, 1, 1 — e a pessoa jura que o botão
+está quebrado. No console, o valor que a função leu aparece sempre igual:</p>
+
+<pre class="term">somar com total = 0
+somar com total = 0
+somar com total = 0</pre>
+
+<p>Existem duas saídas, e as duas são legítimas. A primeira é listar <code>total</code> nas dependências:
+<code>[total]</code>, e a função passa a ser recriada a cada mudança do total. A segunda é melhor: usar a
+forma funcional do setter, que recebe o valor atual em vez de capturá-lo.</p>
+
+<pre class="file" data-file="Contador.jsx">const somar = useCallback(() =&gt; {
+  setTotal((atual) =&gt; atual + 1);
+}, []);        // não lê total: recebe o valor atual na hora</pre>
+
+<p>Com a forma funcional, a função não precisa enxergar <code>total</code> e o array vazio passa a ser
+verdade. Isso vale para qualquer setter: <code>setLista((l) =&gt; [...l, novo])</code>,
+<code>setPedido((p) =&gt; ({ ...p, pago: true }))</code>. A aula de
+<a href="batching.html">batching</a> explica por que a forma funcional também protege contra atualizações
+em sequência.</p>
+
+<p>Agora a missão: o contador tem os dois problemas juntos — função guardada e valor capturado.</p>
+
+<div class="tryreact" data-goal="clique:#somar;;clique:#somar;;clique:#somar;;texto:total: 3">
+  <p class="try-task">A função guardada enxerga sempre o total 0, então três cliques mostram 1. Use a forma
+  funcional <code>setTotal((atual) =&gt; atual + 1)</code> e mantenha o <code>[]</code>: o painel tem de
+  mostrar <strong>total: 3</strong>.</p>
+  <pre class="jsx">function App() {
+  const [total, setTotal] = useState(0);
+
+  const somar = useCallback(() =&gt; {
+    setTotal(total + 1);
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;total: {total}&lt;/p&gt;
+      &lt;button id="somar" onClick={somar}&gt;Somar um&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;total: 0&lt;/p&gt;
+  &lt;button id="somar"&gt;Somar um&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [total, setTotal] = useState(0);
+
+  const somar = useCallback(() =&gt; {
+    setTotal((atual) =&gt; atual + 1);
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;total: {total}&lt;/p&gt;
+      &lt;button id="somar" onClick={somar}&gt;Somar um&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique três vezes no código inicial: o painel fica em 1. Na solução, cada clique recebe o valor atual e
+soma, então o total chega a 3. Repare que a função continuou sendo a mesma o tempo todo — o que mudou foi
+de onde vem o número: antes, de uma foto do primeiro render; agora, do React, na hora do clique.</p>
+
+<h2>6. A corrente inteira</h2>
+
+<p><code>useCallback</code> sozinho não faz nada. Ele é um elo de uma corrente de três: o filho precisa
+estar em <code>memo</code>, o pai precisa entregar props estáveis e a função precisa ter as dependências
+certas. Se qualquer elo faltar, o trabalho é perdido.</p>
+
+<pre class="file" data-file="Painel.jsx">const Linha = memo(function Linha({ pedido, aoSalvar }) {
+  return (
+    &lt;div&gt;
+      &lt;span&gt;{pedido.nome}&lt;/span&gt;
+      &lt;button onClick={() =&gt; aoSalvar(pedido.id)}&gt;Salvar&lt;/button&gt;
+    &lt;/div&gt;
+  );
+});
+
+function Painel() {
+  const [pedidos, setPedidos] = useState([]);
+
+  const salvar = useCallback((id) =&gt; {
+    setPedidos((lista) =&gt;
+      lista.map((p) =&gt; (p.id === id ? { ...p, salvo: true } : p))
+    );
+  }, []);
+
+  return (
+    &lt;div&gt;
+      {pedidos.map((p) =&gt; (
+        &lt;Linha key={p.id} pedido={p} aoSalvar={salvar} /&gt;
+      ))}
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Aqui as três peças aparecem. O filho em <code>memo</code> compara <code>pedido</code> e
+<code>aoSalvar</code>. A função é estável, porque não lê nada e usa a forma funcional do setter. E cada
+<code>pedido</code> é um objeto que só muda quando aquele pedido muda — porque o <code>map</code> devolve
+o mesmo objeto quando nada mudou. O resultado é que salvar um pedido redesenha uma linha, não a lista.</p>
+
+<p>Repare que o <code>onClick</code> dentro do filho é uma função nova a cada render do filho — e isso não
+importa. Ela não atravessa a fronteira do <code>memo</code>; é usada ali dentro, no elemento
+<code>button</code>. O React não compara a função do <code>onClick</code> para decidir se desenha um
+<code>button</code>: ele atualiza o listener. Preocupação com identidade só vale para props de componentes
+com <code>memo</code> e para dependências de hooks.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ferramenta</th><th>O que ela guarda</th><th>Use quando</th></tr>
+<tr><td><code>memo</code></td><td>o desenho do componente filho</td><td>o filho é pesado e as props mudam pouco</td></tr>
+<tr><td><code>useMemo</code></td><td>o resultado de um cálculo ou um objeto/array</td><td>conta cara ou identidade que atravessa a fronteira</td></tr>
+<tr><td><code>useCallback</code></td><td>a própria função</td><td>a função vai como prop para um filho com <code>memo</code> ou como dependência de efeito</td></tr>
+</table>
+</div>
+
+<p>Essa tabela resolve a dúvida mais comum. <code>useMemo</code> guarda valor; <code>useCallback</code>
+guarda função; <code>memo</code> guarda o desenho. Os três são otimização, e nenhum deles muda o que o
+componente faz — só quanto trabalho ele dá.</p>
+
+<h2>7. Quando não usar</h2>
+
+<p>A regra prática: <code>useCallback</code> só se paga quando a função atravessa uma fronteira que
+compara identidade. Se ela é usada só dentro do próprio componente, o embrulho é custo sem retorno.</p>
+
+<p><strong>Filho sem <code>memo</code>.</strong> Se o filho não está em <code>memo</code>, ele desenha em
+todo render do pai, com função nova ou velha. O <code>useCallback</code> não muda nada.</p>
+
+<p><strong>Função usada só aqui.</strong> <code>&lt;button onClick={salvar}&gt;</code> no próprio
+componente não precisa de estabilidade: o React atualiza o listener e segue. A única exceção é quando a
+função é dependência de um <code>useEffect</code> — aí a identidade importa.</p>
+
+<p><strong>Dependências que mudam sempre.</strong> Se a função depende de um objeto recriado a cada
+render, o <code>useCallback</code> devolve uma função nova a cada render e o trabalho é zero. O conserto
+está no objeto, com <code>useMemo</code>, ou em listar os campos simples que a função realmente usa.</p>
+
+<p><strong>Muitos embrulhos em série.</strong> Um componente com cinco <code>useCallback</code> e dez
+<code>useMemo</code> é mais difícil de ler e muitas vezes não é mais rápido. O React 19 traz o compilador,
+que faz boa parte disso sozinho; escrever à mão continua válido, mas com propósito.</p>
+
+<p>E vale lembrar o efeito colateral pedagógico: o <code>useCallback</code> esconde o valor capturado.
+Quanto mais funções guardadas, mais fácil é criar uma que enxerga o passado. Se você não consegue explicar
+por que a função precisa ser a mesma entre renders, provavelmente ela não precisa.</p>
+
+<h2>8. As regras do useCallback</h2>
+
+<p><strong>A função guardada é a do primeiro render, com as dependências daquele momento.</strong> Ela não
+é "atualizada" — é substituída quando uma dependência muda. Se você não listar o que ela lê, ela fica no
+passado.</p>
+
+<p><strong>Liste tudo o que a função lê.</strong> Props, estado e valores do componente. O ESLint avisa, e
+o aviso não é implicância: é a diferença entre salvar o nome certo e salvar o nome antigo.</p>
+
+<p><strong>Prefira a forma funcional do setter.</strong> <code>setTotal((t) =&gt; t + 1)</code>,
+<code>setLista((l) =&gt; [...l, item])</code>. Assim a função não precisa capturar o valor e o array pode
+ficar vazio de verdade.</p>
+
+<p><strong>Não chame hooks dentro da função guardada.</strong> A função pode rodar em qualquer momento,
+inclusive depois de um clique, e hooks precisam seguir a ordem das chamadas do componente. O React
+reclama na hora — e a regra vale para qualquer callback.</p>
+
+<p><strong>Não guarde efeito colateral na criação.</strong> <code>useCallback</code> não executa a função;
+ele só guarda. Se você quer que algo aconteça na montagem, o lugar é o
+<code>useEffect</code> — a aula de <a href="useEffect.html">useEffect</a> cobre isso.</p>
+
+<p><strong>Não use para "melhorar a performance" sem medir.</strong> Como o <code>useMemo</code>, o
+<code>useCallback</code> tem custo: uma entrada de cache, uma comparação de array e uma camada a mais para
+quem lê. Em componente pequeno, o ganho é invisível e o custo de manutenção é real.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o memo que não segurava nada</h3>
+<p>A Ana colocou <code>memo</code> no filho e continuou vendo ele redesenhar. A prop era uma função criada
+no pai, nova a cada render. O <code>memo</code> comparava e via diferença. Com <code>useCallback</code> no
+pai, a comparação passou a dar igual e o filho parou de desenhar. Duas peças, um resultado.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o pedido salvo com o nome antigo</h3>
+<p>Ela guardou a função com <code>[]</code> e ela lia <code>nome</code>. O campo mostrava "Maria", o
+pedido saía como "Ana". Nada de errado com o <code>input</code>: a função guardada enxergava o valor do
+primeiro render. Incluir <code>nome</code> nas dependências resolve — e, se der para usar a forma
+funcional, melhor ainda.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o contador que só chegava a 1</h3>
+<p>Três cliques, total 1. A função guardada lia <code>total</code> do primeiro render e escrevia
+<code>setTotal(0 + 1)</code> em toda chamada. Com <code>setTotal((atual) =&gt; atual + 1)</code>, cada
+clique recebe o valor do momento e o total sobe. O sintoma é sempre o mesmo: o valor na tela não acompanha
+a conta.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Por que uma função criada no componente é "nova" a cada
+render?</p>
+<label><input type="radio" name="q1"> porque o React apaga as funções antigas</label>
+<label><input type="radio" name="q1"> porque o corpo do componente roda de novo e cria outra função</label>
+<label><input type="radio" name="q1"> porque funções em JavaScript não podem ser comparadas</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que o <code>useCallback</code> devolve?</p>
+<label><input type="radio" name="q2"> o resultado da função executada</label>
+<label><input type="radio" name="q2"> um objeto com a propriedade <code>current</code></label>
+<label><input type="radio" name="q2"> a mesma função, enquanto as dependências não mudam</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Por que a função guardada com <code>[]</code> salva o
+nome antigo?</p>
+<label><input type="radio" name="q3"> porque ela guarda os valores do render em que foi criada</label>
+<label><input type="radio" name="q3"> porque o React limpa o estado a cada clique</label>
+<label><input type="radio" name="q3"> porque o <code>input</code> não é controlado</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: somar sem capturar o total</h2>
+<p>Complete a chamada que soma 1 ao total usando o valor atual, sem precisar ler <code>total</code> e sem
+entrar nas dependências:</p>
+<div class="ex-code">setTotal((atual) =&gt; <input aria-label="resposta 1" data-answer="atual + 1|atual+1" placeholder="...">);</div>
+<p class="ex-dica">Dica: a função recebe o valor atual como parâmetro e devolve o próximo. Não use
+<code>total</code> aqui dentro — ele é o valor do render, não o do clique.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Toda função declarada dentro de um componente nasce de novo a cada render, e o React compara funções
+por identidade. Quando essa função vai como prop para um filho em <code>memo</code> ou entra nas
+dependências de um efeito, a identidade nova derruba a otimização: o filho redesenha, o efeito roda de
+novo. O <code>useCallback</code> guarda a função e devolve a mesma enquanto as dependências não mudam.</p>
+
+<p>O preço é o valor capturado. A função guardada enxerga os valores do render em que nasceu, então
+esquecer uma dependência produz aquele bug em que a tela mostra uma coisa e o código salva outra. A saída
+tem duas portas: listar a dependência ou — melhor — usar a forma funcional do setter, que recebe o valor
+atual e não precisa capturar nada.</p>
+
+<p>E o mais importante: <code>useCallback</code> sozinho não otimiza nada. Ele é um elo entre o
+<code>memo</code> do filho, props estáveis e dependências corretas. Se a função não atravessa fronteira
+nenhuma, o embrulho é só ruído. O próximo hook, o <code>useReducer</code>, muda de assunto: em vez de
+guardar funções, ele organiza as transições de estado de um componente que já tem estados demais.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Função no componente é nova a cada render; o React compara identidade.</li>
+<li><code>useCallback(fn, deps)</code> devolve a mesma função enquanto as deps não mudam.</li>
+<li>A função guardada enxerga os valores do render em que foi criada.</li>
+<li>Dependência faltando: valor antigo, sem erro no console — o ESLint avisa.</li>
+<li><code>setTotal((t) =&gt; t + 1)</code> dispensa a dependência do valor.</li>
+<li><code>memo</code> no filho + <code>useCallback</code> no pai + props estáveis = o desenho evitado.</li>
+<li>Sem <code>memo</code> no filho, o <code>useCallback</code> não muda nada.</li>
+<li>Função usada só no próprio componente não precisa de <code>useCallback</code>.</li>
+<li><code>useMemo</code> guarda valor; <code>useCallback</code> guarda função.</li>
+<li>Se não dá para explicar por que a função precisa ser a mesma, ela não precisa.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

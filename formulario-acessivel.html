@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Formulário Acessível | Guia React</title>
+<meta name="description" content="Formulário acessível no React: label ligado ao campo, dica com aria-describedby, erro com role alert e aria-invalid, fieldset e o foco levado ao campo certo.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Formulário <span class="hl">Acessível</span></h1>
+<p class="intro">A Ana quebrou o pulso numa queda de bicicleta e passou duas semanas sem usar o mouse. Foi
+assim que ela descobriu que o formulário da padaria só funcionava para quem enxerga a tela e clica com
+precisão: o texto "Nome" estava num parágrafo solto, o campo só tinha um placeholder cinza, o erro
+aparecia em vermelho sem avisar ninguém e o botão de enviar era uma imagem. Nesta aula ela refaz o
+formulário para que ele funcione com teclado, com leitor de tela e com o zoom ligado — sem perder nada do
+que já tinha.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que um leitor de tela lê em cada campo: nome, papel, valor e estado.</li>
+  <li>Como ligar um <code>label</code> ao campo com <code>htmlFor</code> e <code>id</code>.</li>
+  <li>Por que placeholder não é rótulo.</li>
+  <li>Como a dica chega ao campo com <code>aria-describedby</code>.</li>
+  <li>Como marcar e anunciar um erro com <code>aria-invalid</code> e <code>role="alert"</code>.</li>
+  <li>Como agrupar opções com <code>fieldset</code> e <code>legend</code>.</li>
+  <li>Como levar o foco ao campo certo quando o envio falha.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a semana sem mouse</h2>
+
+<p>No primeiro dia de gesso, a Ana tentou fazer uma encomenda no próprio site para testar. Apertou Tab e o
+foco sumiu: pulou para um lugar qualquer, sem contorno visível, porque o CSS tinha
+<code>outline: none</code> para "ficar mais bonito". Chegou no campo de nome e digitou — sem problema.
+Chegou no botão e apertou Enter: a página recarregou e os campos esvaziaram. Ela tentou de novo, errou o
+telefone de propósito para ver a mensagem de erro, e a mensagem apareceu em vermelho, longe do campo, sem
+que nada fosse anunciado.</p>
+
+<p>Nada disso era um bug do React. Era um formulário escrito só para o caminho mais comum: pessoa com
+mouse, tela grande, visão boa. Quem usa teclado, leitor de tela, zoom de 200% ou tem dificuldade para
+distinguir vermelho de verde fica de fora — e, no caso da padaria, deixa de comprar.</p>
+
+<p>Acessibilidade tem fama de assunto avançado. Na prática, para formulários, são cinco hábitos:
+<strong>rótulo</strong> ligado ao campo, <strong>dica</strong> ligada ao campo, <strong>erro</strong>
+anunciado e ligado ao campo, <strong>grupos</strong> com nome e <strong>foco</strong> no lugar certo.
+Nenhum deles exige biblioteca. Todos cabem no JSX que você já escreve.</p>
+
+<h2>2. O que o leitor de tela lê</h2>
+
+<p>Um leitor de tela não vê pixels: ele percorre a árvore de acessibilidade que o navegador monta a partir
+do HTML. Para cada campo, essa árvore tem quatro informações. O <strong>papel</strong> diz que aquilo é
+uma caixa de edição, um botão, uma lista. O <strong>nome</strong> é o texto que identifica o campo — vem
+do rótulo. O <strong>valor</strong> é o que está digitado. E o <strong>estado</strong> diz se está
+obrigatório, desabilitado, inválido, marcado.</p>
+
+<p>Quando falta o nome, o leitor anuncia só "caixa de edição, em branco". A pessoa ouve três campos
+seguidos assim e não faz ideia de qual é o nome, qual é o telefone e qual é o endereço. É por isso que o
+rótulo não é enfeite: ele é o dado que dá nome ao campo.</p>
+
+<dl class="anatomy">
+<dt>leitor de tela</dt>
+<dd>Programa que lê a tela em voz alta e navega por ela pelo teclado. NVDA e JAWS no Windows, VoiceOver
+no Mac e no iPhone, TalkBack no Android.</dd>
+<dt>nome acessível</dt>
+<dd>O texto que o leitor usa para identificar um elemento. Num campo, vem do <code>label</code>, de
+<code>aria-label</code> ou de <code>aria-labelledby</code>.</dd>
+<dt>papel</dt>
+<dd>O tipo do elemento na árvore: caixa de edição, botão, grupo de opções. Vem da tag HTML; uma
+<code>div</code> com clique não tem papel nenhum.</dd>
+<dt>descrição</dt>
+<dd>O texto extra que o leitor fala depois do nome: a dica de formato, a mensagem de erro. Vem de
+<code>aria-describedby</code>.</dd>
+<dt>estado</dt>
+<dd>O que muda sem trocar o texto: obrigatório, inválido, marcado, desabilitado.</dd>
+</dl>
+
+<p>No leitor de tela, o campo do nome com rótulo, dica e obrigatoriedade soa assim:</p>
+
+<pre class="term">Nome, caixa de edição, obrigatória
+Como está no documento, com sobrenome</pre>
+
+<p>A primeira linha é o nome mais o papel mais o estado. A segunda é a descrição. Se o rótulo estivesse
+solto num parágrafo, a primeira linha seria só "caixa de edição". Se a dica estivesse solta embaixo, ela
+nunca seria lida junto com o campo — a pessoa teria que sair do formulário e voltar para descobrir o que
+era esperado.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que está no HTML</th><th>O que a pessoa ouve</th><th>Problema</th></tr>
+<tr><td><code>label for="nome"</code> + <code>input id="nome"</code></td><td>"Nome, caixa de edição"</td><td>nenhum</td></tr>
+<tr><td>só <code>placeholder="Seu nome"</code></td><td>"caixa de edição, em branco"</td><td>o texto some ao digitar e não é nome</td></tr>
+<tr><td><code>aria-label="Nome"</code> sem texto visível</td><td>"Nome, caixa de edição"</td><td>funciona, mas quem enxerga fica sem o rótulo</td></tr>
+<tr><td><code>aria-describedby="dica"</code></td><td>"Nome, caixa de edição" + a dica</td><td>nenhum; é o jeito certo de dar instrução</td></tr>
+<tr><td><code>aria-invalid="true"</code></td><td>"Nome, caixa de edição, inválido"</td><td>nenhum; avisa o estado do campo</td></tr>
+<tr><td><code>required</code></td><td>"Nome, caixa de edição, obrigatória"</td><td>nenhum; e ainda impede o envio vazio</td></tr>
+</table>
+</div>
+
+<p>Guarde a diferença entre <strong>nome</strong> e <strong>descrição</strong>: o nome identifica o campo,
+a descrição ensina o que colocar nele. Trocar um pelo outro é o erro mais comum — um campo chamado
+"Informe o telefone com DDD" até funciona, mas o nome virou uma frase e a dica se perdeu.</p>
+
+<h2>3. label de verdade: htmlFor e id</h2>
+
+<p>O jeito mais confiável de dar nome a um campo é o par <code>label</code> com <code>htmlFor</code> e
+<code>input</code> com <code>id</code>. O React escreve <code>htmlFor</code> porque
+<code>for</code> é palavra reservada do JavaScript; no HTML gerado, sai <code>for</code>.</p>
+
+<pre class="file" data-file="Encomenda.jsx">function Encomenda() {
+  const [nome, setNome] = useState("");
+
+  return (
+    &lt;form onSubmit={(e) =&gt; e.preventDefault()}&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;button type="submit"&gt;Encomendar&lt;/button&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+
+<p>Esse par faz três coisas de uma vez. Dá o nome ao campo na árvore de acessibilidade. Faz o texto do
+rótulo ser clicável: clicar em "Nome" leva o cursor para o campo. E deixa o leitor de tela anunciar o
+rótulo quando o campo recebe o foco, o que ajuda quem navega por formulários grandes.</p>
+
+<p>Se você escrever <code>for</code> em vez de <code>htmlFor</code>, o React avisa no console do
+navegador:</p>
+
+<pre class="term">Warning: Invalid DOM property `for`. Did you mean `htmlFor`?</pre>
+
+<p>O aviso aparece só em desenvolvimento — na build de produção o atributo é ignorado em silêncio, e o
+campo fica sem nome. É o tipo de erro que passa no teste de quem enxerga e falha no leitor de tela.</p>
+
+<p>Existe uma segunda forma, que dispensa o par: embrulhar o campo dentro do próprio
+<code>label</code>.</p>
+
+<pre class="file" data-file="Busca.jsx">&lt;label&gt;
+  Buscar pão
+  &lt;input value={busca} onChange={(e) =&gt; setBusca(e.target.value)} /&gt;
+&lt;/label&gt;</pre>
+
+<p>Funciona igual para o leitor e para o clique. O par <code>htmlFor</code>/<code>id</code> é melhor
+quando o layout separa o rótulo do campo (uma coluna de rótulos, outra de campos), porque aí o
+<code>label</code> não pode envolver o <code>input</code>. Nesta aula a Ana usa o par, que é o mais
+comum em formulários de loja.</p>
+
+<p>Agora a primeira missão. O campo tem só um placeholder e um parágrafo solto escrito "Nome" — o
+leitor de tela não tem como saber que os dois têm relação.</p>
+
+<div class="tryreact" data-goal="conta:label=1;;clique:label;;css:#nome|outline-style=auto">
+  <p class="try-task">Troque o parágrafo por um <code>&lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;</code>.
+  Clique no texto do rótulo: o foco tem de ir para o campo (o painel mostra o contorno do foco).</p>
+  <pre class="jsx">function App() {
+  const [nome, setNome] = useState("");
+
+  return (
+    &lt;form onSubmit={(e) =&gt; e.preventDefault()}&gt;
+      &lt;p&gt;Nome&lt;/p&gt;
+      &lt;input
+        id="nome"
+        placeholder="Seu nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;button type="submit"&gt;Encomendar&lt;/button&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;form&gt;
+  &lt;p&gt;Nome&lt;/p&gt;
+  &lt;input id="nome" placeholder="Seu nome" value=""&gt;
+  &lt;button type="submit"&gt;Encomendar&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nome, setNome] = useState("");
+
+  return (
+    &lt;form onSubmit={(e) =&gt; e.preventDefault()}&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        placeholder="Seu nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;button type="submit"&gt;Encomendar&lt;/button&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+</div>
+
+<p>O clique no rótulo não é um recurso do React: é o navegador ligando o <code>for</code> ao
+<code>id</code>. Por isso a missão confere o foco no campo — não basta existir um <code>label</code>
+solto, ele precisa apontar para o campo certo. Um <code>id</code> repetido na página quebra essa ligação:
+o navegador liga o rótulo ao primeiro elemento com aquele <code>id</code> e ignora o resto.</p>
+
+<p>Repare também que o placeholder continua no código, agora como o que ele é: uma dica de formato, não
+o nome do campo. Placeholder com o mesmo texto do rótulo é redundância; placeholder com "99999-9999" é
+ajuda de verdade.</p>
+
+<h2>4. Dicas ligadas ao campo</h2>
+
+<p>Toda instrução que a pessoa precisa para preencher o campo deve ser lida junto com o campo. A forma de
+fazer isso é dar um <code>id</code> ao texto da dica e apontar para ele em
+<code>aria-describedby</code>. O leitor lê o nome, depois a descrição, e a pessoa já sabe o que digitar
+sem sair do lugar.</p>
+
+<pre class="file" data-file="Encomenda.jsx">&lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+&lt;input id="nome" aria-describedby="dica-nome" /&gt;
+&lt;p id="dica-nome"&gt;Como está no documento, com sobrenome.&lt;/p&gt;</pre>
+
+<p>Se o campo tem mais de uma informação — a dica e o erro —, o <code>aria-describedby</code> aceita
+vários <code>id</code> separados por espaço: <code>aria-describedby="dica-nome erro-nome"</code>. O
+leitor lê na ordem em que estão ali. É por isso que a dica vem primeiro: ela continua valendo quando o
+erro aparece.</p>
+
+<p>O que <em>não</em> funciona é confiar na posição visual. Um parágrafo logo abaixo do campo, sem
+ligação nenhuma, é lido quando o leitor chega nele na navegação — não quando chega no campo. Para quem
+usa zoom alto, o parágrafo pode estar fora da tela; para quem usa leitor, ele pode vir depois de mais
+três campos. A ligação explícita resolve os dois casos.</p>
+
+<p>Uma dica que evita erro antes de acontecer: escreva o formato esperado, não o que a pessoa não pode
+fazer. "Telefone com DDD, só números" ajuda; "não digite parênteses" faz a pessoa descobrir o problema
+depois. E use <code>autocomplete</code> quando fizer sentido — <code>autocomplete="name"</code>,
+<code>autocomplete="tel"</code> —, porque ele permite que o navegador preencha o campo com um toque em
+vez de digitar no celular.</p>
+
+<h2>5. Quando o campo está errado</h2>
+
+<p>Erro em formulário acessível tem três partes: o texto que explica, o estado do campo e o anúncio na
+hora em que o erro aparece. Só a primeira costuma existir; as três são necessárias.</p>
+
+<p>O texto é o que você já faz na aula de <a href="validacao.html">validação</a>: uma frase perto do
+campo, dizendo o que fazer. O estado é o atributo <code>aria-invalid</code>, que marca o campo como
+inválido para o leitor de tela e para o CSS (<code>[aria-invalid="true"]</code> pinta a borda). O anúncio
+é o <code>role="alert"</code> no parágrafo do erro: quando ele aparece, o leitor interrompe o que estava
+lendo e fala a mensagem.</p>
+
+<pre class="file" data-file="Encomenda.jsx">&lt;input
+  id="nome"
+  value={nome}
+  aria-invalid={erro !== ""}
+  aria-describedby="dica-nome erro-nome"
+  onChange={(e) =&gt; setNome(e.target.value)}
+/&gt;
+{erro &amp;&amp; &lt;p id="erro-nome" role="alert"&gt;{erro}&lt;/p&gt;}</pre>
+
+<p>Três detalhes que fazem diferença. Primeiro: <code>role="alert"</code> é para a mensagem que
+<em>aparece</em>, não para o container que muda a cada tecla — senão o leitor repete a frase a cada
+letra e vira tortura. Segundo: a mensagem diz o que fazer ("Informe o nome de quem vai buscar"), não o
+que a pessoa fez de errado ("campo inválido"). Terceiro: cor não é informação. Quem não distingue
+vermelho não vê a borda vermelha; o texto e o <code>aria-invalid</code> é que contam a história.</p>
+
+<p>Para quem prefere manter as mensagens de erro sempre no DOM, existe <code>aria-live="polite"</code>
+num container vazio: o leitor anuncia o que aparecer ali, sem interromper. <code>role="alert"</code> é
+o mesmo mecanismo com prioridade alta. Para erro de formulário, <code>alert</code> é o mais usado; para
+contadores e avisos que mudam sozinhos, <code>polite</code> é melhor.</p>
+
+<p>Agora a missão: o erro existe, mas nenhum leitor de tela vai encontrá-lo.</p>
+
+<div class="tryreact" data-goal="clique:#enviar;;attr:#nome|aria-describedby=dica-nome;;attr:#nome|aria-invalid=true;;attr:#erro-nome|role=alert;;texto:Informe o nome">
+  <p class="try-task">Ligue a dica ao campo com <code>aria-describedby="dica-nome"</code>, marque o
+  campo com <code>aria-invalid</code> quando houver erro e dê <code>role="alert"</code> ao parágrafo do
+  erro. Clique em Encomendar com o campo vazio.</p>
+  <pre class="jsx">function App() {
+  const [nome, setNome] = useState("");
+  const [erro, setErro] = useState("");
+
+  function enviar(e) {
+    e.preventDefault();
+    if (nome.trim() === "") {
+      setErro("Informe o nome de quem vai buscar");
+    } else {
+      setErro("");
+    }
+  }
+
+  return (
+    &lt;form onSubmit={enviar}&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;p id="dica-nome"&gt;Como está no documento, com sobrenome.&lt;/p&gt;
+      {erro &amp;&amp; &lt;p id="erro-nome"&gt;{erro}&lt;/p&gt;}
+      &lt;button id="enviar" type="submit"&gt;Encomendar&lt;/button&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;form&gt;
+  &lt;label for="nome"&gt;Nome&lt;/label&gt;
+  &lt;input id="nome" value=""&gt;
+  &lt;p id="dica-nome"&gt;Como está no documento, com sobrenome.&lt;/p&gt;
+  &lt;button id="enviar" type="submit"&gt;Encomendar&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nome, setNome] = useState("");
+  const [erro, setErro] = useState("");
+
+  function enviar(e) {
+    e.preventDefault();
+    if (nome.trim() === "") {
+      setErro("Informe o nome de quem vai buscar");
+    } else {
+      setErro("");
+    }
+  }
+
+  return (
+    &lt;form onSubmit={enviar}&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        aria-describedby="dica-nome"
+        aria-invalid={erro !== ""}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;p id="dica-nome"&gt;Como está no documento, com sobrenome.&lt;/p&gt;
+      {erro &amp;&amp; &lt;p id="erro-nome" role="alert"&gt;{erro}&lt;/p&gt;}
+      &lt;button id="enviar" type="submit"&gt;Encomendar&lt;/button&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em Encomendar e depois digite um nome: o erro some, <code>aria-invalid</code> volta a
+<code>false</code> e o parágrafo com <code>role="alert"</code> sai do DOM. O estado acompanha o valor, como
+na validação que você já conhece — a diferença é que agora ele também é anunciado. Se você esquecer o
+<code>id="erro-nome"</code>, o <code>aria-describedby</code> aponta para o nada e o leitor não fala a
+mensagem; é um erro silencioso.</p>
+
+<h2>6. Grupos com nome: fieldset e legend</h2>
+
+<p>Algumas perguntas não pertencem a um campo só. "Como você quer receber?" vale para o conjunto de
+opções — retirar, entrega, correio. Dar o mesmo rótulo a cada opção é errado; deixar sem rótulo é pior. O
+HTML resolve com <code>fieldset</code> e <code>legend</code>: o <code>legend</code> nomeia o grupo, e o
+leitor de tela anuncia esse nome antes de cada opção.</p>
+
+<pre class="file" data-file="Recebimento.jsx">&lt;fieldset&gt;
+  &lt;legend&gt;Como você quer receber?&lt;/legend&gt;
+  &lt;label&gt;
+    &lt;input type="radio" name="recebimento" value="retirada"
+      checked={forma === "retirada"}
+      onChange={(e) =&gt; setForma(e.target.value)} /&gt;
+    Retirar no balcão
+  &lt;/label&gt;
+  &lt;label&gt;
+    &lt;input type="radio" name="recebimento" value="entrega"
+      checked={forma === "entrega"}
+      onChange={(e) =&gt; setForma(e.target.value)} /&gt;
+    Entrega em casa
+  &lt;/label&gt;
+&lt;/fieldset&gt;</pre>
+
+<p>O <code>name</code> igual em todas as opções é o que faz o navegador tratar as bolinhas como um grupo
+só: escolher uma desmarca a outra, e as setas do teclado pulam de uma para outra. O
+<code>fieldset</code> é o que diz ao leitor de tela que existe um grupo e qual é a pergunta dele. Os dois
+juntos é que fazem o serviço; só o <code>name</code> agrupa o comportamento, mas não dá nome ao
+conjunto.</p>
+
+<p>Aula de <a href="radio.html">radio</a> mostra o grupo controlado com calma, e a de
+<a href="checkbox.html">checkbox</a> mostra as caixas de marcar. O que vale levar daqui é o hábito: se
+duas ou mais opções respondem à mesma pergunta, elas vão dentro de um <code>fieldset</code> com
+<code>legend</code>. Se o layout não permite, <code>role="group"</code> com
+<code>aria-labelledby</code> funciona, mas é mais fácil de errar.</p>
+
+<h2>7. Para onde o foco vai</h2>
+
+<p>Quando o envio falha, quem enxerga vê a mensagem vermelha e rola até ela. Quem usa teclado e leitor de
+tela continua no botão, sem saber que existe um erro em cima. A correção é mover o foco para o lugar
+onde está o problema — o primeiro campo inválido.</p>
+
+<pre class="file" data-file="Encomenda.jsx">function Encomenda() {
+  const [nome, setNome] = useState("");
+  const [erro, setErro] = useState("");
+  const campoNome = useRef(null);
+
+  function enviar(e) {
+    e.preventDefault();
+    if (nome.trim() === "") {
+      setErro("Informe o nome de quem vai buscar");
+      campoNome.current.focus();
+    } else {
+      setErro("");
+    }
+  }
+
+  return (
+    &lt;form onSubmit={enviar}&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        ref={campoNome}
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      {erro &amp;&amp; &lt;p role="alert"&gt;{erro}&lt;/p&gt;}
+      &lt;button type="submit"&gt;Encomendar&lt;/button&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+
+<p><code>useRef(null)</code> cria uma caixa que guarda uma referência ao elemento; <code>ref={campoNome}</code>
+entrega o <code>input</code> de verdade para essa caixa; <code>.focus()</code> é o método do elemento que
+leva o cursor para lá. A aula de <a href="useRef.html">useRef</a> destrincha o assunto — aqui basta saber
+que é assim que se fala com um elemento do DOM.</p>
+
+<p>Duas regras. Primeiro: mova o foco só quando o erro aparece, nunca a cada tecla; um campo que rouba o
+cursor enquanto a pessoa digita é pior que um erro silencioso. Segundo: se o formulário tem muitos campos,
+considere focar um resumo de erros no topo, com <code>tabIndex={-1}</code> para poder receber foco sem
+entrar na ordem do Tab. O resumo lista os problemas e cada item leva ao campo.</p>
+
+<p>Enquanto você mexe no foco, não apague o contorno. <code>outline: none</code> no CSS deixa o foco
+invisível para quem usa teclado — é a reclamação número um de quem navega com Tab. Se o contorno padrão
+não combina com o layout, troque por outro (<code>outline: 2px solid</code>, <code>box-shadow</code>),
+mas não remova sem colocar nada no lugar.</p>
+
+<p>Agora a missão. O erro é anunciado, mas o foco continua no botão.</p>
+
+<div class="tryreact" data-goal="clique:#enviar;;css:#nome|outline-style=auto;;texto:Informe o nome">
+  <p class="try-task">Use <code>useRef</code> para guardar o campo do nome e leve o foco até ele quando o
+  nome estiver vazio. Clique em Encomendar e confira o contorno no campo.</p>
+  <pre class="jsx">function App() {
+  const [nome, setNome] = useState("");
+  const [erro, setErro] = useState("");
+
+  function enviar(e) {
+    e.preventDefault();
+    if (nome.trim() === "") {
+      setErro("Informe o nome de quem vai buscar");
+    } else {
+      setErro("");
+    }
+  }
+
+  return (
+    &lt;form onSubmit={enviar}&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        aria-invalid={erro !== ""}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      {erro &amp;&amp; &lt;p role="alert"&gt;{erro}&lt;/p&gt;}
+      &lt;button id="enviar" type="submit"&gt;Encomendar&lt;/button&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;form&gt;
+  &lt;label for="nome"&gt;Nome&lt;/label&gt;
+  &lt;input id="nome" aria-invalid="false" value=""&gt;
+  &lt;button id="enviar" type="submit"&gt;Encomendar&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nome, setNome] = useState("");
+  const [erro, setErro] = useState("");
+  const campoNome = useRef(null);
+
+  function enviar(e) {
+    e.preventDefault();
+    if (nome.trim() === "") {
+      setErro("Informe o nome de quem vai buscar");
+      campoNome.current.focus();
+    } else {
+      setErro("");
+    }
+  }
+
+  return (
+    &lt;form onSubmit={enviar}&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        ref={campoNome}
+        value={nome}
+        aria-invalid={erro !== ""}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      {erro &amp;&amp; &lt;p role="alert"&gt;{erro}&lt;/p&gt;}
+      &lt;button id="enviar" type="submit"&gt;Encomendar&lt;/button&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+</div>
+
+<p>Na prévia ao vivo, repare no que muda: o cursor pisca no campo do nome e o contorno aparece nele, não
+no botão. Para quem usa leitor de tela, o anúncio vem junto — o campo recebe o foco, o leitor fala o nome
+do campo, a descrição e o estado inválido. É a diferença entre "aconteceu um erro em algum lugar" e "o
+nome está vazio, preencha aqui".</p>
+
+<h2>8. Teclado, ordem e os detalhes que somam</h2>
+
+<p>Formulário acessível é formado por muitos detalhes pequenos. Estes são os que mais aparecem no dia a
+dia de quem constrói tela.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que se faz</th><th>O que a pessoa sente</th><th>O conserto</th></tr>
+<tr><td><code>&lt;div onClick=&gt;</code> como botão</td><td>não recebe Tab, não responde a Enter</td><td><code>&lt;button&gt;</code>, que já vem com papel e teclado</td></tr>
+<tr><td>placeholder no lugar do rótulo</td><td>o texto some ao digitar; o campo fica sem nome</td><td><code>label</code> visível e ligado ao campo</td></tr>
+<tr><td>erro só em vermelho</td><td>não é lido e não é visto por quem não distingue cor</td><td>texto + <code>role="alert"</code> + <code>aria-invalid</code></td></tr>
+<tr><td><code>outline: none</code> no CSS</td><td>não se sabe onde o foco está</td><td>manter ou trocar o contorno, nunca remover</td></tr>
+<tr><td><code>tabIndex="1"</code> em vários campos</td><td>a ordem do Tab fica imprevisível</td><td>deixar a ordem do DOM; <code>-1</code> só para receber foco</td></tr>
+<tr><td>botão de ícone sem texto</td><td>o leitor fala "botão" e nada mais</td><td><code>aria-label="Fechar"</code> no botão</td></tr>
+</table>
+</div>
+
+<p>A ordem do Tab segue a ordem do HTML, não a posição na tela. Isso importa quando o CSS usa
+<code>order</code> ou posicionamento absoluto: o visual diz uma coisa e o teclado faz outra. Se a sua
+tela usa <code>flex-direction: column-reverse</code> para o rodapé, teste com Tab — o caminho pode estar
+de trás para frente.</p>
+
+<p>Sobre <code>required</code>: ele é bom e tem efeito colateral. O navegador passa a validar o campo
+sozinho e mostra um balão nativo, no idioma do navegador, antes do seu <code>onSubmit</code> rodar. Se
+você quer a sua própria mensagem, use <code>required</code> para o leitor de tela e
+<code>noValidate</code> no <code>form</code> para desligar o balão — assim o campo continua sendo
+anunciado como obrigatório e a mensagem que aparece é a sua.</p>
+
+<p>Por último, três ajustes de CSS que não são enfeite: contraste de pelo menos 4,5:1 entre texto e
+fundo; área de toque de pelo menos 44 por 44 pixels nos botões; e tamanho de fonte que aguente o zoom de
+200% sem quebrar o layout. Nada disso é React — é a mesma página que você já tem, vista por outra
+pessoa.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o campo que o leitor chama de "caixa de edição"</h3>
+<p>A Ana tinha três campos com placeholder e nenhum rótulo. No leitor de tela, os três eram "caixa de
+edição, em branco" — sem nome, sem ordem reconhecível. O conserto foi trocar cada parágrafo solto por um
+<code>label</code> com <code>htmlFor</code> apontando para o <code>id</code> do campo. Três linhas de
+HTML mudaram a experiência inteira.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o erro que ninguém ouviu</h3>
+<p>O erro aparecia em vermelho, com texto, e desaparecia quando a pessoa corrigia. Só que nada disso era
+anunciado: quem não estava olhando a tela não sabia que o envio tinha falhado. A correção foi
+<code>role="alert"</code> no parágrafo, <code>aria-invalid</code> no campo e o foco indo para o campo com
+problema. Três atributos, um problema resolvido.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o Tab que pulava o botão</h3>
+<p>O botão de enviar era uma imagem com <code>onClick</code>. Mouse funcionava; teclado, não — a imagem
+não recebe foco nem responde a Enter. O conserto é trocar por <code>&lt;button&gt;</code> com o ícone
+dentro, que já vem com papel, foco e teclado de graça. Estilo é CSS; comportamento é HTML.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que dá nome a um campo para o leitor de tela?</p>
+<label><input type="radio" name="q1"> o <code>placeholder</code> cinza dentro do campo</label>
+<label><input type="radio" name="q1"> um <code>label</code> ligado ao campo por <code>for</code> e <code>id</code></label>
+<label><input type="radio" name="q1"> o texto que está visualmente acima do campo</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Para que serve <code>aria-describedby</code>?</p>
+<label><input type="radio" name="q2"> para esconder a dica de quem usa leitor de tela</label>
+<label><input type="radio" name="q2"> para trocar o nome do campo por uma frase longa</label>
+<label><input type="radio" name="q2"> para ligar a dica ao campo, lida depois do nome</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que <code>role="alert"</code> faz na mensagem de erro?</p>
+<label><input type="radio" name="q3"> faz o leitor de tela anunciar a mensagem assim que ela aparece</label>
+<label><input type="radio" name="q3"> pinta a mensagem de vermelho automaticamente</label>
+<label><input type="radio" name="q3"> impede o envio do formulário até o campo ser corrigido</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: ligar a dica ao campo</h2>
+<p>O campo abaixo tem uma dica com <code>id="dica-nome"</code>. Complete o atributo que faz o leitor de
+tela ler essa dica junto com o campo:</p>
+<div class="ex-code">&lt;input id="nome" <input aria-label="resposta 1" data-answer="aria-describedby" placeholder="...">="dica-nome"&gt;</div>
+<p class="ex-dica">Dica: é o atributo que aponta para o <code>id</code> de um ou mais textos de apoio,
+separados por espaço. Não é o mesmo atributo que dá o nome ao campo.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Acessibilidade em formulário começa pelo nome. Cada campo precisa de um <code>label</code> ligado por
+<code>htmlFor</code> e <code>id</code> — ou envolvendo o campo —, porque é isso que o leitor de tela
+anuncia junto com o foco. Placeholder é dica de formato, não nome. Dicas longas vão em
+<code>aria-describedby</code>, apontando para o <code>id</code> do texto.</p>
+
+<p>Erro tem três partes: a mensagem clara, o <code>aria-invalid</code> no campo e o
+<code>role="alert"</code> no parágrafo, para o anúncio acontecer na hora. Grupos de opções vão em
+<code>fieldset</code> com <code>legend</code>, e o <code>name</code> igual agrupa o comportamento do
+teclado. Quando o envio falha, o foco vai para o campo com problema — com <code>useRef</code> e
+<code>.focus()</code> —, e nunca a cada tecla.</p>
+
+<p>O resto é disciplina de HTML: <code>button</code> no lugar de <code>div</code> clicável, contorno de
+foco visível, ordem do Tab igual à ordem do documento, contraste e área de toque. Nada disso é React
+específico — é a mesma página, agora legível para todo mundo. E vale testar com Tab, com zoom de 200% e,
+se puder, com um leitor de tela: cinco minutos de teste com teclado encontram mais problema que uma tarde
+de leitura de documentação.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>O leitor lê nome, papel, valor e estado de cada campo.</li>
+<li><code>label htmlFor="nome"</code> + <code>input id="nome"</code> é o par que dá nome ao campo.</li>
+<li>Clicar no rótulo foca o campo — é o navegador ligando <code>for</code> a <code>id</code>.</li>
+<li>Placeholder não é rótulo: some ao digitar.</li>
+<li><code>aria-describedby</code> liga a dica (e o erro) ao campo.</li>
+<li><code>aria-invalid</code> marca o estado; <code>role="alert"</code> anuncia a mensagem.</li>
+<li>Erro só em vermelho não é informação para todo mundo.</li>
+<li><code>fieldset</code> + <code>legend</code> nomeiam um grupo de opções.</li>
+<li><code>useRef</code> + <code>.focus()</code> leva o cursor ao campo com problema.</li>
+<li>Nunca apague o contorno do foco; teste a página inteira com Tab.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

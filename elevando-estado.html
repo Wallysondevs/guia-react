@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elevando o Estado | Guia React</title>
+<meta name="description" content="Elevar o estado em React: subir o useState para o pai comum, descer dados por props e subir avisos por callback, com a barra e o número que mostram a mesma quantidade.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Elevando o <span class="hl">Estado</span></h1>
+<p class="intro">O carrinho do site da Ana mostra "0 itens" no topo enquanto os dois botões de adicionar
+contam pão e salgado cada um por si. É o retrato de um problema clássico: o dado que a tela inteira precisa
+está guardado dentro de um pedaço da tela, e os outros pedaços não têm como vê-lo. Nesta aula a Ana aprende a
+<strong>elevar o estado</strong> — mudar o <code>useState</code> de lugar, para o pai comum dos componentes
+que precisam do mesmo dado — e a manter o fluxo nos dois sentidos: dados descem por props, avisos sobem por
+funções.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como descobrir onde um estado deve morar, a partir de quem o usa.</li>
+  <li>O que muda no filho quando o estado sobe: ele passa a receber valor e a avisar o pai.</li>
+  <li>Como escrever uma prop de callback e por que ela se chama <code>onAlgo</code>.</li>
+  <li>Dois controles diferentes editando o mesmo dado, sem cópias.</li>
+  <li>Quando <em>não</em> elevar: o custo de subir o estado cedo demais.</li>
+  <li>O que se perde quando um componente muda de lugar na árvore.</li>
+  <li>Os tropeços: cópia esquecida no filho, callback recriada, estado derivado guardado à toa.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o carrinho que mostra zero</h2>
+
+<p>O carrinho da padaria tem três pedaços: o cabeçalho que conta os itens, a lista de pães e a lista de
+salgados. Cada lista guarda a própria lista de itens, porque cada uma foi escrita no seu dia e resolveu o
+problema sozinha. O cabeçalho, coitado, não tem estado nenhum: exibe zero e vai continuar exibindo zero.</p>
+
+<p>O erro não é de digitação, é de lugar. O cabeçalho precisa saber quantos itens existem nas duas listas, e
+a informação está trancada dentro de cada uma. Não há prop que resolva isso de baixo para cima: em React, os
+dados descem a árvore, nunca sobem sozinhos. Quem precisa ver os dois lados tem de ser um ancestral dos dois
+— e é aí que o estado muda de endereço.</p>
+
+<p>Elevar o estado é exatamente isso: pegar o <code>useState</code> que estava no componente que usa e
+colocá-lo no menor componente que é pai de todos os que precisam do dado. O resto é consequência. O filho que
+antes mandava em si mesmo passa a receber o valor por prop e a pedir mudanças por uma função que o pai
+entrega. A tela continua igual; o comando mudou de mãos.</p>
+
+<h2>2. Onde o estado deve morar</h2>
+
+<p>A pergunta que resolve quase todos os casos é: <strong>quem precisa ver esse valor?</strong> Se é só o
+próprio componente, o estado fica nele. Se são dois irmãos, sobe para o pai dos dois. Se são primos distantes,
+sobe para o avô comum — e aí vale considerar contexto, que é outra aula. O que não funciona é deixar o valor
+num lugar e pedir que outro lugar o veja por mágica.</p>
+
+<dl class="anatomy">
+<dt>elevar</dt>
+<dd>Mover o <code>useState</code> do componente que usa o valor para o menor ancestral comum de todos os que
+precisam dele.</dd>
+<dt>pai comum</dt>
+<dd>O componente mais próximo que está acima de todos os interessados. É o novo dono do estado.</dd>
+<dt>prop de dado</dt>
+<dd>O valor descendo: <code>&lt;Aviso escuro={escuro} /&gt;</code>. Somente leitura, como toda prop.</dd>
+<dt>prop de callback</dt>
+<dd>A função que sobe o aviso: <code>onAlternar={...}</code>. O filho chama, o pai decide o que fazer.</dd>
+<dt>dono</dt>
+<dd>O componente que tem o <code>useState</code>. Só ele chama o <code>set</code>; os outros pedem.</dd>
+<dt>fonte única</dt>
+<dd>Um dado, um lugar. Se duas cópias do mesmo valor existem na tela, uma delas vai ficar velha.</dd>
+</dl>
+
+<p>Repare que elevar não é "deixar tudo no topo". O pai comum de dois irmãos é o pai deles, não o
+<code>App</code>; e se só um componente usa o valor, o pai dele é um lugar desnecessário. O critério é o
+alcance da informação, não o tamanho do arquivo. Estado no lugar certo é o que faz um componente ser
+reutilizável: um <code>CampoDeBusca</code> que guarda o próprio texto pode ser usado em dez telas; um que
+depende do estado da página só funciona naquela página.</p>
+
+<h2>3. Subir o estado: um interruptor e um aviso</h2>
+
+<p>O primeiro caso é pequeno e mostra o desenho inteiro. Um botão alterna o tema, e um parágrafo mostra qual é
+o tema atual. Hoje o estado mora no botão: ele sabe se está escuro, mas o parágrafo não. O código inicial
+mostra "Tema: claro" para sempre, mesmo que você clique e veja o botão mudando por dentro.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Tema: escuro">
+  <p class="try-task">Leve o estado <code>escuro</code> para o <code>App</code>, passe <code>escuro</code> para
+  o <code>Aviso</code> e uma função <code>onAlternar</code> para o <code>BotaoTema</code> chamar. Clique em
+  "Alternar tema".</p>
+  <pre class="jsx">function BotaoTema() {
+  const [escuro, setEscuro] = useState(false);
+  return &lt;button onClick={() =&gt; setEscuro(!escuro)}&gt;Alternar tema&lt;/button&gt;;
+}
+
+function Aviso() {
+  return &lt;p&gt;Tema: claro&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;BotaoTema /&gt;
+      &lt;Aviso /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Alternar tema&lt;/button&gt;
+  &lt;p&gt;Tema: claro&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function BotaoTema({ onAlternar }) {
+  return &lt;button onClick={onAlternar}&gt;Alternar tema&lt;/button&gt;;
+}
+
+function Aviso({ escuro }) {
+  return &lt;p&gt;Tema: {escuro ? "escuro" : "claro"}&lt;/p&gt;;
+}
+
+function App() {
+  const [escuro, setEscuro] = useState(false);
+
+  return (
+    &lt;div&gt;
+      &lt;BotaoTema onAlternar={() =&gt; setEscuro(!escuro)} /&gt;
+      &lt;Aviso escuro={escuro} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Leia a solução como uma mudança de endereço. O <code>useState</code> saiu do <code>BotaoTema</code> e foi
+para o <code>App</code>; o <code>BotaoTema</code> ficou sem estado nenhum e recebeu uma função para chamar no
+clique; o <code>Aviso</code> recebeu o valor e só desenha. O <code>App</code> é o único que chama
+<code>setEscuro</code>, e é isso que faz dele o dono. O botão não decide mais nada: ele avisa.</p>
+
+<p>Guarde o nome <code>onAlternar</code>, porque ele é uma convenção e não um capricho. O prefixo
+<code>on</code> diz "isto é um aviso que eu emito", e o resto diz qual é o acontecimento. Quem lê
+<code>&lt;BotaoTema onAlternar={...} /&gt;</code> sabe duas coisas sem abrir o arquivo: o botão vai chamar a
+função quando algo acontecer, e quem chama decide o que fazer. A convenção funciona igual para
+<code>onChange</code>, <code>onClick</code> e <code>onEnviar</code> dos seus próprios componentes.</p>
+
+<h2>4. Dados descem, avisos sobem</h2>
+
+<p>O segundo caso é o carrinho de verdade. Duas listas, cada uma com o próprio estado; um cabeçalho que não
+tem como somar o que não vê. O caminho da solução tem três passos, sempre nesta ordem: subir os dados, passar
+os dados para baixo, passar a função que os altera para baixo. Quem faz os três ganha a tela coerente.</p>
+
+<div class="tryreact" data-goal="clique:#pao;;clique:#salgado;;texto:Carrinho: 2 itens;;texto:Pães: 1">
+  <p class="try-task">Mova a lista de itens para o <code>App</code>, passe <code>quantos</code> para cada lista
+  e uma função <code>onAdicionar</code> para os botões. Clique em "Adicionar pão" e em "Adicionar salgado": o
+  cabeçalho tem de contar dois itens.</p>
+  <pre class="jsx">function Cabecalho() {
+  return &lt;h2&gt;Carrinho: 0 itens&lt;/h2&gt;;
+}
+
+function Paes() {
+  const [paes, setPaes] = useState([]);
+  return (
+    &lt;div&gt;
+      &lt;button id="pao" onClick={() =&gt; setPaes([...paes, "Pão"])}&gt;Adicionar pão&lt;/button&gt;
+      &lt;p&gt;Pães: {paes.length}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function Salgados() {
+  const [salgados, setSalgados] = useState([]);
+  return (
+    &lt;div&gt;
+      &lt;button id="salgado" onClick={() =&gt; setSalgados([...salgados, "Queijo"])}&gt;Adicionar salgado&lt;/button&gt;
+      &lt;p&gt;Salgados: {salgados.length}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Cabecalho /&gt;
+      &lt;Paes /&gt;
+      &lt;Salgados /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h2&gt;Carrinho: 0 itens&lt;/h2&gt;
+  &lt;div&gt;
+    &lt;button id="pao"&gt;Adicionar pão&lt;/button&gt;
+    &lt;p&gt;Pães: 0&lt;/p&gt;
+  &lt;/div&gt;
+  &lt;div&gt;
+    &lt;button id="salgado"&gt;Adicionar salgado&lt;/button&gt;
+    &lt;p&gt;Salgados: 0&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Cabecalho({ total }) {
+  return &lt;h2&gt;Carrinho: {total} {total === 1 ? "item" : "itens"}&lt;/h2&gt;;
+}
+
+function Paes({ quantos, onAdicionar }) {
+  return (
+    &lt;div&gt;
+      &lt;button id="pao" onClick={() =&gt; onAdicionar("Pão")}&gt;Adicionar pão&lt;/button&gt;
+      &lt;p&gt;Pães: {quantos}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function Salgados({ quantos, onAdicionar }) {
+  return (
+    &lt;div&gt;
+      &lt;button id="salgado" onClick={() =&gt; onAdicionar("Queijo")}&gt;Adicionar salgado&lt;/button&gt;
+      &lt;p&gt;Salgados: {quantos}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const [itens, setItens] = useState([]);
+
+  return (
+    &lt;div&gt;
+      &lt;Cabecalho total={itens.length} /&gt;
+      &lt;Paes
+        quantos={itens.filter((i) =&gt; i === "Pão").length}
+        onAdicionar={(item) =&gt; setItens([...itens, item])}
+      /&gt;
+      &lt;Salgados
+        quantos={itens.filter((i) =&gt; i === "Queijo").length}
+        onAdicionar={(item) =&gt; setItens([...itens, item])}
+      /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O que mudou de fato: existe <strong>uma</strong> lista de itens, no <code>App</code>, e as duas listas de
+baixo são apenas janelas para ela. O <code>quantos</code> que cada filho recebe não é um estado novo; é uma
+conta feita na hora, com <code>filter</code>. O cabeçalho recebe o tamanho da mesma lista. Não há como os
+três discordarem, porque não há três valores — há um valor e três leituras.</p>
+
+<p>O que também mudou: o filho não tem mais como adicionar nada sozinho. Ele chama
+<code>onAdicionar("Pão")</code> e quem decide é o pai. Essa dependência parece uma perda de autonomia e é o
+ponto central do padrão: o filho continua sendo reaproveitável, porque não sabe de onde vem a lista nem para
+onde vai. Numa outra tela, o mesmo <code>Paes</code> pode receber outra lista e outra função, e vai funcionar
+igual.</p>
+
+<p>Num arquivo de verdade, o desenho fica assim — e repare que o estado do carrinho não aparece em nenhum
+filho:</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const [itens, setItens] = useState([]);
+
+  function adicionar(item) {
+    setItens([...itens, item]);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;Cabecalho total={itens.length} /&gt;
+      &lt;Paes quantos={itens.filter((i) =&gt; i === "Pão").length} onAdicionar={adicionar} /&gt;
+      &lt;Salgados quantos={itens.filter((i) =&gt; i === "Queijo").length} onAdicionar={adicionar} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>A função <code>adicionar</code> é declarada uma vez, com nome, e entregue aos dois filhos. É melhor do que
+duas funções anônimas iguais no JSX, por dois motivos: o nome documenta a intenção e a identidade da função é
+a mesma nos dois lugares. A identidade da função importa para o desempenho e tem
+aula própria (<code>useCallback</code>, adiante); aqui basta saber que uma função com nome, fora do JSX, é mais fácil de
+ler e de reaproveitar.</p>
+
+<h2>5. Um estado, dois controles</h2>
+
+<p>O terceiro caso mostra que elevar estado não é só para irmãos. A Ana tem dois jeitos de escolher a
+quantidade de pães: digitando no campo numérico ou arrastando a barra. Hoje cada um tem o próprio
+<code>useState</code>, então você digita 4 no campo, a barra continua em 1 e o texto embaixo não muda. São
+três valores para o mesmo fato.</p>
+
+<div class="tryreact" data-goal="digite:#numero=4;;texto:Quantidade: 4;;attr:#barra|value=4">
+  <p class="try-task">Leve o estado <code>qtd</code> para o <code>App</code> e entregue <code>qtd</code> e
+  <code>onMudar</code> aos dois controles. Digite <strong>4</strong> no campo: a barra e o texto têm de
+  acompanhar.</p>
+  <pre class="jsx">function Numero() {
+  const [qtd, setQtd] = useState(1);
+  return (
+    &lt;input id="numero" type="number" value={qtd} onChange={(e) =&gt; setQtd(Number(e.target.value))} /&gt;
+  );
+}
+
+function Barra() {
+  const [qtd, setQtd] = useState(1);
+  return (
+    &lt;input id="barra" type="range" min="1" max="9" value={qtd} onChange={(e) =&gt; setQtd(Number(e.target.value))} /&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Numero /&gt;
+      &lt;Barra /&gt;
+      &lt;p&gt;Quantidade: 1&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input id="numero" type="number" value="1"&gt;
+  &lt;input id="barra" min="1" max="9" type="range" value="1"&gt;
+  &lt;p&gt;Quantidade: 1&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Numero({ qtd, onMudar }) {
+  return (
+    &lt;input id="numero" type="number" value={qtd} onChange={(e) =&gt; onMudar(Number(e.target.value))} /&gt;
+  );
+}
+
+function Barra({ qtd, onMudar }) {
+  return (
+    &lt;input id="barra" type="range" min="1" max="9" value={qtd} onChange={(e) =&gt; onMudar(Number(e.target.value))} /&gt;
+  );
+}
+
+function App() {
+  const [qtd, setQtd] = useState(1);
+
+  return (
+    &lt;div&gt;
+      &lt;Numero qtd={qtd} onMudar={setQtd} /&gt;
+      &lt;Barra qtd={qtd} onMudar={setQtd} /&gt;
+      &lt;p&gt;Quantidade: {qtd}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Aqui os dois filhos são idênticos na forma: recebem <code>qtd</code>, desenham o campo e chamam
+<code>onMudar</code> com o número novo. Nenhum dos dois guarda nada. Quem guarda é o <code>App</code>, e é por
+isso que digitar no campo move a barra: os dois estão desenhando o mesmo <code>qtd</code>. O padrão tem nome —
+componente controlado — e é o mesmo que o <code>input</code> faz com o seu estado desde a aula de
+<a href="entrada-controlada.html">entrada controlada</a>.</p>
+
+<p>Com um <code>console.log</code> em cada componente da caixa, uma tecla no campo imprime três linhas — o
+pai primeiro, depois os dois filhos, todos com o mesmo número:</p>
+
+<pre class="term">render do App: qtd = 4
+render do Numero: qtd = 4
+render do Barra: qtd = 4</pre>
+
+<p>Essa repetição do mesmo número em três lugares é o que se chama de fonte única: não há três valores, há
+três leituras de um valor só. E é também o custo do padrão — cada mudança no pai desenha todos os filhos que
+recebem o valor, mesmo os que não mudaram visualmente. Em telas pequenas isso é irrelevante; em listas
+grandes, é o motivo de existirem as técnicas de otimização das próximas aulas.</p>
+
+<p>O <code>Number(e.target.value)</code> está ali porque todo campo devolve texto. Sem a conversão, a barra
+receberia <code>"4"</code> e continuaria funcionando por coincidência do navegador, enquanto uma soma
+posterior viraria <code>"4" + 1 = "41"</code>. Converter na borda — no <code>onChange</code> — é o hábito que
+evita esse tipo de bug silencioso.</p>
+
+<h2>6. Onde parar de subir</h2>
+
+<p>Elevar tem custo, e o custo é acoplamento. Quanto mais alto o estado mora, mais componentes precisam
+recebê-lo por prop, e mais a página inteira redesenha quando ele muda. Uma busca que filtra uma lista não
+precisa do estado no <code>App</code> se a busca e a lista estão no mesmo componente; precisa, no máximo, no
+pai delas duas. O nome disso é colocar o estado perto de onde ele é usado.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sinal</th><th>O que significa</th><th>O que fazer</th></tr>
+<tr><td>dois irmãos precisam do mesmo valor</td><td>o dono está baixo demais</td><td>subir para o pai dos dois</td></tr>
+<tr><td>um irmão precisa apagar o que o outro escreveu</td><td>o dono está baixo demais</td><td>subir, ou trocar a <code>key</code> do filho</td></tr>
+<tr><td>o valor só aparece num componente</td><td>o dono já está no lugar certo</td><td>não mexer</td></tr>
+<tr><td>o valor desce por três níveis que não o usam</td><td>subiu demais</td><td>descer de volta ou usar contexto</td></tr>
+<tr><td>mudar uma tecla redesenha a página inteira</td><td>o estado está alto demais</td><td>descer para o componente que usa</td></tr>
+</table>
+</div>
+
+<p>A última linha é a que dói em produção. Um campo controlado no topo da árvore faz o formulário inteiro
+redesenhar a cada tecla; se houver uma tabela de duzentas linhas na mesma árvore, você vai sentir. A solução
+não é tornar o campo não controlado por reflexo: é perceber que aquele estado não precisava estar tão alto.
+Estado no lugar certo é uma decisão de desempenho e de clareza ao mesmo tempo.</p>
+
+<h2>7. Quando o estado muda de endereço</h2>
+
+<p>Subir o estado muda quem manda, e essa mudança tem um efeito colateral que quase ninguém antecipa: o
+componente filho pode perder o estado próprio. Isso acontece quando o componente troca de posição na árvore —
+por exemplo, sai de dentro de um <code>if</code> e vai para outro ramo, ou deixa de ser o primeiro filho e
+passa a ser o segundo. O React identifica componentes por posição, e mudar de lugar é, para ele, criar outro
+componente.</p>
+
+<p>O sintoma é um campo que "esquece" o que estava digitado depois de uma mudança que não tinha nada a ver.
+Quando isso acontece, a pergunta é onde o componente estava antes e onde ele está agora. Se você precisa que
+ele seja sempre o mesmo, dê uma <code>key</code> estável — e se precisa justamente que ele esqueça, mude a
+<code>key</code>, como a aula de <a href="controlado-e-nao-controlado.html">controlado e não controlado</a>
+mostra.</p>
+
+<p>Há um caso em que perder o estado é o objetivo. A Ana tinha um seletor de produto e, ao lado, um formulário
+de avaliação que guardava a nota digitada. Ao trocar de produto, a nota antiga continuava na tela — porque o
+formulário estava na mesma posição. A solução foi <code>key={produto.id}</code>: novo produto, formulário
+novo, nota zerada. Não foi preciso nenhum efeito de limpeza; a identidade fez o trabalho.</p>
+
+<h2>8. Os tropeços de quem está subindo</h2>
+
+<p>O primeiro tropeço é subir e deixar uma cópia. O estado vai para o pai, mas o filho continua com o seu
+<code>useState</code> e passa a desenhar a cópia local, que ninguém atualiza. O sintoma é uma tela em que
+metade muda e metade não. Ao elevar, apague o estado do filho; não deixe os dois convivendo "para não quebrar
+nada".</p>
+
+<p>O segundo é chamar o <code>set</code> do pai de dentro do filho por outro caminho. Passar
+<code>setItens</code> como prop funciona, e é tentador — mas o filho passa a saber como o pai guarda o dado.
+No dia em que o pai precisar validar, registrar ou somar frete, vai ter de mudar o filho também. Passe uma
+função com nome de intenção (<code>adicionar</code>) e deixe a decisão no dono.</p>
+
+<p>O terceiro é guardar em estado o que podia ser conta. "<code>total</code>", "<code>quantosPães</code>",
+"<code>estaVazio</code>" são derivados da lista; guardá-los significa atualizar dois lugares em cada mudança,
+e um dia esquecer um. Calcule no desenho, como a solução da caixa faz com <code>filter</code>. Se a conta for
+pesada, existe <code>useMemo</code>, com aula própria adiante; se for barata, ela é só uma linha.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você vê</th><th>Causa provável</th><th>Conserto</th></tr>
+<tr><td>só metade da tela muda</td><td>o filho ficou com uma cópia do estado</td><td>apagar o <code>useState</code> do filho e usar a prop</td></tr>
+<tr><td>o pai não fica sabendo do clique</td><td>faltou a prop de callback</td><td><code>onAlgo={...}</code> e chamar dentro do filho</td></tr>
+<tr><td>o total aparece errado por um instante</td><td>total guardado em estado e atualizado à parte</td><td>derivar do array no render</td></tr>
+<tr><td>o campo esquece o texto</td><td>o componente mudou de lugar na árvore</td><td><code>key</code> estável</td></tr>
+<tr><td>tudo redesenha a cada tecla</td><td>estado alto demais</td><td>descer o estado para perto do campo</td></tr>
+</table>
+</div>
+
+<p>Vale também saber o que o console mostra quando o desenho está certo. Um <code>console.log</code> na função
+do pai e outro no callback do filho contam a história na ordem em que ela acontece:</p>
+
+<pre class="term">adicionou: Pão
+itens agora: Pão
+adicionou: Queijo
+itens agora: Pão, Queijo</pre>
+
+<p>A primeira linha sai do callback do filho; a segunda, do desenho do pai, que rodou depois. Quando você vê
+"adicionou" sem um "itens agora" correspondente, o aviso não chegou ao dono — e o problema está na prop de
+callback, não no estado.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o filtro e a lista</h3>
+<p>Na tela de produtos, a caixa de busca fica na barra do topo e a lista fica no corpo. São irmãos, e o filtro
+tem de chegar à lista. Sobe o texto da busca para o componente que contém os dois, e desce como prop. A lista
+continua dona do que é dela — a ordem, a página atual — e recebe só o termo. Se a barra de busca fosse
+reutilizável em outra tela, ela receberia o termo e o <code>onBuscar</code> e não saberia de nada.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o modal de confirmação</h3>
+<p>O botão "Cancelar encomenda" abre um modal de confirmação, e o modal precisa saber qual encomenda está em
+jogo. O estado <code>encomendaSelecionada</code> sobe para o pai que desenha a lista e o modal. O modal recebe
+o dado e duas funções: <code>onConfirmar</code> e <code>onFechar</code>. O modal não decide nada; ele mostra e
+avisa, e por isso o mesmo modal serve para cancelar, excluir ou arquivar.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o carrinho que virou contexto</h3>
+<p>Quando o carrinho passou a ser lido pelo cabeçalho, pela lista, pelo rodapé e pela página de pagamento, o
+estado subiu até o topo e começou a descer por sete níveis. Aí o problema deixou de ser elevar e virou
+passagem de prop demais — o assunto de <a href="props-drilling.html">props drilling</a> e o motivo de existir
+o <a href="contexto-introducao.html">contexto</a>. Elevar continua sendo o primeiro passo; o segundo é decidir
+como o valor viaja.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Para onde vai o estado quando dois irmãos precisam do mesmo valor?</p>
+<label><input type="radio" name="q1"> para o primeiro dos dois irmãos</label>
+<label><input type="radio" name="q1"> para o menor ancestral comum dos dois</label>
+<label><input type="radio" name="q1"> para um arquivo separado, fora da árvore</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O filho que recebe o dado e precisa mudá-lo recebe o quê?</p>
+<label><input type="radio" name="q2"> uma cópia do <code>useState</code> do pai</label>
+<label><input type="radio" name="q2"> permissão para alterar a prop diretamente</label>
+<label><input type="radio" name="q2"> uma função que ele chama e o pai decide o que fazer</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Qual é o sinal de que o estado subiu demais?</p>
+<label><input type="radio" name="q3"> o valor desce por vários níveis que não o usam, e a página redesenha demais</label>
+<label><input type="radio" name="q3"> o componente pai ficou maior que o filho</label>
+<label><input type="radio" name="q3"> existem mais de duas props no filho</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o aviso que sobe</h2>
+<p>O filho <code>Paes</code> quer avisar o pai que um pão foi escolhido. Complete a chamada que entrega o item
+para a função que o pai mandou por prop:</p>
+<div class="ex-code">&lt;button onClick={() =&gt; <input aria-label="resposta 1" data-answer="onAdicionar" placeholder="...">("Pão")}&gt;Adicionar pão&lt;/button&gt;</div>
+<p class="ex-dica">Dica: é o nome da prop de callback, a mesma que o pai passa no JSX. Sem os parênteses, você
+estaria entregando a função em vez de chamá-la.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Elevar o estado é mudar o <code>useState</code> de lugar: do componente que usa o valor para o menor
+ancestral comum de todos os que precisam dele. O dono novo passa a chamar o <code>set</code>, e os outros
+passam a receber o valor por prop e a pedir mudanças por uma função. Esse é o fluxo inteiro do React em uma
+frase — dados descem, avisos sobem — e ele aparece em toda tela que tem dois pedaços conversando.</p>
+
+<p>A escolha do lugar é uma decisão de alcance, não de tamanho. Estado baixo demais esconde a informação de
+quem precisa dela; estado alto demais obriga meia página a redesenhar por causa de uma tecla. O caminho é
+começar no componente que usa e subir somente quando um segundo componente precisa ver o mesmo valor. Se o
+valor precisar atravessar muitos níveis, o problema muda de nome e as aulas de props drilling e contexto
+continuam a conversa.</p>
+
+<p>E o detalhe que separa quem entendeu de quem decorou: um dado, um dono. Se duas cópias do mesmo valor
+existem na tela, uma delas vai envelhecer. Total, contagem e "está vazio" são contas feitas na hora, não
+estados paralelos. Guardar o que é derivado é a forma mais comum de criar uma tela que discorda de si
+mesma.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Estado vai para o menor pai comum de quem precisa do valor.</li>
+<li>O dono é quem tem o <code>useState</code>; os filhos só pedem.</li>
+<li>Prop de dado desce; prop de callback sobe o aviso.</li>
+<li>Nomeie callbacks com <code>on</code>: <code>onAdicionar</code>, <code>onAlternar</code>.</li>
+<li>Prefira uma função com nome a duas funções anônimas iguais no JSX.</li>
+<li>Dois controles do mesmo dado: um estado no pai, <code>value</code> e <code>onMudar</code> nos dois.</li>
+<li>Depois de subir, apague o estado do filho: duas cópias é bug marcado.</li>
+<li>Total e contagem se calculam no render, não se guardam.</li>
+<li>Componente que muda de lugar na árvore perde o estado próprio; <code>key</code> resolve.</li>
+<li>Subir demais custa redesenho e props demais: é hora de falar de contexto.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

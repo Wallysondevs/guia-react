@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O useTransition | Guia React</title>
+<meta name="description" content="O useTransition do React 19: marcar atualizações não urgentes, mostrar o estado pendente e rodar ações assíncronas sem travar a digitação do leitor.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O <span class="hl">useTransition</span></h1>
+<p class="intro">A Ana pôs uma busca na loja: você digita “queijo” e a lista se filtra na hora. Com trinta
+pães, perfeito. Com os dois mil itens que ela cadastrou no estoque, cada letra digitada travava o campo por
+meio segundo — a pessoa digitava “q”, “u”, “e” e as letras apareciam atrasadas, uma por uma. Nesta aula a
+Ana aprende o <code>useTransition</code>: como dizer ao React “esta parte pode esperar, mas o que a pessoa
+está digitando não pode” — e como mostrar um aviso enquanto a parte lenta trabalha.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma transição e o que muda quando uma atualização entra nela.</li>
+  <li>Como usar <code>const [pendente, iniciar] = useTransition()</code>.</li>
+  <li>Por que o campo de texto precisa continuar urgente.</li>
+  <li>O que o <code>pendente</code> mede, quando ele vira <code>true</code> e quando volta.</li>
+  <li>Como rodar uma ação assíncrona dentro da transição, no React 19.</li>
+  <li>Como desabilitar um botão enquanto a ação está em curso.</li>
+  <li>O que o <code>useTransition</code> não faz: não é debounce, não cancela promessa.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a busca que engasga a digitação</h2>
+
+<p>O campo de busca da Ana é controlado: cada letra vira estado, o estado filtra a lista, a lista aparece.
+Enquanto a lista tinha trinta itens, tudo acontecia no mesmo instante. Com dois mil itens, o filtro passou a
+custar caro — e o custo cai justamente na letra que a pessoa acabou de digitar. O navegador fica ocupado
+filtrando, e o campo não redesenha até terminar.</p>
+
+<p>O sintoma é fácil de reconhecer: você digita rápido e as letras aparecem com atraso, como se o teclado
+estivesse com preguiça. Não é a rede, não é o computador: é a ordem em que o React foi obrigado a trabalhar.
+Toda atualização de estado era tratada como urgente, inclusive a que recalcula a lista inteira.</p>
+
+<p>A ideia do <code>useTransition</code> é separar essas duas coisas. A letra digitada é urgente: tem de
+aparecer no campo agora. A lista filtrada pode esperar um pouco, e o React pode até interromper o trabalho
+dela se outra letra chegar. Quem decide o que é urgente é você, e a ferramenta para isso é uma transição.</p>
+
+<h2>2. O que é uma transição</h2>
+
+<p>Uma transição é um jeito de marcar uma atualização de estado como <strong>não urgente</strong>. O nome
+vem da ideia de passagem: o React prepara a tela nova em segundo plano e troca quando ela está pronta,
+mantendo a antiga visível no meio do caminho. Se uma atualização urgente chegar durante o preparo, ela
+passa na frente.</p>
+
+<dl class="anatomy">
+<dt>transição</dt>
+<dd>Uma atualização de estado marcada como não urgente. Pode ser interrompida e não bloqueia a
+digitação.</dd>
+<dt>useTransition</dt>
+<dd>O hook que devolve o par: <code>const [pendente, iniciar] = useTransition()</code>. Vem do React e, nas
+caixas, já está no escopo.</dd>
+<dt>iniciar</dt>
+<dd>A função que recebe o trabalho: <code>iniciar(() =&gt; setFiltro(valor))</code>. Tudo o que for atualizado
+dentro dela é transição.</dd>
+<dt>pendente</dt>
+<dd>O <code>isPending</code>: <code>true</code> enquanto a transição não terminou. Serve para mostrar
+“filtrando…”, desabilitar botão, esmaecer a lista.</dd>
+<dt>atualização urgente</dt>
+<dd>O que precisa aparecer na hora: a letra no campo, o clique no botão, o checkbox marcado. Fica
+<strong>fora</strong> da transição.</dd>
+<dt>ação assíncrona</dt>
+<dd>No React 19, a função passada para <code>iniciar</code> pode ser <code>async</code>: o
+<code>pendente</code> continua verdadeiro até depois do <code>await</code>.</dd>
+</dl>
+
+<p>Antes de ver código, vale entender o que a transição não é. Ela não adia a chamada de
+<code>setFiltro</code>: a função roda na hora, o estado novo é agendado na hora. O que muda é a
+<strong>prioridade</strong> com que o React desenha o resultado. É como pedir uma pizza e continuar
+conversando: o pedido foi feito, a conversa não para.</p>
+
+<p>Também não é mágica de desempenho. Se o seu filtro leva dois segundos de cálculo puro, a transição não
+faz esse cálculo ficar rápido — ela faz o campo continuar respondendo enquanto o cálculo acontece. Para
+ficar rápido de verdade, o caminho é reduzir o trabalho: filtrar menos itens, paginar, memoizar. A transição
+cuida da sensação; o algoritmo cuida do tempo.</p>
+
+<h2>3. A caixa: a lista que espera</h2>
+
+<p>A caixa simula uma busca no servidor. Como não há rede aqui dentro, a espera é feita com
+<code>new Promise((ok) =&gt; setTimeout(ok, 3000))</code> — a mesma forma que você usaria para simular
+qualquer chamada. A versão inicial busca, mas não avisa nada: durante três segundos, a tela fica igual, e a
+pessoa clica de novo achando que o botão não funcionou. A missão é marcar a busca como transição e mostrar
+“Buscando no forno…” enquanto ela não termina.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Buscando no forno">
+  <p class="try-task">Chame <code>const [pendente, iniciar] = useTransition()</code> no topo e envolva o
+  trabalho do <code>buscar</code> com <code>iniciar(async () =&gt; { ... })</code>. Enquanto a promise não
+  resolve, mostre <code>"Buscando no forno…"</code> em vez de “Lista pronta”.</p>
+  <pre class="jsx">function App() {
+  const [lista, setLista] = useState(["Pão francês"]);
+
+  async function buscar() {
+    await new Promise((ok) =&gt; setTimeout(ok, 3000));
+    setLista(["Pão francês", "Pão de queijo bom"]);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={buscar}&gt;Buscar pães de queijo&lt;/button&gt;
+      &lt;p&gt;Lista pronta&lt;/p&gt;
+      &lt;ul&gt;
+        {lista.map((p) =&gt; (
+          &lt;li key={p}&gt;{p}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Buscar pães de queijo&lt;/button&gt;
+  &lt;p&gt;Lista pronta&lt;/p&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Pão francês&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [pendente, iniciar] = useTransition();
+  const [lista, setLista] = useState(["Pão francês"]);
+
+  function buscar() {
+    iniciar(async () =&gt; {
+      await new Promise((ok) =&gt; setTimeout(ok, 3000));
+      setLista(["Pão francês", "Pão de queijo bom"]);
+    });
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={buscar}&gt;Buscar pães de queijo&lt;/button&gt;
+      &lt;p&gt;{pendente ? "Buscando no forno…" : "Lista pronta"}&lt;/p&gt;
+      &lt;ul&gt;
+        {lista.map((p) =&gt; (
+          &lt;li key={p}&gt;{p}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Rode a solução, clique em “Buscar pães de queijo” e olhe o painel nos primeiros instantes: o parágrafo muda
+para “Buscando no forno…” e a lista continua com um item. Três segundos depois, o segundo pão aparece. É a
+assinatura de uma transição: a tela antiga fica no lugar, o aviso mostra que tem coisa acontecendo, e a troca
+só ocorre quando o resultado chega.</p>
+
+<p>Repare na diferença de estrutura entre as duas versões. Antes, <code>buscar</code> era uma função
+<code>async</code> que esperava e mexia no estado. Agora, <code>buscar</code> é uma função comum que chama
+<code>iniciar</code> com uma função <code>async</code> dentro. Quem sabe que existe uma transição em curso é
+o React; quem mostra isso é o <code>pendente</code>.</p>
+
+<p>E por que a ação precisa estar dentro do <code>iniciar</code>, e não só o <code>setLista</code>? Porque o
+<code>pendente</code> fica verdadeiro do começo ao fim do que estiver lá dentro — inclusive durante o
+<code>await</code>. Se você deixar a espera fora e marcar só a atualização final, o aviso aparece por um
+instante no fim, que é exatamente quando ninguém precisa dele.</p>
+
+<h2>4. Urgente e não urgente</h2>
+
+<p>O caso mais comum de transição não é a busca, é o filtro. A regra é simples de dizer e fácil de errar na
+prática: o estado que alimenta o campo de texto é urgente; o estado que alimenta a lista é transição. Se os
+dois forem a mesma coisa, o campo espera o filtro. Se os dois forem transição, o campo também espera.</p>
+
+<div class="tryreact" data-goal="digite:input=queijo;;conta:li=1;;texto:Pão de queijo">
+  <p class="try-task">O campo guarda o texto, mas a lista nunca filtra: falta alimentar <code>filtro</code>.
+  Dentro de <code>aoDigitar</code>, chame <code>setTexto(valor)</code> e depois
+  <code>iniciar(() =&gt; setFiltro(valor))</code>.</p>
+  <pre class="jsx">function App() {
+  const [texto, setTexto] = useState("");
+  const [filtro, setFiltro] = useState("");
+  const [pendente, iniciar] = useTransition();
+  const paes = ["Pão francês", "Pão de queijo", "Baguete"];
+
+  function aoDigitar(e) {
+    const valor = e.target.value;
+    setTexto(valor);
+  }
+
+  const filtrados = paes.filter((p) =&gt;
+    p.toLowerCase().includes(filtro.toLowerCase())
+  );
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="busca"&gt;Buscar pão&lt;/label&gt;
+      &lt;input id="busca" value={texto} onChange={aoDigitar} /&gt;
+      {pendente &amp;&amp; &lt;p&gt;Filtrando…&lt;/p&gt;}
+      &lt;ul&gt;
+        {filtrados.map((p) =&gt; (
+          &lt;li key={p}&gt;{p}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="busca"&gt;Buscar pão&lt;/label&gt;
+  &lt;input id="busca" value=""&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Pão francês&lt;/li&gt;
+    &lt;li&gt;Pão de queijo&lt;/li&gt;
+    &lt;li&gt;Baguete&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [texto, setTexto] = useState("");
+  const [filtro, setFiltro] = useState("");
+  const [pendente, iniciar] = useTransition();
+  const paes = ["Pão francês", "Pão de queijo", "Baguete"];
+
+  function aoDigitar(e) {
+    const valor = e.target.value;
+    setTexto(valor);
+    iniciar(() =&gt; setFiltro(valor));
+  }
+
+  const filtrados = paes.filter((p) =&gt;
+    p.toLowerCase().includes(filtro.toLowerCase())
+  );
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="busca"&gt;Buscar pão&lt;/label&gt;
+      &lt;input id="busca" value={texto} onChange={aoDigitar} /&gt;
+      {pendente &amp;&amp; &lt;p&gt;Filtrando…&lt;/p&gt;}
+      &lt;ul&gt;
+        {filtrados.map((p) =&gt; (
+          &lt;li key={p}&gt;{p}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Digite “queijo” e o painel mostra o campo com o texto e a lista com um item só. Com três pães a diferença
+de velocidade é invisível — o valor da caixa é mostrar a <strong>estrutura</strong>, que é a mesma quando a
+lista tem dois mil itens. Aí a transição ganha o direito de ser interrompida: se a pessoa digitar outra
+letra antes de o filtro terminar, o React descarta o trabalho antigo e começa de novo com o texto novo.</p>
+
+<p>Esse descarte é o que muda a sensação de uso. Sem transição, o React termina o filtro de “que” para só
+depois começar o de “quei”. Com transição, ele pode abandonar o primeiro no meio e atender o segundo. A
+pessoa não vê trabalho jogado fora: vê o campo respondendo.</p>
+
+<p>Duas armadilhas aqui. A primeira: esquecer o <code>setTexto</code> fora do <code>iniciar</code> — o campo
+passa a mostrar o valor antigo enquanto o filtro roda, e parece que o teclado não funciona. A segunda: pôr
+<em>tudo</em> na transição, inclusive o estado do campo, e depois estranhar a lentidão. Urgente é o que a
+pessoa está fazendo agora; o resto é transição.</p>
+
+<h2>5. O pendente: o que ele mede e onde ele mora</h2>
+
+<p>O <code>pendente</code> é um booleano que começa falso, vira verdadeiro quando uma transição é iniciada e
+volta a falso quando as atualizações dela foram desenhadas. Ele não mede “a promessa terminou”: mede “a tela
+ainda não mostrou o resultado”. A diferença aparece quando a promessa termina e o desenho ainda não
+aconteceu — nesse intervalo, o <code>pendente</code> continua verdadeiro, e é isso que você quer.</p>
+
+<p>No console do seu projeto, com um <code>console.log</code> no começo e no fim da ação, a sequência é
+assim:</p>
+
+<pre class="term">buscando...
+pendente: true
+2 pães encontrados
+pendente: false</pre>
+
+<p>O <code>pendente</code> mora no componente que chamou o hook. Se você chamar <code>useTransition</code>
+dentro de um componente e ler <code>pendente</code> em outro, o valor não chega lá: hooks não compartilham
+estado entre componentes. Para usar o aviso em outro lugar, passe o booleano por prop ou ponha o hook no
+componente que precisa dele.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Enviando…;;conta:button[disabled]=1">
+  <p class="try-task">O botão pode ser clicado várias vezes enquanto a encomenda é enviada. Use o
+  <code>pendente</code> para desabilitar o botão e trocar o rótulo: <code>disabled={pendente}</code> e
+  <code>{pendente ? "Enviando…" : "Enviar encomenda"}</code>.</p>
+  <pre class="jsx">function App() {
+  const [pendente, iniciar] = useTransition();
+  const [recado, setRecado] = useState("");
+
+  function enviar() {
+    iniciar(async () =&gt; {
+      await new Promise((ok) =&gt; setTimeout(ok, 2000));
+      setRecado("Encomenda registrada");
+    });
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={enviar}&gt;Enviar encomenda&lt;/button&gt;
+      &lt;p&gt;{recado || "Nada enviado"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Enviar encomenda&lt;/button&gt;
+  &lt;p&gt;Nada enviado&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [pendente, iniciar] = useTransition();
+  const [recado, setRecado] = useState("");
+
+  function enviar() {
+    iniciar(async () =&gt; {
+      await new Promise((ok) =&gt; setTimeout(ok, 2000));
+      setRecado("Encomenda registrada");
+    });
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button disabled={pendente} onClick={enviar}&gt;
+        {pendente ? "Enviando…" : "Enviar encomenda"}
+      &lt;/button&gt;
+      &lt;p&gt;{recado || "Nada enviado"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique e olhe o painel antes dos dois segundos: o botão aparece com <code>disabled</code> e o rótulo muda
+para “Enviando…”. Isso resolve um problema real — o clique duplo em formulário de encomenda, que gera dois
+pedidos e uma conversa chata no balcão. O <code>disabled</code> não é enfeite: é a interface dizendo “já
+recebi”.</p>
+
+<p>Note que o <code>pendente</code> não substitui o estado de carregamento do seu formulário. Ele é o estado
+de carregamento da <em>transição</em>. Se você tiver uma requisição que pode falhar, continue precisando de
+um estado para o erro, como em <a href="carregando-e-erro.html">Carregando e Erro</a>. O
+<code>pendente</code> cobre o “está indo”, não o “deu errado”.</p>
+
+<h2>6. Ações assíncronas e o servidor</h2>
+
+<p>Até o React 18, a função passada para <code>iniciar</code> era síncrona: o <code>pendente</code> voltava a
+falso antes de qualquer <code>await</code>. No React 19 ela pode ser <code>async</code>, e o
+<code>pendente</code> acompanha a espera inteira. É essa mudança que fez o
+<code>useTransition</code> virar a base das “ações” de formulário do React 19: enviar, esperar, mostrar o
+resultado.</p>
+
+<p>Nas caixas deste guia não há rede, então a espera é simulada. No projeto da Ana, a função chama o
+servidor de verdade:</p>
+
+<pre class="file" data-file="BuscaDePaes.jsx">import { useState, useTransition } from "react";
+
+export function BuscaDePaes() {
+  const [pendente, iniciar] = useTransition();
+  const [texto, setTexto] = useState("");
+  const [resultados, setResultados] = useState([]);
+
+  function aoDigitar(e) {
+    const valor = e.target.value;
+    setTexto(valor);
+
+    iniciar(async () =&gt; {
+      const resposta = await fetch("/api/paes?q=" + encodeURIComponent(valor));
+      const dados = await resposta.json();
+      setResultados(dados);
+    });
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;input value={texto} onChange={aoDigitar} /&gt;
+      {pendente ? &lt;p&gt;Buscando…&lt;/p&gt; : null}
+      &lt;ul&gt;
+        {resultados.map((pao) =&gt; (
+          &lt;li key={pao.id}&gt;{pao.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Esse código funciona, e tem um problema que a transição não resolve: cada letra dispara uma requisição.
+Com “queijo”, são seis chamadas ao servidor, e a resposta que chega por último pode não ser a da última
+letra. Transição não é debounce. Se você quiser uma chamada por pausa de digitação, precisa de um
+<code>setTimeout</code> cancelado no <code>useEffect</code> — o assunto de <a href="timers.html">Timers</a>
+— ou de uma biblioteca de busca. O <code>useTransition</code> cuida da prioridade do desenho; quem cuida do
+volume de requisições é você.</p>
+
+<p>Ainda sobre o projeto: <code>useTransition</code> é importado do React, como todos os hooks. E existe
+também a função <code>startTransition</code>, importada à parte, para quando a transição acontece fora de um
+componente. Copiar um exemplo da documentação sem o import dá um erro fácil de reconhecer:</p>
+
+<pre class="term">Uncaught ReferenceError: startTransition is not defined</pre>
+
+<p>Se você vir isso, o problema não é a transição: é a linha de <code>import</code> que falta. Nas caixas
+deste guia, use sempre o <code>iniciar</code> que vem do hook — é o que está no escopo e é o que você vai
+usar em noventa por cento dos casos.</p>
+
+<h2>7. O que o useTransition não resolve</h2>
+
+<p>Como toda ferramenta nova, o <code>useTransition</code> atrai usos para os quais não foi feito. Quatro
+aparecem sempre:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você quer</th><th>O useTransition resolve?</th><th>O que fazer</th></tr>
+<tr><td>a digitação não travar</td><td>sim, é o caso clássico</td><td>campo urgente, lista na transição</td></tr>
+<tr><td>uma chamada por pausa de digitação</td><td>não</td><td>debounce com <code>setTimeout</code> no efeito</td></tr>
+<tr><td>cancelar a requisição antiga</td><td>não</td><td><code>AbortController</code> ou ignorar a resposta velha</td></tr>
+<tr><td>mostrar erro de envio</td><td>não</td><td>estado de erro separado, com <code>try</code>/<code>catch</code></td></tr>
+<tr><td>deixar um cálculo pesado mais rápido</td><td>não</td><td>filtrar menos, paginar, <code>useMemo</code></td></tr>
+</table>
+</div>
+
+<p>A linha do erro merece atenção, porque é a que mais surpreende. Se a função <code>async</code> dentro de
+<code>iniciar</code> lançar uma exceção, o React não tem para onde mostrá-la: não existe “tela de erro da
+transição”. Você continua precisando de <code>try</code>/<code>catch</code> e de um estado para a mensagem.
+O <code>pendente</code> volta a falso, e a interface fica como estava — o que pode parecer que nada
+aconteceu.</p>
+
+<p>Também vale resistir à tentação de envolver tudo. Uma transição a mais não deixa o site mais rápido; ela
+só muda a prioridade de um desenho. Se o trabalho é pequeno, marcar como transição não muda nada na
+prática — e adiciona uma linha que alguém vai ter de entender depois. Use onde a diferença aparece: listas
+grandes, cálculos de filtro, ações que esperam o servidor.</p>
+
+<h2>8. useTransition ou useDeferredValue?</h2>
+
+<p>Os dois hooks resolvem o mesmo desconforto — a tela travando por causa de trabalho pesado — e escolhem
+lados diferentes da mesma moeda. O <code>useTransition</code> marca a <em>atualização</em> como não urgente;
+o <code>useDeferredValue</code> marca um <em>valor</em> como atrasado. A pergunta que separa os dois é: você
+controla a função que muda o estado?</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>useTransition</th><th>useDeferredValue</th></tr>
+<tr><td>você escreve o <code>onChange</code> e o <code>setState</code></td><td>natural</td><td>funciona, mas dá mais voltas</td></tr>
+<tr><td>o valor vem de prop ou de um componente de fora</td><td>não alcança</td><td>é a única opção</td></tr>
+<tr><td>precisa de “carregando” enquanto o desenho não chega</td><td>tem o <code>pendente</code></td><td>dá para comparar o valor atrasado com o atual</td></tr>
+<tr><td>a ação espera o servidor</td><td>o <code>pendente</code> cobre o <code>await</code></td><td>não cobre: é só de desenho</td></tr>
+<tr><td>trabalho em um pedaço da tela que recebe um texto</td><td>possível, mas indireto</td><td>direto: passe o valor atrasado</td></tr>
+</table>
+</div>
+
+<p>Na prática, a escolha quase sempre é óbvia pelo lugar do código. Se o estado nasce no componente que você
+está escrevendo, <code>useTransition</code>. Se o texto chega por prop e você só quer que a lista grande
+espere, <code>useDeferredValue</code>. A próxima aula é exatamente sobre ele, e mostra o mesmo problema
+resolvido pelo outro lado.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: os dois mil itens do estoque</h3>
+<p>O filtro do estoque da Ana rodava a cada letra e travava o campo. Ela separou o estado do texto (urgente)
+do estado do filtro (transição) e a digitação voltou a responder. O trabalho de filtro continuou igual; o
+que mudou foi a ordem em que o React o fez.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o botão de enviar que virava dois pedidos</h3>
+<p>O formulário de encomenda aceitava clique duplo, e o servidor recebia o pedido duas vezes. Com
+<code>disabled={pendente}</code> no botão e o rótulo mudando para “Enviando…”, o segundo clique deixou de
+existir. O <code>pendente</code> funcionou como trava de interface, sem precisar de estado extra.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o aviso que não aparecia</h3>
+<p>Ela pôs a espera fora do <code>iniciar</code>: fez <code>await</code> na função do clique e chamou a
+transição só no fim. O aviso aparecia por um piscar de olhos, já com o resultado pronto. Mover o
+<code>await</code> para dentro de <code>iniciar(async () =&gt; ...)</code> fez o <code>pendente</code> cobrir
+a espera inteira — e o aviso passou a servir para alguma coisa.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que o <code>useTransition</code> faz com uma
+atualização de estado?</p>
+<label><input type="radio" name="q1"> adia a chamada de <code>setEstado</code> por alguns segundos</label>
+<label><input type="radio" name="q1"> marca a atualização como não urgente, para o React desenhá-la sem
+bloquear o que a pessoa está fazendo</label>
+<label><input type="radio" name="q1"> guarda o valor anterior em cache para sempre</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. No campo de busca, o que fica fora da transição?</p>
+<label><input type="radio" name="q2"> a lista filtrada</label>
+<label><input type="radio" name="q2"> a chamada ao servidor</label>
+<label><input type="radio" name="q2"> o estado que alimenta o valor do campo de texto</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Quando o <code>pendente</code> volta a ser falso?</p>
+<label><input type="radio" name="q3"> quando as atualizações da transição foram desenhadas</label>
+<label><input type="radio" name="q3"> quando a promise é criada</label>
+<label><input type="radio" name="q3"> só quando o componente é desmontado</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o aviso de busca</h2>
+<p>Complete a declaração do hook e o uso do booleano:</p>
+<div class="ex-code">const [pendente, iniciar] = <input aria-label="resposta 1" data-answer="useTransition()" placeholder="...">;
+...
+&lt;p&gt;{<input aria-label="resposta 2" data-answer="pendente" placeholder="..."> ? "Buscando…" : "Lista pronta"}&lt;/p&gt;</div>
+<p class="ex-dica">Dica: o hook devolve dois itens na ordem booleano e função. O booleano é o que decide o
+texto do aviso.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O <code>useTransition</code> separa o que é urgente do que pode esperar. O campo de texto, o clique e o
+checkbox ficam urgentes; a lista filtrada, o cálculo pesado e a busca no servidor entram na transição. O hook
+devolve <code>[pendente, iniciar]</code>, e tudo o que acontece dentro de <code>iniciar</code> é marcado como
+não urgente e pode ser interrompido por uma nova digitação.</p>
+
+<p>No React 19, a função passada para <code>iniciar</code> pode ser <code>async</code>, e o
+<code>pendente</code> acompanha o <code>await</code> — é o que permite mostrar “enviando…” durante uma
+requisição de verdade e travar o botão para evitar clique duplo. O aviso vive no componente que chamou o
+hook; para outro componente, vai por prop.</p>
+
+<p>E o que ele não faz: não é debounce, não cancela requisição, não trata erro e não deixa cálculo pesado
+rápido. Cada uma dessas necessidades tem a sua ferramenta, e misturar as duas coisas é o caminho mais curto
+para uma tela que parece quebrada. Quando o valor chega de fora e você só quer atrasar o desenho, o hook da
+próxima aula é o mais direto.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>const [pendente, iniciar] = useTransition()</code>, no topo do componente.</li>
+<li><code>iniciar(() =&gt; setLista(...))</code>: atualização não urgente.</li>
+<li>O campo de texto fica fora da transição: urgente é o que a pessoa está fazendo.</li>
+<li>React 19: <code>iniciar(async () =&gt; ...)</code> e o <code>pendente</code> cobre o <code>await</code>.</li>
+<li><code>pendente</code> é verdadeiro até o resultado aparecer na tela.</li>
+<li><code>disabled={pendente}</code> evita clique duplo em envio.</li>
+<li>O <code>pendente</code> mora no componente que chamou o hook.</li>
+<li>Não é debounce, não cancela promessa e não mostra erro.</li>
+<li>Cálculo pesado continua pesado: transição muda prioridade, não custo.</li>
+<li>Valor que vem de prop: prefira <code>useDeferredValue</code>.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

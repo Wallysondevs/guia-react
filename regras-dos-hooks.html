@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>As Regras dos Hooks | Guia React</title>
+<meta name="description" content="As regras dos hooks explicadas pelo mecanismo: por que o React conta hooks por ordem, o que quebra com if, laço e return antecipado, e como consertar cada caso.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>As Regras dos <span class="hl">Hooks</span></h1>
+<p class="intro">O painel da Ana funcionava. Ela acrescentou um desconto que só aparece quando o cupom está
+ativo, e o botão “Aplicar cupom” parou de fazer qualquer coisa — sem erro na tela, sem borda vermelha, sem
+nada. Depois foi a lista de pães, que quebrou ao receber o segundo item. Nesta aula a Ana entende
+<em>por que</em> essas duas coisas têm a mesma causa: o React não procura os hooks pelo nome, ele os conta
+pela ordem. Entender essa frase resolve os três erros que mais aparecem em código de quem está
+começando.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como o React reconhece cada hook: por posição, não por nome.</li>
+  <li>Por que um hook fora de componente ou de hook próprio não funciona.</li>
+  <li>O que acontece quando um hook fica dentro de um <code>if</code>.</li>
+  <li>Por que hook dentro de laço quebra quando a lista cresce, e a saída de extrair um componente.</li>
+  <li>O que o <code>return</code> antecipado faz com a lista de hooks.</li>
+  <li>Como reescrever cada caso sem perder a lógica.</li>
+  <li>Que mensagens o ESLint e o React dão — e o que elas querem dizer.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o cupom que derrubou o painel</h2>
+
+<p>A Ana quis mostrar um desconto de 10% quando o cupom estivesse aplicado. Escreveu o estado do cupom,
+depois um <code>if</code> e, dentro do <code>if</code>, guardou o valor do desconto em um
+<code>useState</code>. A tela inicial ficou perfeita: “Desconto: 0%”. Clicou em “Aplicar cupom” e o painel
+congelou — o número não mudou, o botão não respondeu mais, e nenhum aviso apareceu.</p>
+
+<p>No mesmo dia, a lista de pães quebrou. Ela guardava o “curtir” de cada pão dentro do
+<code>map</code>, um <code>useState</code> por item. Com um pão, tudo certo. Com dois, a tela sumiu. Duas
+telas diferentes, dois sintomas parecidos, uma causa só: em React, os hooks de um componente são
+identificados pela <strong>ordem</strong> em que são chamados. Quando a ordem ou a quantidade muda de um
+desenho para o outro, o React deixa de saber qual estado é qual.</p>
+
+<p>Vale dizer desde já o que não é a causa: não é cache, não é “o React perdido”, não é bug da
+biblioteca. É uma decisão de projeto que permite ao React guardar estado sem que você nomeie nada. O preço
+dessa economia é uma regra simples de seguir e difícil de adivinhar quando se está começando.</p>
+
+<h2>2. Como o React reconhece um hook</h2>
+
+<p>Quando um componente é desenhado pela primeira vez, o React abre uma ficha para aquela instância e vai
+anotando, na ordem: “posição 1: um <code>useState</code> com o valor 0”, “posição 2: um
+<code>useEffect</code> com estas dependências”, “posição 3: um <code>useId</code>”. No desenho seguinte, ele
+percorre a mesma ficha na mesma ordem e entrega a cada chamada o que estava guardado naquela posição.</p>
+
+<p>Repare no que não entra na conta: o nome da variável, o nome da função, o valor que está dentro. Só a
+posição. É por isso que <code>const [a, setA] = useState(0)</code> e
+<code>const [b, setB] = useState(0)</code> são indistinguíveis para o React — os dois são “o primeiro hook
+deste componente”.</p>
+
+<dl class="anatomy">
+<dt>hook</dt>
+<dd>Cada chamada de uma função que começa com <code>use</code>: <code>useState</code>,
+<code>useEffect</code>, <code>useContext</code>, <code>useId</code>, e os seus.</dd>
+<dt>ordem das chamadas</dt>
+<dd>A sequência em que os hooks aparecem no corpo do componente. É a identidade de cada um: posição 1,
+posição 2, e assim por diante.</dd>
+<dt>desenho</dt>
+<dd>Cada execução do corpo do componente. O React espera a mesma sequência de hooks em todos os
+desenhos.</dd>
+<dt>condição</dt>
+<dd>Um <code>if</code>, um <code>?</code>, um <code>&amp;&amp;</code> que muda quantos hooks rodam. É a
+fonte número um de erro de ordem.</dd>
+<dt>return antecipado</dt>
+<dd>Um <code>return</code> antes de algum hook. No desenho em que ele acontece, os hooks de baixo não
+rodam.</dd>
+<dt>laço</dt>
+<dd><code>map</code>, <code>for</code>, <code>while</code>. Se a lista muda de tamanho, o número de hooks
+muda junto.</dd>
+</dl>
+
+<p>Duas regras resumem tudo, e as duas são sobre a mesma coisa: a sequência tem de ser previsível. A
+primeira: chame hooks somente no corpo de um componente ou de um hook próprio. A segunda: chame sempre na
+mesma ordem, sem condição, sem laço e sem <code>return</code> no meio. As três caixas desta aula quebram uma
+regra de cada vez, de propósito, para você ver o estrago.</p>
+
+<h2>3. Regra 1: só em componente ou em hook próprio</h2>
+
+<p>Hook só funciona durante o desenho de um componente. Fora disso — no topo do arquivo, dentro de um
+<code>onClick</code>, de um <code>setTimeout</code>, de uma função auxiliar chamada na hora errada —, não há
+ficha aberta para anotar nada, e a chamada falha. A caixa mostra o caso mais comum de todos: o estado
+escrito acima do componente, porque parece que “fica mais organizado assim”.</p>
+
+<div class="tryreact" data-goal="texto:Total: R$ 12,50;;clique:button;;texto:Total: € 12,50">
+  <p class="try-task">O <code>useState</code> está no topo do arquivo, fora do componente, e a caixa nem
+  desenha. Mova o estado para dentro do <code>App</code> e faça o botão alternar entre R$ e €.</p>
+  <pre class="jsx">const [moeda, setMoeda] = useState("R$");
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Total: {moeda} 12,50&lt;/p&gt;
+      &lt;button onClick={() =&gt; setMoeda(moeda === "R$" ? "€" : "R$")}&gt;
+        Trocar moeda
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+Erro: Cannot read properties of null (reading 'useState')
+</pre>
+  <pre class="solucao">function App() {
+  const [moeda, setMoeda] = useState("R$");
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Total: {moeda} 12,50&lt;/p&gt;
+      &lt;button onClick={() =&gt; setMoeda(moeda === "R$" ? "€" : "R$")}&gt;
+        Trocar moeda
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel inicial mostra o erro, e é bom olhar para ele com calma porque a mensagem não fala de hook fora
+de componente. Ela fala de <code>null</code>:</p>
+
+<pre class="term">Erro: Cannot read properties of null (reading 'useState')</pre>
+
+<p>A explicação: o <code>useState</code> que existe dentro do React olha para uma variável interna que só tem
+valor durante o desenho de um componente. Fora do desenho, essa variável é <code>null</code>, e ler
+<code>useState</code> de <code>null</code> dá exatamente esse erro. Em um projeto rodando em modo de
+desenvolvimento, a mensagem é mais amigável e fala o nome do problema:</p>
+
+<pre class="term">Uncaught Error: Invalid hook call. Hooks can only be called inside of the body of a function component.</pre>
+
+<p>As duas querem dizer a mesma coisa: “aqui não é lugar de hook”. Quando você vir isso no seu projeto,
+procure a chamada que está fora do corpo de um componente. Os casos que eu já vi: estado no topo do arquivo,
+<code>useState</code> dentro de um <code>onClick</code> para guardar um resultado, e hook chamado em uma
+função auxiliar que também é usada fora do desenho.</p>
+
+<h2>4. Regra 2: sempre no topo, nunca dentro de condição</h2>
+
+<p>Agora o caso da Ana. Ela queria o desconto só quando o cupom existisse, e colocou o
+<code>useState</code> dentro do <code>if</code>. No primeiro desenho, o cupom é falso, então o hook nem é
+chamado: a ficha fica com um hook só. No desenho seguinte, o cupom é verdadeiro, o hook é chamado e a ficha
+precisa de dois. O React percebe a diferença e aborta o desenho.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Desconto: 10%">
+  <p class="try-task">O <code>useState(10)</code> está dentro do <code>if</code>, e clicar em “Aplicar cupom”
+  derruba o painel. Suba o hook para o topo e use o valor só na hora de montar o texto:
+  <code>{cupom ? desconto : 0}%</code>.</p>
+  <pre class="jsx">function App() {
+  const [cupom, setCupom] = useState(false);
+  let desconto = 0;
+
+  if (cupom) {
+    const [d] = useState(10);
+    desconto = d;
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={() =&gt; setCupom(true)}&gt;Aplicar cupom&lt;/button&gt;
+      &lt;p&gt;Desconto: {desconto}%&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Aplicar cupom&lt;/button&gt;
+  &lt;p&gt;Desconto: 0 %&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [cupom, setCupom] = useState(false);
+  const [desconto] = useState(10);
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={() =&gt; setCupom(true)}&gt;Aplicar cupom&lt;/button&gt;
+      &lt;p&gt;Desconto: {cupom ? desconto : 0}%&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em “Aplicar cupom” com o código original: o painel não muda mais, e o botão fica morto. O React
+desmontou a árvore porque a lista de hooks mudou de tamanho. Em modo de desenvolvimento, o console diz
+qual é o problema:</p>
+
+<pre class="term">Rendered more hooks than during the previous render.</pre>
+
+<p>“Desenhou mais hooks do que no desenho anterior.” O inverso também existe — <em>Rendered fewer hooks than
+expected</em>, quando um desenho tem menos hooks que o anterior — e aparece no caso do
+<code>return</code> antecipado, que vem já já. Em ambos, o conserto é o mesmo: todos os hooks no topo, sempre
+chamados, e a condição decidindo apenas o que aparece na tela.</p>
+
+<p>Existe um jeito de ler isso que ajuda a não errar mais: hook é declaração, não ação. Você declara “este
+componente tem um estado de cupom e um estado de desconto” no começo, e usa esses valores onde quiser. O
+<code>if</code> não pode decidir se a declaração existe; ele decide o que ela mostra.</p>
+
+<p>E o mesmo vale para o <code>?</code> e para o <code>&amp;&amp;</code>:
+<code>cupom &amp;&amp; useState(10)</code> é o mesmo erro escrito em uma linha. Também vale para
+<code>try</code>/<code>catch</code> e para qualquer bloco que possa não rodar.</p>
+
+<h2>5. Regra 3: nada de laço — extraia um componente</h2>
+
+<p>O terceiro caso é o mais traiçoeiro, porque funciona enquanto a lista tem o mesmo tamanho. A Ana queria
+que cada pão pudesse ser curtido, e guardou o estado de cada um dentro do <code>map</code>. Com um pão,
+uma ficha com dois hooks. Ela adiciona o segundo pão, o <code>map</code> roda duas vezes, e a ficha passa a
+precisar de três hooks. O React reclama e a tela desaparece.</p>
+
+<div class="tryreact" data-goal="clique:button;;clique:button;;conta:p=3;;texto:Pão 3">
+  <p class="try-task">O <code>useState</code> está dentro do <code>map</code>: ao adicionar o segundo pão, o
+  painel apaga. Crie um componente <code>Item</code> que recebe <code>nome</code> e guarda o próprio
+  “curtido”, e use <code>&lt;Item key={item} nome={item} /&gt;</code> no mapa.</p>
+  <pre class="jsx">function App() {
+  const [itens, setItens] = useState(["Pão"]);
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={() =&gt; setItens([...itens, "Pão " + (itens.length + 1)])}&gt;
+        Adicionar
+      &lt;/button&gt;
+      {itens.map((item) =&gt; {
+        const [curtido, setCurtido] = useState(false);
+        return (
+          &lt;p key={item}&gt;
+            {item}{" "}
+            &lt;button onClick={() =&gt; setCurtido(true)}&gt;
+              {curtido ? "curtido" : "curtir"}
+            &lt;/button&gt;
+          &lt;/p&gt;
+        );
+      })}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Adicionar&lt;/button&gt;
+  &lt;p&gt;
+    Pão
+    &lt;button&gt;curtir&lt;/button&gt;
+  &lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Item({ nome }) {
+  const [curtido, setCurtido] = useState(false);
+  return (
+    &lt;p&gt;
+      {nome}{" "}
+      &lt;button onClick={() =&gt; setCurtido(true)}&gt;
+        {curtido ? "curtido" : "curtir"}
+      &lt;/button&gt;
+    &lt;/p&gt;
+  );
+}
+
+function App() {
+  const [itens, setItens] = useState(["Pão"]);
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={() =&gt; setItens([...itens, "Pão " + (itens.length + 1)])}&gt;
+        Adicionar
+      &lt;/button&gt;
+      {itens.map((item) =&gt; (
+        &lt;Item key={item} nome={item} /&gt;
+      ))}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois do conserto, adicione dois pães e o painel mostra três parágrafos. Cada <code>Item</code> tem a
+sua própria ficha, com um hook só, e a lista pode crescer à vontade. Repare que o estado não mudou de lugar
+por acaso: ele passou a pertencer a um componente, que é onde o React sabe guardá-lo. Extrair o componente
+não é estilo — é a única forma de dar estado a cada item.</p>
+
+<p>Se o estado não é por item, e sim da lista, a resposta é outra: guarde o conjunto no componente de cima,
+como um objeto ou um array de ids curtidos, e passe para o item o que ele precisa saber e a função que ele
+chama. A regra é a mesma nos dois caminhos: o hook fica no corpo de um componente, nunca dentro do
+<code>map</code>.</p>
+
+<h2>6. O return antecipado e o “carregando”</h2>
+
+<p>Existe uma variação do caso do <code>if</code> que pega gente experiente: o <code>return</code>
+antecipado. É comum escrever o estado de carregamento no topo e, logo abaixo, um
+<code>if (!dados) return &lt;p&gt;Carregando…&lt;/p&gt;</code> antes de declarar o resto dos hooks. No
+primeiro desenho, metade dos hooks roda. Quando os dados chegam, a outra metade aparece — e a ficha não
+fecha.</p>
+
+<pre class="file" data-file="Pedidos.jsx">function Pedidos() {
+  const [dados, setDados] = useState(null);
+  const [filtro, setFiltro] = useState("");
+
+  if (!dados) {
+    return &lt;p&gt;Carregando…&lt;/p&gt;;
+  }
+
+  const ordenados = useMemo(() =&gt; ordenar(dados, filtro), [dados, filtro]);
+  ...
+}</pre>
+
+<p>O <code>useMemo</code> da linha 8 é o problema: ele só existe depois que os dados chegam. O conserto é
+mover o <code>return</code> para baixo de todos os hooks — ou seja, declarar tudo primeiro e decidir o que
+desenhar por último:</p>
+
+<pre class="file" data-file="Pedidos.jsx">function Pedidos() {
+  const [dados, setDados] = useState(null);
+  const [filtro, setFiltro] = useState("");
+  const ordenados = useMemo(() =&gt; ordenar(dados, filtro), [dados, filtro]);
+
+  if (!dados) {
+    return &lt;p&gt;Carregando…&lt;/p&gt;;
+  }
+
+  return &lt;Lista itens={ordenados} /&gt;;
+}</pre>
+
+<p>Nessa versão o <code>useMemo</code> recebe <code>dados</code> nulo e devolve uma lista vazia no primeiro
+desenho — nada quebra, e a ficha fica sempre com o mesmo número de hooks. É a mesma ideia da caixa anterior
+aplicada a um <code>return</code>: a ordem das linhas de hook não pode depender de nada.</p>
+
+<p>Quando o componente fica grande demais com essa ginástica, a saída é dividir: um componente
+<code>Carregando</code> e um <code>Lista</code>, e o pai decide qual dos dois desenhar. A condição continua
+existindo — só não fica mais no meio da lista de hooks.</p>
+
+<h2>7. Como sair de cada aperto</h2>
+
+<p>Quase todo desejo legítimo tem um jeito certo que não envolve hook condicional. Esta tabela é a que eu
+consulto quando esqueço:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você quer</th><th>O jeito que quebra</th><th>O jeito certo</th></tr>
+<tr><td>só ter estado quando o cupom existe</td><td><code>if (cupom) { useState(10) }</code></td><td>declarar o estado sempre e usar condicionalmente no JSX</td></tr>
+<tr><td>estado por item de lista</td><td><code>itens.map(() =&gt; useState())</code></td><td>extrair <code>&lt;Item /&gt;</code>, cada um com o seu hook</td></tr>
+<tr><td>sair cedo quando está carregando</td><td><code>return</code> antes de um hook</td><td>todos os hooks primeiro, o <code>return</code> depois</td></tr>
+<tr><td>efeito só quando a aba está aberta</td><td><code>if (aberta) { useEffect(...) }</code></td><td><code>useEffect</code> sempre, com a checagem dentro</td></tr>
+<tr><td>lógica igual em dois componentes</td><td>copiar o <code>useState</code> e ajustar</td><td>um hook próprio, chamado no topo dos dois</td></tr>
+</table>
+</div>
+
+<p>As duas últimas linhas merecem um comentário. No caso do efeito, a checagem vai <em>dentro</em> da função
+do efeito: o hook é declarado sempre, e quem decide se faz algo é o corpo dele. No caso do hook próprio, a
+regra viaja junto: se o seu <code>useContador</code> é chamado dentro de um <code>if</code>, o problema
+continua sendo seu, e o React aponta o componente que chamou.</p>
+
+<p>Há ainda um vício de quem vem de outras linguagens: querer chamar <code>useState</code> dentro de um
+manipulador de evento para “guardar o resultado do clique”. Em React, estado é declarado no corpo; o
+manipulador só chama a função de troca. Se você se pegar escrevendo <code>useState</code> dentro de um
+<code>onClick</code>, pare: o valor precisa existir antes do clique.</p>
+
+<h2>8. O ESLint e as mensagens que você vai ver</h2>
+
+<p>O React não consegue impedir uma chamada condicional em tempo de compilação, mas o ESLint consegue — e é
+ele que segura a maior parte dos erros antes de você rodar a página. O plugin
+<code>eslint-plugin-react-hooks</code> vem configurado nos projetos criados com Vite e Next.js e cobra as
+duas regras. Quando ele reclama, a mensagem costuma apontar a linha exata.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem</th><th>O que significa</th><th>Onde procurar</th></tr>
+<tr><td><code>React Hook "useState" is called conditionally</code></td><td>o hook está dentro de um <code>if</code> ou de um <code>?</code></td><td>suba a chamada para o topo</td></tr>
+<tr><td><code>React Hook "useEffect" is called in function ... that is neither a React function component nor a custom React Hook</code></td><td>o hook está em uma função comum</td><td>mova para o componente ou renomeie para <code>use...</code></td></tr>
+<tr><td><code>React Hook "useState" cannot be called inside a callback</code></td><td>o hook está em <code>map</code>, <code>onClick</code> ou <code>setTimeout</code></td><td>extraia um componente</td></tr>
+<tr><td><code>React Hook useEffect has a missing dependency</code></td><td>o efeito usa um valor que não está na lista de dependências</td><td>veja <a href="dependencias.html">As Dependências</a></td></tr>
+</table>
+</div>
+
+<p>As três primeiras linhas são as regras desta aula. A quarta é outro assunto — dependências de efeito —
+e aparece aqui só para você não confundir: ela não é erro de ordem, é aviso de que o efeito pode estar
+lendo um valor desatualizado. O aviso não impede a página de rodar; o erro de ordem impede.</p>
+
+<p>Uma diferença prática entre os dois mundos: o ESLint reclama antes de rodar e explica; o React reclama
+durante o desenho e derruba a árvore. Se a sua página ficou em branco depois de um clique, desconfie da
+ordem dos hooks antes de desconfiar do CSS. E se o painel das caixas parar de responder, é o mesmo sintoma:
+o React abortou o desenho e o HTML antigo ficou na tela.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o cupom que só existia às vezes</h3>
+<p>A Ana tinha um <code>useState</code> dentro do <code>if (cupom)</code>. A tela inicial funcionava porque
+o cupom começava falso e o hook não rodava; ao aplicar o cupom, o React viu um hook a mais e desmontou o
+painel. Subir o hook para o topo e usar <code>cupom ? desconto : 0</code> no texto resolveu. O estado passou
+a existir desde o primeiro desenho, o que é exatamente o que o React espera.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o “curtir” que morava no map</h3>
+<p>Ela queria marcar cada pão como curtido e guardou o estado dentro do <code>map</code>. Com um pão, tudo
+bem; com dois, a lista desapareceu. O conserto foi extrair <code>Item</code>, com o <code>useState</code>
+dentro dele. A lista passou a poder crescer sem limite, e o estado de cada pão ficou onde devia: na ficha
+daquele item.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o carregando no lugar errado</h3>
+<p>No painel de pedidos, o <code>return &lt;p&gt;Carregando…&lt;/p&gt;</code> estava antes de um
+<code>useMemo</code>. Enquanto os dados não chegavam, o componente tinha três hooks; quando chegavam, tinha
+quatro. A página quebrava no momento em que os dados apareciam — o pior momento possível para depurar.
+Mover o <code>return</code> para baixo de todos os hooks resolveu, e o componente ficou até mais fácil de
+ler.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Como o React sabe qual estado pertence a qual
+<code>useState</code>?</p>
+<label><input type="radio" name="q1"> pelo nome da variável</label>
+<label><input type="radio" name="q1"> pela ordem das chamadas de hook naquele componente</label>
+<label><input type="radio" name="q1"> pela posição do componente na árvore</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que acontece quando um hook só roda em alguns
+desenhos?</p>
+<label><input type="radio" name="q2"> o React avisa e continua com o valor antigo</label>
+<label><input type="radio" name="q2"> nada: o React se adapta à nova quantidade</label>
+<label><input type="radio" name="q2"> as posições escorregam e o React aborta o desenho</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Você precisa de um estado para cada item de uma
+lista. Qual é o caminho?</p>
+<label><input type="radio" name="q3"> extrair um componente de item, com o <code>useState</code> dentro
+dele</label>
+<label><input type="radio" name="q3"> chamar <code>useState</code> dentro do <code>map</code></label>
+<label><input type="radio" name="q3"> criar um array de <code>useState</code> com <code>map</code></label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o carregando fora do lugar</h2>
+<p>O componente abaixo quebra quando os dados chegam. Complete a frase que resolve o problema:</p>
+<div class="ex-code">Todos os hooks precisam ficar <input aria-label="resposta 1" data-answer="antes|acima" placeholder="..."> do
+<code>return</code> que mostra o carregando.</div>
+<p class="ex-dica">Dica: o <code>return</code> antecipado não pode ficar no meio da lista de hooks. Declare
+tudo primeiro e decida o que desenhar depois.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O React identifica cada hook pela posição na sequência de chamadas do componente. Essa é a decisão que
+explica todas as regras: a mesma quantidade de hooks, na mesma ordem, em todo desenho. Hook fora de
+componente não tem ficha onde anotar; hook dentro de <code>if</code> aparece em alguns desenhos e não em
+outros; hook dentro de <code>map</code> multiplica quando a lista cresce; <code>return</code> antes de um
+hook corta a sequência pela metade.</p>
+
+<p>Os três consertos são sempre os mesmos: subir a chamada para o topo, mover o <code>return</code> para
+depois de todos os hooks e extrair um componente quando o estado precisa ser por item. Nenhum deles exige
+truque, e todos deixam o código mais fácil de ler — o que é um bom sinal de que a regra não é arbitrária.</p>
+
+<p>O ESLint avisa antes de rodar e o React derruba a árvore durante o desenho. Se a página ficar em branco
+depois de um clique, ou se o painel das caixas congelar, a ordem dos hooks é a primeira suspeita. E lembre
+que a regra vale também dentro dos seus hooks próprios: eles não são um lugar onde a regra deixa de
+valer.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Hooks são identificados por posição, não por nome.</li>
+<li>Mesma quantidade e mesma ordem em todos os desenhos do componente.</li>
+<li>Hook só no corpo de um componente ou de um hook próprio.</li>
+<li>Nada de <code>if</code>, <code>?</code>, <code>&amp;&amp;</code>, <code>try</code> ou laço em volta de um hook.</li>
+<li><code>return</code> antecipado só depois de todos os hooks.</li>
+<li>Estado por item: extraia um componente e ponha o hook dentro dele.</li>
+<li>Estado que aparece e some não existe: declare sempre e decida no JSX.</li>
+<li>O ESLint cobra as regras antes de a página rodar; o React derruba a árvore se elas forem quebradas.</li>
+<li>O erro de <code>null</code> na leitura de <code>useState</code> quer dizer “hook fora do desenho”.</li>
+<li>A regra vale dentro dos seus hooks próprios também.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

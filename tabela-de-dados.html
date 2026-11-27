@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tabela de Dados | Guia React</title>
+<meta name="description" content="Tabela de dados no React: table, thead, tbody, uma linha por item com map, th com scope, caption, alinhamento de números e o cabeçalho que ordena.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Tabela de <span class="hl">Dados</span></h1>
+<p class="intro">A Ana precisa comparar os pedidos da semana: quem pediu, o que pediu e quanto vai pagar.
+Ela colocou tudo numa lista de parágrafos, e o resultado é aquela cena conhecida — os preços em escada, cada
+um começando num lugar diferente, impossível de somar com os olhos. Nesta aula ela monta uma tabela de
+verdade no React: cabeçalho, linhas geradas a partir do array, números alinhados e um cabeçalho que ordena
+quando é clicado.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>As tags de uma tabela e o papel de cada uma: <code>table</code>, <code>thead</code>,
+  <code>tbody</code>, <code>tr</code>, <code>th</code>, <code>td</code>.</li>
+  <li>Como gerar as linhas com <code>map</code> e onde fica a <code>key</code>.</li>
+  <li>Por que <code>th</code> não é “texto em negrito” e para que serve o <code>scope</code>.</li>
+  <li>O <code>caption</code>, que quase ninguém usa e os leitores de tela agradecem.</li>
+  <li>Como alinhar números à direita sem gambiarra.</li>
+  <li>O que mostrar quando a tabela não tem linhas.</li>
+  <li>Como ordenar clicando no cabeçalho, com <code>aria-sort</code>.</li>
+</ul>
+</div>
+
+<h2>1. A cena: preços em escada</h2>
+
+<p>A lista de pedidos da Ana era assim: um parágrafo por pedido, com nome, produto e valor separados por
+travessão. No papel funciona. Na tela, vira uma escada: “R$ 8” começa numa coluna, “R$ 12” em outra, e o
+olho não consegue comparar nada. Para saber quanto a semana rendeu, ela soma com a calculadora — e erra.</p>
+
+<p>Tabela existe exatamente para isso: alinhar informação em colunas, para que o olho compare na vertical.
+Não é um jeito antigo de diagramar página; é a estrutura certa para dados que têm as mesmas colunas em
+todas as linhas. Nome, produto, valor: três colunas, quantas linhas forem necessárias.</p>
+
+<p>No React, a tabela é escrita com as mesmas tags do HTML — <code>table</code>, <code>thead</code>,
+<code>tbody</code>, <code>tr</code>, <code>th</code>, <code>td</code> — e ganha uma coisa a mais: as
+linhas vêm de um array, com <code>map</code>. Você não escreve três <code>tr</code>; escreve um molde de
+linha e deixa o React repetir.</p>
+
+<p>É a mesma ideia da lista com <code>map</code> da aula <a href="listas-com-map.html">Listas com map</a>,
+dentro de uma estrutura mais exigente. E “mais exigente” aqui é bom: o navegador entende a tabela, os
+leitores de tela entendem a tabela, e o CSS alinha as colunas sozinho.</p>
+
+<h2>2. A anatomia de uma tabela</h2>
+
+<p>Antes de gerar linhas, vale conhecer as peças. Uma tabela tem um cabeçalho e um corpo, e os dois são
+listas de linhas:</p>
+
+<pre class="file" data-file="Pedidos.jsx">&lt;table&gt;
+  &lt;caption&gt;Pedidos da semana&lt;/caption&gt;
+  &lt;thead&gt;
+    &lt;tr&gt;
+      &lt;th scope="col"&gt;Cliente&lt;/th&gt;
+      &lt;th scope="col"&gt;Produto&lt;/th&gt;
+      &lt;th scope="col"&gt;Valor&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody&gt;
+    &lt;tr&gt;
+      &lt;td&gt;Maria&lt;/td&gt;
+      &lt;td&gt;Brioche&lt;/td&gt;
+      &lt;td&gt;R$ 8&lt;/td&gt;
+    &lt;/tr&gt;
+  &lt;/tbody&gt;
+&lt;/table&gt;</pre>
+
+<p>O <code>caption</code> é o título da tabela e precisa ser o primeiro filho do <code>table</code>. O
+<code>thead</code> guarda a linha de títulos; o <code>tbody</code>, as linhas de dados. Cada linha é um
+<code>tr</code>, e cada célula é um <code>td</code> — exceto no cabeçalho, onde é <code>th</code>. O
+navegador usa essa estrutura para navegar por célula com o teclado e para anunciar “coluna Valor, linha
+Maria” num leitor de tela.</p>
+
+<p>Uma confusão comum: <code>th</code> não é uma célula com negrito. É uma célula de <em>cabeçalho</em>, e
+o negrito é só o estilo padrão. A diferença aparece quando alguém usa leitor de tela: o
+<code>th</code> vira a etiqueta das células da mesma coluna; o <code>td</code> é o dado. Trocar um pelo
+outro “funciona” visualmente e quebra a leitura.</p>
+
+<p>O <code>scope</code> diz se aquele cabeçalho vale para a coluna (<code>"col"</code>) ou para a linha
+(<code>"row"</code>). Em tabelas simples, é o suficiente para a acessibilidade funcionar sem nenhum
+atributo extra. Custa uma palavra por <code>th</code> e resolve o assunto.</p>
+
+<h2>3. Uma linha por item, com map</h2>
+
+<p>Com os dados num array, o <code>tbody</code> passa a ter um <code>map</code> só. O molde da linha é o
+<code>tr</code> com as células:</p>
+
+<pre class="file" data-file="Pedidos.jsx">const pedidos = [
+  { id: 1, cliente: "Maria", produto: "Brioche", valor: 8 },
+  { id: 2, cliente: "João", produto: "Sonho", valor: 5 },
+  { id: 3, cliente: "Bia", produto: "Croissant", valor: 7 }
+];
+
+&lt;tbody&gt;
+  {pedidos.map((pedido) =&gt; (
+    &lt;tr key={pedido.id}&gt;
+      &lt;td&gt;{pedido.cliente}&lt;/td&gt;
+      &lt;td&gt;{pedido.produto}&lt;/td&gt;
+      &lt;td&gt;R$ {pedido.valor}&lt;/td&gt;
+    &lt;/tr&gt;
+  ))}
+&lt;/tbody&gt;</pre>
+
+<p>Três pedidos, três linhas. Se amanhã forem trinta, o código é o mesmo. O <code>key</code> fica no
+<code>tr</code>, o elemento que se repete — e não nas células, que são filhas de uma linha já identificada.
+Esse detalhe rende um aviso do React quando errado, e a aula <a href="a-key.html">A key</a> explica o
+porquê.</p>
+
+<p>O <code>id</code> é o melhor candidato a <code>key</code>: é único, estável e não muda quando o cliente
+corrige o nome. Usar o índice do <code>map</code> funciona enquanto a lista só cresce no fim; com remoção
+ou ordenação, o React passa a associar a linha errada ao item errado, e o foco do teclado salta. Se os
+dados vêm de um banco, use o id de lá.</p>
+
+<div class="tryreact" data-goal="conta:tbody tr=3;;texto:R$ 8">
+  <p class="try-task">A tabela tem cabeçalho e uma linha escrita à mão. Gere as linhas do
+  <code>tbody</code> a partir do array <code>pedidos</code>, com <code>key</code> no <code>tr</code>.</p>
+  <pre class="jsx">const pedidos = [
+  { id: 1, cliente: "Maria", produto: "Brioche", valor: 8 },
+  { id: 2, cliente: "João", produto: "Sonho", valor: 5 },
+  { id: 3, cliente: "Bia", produto: "Croissant", valor: 7 }
+];
+
+function App() {
+  return (
+    &lt;table&gt;
+      &lt;thead&gt;
+        &lt;tr&gt;
+          &lt;th&gt;Cliente&lt;/th&gt;
+          &lt;th&gt;Produto&lt;/th&gt;
+          &lt;th&gt;Valor&lt;/th&gt;
+        &lt;/tr&gt;
+      &lt;/thead&gt;
+      &lt;tbody&gt;
+        &lt;tr&gt;
+          &lt;td&gt;Maria&lt;/td&gt;
+          &lt;td&gt;Brioche&lt;/td&gt;
+          &lt;td&gt;R$ 8&lt;/td&gt;
+        &lt;/tr&gt;
+      &lt;/tbody&gt;
+    &lt;/table&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;table&gt;
+  &lt;thead&gt;
+    &lt;tr&gt;
+      &lt;th&gt;Cliente&lt;/th&gt;
+      &lt;th&gt;Produto&lt;/th&gt;
+      &lt;th&gt;Valor&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody&gt;
+    &lt;tr&gt;
+      &lt;td&gt;Maria&lt;/td&gt;
+      &lt;td&gt;Brioche&lt;/td&gt;
+      &lt;td&gt;R$ 8&lt;/td&gt;
+    &lt;/tr&gt;
+  &lt;/tbody&gt;
+&lt;/table&gt;
+</pre>
+  <pre class="solucao">const pedidos = [
+  { id: 1, cliente: "Maria", produto: "Brioche", valor: 8 },
+  { id: 2, cliente: "João", produto: "Sonho", valor: 5 },
+  { id: 3, cliente: "Bia", produto: "Croissant", valor: 7 }
+];
+
+function App() {
+  return (
+    &lt;table&gt;
+      &lt;thead&gt;
+        &lt;tr&gt;
+          &lt;th&gt;Cliente&lt;/th&gt;
+          &lt;th&gt;Produto&lt;/th&gt;
+          &lt;th&gt;Valor&lt;/th&gt;
+        &lt;/tr&gt;
+      &lt;/thead&gt;
+      &lt;tbody&gt;
+        {pedidos.map((pedido) =&gt; (
+          &lt;tr key={pedido.id}&gt;
+            &lt;td&gt;{pedido.cliente}&lt;/td&gt;
+            &lt;td&gt;{pedido.produto}&lt;/td&gt;
+            &lt;td&gt;R$ {pedido.valor}&lt;/td&gt;
+          &lt;/tr&gt;
+        ))}
+      &lt;/tbody&gt;
+    &lt;/table&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra o HTML gerado com as três linhas. Repare que ele preserva a estrutura:
+<code>tbody</code> contém os três <code>tr</code>, cada um com seus três <code>td</code>. Se você vir
+linhas soltas fora do <code>tbody</code>, é sinal de que o <code>map</code> foi colocado no lugar errado —
+por exemplo, envolvendo o <code>table</code> inteiro e repetindo a tabela.</p>
+
+<pre class="term">&gt; document.querySelectorAll("tbody tr").length
+3
+&gt; document.querySelectorAll("thead tr").length
+1
+&gt; document.querySelector("td").innerText
+"Maria"</pre>
+
+<p>Essas três linhas são o jeito mais rápido de conferir uma tabela no navegador, com o DevTools aberto:
+conte as linhas do corpo, conte as do cabeçalho e leia uma célula. Se o número de <code>tr</code> do corpo
+não bate com o tamanho do array, o <code>map</code> está no lugar errado ou o array mudou sem redesenhar.</p>
+
+<dl class="anatomy">
+<dt>table</dt>
+<dd>O contêiner da tabela. Não deve ser usado para diagramar página; é para dados com colunas.</dd>
+<dt>caption</dt>
+<dd>Título da tabela, primeiro filho do <code>table</code>. Anunciado por leitores de tela.</dd>
+<dt>thead / tbody</dt>
+<dd>Cabeçalho e corpo. O primeiro guarda os títulos das colunas; o segundo, as linhas de dados.</dd>
+<dt>tr</dt>
+<dd>Uma linha. Recebe a <code>key</code> quando gerada por <code>map</code>.</dd>
+<dt>th / td</dt>
+<dd>Célula de cabeçalho e célula de dado. O <code>th</code> etiqueta a coluna; o <code>td</code> carrega o
+valor.</dd>
+<dt>scope</dt>
+<dd>Atributo do <code>th</code> que diz se ele vale para a coluna (<code>"col"</code>) ou para a linha
+(<code>"row"</code>).</dd>
+</dl>
+
+<h2>4. Caption e scope: o que ninguém vê e todo mundo usa</h2>
+
+<p>Os dois atributos que fazem uma tabela ser compreensível para quem não enxerga custam quase nada. O
+<code>caption</code> dá nome à tabela; o <code>scope</code> liga cada célula ao seu cabeçalho. Numa loja,
+o <code>caption</code> pode ser “Pedidos da semana” — a mesma frase que você colocaria num
+<code>h2</code>, mas dentro da tabela, para não se perder quando ela é lida fora de contexto.</p>
+
+<p>O <code>scope="col"</code> parece redundante quando a tabela tem uma linha de títulos no topo. E é, para
+quem vê. Para quem usa leitor de tela, é a diferença entre ouvir “R$ 8” e ouvir “Valor, R$ 8”. Multiplique
+por trinta linhas e você entende por que vale a linha extra.</p>
+
+<div class="tryreact" data-goal="attr:th|scope=col;;texto:Pedidos da semana;;conta:tbody tr=3">
+  <p class="try-task">A tabela já tem as três linhas, mas os cabeçalhos não dizem a que se referem e a
+  tabela não tem título. Acrescente <code>scope="col"</code> em cada <code>th</code> e um
+  <code>&lt;caption&gt;Pedidos da semana&lt;/caption&gt;</code> logo depois da abertura do
+  <code>table</code>.</p>
+  <pre class="jsx">const pedidos = [
+  { id: 1, cliente: "Maria", produto: "Brioche", valor: 8 },
+  { id: 2, cliente: "João", produto: "Sonho", valor: 5 },
+  { id: 3, cliente: "Bia", produto: "Croissant", valor: 7 }
+];
+
+function App() {
+  return (
+    &lt;table&gt;
+      &lt;thead&gt;
+        &lt;tr&gt;
+          &lt;th&gt;Cliente&lt;/th&gt;
+          &lt;th&gt;Produto&lt;/th&gt;
+          &lt;th&gt;Valor&lt;/th&gt;
+        &lt;/tr&gt;
+      &lt;/thead&gt;
+      &lt;tbody&gt;
+        {pedidos.map((pedido) =&gt; (
+          &lt;tr key={pedido.id}&gt;
+            &lt;td&gt;{pedido.cliente}&lt;/td&gt;
+            &lt;td&gt;{pedido.produto}&lt;/td&gt;
+            &lt;td&gt;R$ {pedido.valor}&lt;/td&gt;
+          &lt;/tr&gt;
+        ))}
+      &lt;/tbody&gt;
+    &lt;/table&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;table&gt;
+  &lt;thead&gt;
+    &lt;tr&gt;
+      &lt;th&gt;Cliente&lt;/th&gt;
+      &lt;th&gt;Produto&lt;/th&gt;
+      &lt;th&gt;Valor&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody&gt;
+    &lt;tr&gt;
+      &lt;td&gt;Maria&lt;/td&gt;
+      &lt;td&gt;Brioche&lt;/td&gt;
+      &lt;td&gt;R$ 8&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;João&lt;/td&gt;
+      &lt;td&gt;Sonho&lt;/td&gt;
+      &lt;td&gt;R$ 5&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;Bia&lt;/td&gt;
+      &lt;td&gt;Croissant&lt;/td&gt;
+      &lt;td&gt;R$ 7&lt;/td&gt;
+    &lt;/tr&gt;
+  &lt;/tbody&gt;
+&lt;/table&gt;
+</pre>
+  <pre class="solucao">const pedidos = [
+  { id: 1, cliente: "Maria", produto: "Brioche", valor: 8 },
+  { id: 2, cliente: "João", produto: "Sonho", valor: 5 },
+  { id: 3, cliente: "Bia", produto: "Croissant", valor: 7 }
+];
+
+function App() {
+  return (
+    &lt;table&gt;
+      &lt;caption&gt;Pedidos da semana&lt;/caption&gt;
+      &lt;thead&gt;
+        &lt;tr&gt;
+          &lt;th scope="col"&gt;Cliente&lt;/th&gt;
+          &lt;th scope="col"&gt;Produto&lt;/th&gt;
+          &lt;th scope="col"&gt;Valor&lt;/th&gt;
+        &lt;/tr&gt;
+      &lt;/thead&gt;
+      &lt;tbody&gt;
+        {pedidos.map((pedido) =&gt; (
+          &lt;tr key={pedido.id}&gt;
+            &lt;td&gt;{pedido.cliente}&lt;/td&gt;
+            &lt;td&gt;{pedido.produto}&lt;/td&gt;
+            &lt;td&gt;R$ {pedido.valor}&lt;/td&gt;
+          &lt;/tr&gt;
+        ))}
+      &lt;/tbody&gt;
+    &lt;/table&gt;
+  );
+}</pre>
+</div>
+
+<p>No painel, o <code>caption</code> aparece como primeiro filho do <code>table</code> e os
+<code>th</code> ganham o atributo. Se você colocar o <code>caption</code> depois do <code>thead</code>, o
+navegador pode movê-lo para o lugar certo na leitura, mas o HTML fica inválido — e o validador reclama.
+Ordem é parte da estrutura.</p>
+
+<h2>5. Números à direita, texto à esquerda</h2>
+
+<p>Alinhamento não é capricho: é leitura. Números alinhados à direita fazem as unidades coincidirem na
+vertical, e a comparação de 8 com 12 fica imediata. Texto alinhado à esquerda é mais fácil de escanear.
+Numa tabela de pedidos, cliente e produto à esquerda, valor à direita.</p>
+
+<pre class="term">.tabela th,
+.tabela td {
+  padding: 0.5rem;
+  border-bottom: 1px solid #ddd;
+}
+
+.tabela .valor {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}</pre>
+
+<p>No React, aplique a classe na célula: <code>&lt;td className="valor"&gt;</code>. O
+<code>text-align: right</code> alinha; o <code>font-variant-numeric: tabular-nums</code> faz todos os
+dígitos ocuparem a mesma largura, então os números ficam numa coluna perfeitamente reta. É CSS puro, não
+tem nada de React — e é a diferença entre uma tabela amadora e uma tabela que dá gosto de ler.</p>
+
+<p>Cuidado com a tentação de alinhar pelo JSX, com espaços. Espaços colapsam no HTML e o resultado fica
+imprevisível. Alinhamento é trabalho do CSS; o React só entrega a estrutura com as classes certas.</p>
+
+<h2>6. A tabela sem linhas</h2>
+
+<p>Quando <code>pedidos</code> está vazio, o <code>map</code> devolve um array vazio e o
+<code>tbody</code> fica sem nenhuma linha. O navegador mostra só o cabeçalho flutuando — o que parece um
+bug. A solução é uma linha especial que ocupa todas as colunas:</p>
+
+<pre class="file" data-file="Pedidos.jsx">&lt;tbody&gt;
+  {pedidos.length === 0 ? (
+    &lt;tr&gt;
+      &lt;td colSpan="3"&gt;Nenhum pedido nesta semana.&lt;/td&gt;
+    &lt;/tr&gt;
+  ) : (
+    pedidos.map((pedido) =&gt; (
+      &lt;tr key={pedido.id}&gt;
+        &lt;td&gt;{pedido.cliente}&lt;/td&gt;
+        &lt;td&gt;{pedido.produto}&lt;/td&gt;
+        &lt;td&gt;R$ {pedido.valor}&lt;/td&gt;
+      &lt;/tr&gt;
+    ))
+  )}
+&lt;/tbody&gt;</pre>
+
+<p><code>colSpan</code> (com S maiúsculo no React) faz a célula atravessar três colunas. O número precisa
+bater com a quantidade de colunas da tabela; se você acrescentar uma coluna e esquecer de atualizar o
+<code>colSpan</code>, a mensagem fica torta. Em tabelas maiores, vale calcular:
+<code>colSpan={colunas.length}</code>.</p>
+
+<p>E a mensagem precisa ser específica. “Nenhum pedido nesta semana” diz o que está vazio e delimita o
+tempo; “Nenhum resultado” não diz nada. Essa diferença entre vazio de verdade e vazio de filtro é a aula de
+Estados Vazios, e a tabela é onde ela aparece com mais força: o cabeçalho fica, o corpo recebe a
+explicação.</p>
+
+<h2>7. Ordenar pelo cabeçalho</h2>
+
+<p>Numa tabela, o lugar natural para ordenar é o título da coluna. A pessoa clica em “Valor” e as linhas
+se reordenam. Para isso, o <code>th</code> precisa conter um <code>button</code> — clicar em
+<code>th</code> não é acessível por teclado, enquanto um botão é.</p>
+
+<pre class="file" data-file="Pedidos.jsx">&lt;th scope="col" aria-sort={ordem === "valor" ? "descending" : "none"}&gt;
+  &lt;button className="preco" onClick={() =&gt; setOrdem("valor")}&gt;
+    Valor
+  &lt;/button&gt;
+&lt;/th&gt;</pre>
+
+<p>O <code>aria-sort</code> vai no <code>th</code>, não no botão, e aceita
+<code>"ascending"</code>, <code>"descending"</code> e <code>"none"</code>. Ele é o que anuncia “coluna
+Valor, ordem decrescente” para quem usa leitor de tela. Sem ele, a mudança de ordem é invisível para uma
+parte das pessoas.</p>
+
+<p>A ordenação em si é a da aula <a href="ordenar.html">Ordenar</a>: comparador, cópia com spread e
+critério no estado. O que a tabela acrescenta é o lugar do clique e o atributo que descreve o estado. E o
+cuidado de sempre: ordenar a lista antes do <code>map</code>, nunca mexendo no array original.</p>
+
+<div class="tryreact" data-goal="clique:button.preco;;attr:th[aria-sort]|aria-sort=descending;;texto:1º Brioche">
+  <p class="try-task">O botão “Valor” já troca o estado <code>ordem</code>, mas a tabela ignora. Ordene as
+  linhas do maior valor para o menor, mostre a posição na primeira coluna e marque o
+  <code>th</code> de Valor com <code>aria-sort="descending"</code>.</p>
+  <pre class="jsx">const pedidos = [
+  { id: 1, cliente: "Maria", produto: "Brioche", valor: 8 },
+  { id: 2, cliente: "João", produto: "Sonho", valor: 5 },
+  { id: 3, cliente: "Bia", produto: "Croissant", valor: 7 }
+];
+
+function App() {
+  const [ordem, setOrdem] = useState("chegada");
+  const linhas = pedidos;
+  return (
+    &lt;table&gt;
+      &lt;thead&gt;
+        &lt;tr&gt;
+          &lt;th scope="col"&gt;#&lt;/th&gt;
+          &lt;th scope="col"&gt;Produto&lt;/th&gt;
+          &lt;th scope="col"&gt;
+            &lt;button className="preco" onClick={() =&gt; setOrdem("valor")}&gt;Valor&lt;/button&gt;
+          &lt;/th&gt;
+        &lt;/tr&gt;
+      &lt;/thead&gt;
+      &lt;tbody&gt;
+        {linhas.map((pedido, i) =&gt; (
+          &lt;tr key={pedido.id}&gt;
+            &lt;td&gt;{i + 1}º&lt;/td&gt;
+            &lt;td&gt;{pedido.produto}&lt;/td&gt;
+            &lt;td&gt;R$ {pedido.valor}&lt;/td&gt;
+          &lt;/tr&gt;
+        ))}
+      &lt;/tbody&gt;
+    &lt;/table&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;table&gt;
+  &lt;thead&gt;
+    &lt;tr&gt;
+      &lt;th scope="col"&gt;#&lt;/th&gt;
+      &lt;th scope="col"&gt;Produto&lt;/th&gt;
+      &lt;th scope="col"&gt;
+        &lt;button class="preco"&gt;Valor&lt;/button&gt;
+      &lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody&gt;
+    &lt;tr&gt;
+      &lt;td&gt;1 º&lt;/td&gt;
+      &lt;td&gt;Brioche&lt;/td&gt;
+      &lt;td&gt;R$ 8&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;2 º&lt;/td&gt;
+      &lt;td&gt;Sonho&lt;/td&gt;
+      &lt;td&gt;R$ 5&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;3 º&lt;/td&gt;
+      &lt;td&gt;Croissant&lt;/td&gt;
+      &lt;td&gt;R$ 7&lt;/td&gt;
+    &lt;/tr&gt;
+  &lt;/tbody&gt;
+&lt;/table&gt;
+</pre>
+  <pre class="solucao">const pedidos = [
+  { id: 1, cliente: "Maria", produto: "Brioche", valor: 8 },
+  { id: 2, cliente: "João", produto: "Sonho", valor: 5 },
+  { id: 3, cliente: "Bia", produto: "Croissant", valor: 7 }
+];
+
+function App() {
+  const [ordem, setOrdem] = useState("chegada");
+  const linhas = [...pedidos].sort((a, b) =&gt; b.valor - a.valor);
+  return (
+    &lt;table&gt;
+      &lt;thead&gt;
+        &lt;tr&gt;
+          &lt;th scope="col"&gt;#&lt;/th&gt;
+          &lt;th scope="col"&gt;Produto&lt;/th&gt;
+          &lt;th scope="col" aria-sort="descending"&gt;
+            &lt;button className="preco" onClick={() =&gt; setOrdem("valor")}&gt;Valor&lt;/button&gt;
+          &lt;/th&gt;
+        &lt;/tr&gt;
+      &lt;/thead&gt;
+      &lt;tbody&gt;
+        {linhas.map((pedido, i) =&gt; (
+          &lt;tr key={pedido.id}&gt;
+            &lt;td&gt;{i + 1}º&lt;/td&gt;
+            &lt;td&gt;{pedido.produto}&lt;/td&gt;
+            &lt;td&gt;R$ {pedido.valor}&lt;/td&gt;
+          &lt;/tr&gt;
+        ))}
+      &lt;/tbody&gt;
+    &lt;/table&gt;
+  );
+}</pre>
+</div>
+
+<p>A meta confere três coisas: o clique no botão, o <code>aria-sort</code> no <code>th</code> e o texto
+“1º Brioche” na prévia. Se a ordem mudou mas a conferência falhou no atributo, falta o
+<code>aria-sort</code>; se o atributo está lá e o texto não, o <code>sort</code> não entrou. Um erro por
+vez, sempre.</p>
+
+<h2>8. Tabela ou lista de cartões?</h2>
+
+<p>Tabela não é a resposta para tudo. Ela brilha quando as linhas têm as mesmas colunas e a pessoa precisa
+comparar valores. Sofre quando cada item tem muita informação, imagens ou ações diferentes. No celular,
+uma tabela de seis colunas rola de lado — e rolagem lateral é o pior gesto possível.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tag</th><th>Papel</th><th>Onde fica</th></tr>
+<tr><td><code>table</code></td><td>o contêiner dos dados</td><td>raiz da tabela</td></tr>
+<tr><td><code>caption</code></td><td>o título da tabela</td><td>primeiro filho do <code>table</code></td></tr>
+<tr><td><code>thead</code></td><td>linha de títulos das colunas</td><td>depois do <code>caption</code></td></tr>
+<tr><td><code>tbody</code></td><td>linhas de dados</td><td>depois do <code>thead</code></td></tr>
+<tr><td><code>tr</code></td><td>uma linha</td><td>dentro de <code>thead</code> ou <code>tbody</code></td></tr>
+<tr><td><code>th</code> / <code>td</code></td><td>célula de cabeçalho / de dado</td><td>dentro de um <code>tr</code></td></tr>
+</table>
+</div>
+
+<p>Uma alternativa comum é esconder a tabela no celular e mostrar cartões. Isso duplica a marcação e
+costuma sair pela culatra. Para a padaria, com três colunas, a tabela funciona no celular se você deixar o
+nome do produto quebrar linha e reduzir o padding. O guia inteiro usa <code>overflow-x</code> nas tabelas
+de referência justamente por isso — e é o que o <code>div.table-wrap</code> faz nas páginas deste
+site.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Tabela</th><th>Lista de cartões</th></tr>
+<tr><td>comparar valores entre linhas</td><td>melhor escolha</td><td>difícil: o olho não alinha</td></tr>
+<tr><td>poucas colunas, muitas linhas</td><td>funciona bem</td><td>funciona, com mais rolagem</td></tr>
+<tr><td>imagem e descrição longa por item</td><td>aperta demais</td><td>melhor escolha</td></tr>
+<tr><td>ação por linha (editar, excluir)</td><td>coluna de ações</td><td>botão no cartão</td></tr>
+</table>
+</div>
+
+<p>Se a decisão for tabela, capriche no cabeçalho: ele é o mapa que a pessoa usa para entender as colunas.
+Se for cartão, cada cartão precisa repetir o nome do campo (“Valor: R$ 8”), porque não há cabeçalho para
+consultar.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a linha aparece fora do corpo</h3>
+<p>A Ana colocou o <code>map</code> envolvendo o <code>table</code> inteiro. O resultado são três tabelas
+de uma linha cada, com cabeçalho repetido, e o CSS alinha cada uma do seu jeito. O <code>map</code> vai
+dentro do <code>tbody</code>, gerando <code>tr</code> — nunca em volta da tabela.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o cabeçalho não acompanha a ordenação</h3>
+<p>As linhas mudam de ordem, mas a seta e o anúncio continuam dizendo “ordem crescente”. Faltou ligar o
+<code>aria-sort</code> ao estado: quando o critério é aquele, o valor é <code>"ascending"</code> ou
+<code>"descending"</code>; nos outros, <code>"none"</code>. O atributo não muda a ordem — só a descreve.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: a tabela vazia vira um cabeçalho solto</h3>
+<p>Sem linhas, sobra a faixa de títulos e nada embaixo. A correção é a linha com <code>colSpan</code> e uma
+mensagem que diga o que está vazio. E lembre de atualizar o número do <code>colSpan</code> quando
+acrescentar uma coluna, senão a mensagem ocupa menos espaço do que devia.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Onde vai a <code>key</code> numa tabela gerada por <code>map</code>?</p>
+<label><input type="radio" name="q1"> em cada <code>td</code></label>
+<label><input type="radio" name="q1"> no <code>tr</code> que o <code>map</code> devolve</label>
+<label><input type="radio" name="q1"> no <code>table</code>, uma vez só</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que o <code>scope="col"</code> faz?</p>
+<label><input type="radio" name="q2"> deixa o cabeçalho em negrito</label>
+<label><input type="radio" name="q2"> ordena a coluna automaticamente</label>
+<label><input type="radio" name="q2"> diz que aquele <code>th</code> etiqueta as células da coluna</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Para que serve o <code>caption</code>?</p>
+<label><input type="radio" name="q3"> dar nome à tabela, inclusive para leitores de tela</label>
+<label><input type="radio" name="q3"> criar a linha de títulos das colunas</label>
+<label><input type="radio" name="q3"> alinhar os números à direita</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a célula que atravessa colunas</h2>
+<p>Complete o atributo que faz a mensagem de vazio ocupar três colunas.</p>
+<div class="ex-code">&lt;td <input aria-label="resposta 1" data-answer="colSpan" placeholder="...">="3"&gt;Nenhum pedido nesta semana.&lt;/td&gt;</div>
+<p class="ex-dica">Dica: no React o atributo é escrito em camelCase, com o S maiúsculo no meio.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Tabela é estrutura, não estilo. <code>table</code> contém <code>caption</code>, <code>thead</code> e
+<code>tbody</code>; cada linha é um <code>tr</code>, cada célula um <code>td</code>, e os títulos das
+colunas são <code>th</code> com <code>scope="col"</code>. As linhas vêm do <code>map</code> sobre o array,
+com a <code>key</code> no <code>tr</code> — o id do dado, não o índice, quando possível.</p>
+
+<p>O <code>caption</code> nomeia a tabela e o <code>scope</code> liga cada célula ao seu cabeçalho. São os
+dois detalhes que separam uma tabela que funciona de uma tabela que só parece funcionar. Números alinham à
+direita com <code>text-align</code> e <code>tabular-nums</code>; texto, à esquerda.</p>
+
+<p>Sem linhas, o corpo recebe uma linha com <code>colSpan</code> e uma mensagem específica. Com muitas
+linhas, o cabeçalho ganha botões que ordenam — e o <code>th</code> ganha <code>aria-sort</code> para
+descrever a ordem atual. E lembre que a ordem se calcula antes do <code>map</code>, como na aula de
+Ordenar.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>thead</code> para títulos, <code>tbody</code> para dados.</li>
+<li>Uma linha por item: <code>map</code> dentro do <code>tbody</code>.</li>
+<li><code>key</code> no <code>tr</code>; use o id, não o índice.</li>
+<li><code>th</code> é cabeçalho, não negrito; <code>scope="col"</code> liga a coluna.</li>
+<li><code>caption</code> é o título da tabela e vem primeiro.</li>
+<li><code>colSpan</code> faz a célula atravessar colunas; case com o número de colunas.</li>
+<li><code>aria-sort</code> no <code>th</code> descreve a ordenação.</li>
+<li>Clique de ordenação vai num <code>button</code> dentro do <code>th</code>.</li>
+<li>Números à direita, texto à esquerda, dígitos de largura fixa.</li>
+<li>Tabela no celular precisa de <code>overflow-x</code>; cartões são alternativa.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

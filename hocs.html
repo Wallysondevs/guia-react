@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Higher-Order Components | Guia React</title>
+<meta name="description" content="Higher-Order Components explicados devagar: uma função que recebe um componente e devolve outro, com props repassadas, dados injetados, estado próprio e displayName.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Higher-Order <span class="hl">Components</span></h1>
+<p class="intro">A Ana tem três cartões no site — o pão do dia, a encomenda e o aviso de preço — e todos
+precisam da mesma moldura em volta: uma borda, o nome da padaria no topo e o mesmo espaçamento. Em vez
+de repetir a moldura em três componentes, ela escreve uma função que <strong>recebe um componente e
+devolve outro</strong>, já embrulhado. Esse é o Higher-Order Component, e o nome comprido esconde uma
+ideia de duas linhas.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um HOC: uma função que recebe um componente e devolve um componente novo.</li>
+  <li>Como se escreve o primeiro HOC e como se usa o resultado no lugar do componente original.</li>
+  <li>Por que <code>{...props}</code> é obrigatório para o componente de dentro continuar funcionando.</li>
+  <li>Como um HOC injeta dados e como isso pode brigar com as props de quem chama.</li>
+  <li>O que acontece quando o HOC guarda estado: cada uso tem o seu, separado.</li>
+  <li>Como nomear o resultado para não se perder no DevTools.</li>
+  <li>Quando usar HOC, quando usar hook e quando usar render prop.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a mesma moldura em três cartões</h2>
+
+<p>No site da Ana, três componentes diferentes aparecem dentro da mesma moldura: um cartão de pão, um
+cartão de encomenda e um cartão de aviso. A moldura é sempre a mesma — uma <code>div</code> com a classe
+<code>moldura</code>, o nome da padaria em negrito e o conteúdo embaixo. O que muda é o miolo.</p>
+
+<p>A primeira solução é copiar a moldura nos três arquivos. Funciona até o dia em que ela decide que o
+nome da padaria fica no rodapé da moldura: três arquivos de novo. A segunda solução é criar um
+componente <code>Moldura</code> e usá-lo em volta dos outros três, com
+<code>&lt;Moldura&gt;&lt;CartaoDePao /&gt;&lt;/Moldura&gt;</code>. Essa é boa, e é o assunto da aula de
+<a href="slots-com-children.html">Slots com children</a>: o conteúdo entra pelo buraco.</p>
+
+<p>Só que existe uma terceira forma, mais antiga e ainda muito comum em bibliotecas: uma
+<strong>função</strong> que recebe o componente e devolve uma versão dele já embrulhada. Em vez de
+escrever a moldura em volta de cada uso, você embrulha o componente uma vez e passa a usar o resultado
+como se fosse o original. É o mesmo raciocínio de uma etiqueta: você não troca a caixa, cola a etiqueta
+nela.</p>
+
+<p>O nome disso é Higher-Order Component, ou HOC. "Higher-order" é o mesmo termo que aparece em
+"higher-order function" — uma função que trabalha com outras funções. Um HOC não é um componente: é uma
+função que fabrica componentes. A distinção parece preciosismo e é a chave para não se perder mais
+adiante.</p>
+
+<h2>2. O que é um HOC, na prática</h2>
+
+<p>Um HOC recebe um componente como argumento e devolve uma função componente nova. A nova usa a
+original por dentro, acrescentando o que quiser em volta. Por convenção, o nome do HOC começa com
+<code>com</code> (ou <code>with</code>, em inglês) e o resultado ganha um nome que lembra os dois:
+<code>comMoldura(Cartao)</code> devolve <code>CartaoComMoldura</code>.</p>
+
+<dl class="anatomy">
+<dt>HOC</dt>
+<dd>Função que recebe um componente e devolve outro componente. Não desenha nada sozinha: o desenho
+aparece quando o resultado é usado no JSX.</dd>
+<dt>componente envolvido</dt>
+<dd>O componente que entra no HOC, também chamado de <em>wrapped</em>. É ele que tem o conteúdo real,
+como o nome do pão.</dd>
+<dt>componente envolvente</dt>
+<dd>O componente que o HOC devolve, também chamado de <em>wrapper</em>. Ele desenha a moldura e chama o
+envolvido por dentro.</dd>
+<dt>repassar props</dt>
+<dd>Entregar ao componente de dentro as props que o wrapper recebeu, com <code>{...props}</code>. Sem
+isso, o miolo recebe <code>undefined</code> em tudo.</dd>
+<dt>displayName</dt>
+<dd>Uma propriedade de texto que dá nome ao componente no React DevTools. Serve para o wrapper não
+aparecer como uma pilha de "Envolvido".</dd>
+</dl>
+
+<p>Duas consequências vêm de graça com essa definição. A primeira: o HOC roda <strong>uma vez</strong>,
+na hora em que você escreve <code>comMoldura(Cartao)</code> — não a cada desenho. A segunda: o resultado
+é um componente comum; pode ir para o JSX, pode entrar em outro HOC, pode receber props normalmente.</p>
+
+<p>Para confirmar que os dois lados são funções e que o que muda é o que cada uma aceita, um log com
+<code>typeof</code> resolve:</p>
+
+<pre class="file" data-file="teste.js">console.log("typeof comMoldura: " + typeof comMoldura);
+console.log("typeof CartaoComMoldura: " + typeof CartaoComMoldura);</pre>
+
+<pre class="term">typeof comMoldura: function
+typeof CartaoComMoldura: function</pre>
+
+<p>As duas linhas dizem <code>function</code>, e isso não é erro: em JavaScript componente também é
+função. A diferença está no que cada uma recebe. <code>comMoldura</code> recebe um componente;
+<code>CartaoComMoldura</code> recebe props. Trocar uma pela outra é o erro mais comum da aula, e o
+sintoma é uma tela vazia.</p>
+
+<h2>3. O primeiro HOC: a moldura</h2>
+
+<p>Olhe o código. <code>comMoldura</code> recebe <code>Componente</code> e devolve
+<code>Envolvido</code>, uma função componente normal. Dentro dela, o <code>&lt;Componente {...props}
+/&gt;</code> desenha o componente original com todas as props que o wrapper recebeu. No fim,
+<code>const CartaoComMoldura = comMoldura(Cartao)</code> guarda o resultado.</p>
+
+<div class="tryreact" data-goal="conta:.moldura=1;;texto:Pão francês">
+  <p class="try-task">O HOC <code>comMoldura</code> já está escrito, mas o <code>App</code> desenha o
+  <code>Cartao</code> direto, sem moldura. Embrulhe o cartão com o HOC e use o resultado no
+  <code>App</code>.</p>
+  <pre class="jsx">function Cartao({ nome }) {
+  return &lt;p&gt;{nome}&lt;/p&gt;;
+}
+
+function comMoldura(Componente) {
+  return function Envolvido(props) {
+    return (
+      &lt;div className="moldura"&gt;
+        &lt;strong&gt;Padaria da Ana&lt;/strong&gt;
+        &lt;Componente {...props} /&gt;
+      &lt;/div&gt;
+    );
+  };
+}
+
+function App() {
+  return &lt;Cartao nome="Pão francês" /&gt;;
+}</pre>
+  <pre class="out">
+&lt;p&gt;Pão francês&lt;/p&gt;
+</pre>
+  <pre class="solucao">function Cartao({ nome }) {
+  return &lt;p&gt;{nome}&lt;/p&gt;;
+}
+
+function comMoldura(Componente) {
+  return function Envolvido(props) {
+    return (
+      &lt;div className="moldura"&gt;
+        &lt;strong&gt;Padaria da Ana&lt;/strong&gt;
+        &lt;Componente {...props} /&gt;
+      &lt;/div&gt;
+    );
+  };
+}
+
+const CartaoComMoldura = comMoldura(Cartao);
+
+function App() {
+  return &lt;CartaoComMoldura nome="Pão francês" /&gt;;
+}</pre>
+</div>
+
+<p>O painel mostra a <code>div.moldura</code> com o nome da padaria e, dentro, o parágrafo do cartão. O
+<code>Cartao</code> original não mudou uma linha, e continua podendo ser usado sem moldura em outro
+lugar do site. É a diferença entre mudar a peça e vestir a peça.</p>
+
+<p>Repare no <code>{...props}</code>. Ele espalha todas as props recebidas pelo wrapper dentro do
+componente de dentro. Sem essa linha, o <code>nome</code> que o <code>App</code> passou ficaria preso no
+wrapper, e o <code>Cartao</code> receberia um objeto vazio — desenhando um parágrafo em branco. Parece
+um detalhe de sintaxe; é a diferença entre um HOC útil e um HOC que engole dados.</p>
+
+<h2>4. As props precisam atravessar</h2>
+
+<p>Vale ver o problema de perto, porque ele volta em todo HOC. O wrapper é um componente no meio do
+caminho: tudo o que o <code>App</code> passa chega primeiro a ele. Se ele não repassar, o dado morre ali.
+E o wrapper não sabe quais props o componente de dentro espera — <code>nome</code>, <code>preco</code>,
+<code>onClick</code>, o que for. Por isso a resposta certa é sempre repassar <em>todas</em>, com o
+espalhamento, em vez de listar as que você acha que existem.</p>
+
+<p>Existem três jeitos de escrever a chamada, e a ordem importa quando há colisão de nomes. Escrever
+<code>&lt;Componente {...props} extra={1} /&gt;</code> faz a prop do HOC vencer; escrever
+<code>&lt;Componente extra={1} {...props} /&gt;</code> deixa quem chama sobrescrever. Nenhum dos dois
+está errado: são políticas diferentes. O primeiro garante que a injeção vale sempre; o segundo permite
+que a página faça exceções.</p>
+
+<pre class="file" data-file="comMoldura.jsx">function comMoldura(Componente) {
+  return function Envolvido(props) {
+    console.log("props recebidas: " + Object.keys(props).join(", "));
+    return (
+      &lt;div className="moldura"&gt;
+        &lt;strong&gt;Padaria da Ana&lt;/strong&gt;
+        &lt;Componente {...props} /&gt;
+      &lt;/div&gt;
+    );
+  };
+}</pre>
+
+<p>Com <code>&lt;CartaoComMoldura nome="Pão francês" /&gt;</code>, o console mostra quais props
+chegaram ao wrapper:</p>
+
+<pre class="term">console: props recebidas: nome</pre>
+
+<p>Se a lista vier vazia e o miolo aparecer em branco, o problema está na chamada — o
+<code>App</code> não passou nada. Se vier com <code>nome</code> e o miolo continuar em branco, o
+problema está no <code>{...props}</code> que faltou dentro do wrapper. Duas perguntas, dois lugares
+diferentes para olhar.</p>
+
+<h2>5. O HOC que injeta dados</h2>
+
+<p>Além de embrulhar, um HOC pode <em>acrescentar</em> props. É o caso do desconto da padaria: o preço
+com 10% é uma regra do negócio, igual para todos os cartões, e não deveria ser digitada em cada página.
+O HOC injeta <code>desconto</code> e o componente de dentro usa o valor que recebeu.</p>
+
+<div class="tryreact" data-goal="texto:R$ 30">
+  <p class="try-task">O <code>Preco</code> recebe <code>desconto={10}</code> do HOC, mas mostra o valor
+  cheio. Mostre o valor já com o desconto aplicado.</p>
+  <pre class="jsx">function comDesconto(Componente) {
+  return function Envolvido(props) {
+    return &lt;Componente {...props} desconto={10} /&gt;;
+  };
+}
+
+function Preco({ valor, desconto }) {
+  return &lt;p&gt;R$ {valor}&lt;/p&gt;;
+}
+
+const PrecoComDesconto = comDesconto(Preco);
+
+function App() {
+  return &lt;PrecoComDesconto valor={40} /&gt;;
+}</pre>
+  <pre class="out">
+&lt;p&gt;R$ 40&lt;/p&gt;
+</pre>
+  <pre class="solucao">function comDesconto(Componente) {
+  return function Envolvido(props) {
+    return &lt;Componente {...props} desconto={10} /&gt;;
+  };
+}
+
+function Preco({ valor, desconto }) {
+  return &lt;p&gt;R$ {valor - desconto}&lt;/p&gt;;
+}
+
+const PrecoComDesconto = comDesconto(Preco);
+
+function App() {
+  return &lt;PrecoComDesconto valor={40} /&gt;;
+}</pre>
+</div>
+
+<p>O painel passa de <code>R$ 40</code> para <code>R$ 30</code>. O <code>App</code> nunca soube do
+desconto: passou o valor cheio e recebeu o preço final. É a mesma divisão de responsabilidades da aula
+anterior, com outra roupa — o HOC decide o dado, o componente decide o desenho.</p>
+
+<p>Essa injeção tem um risco que vale conhecer: o nome da prop injetada não pode brigar com as props
+naturais do componente. Um HOC chamado <code>comUsuario</code> que injeta <code>usuario</code> quebra no
+dia em que alguém quiser passar outro usuário. A saída é escolher nomes improváveis
+(<code>usuarioAtual</code>) ou deixar o HOC receber a configuração:
+<code>comDesconto(10)(Preco)</code>, um HOC que devolve outro HOC. A segunda forma é mais flexível e
+mais difícil de ler; use quando precisar mesmo.</p>
+
+<h2>6. O HOC que guarda estado</h2>
+
+<p>HOC também pode ter estado. O wrapper chama <code>useState</code> como qualquer componente e entrega
+ao de dentro tanto o valor quanto a função que muda. Isso permite reaproveitar comportamento — contar
+cliques, controlar aberto e fechado, guardar o texto digitado — sem repetir o <code>useState</code> em
+cada componente.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Pão francês — 1">
+  <p class="try-task">O HOC <code>comCliques</code> entrega <code>cliques</code> e
+  <code>aoClicar</code>, mas o <code>BotaoDePedido</code> ignora os dois. Mostre o contador no botão e
+  ligue o clique à função recebida.</p>
+  <pre class="jsx">function comCliques(Componente) {
+  return function Envolvido(props) {
+    const [cliques, setCliques] = useState(0);
+    return &lt;Componente {...props} cliques={cliques} aoClicar={() =&gt; setCliques(cliques + 1)} /&gt;;
+  };
+}
+
+function BotaoDePedido({ texto }) {
+  return &lt;button&gt;{texto}&lt;/button&gt;;
+}
+
+const BotaoContado = comCliques(BotaoDePedido);
+
+function App() {
+  return &lt;BotaoContado texto="Pão francês" /&gt;;
+}</pre>
+  <pre class="out">
+&lt;button&gt;Pão francês&lt;/button&gt;
+</pre>
+  <pre class="solucao">function comCliques(Componente) {
+  return function Envolvido(props) {
+    const [cliques, setCliques] = useState(0);
+    return &lt;Componente {...props} cliques={cliques} aoClicar={() =&gt; setCliques(cliques + 1)} /&gt;;
+  };
+}
+
+function BotaoDePedido({ texto, cliques, aoClicar }) {
+  return (
+    &lt;button onClick={aoClicar}&gt;
+      {texto} — {cliques}
+    &lt;/button&gt;
+  );
+}
+
+const BotaoContado = comCliques(BotaoDePedido);
+
+function App() {
+  return &lt;BotaoContado texto="Pão francês" /&gt;;
+}</pre>
+</div>
+
+<p>Cada clique no botão faz o painel mostrar um número maior. Duas coisas importantes aconteceram. A
+primeira: o estado vive no wrapper, não no <code>BotaoDePedido</code> — o botão é só o desenho. A
+segunda: se você usar <code>&lt;BotaoContado /&gt;</code> duas vezes, cada uso ganha o seu contador
+próprio, porque são duas instâncias do wrapper. Estado em React é sempre por instância.</p>
+
+<p>E aqui está a maior diferença em relação a um hook: o estado do HOC não é acessível de fora. Se a
+página precisa saber o total de cliques de todos os botões, o HOC não serve — o número teria de subir
+para o componente pai, como a aula de <a href="elevando-estado.html">Elevando o Estado</a> mostra. HOC é
+bom para comportamento isolado, não para estado compartilhado entre irmãos.</p>
+
+<h2>7. Nome e identidade: o que não fazer</h2>
+
+<p>O React DevTools mostra a árvore de componentes pelo nome da função. Como todo HOC devolve uma função
+chamada <code>Envolvido</code>, a árvore vira uma pilha de <code>Envolvido</code>,
+<code>Envolvido</code>, <code>Envolvido</code>, e você perde a pista de qual é qual. O conserto é dar
+nome ao resultado com <code>displayName</code>, uma propriedade de texto que só serve para leitura:</p>
+
+<pre class="file" data-file="comMoldura.jsx">function comMoldura(Componente) {
+  function Envolvido(props) {
+    return (
+      &lt;div className="moldura"&gt;
+        &lt;Componente {...props} /&gt;
+      &lt;/div&gt;
+    );
+  }
+  Envolvido.displayName = "comMoldura(" + (Componente.displayName || Componente.name) + ")";
+  return Envolvido;
+}</pre>
+
+<p>Com isso o DevTools mostra <code>comMoldura(Cartao)</code> em vez de <code>Envolvido</code>. O
+<code>Componente.name</code> vem do nome da função; o <code>displayName</code> é o nome escolhido à mão,
+que vale mais quando existe. É um detalhe de depuração, mas economiza minutos toda vez que a árvore
+cresce.</p>
+
+<p>Agora o erro caro: criar o HOC <strong>dentro</strong> do componente. Cada desenho do
+<code>App</code> cria uma função nova, e para o React uma função nova é um componente novo — ele
+desmonta o antigo e monta o novo do zero. O sintoma é estado que volta ao inicial, campo que perde o
+foco a cada letra, animação que reinicia. Se o HOC precisa de configuração, chame-o no topo do arquivo,
+fora de qualquer componente:</p>
+
+<pre class="file" data-file="App.jsx">// errado: um componente novo a cada desenho do App
+function App() {
+  const Envolvido = comMoldura(Cartao);
+  return &lt;Envolvido nome="Pão francês" /&gt;;
+}
+
+// certo: criado uma vez, fora do componente
+const CartaoComMoldura = comMoldura(Cartao);
+
+function App() {
+  return &lt;CartaoComMoldura nome="Pão francês" /&gt;;
+}</pre>
+
+<p>Um terceiro cuidado, mais raro: não altere o componente que entrou. Escrever
+<code>Componente.novoMetodo = ...</code> ou mexer nas props dele por fora quebra o componente para todos
+os outros usos. O HOC só pode devolver um componente novo que <em>usa</em> o antigo — nunca modificar o
+antigo.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Cuidado</th><th>O certo</th><th>O sintoma quando falta</th></tr>
+<tr><td>onde criar</td><td>fora dos componentes, no topo do arquivo</td><td>estado zerado e campo perdendo o foco</td></tr>
+<tr><td>props</td><td><code>&lt;Componente {...props} /&gt;</code></td><td>miolo em branco, sem erro</td></tr>
+<tr><td>nome</td><td><code>displayName</code> no wrapper</td><td>árvore cheia de <code>Envolvido</code></td></tr>
+<tr><td>componente recebido</td><td>devolver um novo que usa o antigo</td><td>outros usos do original quebram</td></tr>
+</table>
+</div>
+
+<p>Os quatro sintomas da tabela têm uma coisa em comum: nenhum deles reclama na tela. O React não sabe
+que você queria uma moldura em volta do cartão; ele só sabe desenhar o que recebeu. Por isso vale a
+regra de revisão — todo HOC tem espalhamento, nome e criação fora do componente — antes de culpar a
+biblioteca.</p>
+
+<h2>8. HOC × hook × render prop</h2>
+
+<p>As três ferramentas resolvem "reaproveitar alguma coisa" e não são intercambiáveis. O hook
+reaproveita lógica e roda <em>dentro</em> do seu componente, com acesso direto ao estado e às props. A
+render prop deixa o componente decidir quando chamar a sua função, e você mantém o controle do desenho.
+O HOC devolve um componente pronto para usar, sem mudar o seu código.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Eu quero…</th><th>Ferramenta</th><th>O que ela faz</th></tr>
+<tr><td>reaproveitar lógica com estado</td><td>hook próprio</td><td>roda dentro do componente; sem camada extra</td></tr>
+<tr><td>controlar o desenho item por item</td><td>render prop</td><td>o componente chama a sua função com o dado</td></tr>
+<tr><td>usar uma peça já embrulhada, sem tocar nela</td><td>HOC</td><td>devolve um componente novo, pronto para o JSX</td></tr>
+<tr><td>envolver uma biblioteca de terceiros</td><td>HOC</td><td>não dá para editar o componente alheio</td></tr>
+</table>
+</div>
+
+<p>Na prática, o hook venceu a maior parte das disputas, pelo mesmo motivo das render props: com
+<code>useState</code> à mão, não é preciso um componente de fora segurando o estado. HOC continua útil
+quando você precisa entregar um componente pronto — em bibliotecas, em rotas que exigem autenticação,
+em integrações com código que não é seu. Também continua sendo o jeito mais simples de acrescentar a
+mesma moldura a componentes que você não pode editar.</p>
+
+<p>Escolher é mais fácil com uma pergunta: eu quero escrever um <em>componente</em> que já vem com o
+comportamento (HOC), ou <em>usar</em> o comportamento dentro do meu componente (hook)? Se a resposta for
+a segunda, quase sempre o hook é mais direto. Se você precisa que o resultado apareça no JSX como uma
+peça, o HOC resolve sem inventar nada.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o cartão embrulhado aparece vazio</h3>
+<p>A Ana criou o HOC, usou o resultado no <code>App</code> e o miolo ficou em branco. O culpado era um
+<code>&lt;Componente /&gt;</code> sem o <code>{...props}</code>: o wrapper recebeu <code>nome</code> e
+não repassou. O cartão desenhou <code>undefined</code> dentro do parágrafo. A regra é curta — todo HOC
+que não injeta props repassa todas — e vale a pena escrever assim desde o primeiro dia.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: dois usos do mesmo HOC compartilham o contador</h3>
+<p>Ela usou <code>&lt;BotaoContado /&gt;</code> em duas páginas e esperava números independentes. Era o
+que acontecia: cada uso é uma instância, com o seu <code>useState</code>. O problema foi outro — ela
+tinha criado o HOC dentro do componente pai, e cada desenho do pai remontava os filhos, zerando tudo. A
+lição: HOC se cria fora, no topo do arquivo, como qualquer componente.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o nome sumiu do DevTools</h3>
+<p>Depois de três HOCs aninhados, a árvore mostrava quatro <code>Envolvido</code> seguidos e ela não
+sabia qual era qual. Acrescentar <code>displayName</code> em cada HOC resolveu em uma linha. Não muda o
+que aparece na tela — muda o que você consegue ler quando precisa investigar. Em código de equipe, isso
+é documentação barata.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. Um HOC é…</p>
+<label><input type="radio" name="hc1"> um componente com nome comprido</label>
+<label><input type="radio" name="hc1"> um hook que recebe um componente</label>
+<label><input type="radio" name="hc1"> uma função que recebe um componente e devolve outro</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. Para que serve o <code>{...props}</code> dentro do
+wrapper?</p>
+<label><input type="radio" name="hc2"> repassar ao componente de dentro as props que o wrapper recebeu</label>
+<label><input type="radio" name="hc2"> copiar as props para uma variável global</label>
+<label><input type="radio" name="hc2"> transformar as props em estado do componente</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. Onde um HOC deve ser chamado?</p>
+<label><input type="radio" name="hc3"> dentro do <code>return</code> de um componente</label>
+<label><input type="radio" name="hc3"> fora dos componentes, uma vez, no topo do arquivo</label>
+<label><input type="radio" name="hc3"> dentro de um <code>useEffect</code>, depois do primeiro desenho</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: embrulhar o cartão</h2>
+<p>Complete a chamada que cria a versão embrulhada do <code>Cartao</code>, usando o HOC
+<code>comMoldura</code>. Depois responda: o resultado dessa chamada é um componente ou um HOC?</p>
+<div class="ex-code">const CartaoComMoldura = <input aria-label="resposta 1" data-answer="comMoldura" placeholder="...">(Cartao);</div>
+<p class="ex-dica">Dica: o nome começa com <code>com</code>, como todo HOC em português — e é ele que
+recebe o componente, não o contrário.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Higher-Order Component é uma função que recebe um componente e devolve outro. O componente que volta
+desenha o que quiser em volta e chama o original por dentro, repassando as props com
+<code>{...props}</code>. Você usa o resultado no JSX como usaria o componente original — e o original
+continua disponível, sem uma linha alterada.</p>
+
+<p>As três utilidades do padrão são: acrescentar moldura, injetar dados e acrescentar comportamento com
+estado. Cada uma tem um cuidado. A moldura exige o repasse de props. A injeção exige nome que não brigue
+com as props naturais e uma decisão sobre a ordem do espalhamento. O estado é por instância do wrapper,
+não por componente de dentro, e não sobe para irmãos.</p>
+
+<p>Hoje os hooks cobrem a maior parte do que os HOCs faziam, e é por isso que você vê menos
+<code>withAlgumaCoisa</code> em código novo. Mas o padrão continua sendo o jeito mais direto de entregar
+um componente pronto, e aparece em bibliotecas, em rotas protegidas e em qualquer lugar onde você não
+pode editar o componente que precisa ser embrulhado.</p>
+
+<p>Fica também a lição de leitura que vale para todo padrão deste nível: quando um nome comprido
+assusta, traduza para uma frase. "Higher-Order Component é uma função que recebe um componente e devolve
+outro." Se a frase fizer sentido, o código faz sentido — e o inverso também vale.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>HOC é função que recebe componente e devolve componente; não é componente.</li>
+<li>O HOC roda uma vez, na chamada; o resultado é que vira elemento no JSX.</li>
+<li>Sem <code>{...props}</code>, o componente de dentro perde todas as props.</li>
+<li><code>&lt;Componente {...props} extra={x} /&gt;</code>: a injeção vence; invertida, quem chama vence.</li>
+<li>O HOC começa com <code>com</code>; o resultado junta os dois nomes: <code>CartaoComMoldura</code>.</li>
+<li>Estado do HOC é por instância e não é visível de fora.</li>
+<li><code>displayName</code> salva a leitura da árvore no DevTools.</li>
+<li>Nunca crie o HOC dentro do componente: cada desenho remonta a árvore.</li>
+<li>Não altere o componente recebido; devolva um novo que usa o antigo.</li>
+<li>Precisa de lógica dentro do seu componente? Hook. Precisa de uma peça pronta? HOC.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Filtrar | Guia React</title>
+<meta name="description" content="Filtrar listas em React: o filter antes do map, o filtro como estado, a lista visível como derivada, contagem, estado vazio e o erro de filtrar o próprio estado.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Filtrar</span></h1>
+<p class="intro">A vitrine da Ana tem cinco pães e três botões: todos, pães e doces. O que ela quer é
+simples de dizer e fácil de errar — mostrar só os que combinam com o botão escolhido, sem estragar a
+lista original, e avisar quando não sobra nada. Nesta aula ela aprende a filtrar <strong>antes</strong>
+de desenhar, a guardar o filtro como estado e a derivar a lista visível sem tocar nos dados.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que o <code>filter</code> faz com um array, sem React no meio.</li>
+  <li>Por que filtrar vem antes do <code>map</code>, e não depois.</li>
+  <li>Que a escolha do filtro é estado, e a lista filtrada é derivada.</li>
+  <li>Como contar o que sobrou e o que mostrar quando não sobra nada.</li>
+  <li>Por que filtrar o próprio estado é o erro caro — e como evitar.</li>
+  <li>Que filtrar não é esconder com CSS, e que filtrar não é buscar por texto.</li>
+  <li>Como a chave estável continua valendo quando a lista encolhe.</li>
+</ul>
+</div>
+
+<h2>1. A cena: cinco pães e três botões</h2>
+
+<p>Na vitrine da Ana há cinco itens: pão francês, broa de milho, pão de queijo, bolo de fubá e croissant.
+Três deles são pães; dois são doces. Ela quer três botões no topo — Todos, Pães, Doces — e que a lista
+mostre só o que combina com o botão escolhido.</p>
+
+<p>A primeira tentativa é a mais óbvia: cada botão tem o seu próprio <code>if</code>, cada <code>if</code>
+desenha a sua própria lista. Funciona e dura uma semana. Na semana seguinte ela acrescenta uma categoria
+— salgados — e agora tem quatro listas quase iguais, quatro lugares para corrigir o preço e quatro
+chances de esquecer um pão.</p>
+
+<p>A segunda tentativa é a certa: uma lista só, um estado que guarda a categoria escolhida e um
+<code>filter</code> que reduz o array antes do <code>map</code>. A ideia é a mesma da aula de
+<a href="estado-derivado.html">Estado Derivado</a> — guarde o mínimo e calcule o resto — aplicada a
+listas.</p>
+
+<p>Três conceitos vão se juntar nesta aula, e vale nomeá-los antes: <strong>filtrar</strong> é escolher
+quais itens continuam; <strong>estado</strong> é o que você guarda entre um desenho e outro; e
+<strong>derivado</strong> é o que você calcula na hora, sem guardar. A maior parte dos bugs de filtro
+nasce de trocar esses papéis.</p>
+
+<h2>2. O que o <code>filter</code> faz, sem React no meio</h2>
+
+<p><code>filter</code> é um método de array como <code>map</code>. Ele recebe uma função de teste, roda
+essa função para cada item e devolve um <strong>array novo</strong> com os itens em que a função devolveu
+verdadeiro. O array original não muda: nada sai dele, nada é removido.</p>
+
+<pre class="file" data-file="teste.js">const paes = [
+  { id: 1, nome: "Pão francês", categoria: "paes" },
+  { id: 2, nome: "Broa de milho", categoria: "paes" },
+  { id: 3, nome: "Bolo de fubá", categoria: "doces" },
+  { id: 4, nome: "Croissant", categoria: "doces" },
+  { id: 5, nome: "Pão de queijo", categoria: "paes" }
+];
+
+const doces = paes.filter((p) =&gt; p.categoria === "doces");
+console.log(doces.map((p) =&gt; p.nome).join(", "));
+console.log(paes.length);</pre>
+
+<p>O console mostra a lista filtrada e prova que o original continua inteiro:</p>
+
+<pre class="term">Bolo de fubá, Croissant
+5</pre>
+
+<p>Essa segunda linha é a mais importante da aula. <code>filter</code> não remove nada de
+<code>paes</code>: ele constrói outro array com os aprovados. Quem remove é <code>splice</code>,
+<code>pop</code> e companhia — métodos que mudam o array no lugar. Guarde a diferença: <code>filter</code>
+cria, <code>splice</code> destrói.</p>
+
+<dl class="anatomy">
+<dt>filtrar</dt>
+<dd>Escolher quais itens de um array continuam, por uma função de teste. Não altera o array original:
+devolve outro, menor ou igual.</dd>
+<dt>teste</dt>
+<dd>A função que responde sim ou não para cada item, como
+<code>(p) =&gt; p.categoria === "doces"</code>. O nome técnico é predicado.</dd>
+<dt>lista derivada</dt>
+<dd>A lista calculada a partir de outra, a cada desenho. Não é estado: não precisa de
+<code>useState</code> e nunca fica desatualizada.</dd>
+<dt>fonte de verdade</dt>
+<dd>O lugar único onde o dado mora. No filtro, é a lista completa; a visível é só uma leitura dela.</dd>
+<dt>estado vazio</dt>
+<dd>O que a tela mostra quando o filtro não deixa nenhum item. Precisa de uma frase, não de uma área em
+branco.</dd>
+</dl>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método</th><th>Devolve</th><th>Use para</th></tr>
+<tr><td><code>filter</code></td><td>array novo, menor ou igual</td><td>escolher quais itens aparecem</td></tr>
+<tr><td><code>map</code></td><td>array novo, do mesmo tamanho</td><td>transformar cada item em JSX</td></tr>
+<tr><td><code>find</code></td><td>um item só, ou <code>undefined</code></td><td>achar um pão pelo id</td></tr>
+<tr><td><code>some</code></td><td><code>true</code> ou <code>false</code></td><td>saber se existe algum que combine</td></tr>
+</table>
+</div>
+
+<p>A ordem clássica é <code>filter</code> e depois <code>map</code>: primeiro escolhe quem fica, depois
+transforma cada um em elemento. Fazer o contrário — <code>map</code> e depois <code>filter</code> —
+funciona em JavaScript, mas você acaba testando propriedades de elementos JSX, que não têm
+<code>categoria</code> nem <code>nome</code>. Filtre o dado, não o desenho.</p>
+
+<h2>3. Filtrar antes de desenhar</h2>
+
+<p>Olhe a caixa. O estado <code>categoria</code> já existe e os botões já mudam esse estado — mas a
+lista desenha <code>paes</code> inteiro, então nada muda na tela. O conserto é uma linha: derivar
+<code>visiveis</code> com <code>filter</code> e percorrer essa lista no <code>map</code>.</p>
+
+<div class="tryreact" data-goal="clique:.doces;;conta:li=2;;texto:Bolo de fubá">
+  <p class="try-task">Os botões mudam o estado <code>categoria</code>, mas a lista mostra sempre os cinco
+  pães. Filtre os pães pela categoria escolhida antes de desenhar e clique em Doces para conferir.</p>
+  <pre class="jsx">function App() {
+  const [categoria, setCategoria] = useState("todos");
+  const paes = [
+    { id: 1, nome: "Pão francês", categoria: "paes" },
+    { id: 2, nome: "Broa de milho", categoria: "paes" },
+    { id: 3, nome: "Bolo de fubá", categoria: "doces" },
+    { id: 4, nome: "Croissant", categoria: "doces" },
+    { id: 5, nome: "Pão de queijo", categoria: "paes" }
+  ];
+
+  return (
+    &lt;div&gt;
+      &lt;button className="todos" onClick={() =&gt; setCategoria("todos")}&gt;Todos&lt;/button&gt;
+      &lt;button className="paes" onClick={() =&gt; setCategoria("paes")}&gt;Pães&lt;/button&gt;
+      &lt;button className="doces" onClick={() =&gt; setCategoria("doces")}&gt;Doces&lt;/button&gt;
+      &lt;ul&gt;
+        {paes.map((p) =&gt; (
+          &lt;li key={p.id}&gt;{p.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button class="todos"&gt;Todos&lt;/button&gt;
+  &lt;button class="paes"&gt;Pães&lt;/button&gt;
+  &lt;button class="doces"&gt;Doces&lt;/button&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Pão francês&lt;/li&gt;
+    &lt;li&gt;Broa de milho&lt;/li&gt;
+    &lt;li&gt;Bolo de fubá&lt;/li&gt;
+    &lt;li&gt;Croissant&lt;/li&gt;
+    &lt;li&gt;Pão de queijo&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [categoria, setCategoria] = useState("todos");
+  const paes = [
+    { id: 1, nome: "Pão francês", categoria: "paes" },
+    { id: 2, nome: "Broa de milho", categoria: "paes" },
+    { id: 3, nome: "Bolo de fubá", categoria: "doces" },
+    { id: 4, nome: "Croissant", categoria: "doces" },
+    { id: 5, nome: "Pão de queijo", categoria: "paes" }
+  ];
+  const visiveis = paes.filter((p) =&gt; categoria === "todos" || p.categoria === categoria);
+
+  return (
+    &lt;div&gt;
+      &lt;button className="todos" onClick={() =&gt; setCategoria("todos")}&gt;Todos&lt;/button&gt;
+      &lt;button className="paes" onClick={() =&gt; setCategoria("paes")}&gt;Pães&lt;/button&gt;
+      &lt;button className="doces" onClick={() =&gt; setCategoria("doces")}&gt;Doces&lt;/button&gt;
+      &lt;ul&gt;
+        {visiveis.map((p) =&gt; (
+          &lt;li key={p.id}&gt;{p.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em Doces e o painel mostra dois <code>&lt;li&gt;</code>: bolo de fubá e croissant. A condição
+tem duas partes porque "todos" não é uma categoria de pão — é a ausência de filtro. A primeira parte,
+<code>categoria === "todos"</code>, aprovando todo mundo, resolve isso sem precisar de um
+<code>if</code> separado.</p>
+
+<p>Repare que a key continua sendo <code>p.id</code>, mesmo com a lista menor. É isso que faz o estado de
+cada linha acompanhar o pão certo quando o filtro muda, como a aula de
+<a href="chaves-estaveis.html">Chaves Estáveis</a> explicou. Com índice no lugar do id, filtrar
+embaralharia os checks.</p>
+
+<p>Também vale notar o lugar do cálculo: <code>visiveis</code> é uma <code>const</code> calculada no
+corpo do componente, antes do <code>return</code>. Não é estado, não é efeito, não precisa de
+<code>useMemo</code> em uma lista de cinco itens. Calcular no corpo é o padrão; otimizar vem depois, e só
+se medir.</p>
+
+<h2>4. O filtro escolhido é estado</h2>
+
+<p>Das duas coisas envolvidas — a categoria escolhida e a lista filtrada — só a primeira precisa ser
+guardada. A categoria é uma decisão do usuário que precisa sobreviver entre desenhos: se ela não for
+estado, cada clique atualiza a tela por um instante e some no desenho seguinte.</p>
+
+<p>A lista filtrada, por outro lado, é consequência. Guardá-la em estado significa criar uma segunda
+fonte de verdade: no dia em que alguém acrescentar um pão, a lista guardada fica desatualizada; no dia em
+que o pão mudar de categoria, idem. Todo bug de "a tela não atualizou" começa com duas fontes de verdade
+para o mesmo dado.</p>
+
+<pre class="file" data-file="App.jsx">// certo: guarda a escolha, calcula a lista
+const [categoria, setCategoria] = useState("todos");
+const visiveis = paes.filter((p) =&gt; categoria === "todos" || p.categoria === categoria);
+
+// errado: guarda a lista e a escolha, e precisa sincronizar as duas
+const [categoria, setCategoria] = useState("todos");
+const [visiveis, setVisiveis] = useState(paes);</pre>
+
+<p>O padrão do estado também merece atenção: <code>"todos"</code> é uma escolha, não um vazio. Se você
+usasse <code>null</code> para "sem filtro", cada condição precisaria tratar o nulo. Uma string
+especial como <code>"todos"</code> deixa a condição curta e o valor legível no DevTools.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que guardar</th><th>Onde</th><th>Por quê</th></tr>
+<tr><td>a categoria escolhida</td><td>estado (<code>useState</code>)</td><td>é uma decisão do usuário, precisa durar</td></tr>
+<tr><td>a lista filtrada</td><td>derivada no corpo</td><td>é consequência; recalcular é barato</td></tr>
+<tr><td>o texto da busca</td><td>estado</td><td>mesma lógica, assunto de outra aula</td></tr>
+<tr><td>a lista completa</td><td>estado ou prop</td><td>é a fonte de verdade, nunca a cópia filtrada</td></tr>
+</table>
+</div>
+
+<p>Quando a lista original vem de fora, por prop, a conta não muda: a prop é a fonte, o estado é a
+categoria, e o <code>filter</code> continua sendo derivado. O que não pode acontecer é o componente
+receber a lista por prop e guardar uma cópia em estado para "poder filtrar" — aí a prop muda e a cópia
+não.</p>
+
+<h2>5. Contar o que sobrou e avisar quando não sobra nada</h2>
+
+<p>Uma lista filtrada pode ficar vazia, e lista vazia sem explicação parece bug. A Ana quer duas coisas:
+uma linha dizendo quantos itens estão à vista e, quando não houver nenhum, uma frase no lugar da
+lista. As duas contas saem do mesmo array derivado.</p>
+
+<div class="tryreact" data-goal="clique:.sem-gluten;;texto:0 de 5;;texto:Nenhum pão nessa categoria">
+  <p class="try-task">O botão "Sem glúten" não tem nenhum pão, e a tela fica em branco. Mostre a
+  contagem (<code>0 de 5</code>) e, quando a lista estiver vazia, a frase "Nenhum pão nessa
+  categoria".</p>
+  <pre class="jsx">function App() {
+  const [categoria, setCategoria] = useState("todos");
+  const paes = [
+    { id: 1, nome: "Pão francês", categoria: "paes" },
+    { id: 2, nome: "Broa de milho", categoria: "paes" },
+    { id: 3, nome: "Bolo de fubá", categoria: "doces" },
+    { id: 4, nome: "Croissant", categoria: "doces" },
+    { id: 5, nome: "Pão de queijo", categoria: "paes" }
+  ];
+  const visiveis = paes.filter((p) =&gt; categoria === "todos" || p.categoria === categoria);
+
+  return (
+    &lt;div&gt;
+      &lt;button className="todos" onClick={() =&gt; setCategoria("todos")}&gt;Todos&lt;/button&gt;
+      &lt;button className="sem-gluten" onClick={() =&gt; setCategoria("sem-gluten")}&gt;Sem glúten&lt;/button&gt;
+      &lt;ul&gt;
+        {visiveis.map((p) =&gt; (
+          &lt;li key={p.id}&gt;{p.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button class="todos"&gt;Todos&lt;/button&gt;
+  &lt;button class="sem-gluten"&gt;Sem glúten&lt;/button&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Pão francês&lt;/li&gt;
+    &lt;li&gt;Broa de milho&lt;/li&gt;
+    &lt;li&gt;Bolo de fubá&lt;/li&gt;
+    &lt;li&gt;Croissant&lt;/li&gt;
+    &lt;li&gt;Pão de queijo&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [categoria, setCategoria] = useState("todos");
+  const paes = [
+    { id: 1, nome: "Pão francês", categoria: "paes" },
+    { id: 2, nome: "Broa de milho", categoria: "paes" },
+    { id: 3, nome: "Bolo de fubá", categoria: "doces" },
+    { id: 4, nome: "Croissant", categoria: "doces" },
+    { id: 5, nome: "Pão de queijo", categoria: "paes" }
+  ];
+  const visiveis = paes.filter((p) =&gt; categoria === "todos" || p.categoria === categoria);
+
+  return (
+    &lt;div&gt;
+      &lt;button className="todos" onClick={() =&gt; setCategoria("todos")}&gt;Todos&lt;/button&gt;
+      &lt;button className="sem-gluten" onClick={() =&gt; setCategoria("sem-gluten")}&gt;Sem glúten&lt;/button&gt;
+      &lt;p&gt;{visiveis.length} de {paes.length}&lt;/p&gt;
+      {visiveis.length === 0 ? (
+        &lt;p className="vazio"&gt;Nenhum pão nessa categoria&lt;/p&gt;
+      ) : (
+        &lt;ul&gt;
+          {visiveis.map((p) =&gt; (
+            &lt;li key={p.id}&gt;{p.nome}&lt;/li&gt;
+          ))}
+        &lt;/ul&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A contagem usa <code>visiveis.length</code> e <code>paes.length</code> — e não dois arrays
+diferentes. Se você contar a lista completa, o número mente; se contar uma cópia guardada em estado, ele
+mente um desenho depois. Contagem é sempre derivada da mesma lista que está na tela.</p>
+
+<p>Um log de duas linhas confirma a conta sem precisar olhar a tela:</p>
+
+<pre class="file" data-file="App.jsx">const visiveis = paes.filter((p) =&gt; categoria === "todos" || p.categoria === categoria);
+console.log("visíveis: " + visiveis.length + " de " + paes.length);</pre>
+
+<p>Com o filtro em "doces" e depois em "sem-gluten", o console mostra:</p>
+
+<pre class="term">categoria doces:      console: visíveis: 2 de 5
+categoria sem-gluten: console: visíveis: 0 de 5</pre>
+
+<p>Se o primeiro número for igual ao segundo, o filtro não está filtrando; se for maior do que o total,
+alguém duplicou itens no caminho. A contagem é o teste mais rápido de sanidade de uma lista filtrada.</p>
+
+<p>O ternário com <code>visiveis.length === 0</code> decide entre a frase e a lista. A comparação com
+zero é explícita de propósito: escrever <code>{visiveis.length &amp;&amp; &lt;ul&gt;...&lt;/ul&gt;}</code>
+funciona, mas deixa um <code>0</code> aparecendo na tela quando a lista está vazia. É a mesma armadilha
+da aula de <a href="renderizacao-condicional.html">Renderização Condicional</a>, agora em forma de
+contagem.</p>
+
+<p>Uma frase de estado vazio boa diz duas coisas: o que aconteceu e o que fazer. "Nenhum pão nessa
+categoria" já é melhor do que uma área em branco; melhor ainda seria "Nenhum pão sem glúten por hoje —
+veja a vitrine completa" com um botão que volta para "Todos". Um estado vazio com saída é o que separa
+uma tela que parece quebrada de uma tela que conversa.</p>
+
+<h2>6. O tropeço caro: filtrar o estado</h2>
+
+<p>Aqui está o erro que a Ana cometeu e que quase todo mundo comete uma vez. Ela clicou em "Pães", viu
+três itens, clicou em "Todos" e continuaram três. O culpado estava na função do clique: em vez de
+guardar a categoria e deixar o <code>filter</code> fazer a conta, ela filtrava o <strong>estado</strong>
+e guardava o resultado por cima da lista original.</p>
+
+<div class="tryreact" data-goal="clique:.paes;;clique:.todos;;conta:li=5">
+  <p class="try-task">Clique em Pães e depois em Todos: a lista não volta, porque o estado está sendo
+  filtrado. Guarde só a categoria e derive a lista visível sem tocar no array de pães.</p>
+  <pre class="jsx">function App() {
+  const [categoria, setCategoria] = useState("todos");
+  const [paes, setPaes] = useState([
+    { id: 1, nome: "Pão francês", categoria: "paes" },
+    { id: 2, nome: "Broa de milho", categoria: "paes" },
+    { id: 3, nome: "Bolo de fubá", categoria: "doces" },
+    { id: 4, nome: "Croissant", categoria: "doces" },
+    { id: 5, nome: "Pão de queijo", categoria: "paes" }
+  ]);
+
+  function escolher(nova) {
+    setCategoria(nova);
+    setPaes(paes.filter((p) =&gt; nova === "todos" || p.categoria === nova));
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button className="todos" onClick={() =&gt; escolher("todos")}&gt;Todos&lt;/button&gt;
+      &lt;button className="paes" onClick={() =&gt; escolher("paes")}&gt;Pães&lt;/button&gt;
+      &lt;ul&gt;
+        {paes.map((p) =&gt; (
+          &lt;li key={p.id}&gt;{p.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button class="todos"&gt;Todos&lt;/button&gt;
+  &lt;button class="paes"&gt;Pães&lt;/button&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Pão francês&lt;/li&gt;
+    &lt;li&gt;Broa de milho&lt;/li&gt;
+    &lt;li&gt;Bolo de fubá&lt;/li&gt;
+    &lt;li&gt;Croissant&lt;/li&gt;
+    &lt;li&gt;Pão de queijo&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [categoria, setCategoria] = useState("todos");
+  const paes = [
+    { id: 1, nome: "Pão francês", categoria: "paes" },
+    { id: 2, nome: "Broa de milho", categoria: "paes" },
+    { id: 3, nome: "Bolo de fubá", categoria: "doces" },
+    { id: 4, nome: "Croissant", categoria: "doces" },
+    { id: 5, nome: "Pão de queijo", categoria: "paes" }
+  ];
+  const visiveis = paes.filter((p) =&gt; categoria === "todos" || p.categoria === categoria);
+
+  return (
+    &lt;div&gt;
+      &lt;button className="todos" onClick={() =&gt; setCategoria("todos")}&gt;Todos&lt;/button&gt;
+      &lt;button className="paes" onClick={() =&gt; setCategoria("paes")}&gt;Pães&lt;/button&gt;
+      &lt;ul&gt;
+        {visiveis.map((p) =&gt; (
+          &lt;li key={p.id}&gt;{p.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A solução mudou três coisas pequenas. A lista de pães deixou de ser estado e virou uma
+<code>const</code> no corpo do componente. A função <code>escolher</code> desapareceu: cada botão agora
+só chama <code>setCategoria</code>. E nasceu a linha do <code>filter</code>, que deriva
+<code>visiveis</code> a cada desenho. Com isso, "Pães" mostra três e "Todos" volta a mostrar cinco,
+porque a lista completa nunca foi alterada.</p>
+
+<p>Por que o erro original é tão fácil de cometer? Porque <code>setPaes</code> substitui a lista inteira
+pela versão filtrada. O React não guarda um histórico do estado: o que você manda é o novo valor. Filtrar
+o pão francês para fora é definitivo até a página recarregar. Não existe "desfiltrar" — só existe manter
+o array completo e calcular o que aparece.</p>
+
+<p>E há a versão silenciosa do mesmo erro: <code>paes.sort()</code> dentro do clique. <code>sort</code>
+muda o array no lugar e devolve a mesma referência; o React pode não perceber a mudança e a tela não
+atualiza. A regra que cobre os dois casos: <em>não mexa no array que veio do estado; construa outro</em>.
+A aula de <a href="estado-com-array.html">Estado com Array</a> mostra as operações seguras, com
+espalhamento.</p>
+
+<h2>7. Filtrar não é esconder (e não é buscar)</h2>
+
+<p>Dois atalhos que parecem filtro e não são. O primeiro é o CSS: em vez de reduzir a lista, esconder os
+itens que não combinam com <code>display: none</code>. A tela fica certa e o resto errado — os itens
+continuam no HTML, continuam sendo montados pelo React a cada desenho e, dependendo de como você esconde
+(<code>opacity: 0</code>, por exemplo), continuam alcançáveis pelo teclado e por leitores de tela. Filtrar
+é não desenhar; esconder é desenhar sem mostrar.</p>
+
+<p>O segundo atalho é confundir filtrar com buscar. Filtrar por categoria é escolher entre valores
+fixos: pães, doces, todos. Buscar é comparar texto digitado com o nome do item, e tem as suas próprias
+armadilhas — maiúsculas, acentos, pedaços de palavra, o tempo entre uma tecla e outra. São duas aulas
+diferentes por um motivo: o filtro é uma escolha; a busca é uma comparação. As duas se combinam bem — dá
+para buscar dentro da categoria escolhida — mas é melhor implementá-las separadas.</p>
+
+<p>Há ainda o filtro que não filtra por causa do tipo. Se a categoria no dado é o número
+<code>1</code> e você compara com a string <code>"1"</code>, o <code>===</code> reprova todo mundo e a
+lista fica vazia. Se você escreve <code>p.categoria = "doces"</code> com um sinal de igual, o
+<code>filter</code> altera o dado e considera todo mundo aprovado — o bug mais confuso dos dois, porque
+a lista continua completa e o dado fica errado. Em comparação, sempre <code>===</code>; em atribuição,
+nunca dentro de condição.</p>
+
+<p>O filtro também pode ficar caro. Com listas grandes, <code>filter</code> roda a cada desenho, e cada
+tecla digitada na busca gera um desenho. Nesses casos, <code>useMemo</code> evita repetir a conta quando
+as entradas não mudaram — mas só vale depois de medir. Para cinco pães, o custo é invisível e a
+complexidade extra só atrapalha.</p>
+
+<h2>8. Onde o filtro mora, afinal</h2>
+
+<p>Existem três lugares possíveis para o filtro, e a escolha muda o comportamento do site. No estado do
+componente, o filtro é local: sai da página ao recarregar. Na URL, o filtro é compartilhável: o link
+"doces" abre a vitrine já filtrada. Na prop, o filtro é controlado por quem está acima: útil quando a
+mesma escolha vale para vários componentes da tela.</p>
+
+<p>Para a vitrine da Ana, estado local é suficiente e é o mais simples. Se ela quiser mandar o link dos
+doces para um cliente, a URL vira necessária — e aí o estado passa a ler a URL em vez de nascer com
+<code>"todos"</code>. O importante é que exista <em>uma</em> fonte de verdade: escolher entre estado, URL
+e prop é decisão de arquitetura; duplicar não é.</p>
+
+<p>Um detalhe de interface que vale desde já: o botão da categoria ativa precisa parecer ativo. Como a
+categoria está no estado, o <code>className</code> condicional resolve:
+<code>className={categoria === "doces" ? "ativo" : ""}</code>. Sem esse sinal, o usuário clica e não sabe
+se a lista mudou por causa do clique ou porque era assim mesmo — especialmente quando o filtro devolve
+zero itens.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a contagem diz 5, a tela mostra 2</h3>
+<p>A Ana mostrou <code>{paes.length} itens</code> em vez de <code>{visiveis.length} itens</code>. Com o
+filtro de doces, o número continuou cinco e a lista, dois. Número que não corresponde ao que está na
+tela destrói a confiança do usuário. A regra é usar sempre a mesma lista: se o <code>map</code> percorre
+<code>visiveis</code>, a contagem lê <code>visiveis.length</code>.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o filtro não volta ao clicar em Todos</h3>
+<p>Ela fez o estado receber a lista filtrada, como na caixa da seção 6. Ao clicar em "Todos", o
+<code>filter</code> rodou sobre a lista já reduzida e não tinha como recuperar os itens perdidos. O
+conserto é manter a lista completa intacta e derivar a visível a cada desenho. Filtro é uma lente, não
+uma tesoura.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: filtrar deixou a lista em branco sem aviso</h3>
+<p>A categoria "sem glúten" não tinha nenhum pão e a tela ficou vazia, sem uma palavra. O usuário não
+sabe se a página quebrou ou se não há produto. Uma frase de estado vazio mais a contagem resolvem em
+duas linhas — e, se possível, um botão que volta para "Todos". Estado vazio é informação, não ausência.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que <code>filter</code> devolve?</p>
+<label><input type="radio" name="fi1"> o mesmo array, sem os itens reprovados</label>
+<label><input type="radio" name="fi1"> um array novo com os itens aprovados</label>
+<label><input type="radio" name="fi1"> um elemento JSX com a lista pronta</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Qual é o estado mínimo para uma vitrine filtrável?</p>
+<label><input type="radio" name="fi2"> a lista filtrada</label>
+<label><input type="radio" name="fi2"> a lista completa e a lista filtrada</label>
+<label><input type="radio" name="fi2"> a categoria escolhida</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. A lista tem categoria <code>"doces"</code>. O que
+<code>filter((p) =&gt; p.categoria = "doces")</code> faz?</p>
+<label><input type="radio" name="fi3"> atribui o valor a todos os itens e aprova todo mundo</label>
+<label><input type="radio" name="fi3"> compara e aprova só os doces</label>
+<label><input type="radio" name="fi3"> não compila: <code>=</code> não existe dentro de função</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a lista visível</h2>
+<p>Complete a linha que deriva a lista visível a partir da categoria escolhida. Depois responda: essa
+lista deve ficar em <code>useState</code>?</p>
+<div class="ex-code">const visiveis = paes.<input aria-label="resposta 1" data-answer="filter" placeholder="...">((p) =&gt; p.categoria === categoria);</div>
+<p class="ex-dica">Dica: é o método de array que devolve um array novo só com os itens aprovados pela
+função de teste.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Filtrar é escolher quais itens continuam, e <code>filter</code> faz isso devolvendo um array novo sem
+tocar no original. No JSX, o filtro vem antes do <code>map</code>: primeiro você reduz o dado, depois
+transforma cada item em elemento. Fazer o contrário testa propriedades de elementos, que não existem.</p>
+
+<p>O estado guarda a escolha — a categoria — e a lista visível é derivada no corpo do componente.
+Guardar as duas é criar duas fontes de verdade, e a segunda sempre atrasa. Contagem e estado vazio saem
+da mesma lista que está na tela: <code>visiveis.length</code> e um ternário para a frase de "nenhum
+resultado".</p>
+
+<p>O erro caro é filtrar o próprio estado: a lista encolhe para sempre e "Todos" não recupera nada.
+Filtrar é uma lente, não uma tesoura. Também não é esconder com CSS — item escondido continua no HTML,
+no leitor de tela e na busca — nem buscar por texto, que é outra comparação e outra aula.</p>
+
+<p>Por fim, o filtro e a chave trabalham juntos: com <code>key={p.id}</code>, o estado de cada linha
+acompanha o pão quando a lista encolhe. Com índice, filtrar embaralha. Duas decisões pequenas que,
+tomadas juntas, fazem uma vitrine que se comporta como o usuário espera.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>filter</code> devolve array novo; o original fica intacto.</li>
+<li>Filtre o dado, depois faça o <code>map</code>; nunca o contrário.</li>
+<li>Estado: a categoria escolhida. Derivado: a lista visível.</li>
+<li>"Todos" é uma escolha explícita — trate na condição, não com <code>if</code> separado.</li>
+<li>Contagem com <code>visiveis.length</code>, a mesma lista que está na tela.</li>
+<li>Lista vazia pede frase de estado vazio e, se der, uma saída.</li>
+<li>Filtrar o estado apaga dados para sempre: "Todos" não volta.</li>
+<li><code>sort</code> e <code>splice</code> mudam no lugar; no estado, construa outro array.</li>
+<li>Filtro por categoria não é busca por texto, e esconder com CSS não é filtrar.</li>
+<li><code>key={p.id}</code> mantém o estado no item certo quando o filtro muda.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

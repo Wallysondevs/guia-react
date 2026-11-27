@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estados Vazios | Guia React</title>
+<meta name="description" content="Estados vazios no React: a diferença entre lista vazia, filtro sem resultado e carregando, mensagens acionáveis, botão de primeira vez e anúncio com role status.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Estados <span class="hl">Vazios</span></h1>
+<p class="intro">Segunda-feira de manhã, a Ana abre o painel e encontra a tela em branco: nenhuma encomenda
+ainda, porque o dia começou. Ela não sabe se o sistema quebrou, se está carregando ou se realmente não há
+nada — e vai passar a manhã desconfiando do site. Nesta aula ela aprende a desenhar o vazio: dizer o que
+está vazio, por quê e o que fazer a seguir, sem confundir lista vazia com busca sem resultado nem com
+carregamento.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que uma área em branco é pior do que uma mensagem.</li>
+  <li>A diferença entre lista vazia, filtro sem resultado e carregando.</li>
+  <li>O teste <code>length === 0</code> e onde ele entra no JSX.</li>
+  <li>O que uma boa mensagem de vazio precisa dizer.</li>
+  <li>Como oferecer uma saída: limpar a busca, cadastrar o primeiro item.</li>
+  <li>O vazio de primeira vez, que é um convite, e não um erro.</li>
+  <li>Como anunciar o vazio para quem usa leitor de tela.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a tela em branco de segunda-feira</h2>
+
+<p>Todo começo de dia é igual. A Ana abre o painel de encomendas e não há nada: as primeiras ainda não
+chegaram. O componente faz o que foi mandado — desenha a lista, e a lista está vazia —, então a área fica
+em branco. Para quem programou, isso é óbvio. Para quem usa, é angústia: será que carregou? Será que o
+filtro ficou ligado de ontem? Será que os pedidos sumiram?</p>
+
+<p>Um estado vazio é a tela que aparece quando não há itens para mostrar. Ele não é um erro, e por isso
+costuma ser esquecido: o caminho “tem dados” é o que o programador testa, enquanto o caminho “não tem
+dados” fica sem projeto. Só que o vazio é o primeiro estado que a maioria dos usuários vê — a conta nova, o
+dia novo, a busca que não achou.</p>
+
+<p>Projetar o vazio é decidir três coisas: o que dizer, o que não mostrar e qual o próximo passo. A frase
+“nenhum item” cumpre a primeira e falha as outras duas. A mensagem boa é específica e oferece um caminho:
+“Nenhuma encomenda hoje. Cadastre a primeira no balcão.”</p>
+
+<p>Nesta aula, a Ana vai tratar três vazios diferentes — e o maior aprendizado é que eles não são o mesmo.
+Uma lista vazia porque o dia começou pede uma ação. Uma busca sem resultado pede outra. Um carregamento
+pede, acima de tudo, tempo.</p>
+
+<h2>2. Vazio não é erro — e não é tudo igual</h2>
+
+<p>Antes de escrever a primeira mensagem, vale separar as quatro situações em que uma lista não mostra
+itens. Elas parecem iguais na tela e são completamente diferentes no código:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Como você sabe</th><th>O que a pessoa precisa ver</th></tr>
+<tr><td>carregando</td><td>o pedido ainda não voltou</td><td>um sinal de espera, nunca “nenhum item”</td></tr>
+<tr><td>lista vazia de verdade</td><td>o array existe e tem tamanho 0</td><td>o que está vazio e como começar</td></tr>
+<tr><td>filtro ou busca sem resultado</td><td>há dados, mas nenhum passa no filtro</td><td>o termo usado e um jeito de limpar</td></tr>
+<tr><td>erro</td><td>o pedido falhou</td><td>o que aconteceu e como tentar de novo</td></tr>
+</table>
+</div>
+
+<p>Confundir as quatro é a origem de mensagens erradas: “Nenhuma encomenda” enquanto os dados ainda estão a
+caminho; “Nada encontrado” quando na verdade o cadastro está vazio. Cada uma tem seu teste e sua frase, e
+o React só precisa de condicionais para separar.</p>
+
+<p>A ordem dos testes importa. Sempre teste o carregamento primeiro, o erro depois, e só então os vazios.
+Se você testar o vazio antes, a tela vai dizer “nenhuma encomenda” durante o carregamento — e a pessoa vai
+fechar o painel achando que perdeu os pedidos.</p>
+
+<p>Guardar essa ordem é metade do trabalho. A outra metade é a mensagem, e ela merece uma seção inteira,
+porque é o que a pessoa realmente lê.</p>
+
+<h2>3. O teste de tamanho e a mensagem</h2>
+
+<p>O teste é simples: um array vazio tem <code>length</code> zero. No JSX, isso vira um ternário ou um
+<code>&amp;&amp;</code> antes do <code>map</code>:</p>
+
+<pre class="file" data-file="Encomendas.jsx">{encomendas.length === 0 ? (
+  &lt;p className="vazio" role="status"&gt;
+    Nenhuma encomenda hoje. Cadastre a primeira no balcão.
+  &lt;/p&gt;
+) : (
+  &lt;ul&gt;
+    {encomendas.map((item) =&gt; (
+      &lt;li key={item.id}&gt;{item.nome}&lt;/li&gt;
+    ))}
+  &lt;/ul&gt;
+)}</pre>
+
+<p>Repare que o <code>map</code> nem roda quando a lista está vazia — ele devolveria um array vazio de
+qualquer forma, mas o ternário deixa a intenção explícita. Quem lê o código entende na hora que existe um
+caminho sem dados e que ele foi pensado.</p>
+
+<div class="tryreact" data-goal="conta:.vazio=1;;attr:p.vazio|role=status;;texto:Nenhuma encomenda hoje">
+  <p class="try-task">A lista está vazia e a tela fica em branco. Mostre, no lugar da lista, um parágrafo
+  com a classe <code>vazio</code>, <code>role="status"</code> e o texto “Nenhuma encomenda hoje. Cadastre a
+  primeira no balcão.”</p>
+  <pre class="jsx">const encomendas = [];
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Encomendas de hoje&lt;/h2&gt;
+      &lt;ul&gt;
+        {encomendas.map((item) =&gt; (
+          &lt;li key={item.id}&gt;{item.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h2&gt;Encomendas de hoje&lt;/h2&gt;
+  &lt;ul&gt;&lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const encomendas = [];
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Encomendas de hoje&lt;/h2&gt;
+      {encomendas.length === 0 ? (
+        &lt;p className="vazio" role="status"&gt;
+          Nenhuma encomenda hoje. Cadastre a primeira no balcão.
+        &lt;/p&gt;
+      ) : (
+        &lt;ul&gt;
+          {encomendas.map((item) =&gt; (
+            &lt;li key={item.id}&gt;{item.nome}&lt;/li&gt;
+          ))}
+        &lt;/ul&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel inicial mostra um <code>ul</code> vazio, que é exatamente a área em branco da Ana. Depois da
+correção, ele mostra o parágrafo. Repare que a mensagem não diz só “nenhum item”: diz que é hoje, e diz onde
+resolver. Duas informações a mais, nenhuma linha de código a mais.</p>
+
+<p>Uma tentação comum é esconder a seção inteira quando não há dados. Não faça isso. O título
+“Encomendas de hoje” deve continuar na tela, porque ele dá contexto: sem ele, a pessoa lê uma frase solta
+no meio da página e não sabe do que ela fala. Esconda a lista, não o assunto.</p>
+
+<h2>4. O que uma boa mensagem de vazio diz</h2>
+
+<p>Uma mensagem de vazio tem três partes, e a ordem é essa: o que está vazio, por que está vazio e o que
+fazer agora. Nem toda tela precisa das três por extenso, mas toda boa mensagem responde às três.</p>
+
+<dl class="anatomy">
+<dt>estado vazio</dt>
+<dd>A tela que aparece quando não há itens para mostrar. Não é erro; é uma situação prevista.</dd>
+<dt>vazio de filtro</dt>
+<dd>Há dados, mas nenhum passa no filtro ou na busca. Pede mostrar o termo e oferecer limpar.</dd>
+<dt>carregando</dt>
+<dd>O pedido ainda está em andamento. Não é vazio: mostrar “nenhum item” aqui é mentira.</dd>
+<dt>chamada para ação</dt>
+<dd>O botão ou link que resolve o vazio: cadastrar o primeiro item, limpar a busca, tentar de novo.</dd>
+<dt>aria-live</dt>
+<dd>Atributo que faz o leitor de tela anunciar mudanças numa região da página. <code>role="status"</code>
+já implica uma região educada.</dd>
+</dl>
+
+<p>“O que está vazio” é o mais fácil: encomendas, pães, resultados. “Por que” é o que separa as telas:
+porque o dia começou, porque a busca não achou, porque o filtro está ligado. “O que fazer” é o que separa as
+boas das ótimas: cadastrar, limpar, ver tudo.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Mensagem fraca</th><th>Mensagem que ajuda</th></tr>
+<tr><td>lista vazia de verdade</td><td>“Nenhum item”</td><td>“Nenhuma encomenda hoje. Cadastre a primeira no balcão.”</td></tr>
+<tr><td>busca sem resultado</td><td>“Nada encontrado”</td><td>“Nada encontrado para o termo. Limpar busca.”</td></tr>
+<tr><td>carregando</td><td>“Nenhum item”</td><td>“Carregando encomendas…”</td></tr>
+<tr><td>erro</td><td>“Nenhum item”</td><td>“Não consegui carregar. Tentar de novo.”</td></tr>
+</table>
+</div>
+
+<p>Evite humor no vazio. “Nada por aqui, nem migalhas!” parece simpático no primeiro dia e irrita no
+trigésimo, além de não dizer nada a quem só quer cadastrar um pedido. Simpatia não substitui informação.</p>
+
+<p>Também evite culpar a pessoa. “Você não tem encomendas” soa como cobrança; “Nenhuma encomenda hoje” é um
+fato. A diferença é pequena na frase e enorme na sensação.</p>
+
+<h2>5. Vazio de filtro é outro vazio</h2>
+
+<p>Agora o caso que mais confunde. A lista tem três encomendas; a pessoa digita “xyz” na busca; nada casa.
+O array original continua com três itens, mas a lista filtrada tem zero. Se o componente mostrar “Nenhuma
+encomenda”, ele está mentindo: existem três.</p>
+
+<pre class="term">&gt; encomendas.length
+3
+&gt; encontrados.length
+0</pre>
+
+<p>As duas contagens juntas contam a história inteira: existem três encomendas e nenhuma passou no filtro.
+Uma mensagem que olha só a segunda conclui “nenhuma encomenda”, que é falso. O código precisa olhar as
+duas.</p>
+
+<p>O teste, então, precisa ser duplo. Primeiro, a lista está vazia de verdade? Depois, o filtro não achou
+nada? Cada resposta tem sua mensagem:</p>
+
+<pre class="file" data-file="Encomendas.jsx">{encomendas.length === 0 ? (
+  &lt;p className="vazio"&gt;Nenhuma encomenda cadastrada.&lt;/p&gt;
+) : encontrados.length === 0 ? (
+  &lt;div className="vazio"&gt;
+    &lt;p&gt;Nada encontrado para {busca}.&lt;/p&gt;
+    &lt;button onClick={() =&gt; setBusca("")}&gt;Limpar busca&lt;/button&gt;
+  &lt;/div&gt;
+) : (
+  &lt;ul&gt;…&lt;/ul&gt;
+)}</pre>
+
+<p>Dois ternários encadeados não são o código mais bonito do mundo, mas são honestos: cada condição tem uma
+frase. Quando isso cresce, vale extrair um componente <code>ListaDeEncomendas</code> que recebe os itens e o
+termo buscado — ali dentro, os mesmos testes ficam mais legíveis.</p>
+
+<div class="tryreact" data-goal="digite:input=xyz;;texto:Nada encontrado para xyz;;texto:Limpar busca">
+  <p class="try-task">Digite “xyz” na busca: a tela diz “Nenhuma encomenda”, mas existem três. Separe os
+  dois vazios — mostre “Nada encontrado para xyz.” e um botão “Limpar busca” quando o filtro não achar
+  nada.</p>
+  <pre class="jsx">const encomendas = [
+  { id: 1, nome: "Pão francês" },
+  { id: 2, nome: "Sonho" },
+  { id: 3, nome: "Brioche" }
+];
+
+function App() {
+  const [busca, setBusca] = useState("");
+  const encontrados = encomendas.filter((item) =&gt;
+    item.nome.toLowerCase().includes(busca.toLowerCase())
+  );
+  return (
+    &lt;div&gt;
+      &lt;input
+        value={busca}
+        placeholder="Buscar encomenda"
+        onChange={(e) =&gt; setBusca(e.target.value)}
+      /&gt;
+      {encontrados.length === 0 ? (
+        &lt;p className="vazio"&gt;Nenhuma encomenda&lt;/p&gt;
+      ) : (
+        &lt;ul&gt;
+          {encontrados.map((item) =&gt; (
+            &lt;li key={item.id}&gt;{item.nome}&lt;/li&gt;
+          ))}
+        &lt;/ul&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input placeholder="Buscar encomenda" value=""&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Pão francês&lt;/li&gt;
+    &lt;li&gt;Sonho&lt;/li&gt;
+    &lt;li&gt;Brioche&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const encomendas = [
+  { id: 1, nome: "Pão francês" },
+  { id: 2, nome: "Sonho" },
+  { id: 3, nome: "Brioche" }
+];
+
+function App() {
+  const [busca, setBusca] = useState("");
+  const encontrados = encomendas.filter((item) =&gt;
+    item.nome.toLowerCase().includes(busca.toLowerCase())
+  );
+  return (
+    &lt;div&gt;
+      &lt;input
+        value={busca}
+        placeholder="Buscar encomenda"
+        onChange={(e) =&gt; setBusca(e.target.value)}
+      /&gt;
+      {encomendas.length === 0 ? (
+        &lt;p className="vazio"&gt;Nenhuma encomenda cadastrada.&lt;/p&gt;
+      ) : encontrados.length === 0 ? (
+        &lt;div className="vazio"&gt;
+          &lt;p&gt;Nada encontrado para {busca}.&lt;/p&gt;
+          &lt;button onClick={() =&gt; setBusca("")}&gt;Limpar busca&lt;/button&gt;
+        &lt;/div&gt;
+      ) : (
+        &lt;ul&gt;
+          {encontrados.map((item) =&gt; (
+            &lt;li key={item.id}&gt;{item.nome}&lt;/li&gt;
+          ))}
+        &lt;/ul&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A conferência digita “xyz” e espera as duas coisas: a frase com o termo e o botão para limpar. Se a sua
+tela mostrar as duas mensagens ao mesmo tempo, os testes ficaram independentes em vez de encadeados; se
+mostrar “Nenhuma encomenda”, o primeiro teste está olhando o array filtrado.</p>
+
+<p>E a saída importa tanto quanto a mensagem. Um vazio de filtro sem “limpar” deixa a pessoa presa: ela não
+sabe que existe um filtro ligado, e o site parece quebrado. O botão devolve o controle em um clique.</p>
+
+<h2>6. Carregando não é vazio</h2>
+
+<p>Quando os dados vêm de uma API, existe um intervalo entre o pedido e a resposta. Nesse intervalo, a
+lista tem zero itens — mas isso não significa vazio. Significa “ainda não sei”. Mostrar a mensagem de vazio
+aqui é o bug mais comum de tela inicial:</p>
+
+<pre class="term">&gt; carregando, pedidos.length
+true 0
+&gt; carregando, pedidos.length
+false 0</pre>
+
+<p>As duas linhas têm <code>pedidos.length</code> igual a zero. A diferença está em <code>carregando</code>.
+Por isso o teste do vazio vem depois do teste do carregamento; a aula
+<a href="carregando-e-erro.html">Carregando e Erro</a> monta essa ordem com calma, e o guia volta nela no
+nível de rede.</p>
+
+<p>Na prática, o componente aprende a mostrar três telas: “Carregando encomendas…”, “Nenhuma encomenda
+hoje” e a lista. Três estados, um booleano e um array. O erro é o quarto, e também tem prioridade sobre o
+vazio — se o pedido falhou, a mensagem certa é “Não consegui carregar”, com um botão de tentar de novo.</p>
+
+<p>Existe um jeito de reduzir a confusão: começar com <code>null</code> em vez de <code>[]</code> no estado
+da lista. <code>null</code> significa “não sei”, <code>[]</code> significa “sei, e está vazio”. São duas
+informações diferentes, e o código fica mais fácil de ler quando o estado reflete isso.</p>
+
+<h2>7. O vazio de primeira vez</h2>
+
+<p>Há um vazio que não é problema: o da conta nova. A pessoa acabou de entrar e não tem nada cadastrado. É
+o momento em que ela mais precisa de ajuda — e o momento em que a maioria dos sistemas mostra uma tabela
+vazia. Em vez disso, use o espaço para ensinar o primeiro passo.</p>
+
+<div class="tryreact" data-goal="clique:button.exemplo;;conta:li.item=3;;texto:Sonho">
+  <p class="try-task">O botão “Carregar exemplos” está na tela, mas não faz nada. Ligue-o ao estado para
+  preencher a lista com as três encomendas de exemplo.</p>
+  <pre class="jsx">const exemplo = [
+  { id: 1, nome: "Pão francês" },
+  { id: 2, nome: "Sonho" },
+  { id: 3, nome: "Brioche" }
+];
+
+function App() {
+  const [encomendas, setEncomendas] = useState([]);
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Encomendas de hoje&lt;/h2&gt;
+      {encomendas.length === 0 ? (
+        &lt;div className="vazio"&gt;
+          &lt;p&gt;Ainda não há encomendas hoje.&lt;/p&gt;
+          &lt;button className="exemplo"&gt;Carregar exemplos&lt;/button&gt;
+        &lt;/div&gt;
+      ) : (
+        &lt;ul&gt;
+          {encomendas.map((item) =&gt; (
+            &lt;li className="item" key={item.id}&gt;{item.nome}&lt;/li&gt;
+          ))}
+        &lt;/ul&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h2&gt;Encomendas de hoje&lt;/h2&gt;
+  &lt;div class="vazio"&gt;
+    &lt;p&gt;Ainda não há encomendas hoje.&lt;/p&gt;
+    &lt;button class="exemplo"&gt;Carregar exemplos&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const exemplo = [
+  { id: 1, nome: "Pão francês" },
+  { id: 2, nome: "Sonho" },
+  { id: 3, nome: "Brioche" }
+];
+
+function App() {
+  const [encomendas, setEncomendas] = useState([]);
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Encomendas de hoje&lt;/h2&gt;
+      {encomendas.length === 0 ? (
+        &lt;div className="vazio"&gt;
+          &lt;p&gt;Ainda não há encomendas hoje.&lt;/p&gt;
+          &lt;button className="exemplo" onClick={() =&gt; setEncomendas(exemplo)}&gt;
+            Carregar exemplos
+          &lt;/button&gt;
+        &lt;/div&gt;
+      ) : (
+        &lt;ul&gt;
+          {encomendas.map((item) =&gt; (
+            &lt;li className="item" key={item.id}&gt;{item.nome}&lt;/li&gt;
+          ))}
+        &lt;/ul&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O botão troca o array vazio pelo array de exemplo, e a tela muda sozinha: o ternário passa a mostrar a
+lista. Repare que o vazio desaparece junto com a condição — não é preciso escondê-lo à mão. É a mesma
+vantagem de sempre: a tela é consequência do estado.</p>
+
+<p>Um detalhe de produto: “Carregar exemplos” é um atalho de demonstração. Num sistema real, o botão seria
+“Nova encomenda”, abrindo o formulário, ou “Importar planilha”. O importante é que o vazio tenha uma ação
+primária clara e, no máximo, uma secundária.</p>
+
+<p>Em listas de conteúdo, o vazio de primeira vez costuma vir com uma ilustração leve e uma explicação
+curta do que aquela área faz. Nada de esconder o título e a navegação: a pessoa precisa saber onde está e
+como sair. Uma imagem grande pode empurrar a ação para fora da tela no celular — prefira texto e botão, que
+funcionam em qualquer largura.</p>
+
+<h2>8. Anunciar o vazio para quem não vê</h2>
+
+<p>Uma mensagem visual resolve para quem enxerga. Para quem usa leitor de tela, é preciso mais: a região
+precisa ser anunciada quando muda. O atributo <code>role="status"</code> transforma o elemento numa região
+viva educada — o leitor anuncia o conteúdo depois que a interação termina, sem interromper o que estava
+sendo lido.</p>
+
+<pre class="file" data-file="Encomendas.jsx">&lt;p className="vazio" role="status"&gt;
+  Nada encontrado para {busca}.
+&lt;/p&gt;</pre>
+
+<p>Colocar <code>role="status"</code> numa mensagem que já está na tela desde o começo não adianta muito:
+ela é lida na ordem normal da página. O ganho aparece quando a mensagem surge depois de uma ação — digitar
+na busca, filtrar, apagar o último item. Aí o leitor de tela anuncia a mudança e a pessoa entende por que a
+lista sumiu.</p>
+
+<p>O <code>aria-live="polite"</code> faz a mesma coisa de forma explícita; o <code>role="status"</code> é
+mais curto e já traz a semântica. Evite <code>aria-live="assertive"</code> aqui: ele interrompe a leitura,
+e um “nada encontrado” não é urgência. Urgência é para erro que impede continuar.</p>
+
+<p>Por último, cuidado com duplicação: se a mensagem já está dentro de um elemento com
+<code>role="status"</code>, não repita o atributo num filho. Um anúncio por mudança basta.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: “Nenhum pedido” pisca por meio segundo</h3>
+<p>O componente testa <code>pedidos.length === 0</code> antes de saber se o pedido voltou. A tela mostra o
+vazio, o pedido chega e a lista aparece — um piscar que assusta e faz a pessoa recarregar. Teste o
+carregamento primeiro, com um estado próprio ou com <code>null</code> no lugar de <code>[]</code>.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o vazio some, mas o botão de limpar fica</h3>
+<p>A Ana colocou a mensagem dentro do bloco da lista e o botão fora, num parágrafo separado. Ao limpar a
+busca, a lista volta e o botão continua na tela, sem função. Mensagem e ação devem viver no mesmo bloco
+condicional, para aparecerem e desaparecerem juntas.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o vazio de uma tabela deixa o cabeçalho solto</h3>
+<p>Sem linhas, a tabela mostra só a faixa de títulos e parece quebrada. A correção é uma linha com
+<code>colSpan</code> e a mensagem, mantendo o cabeçalho — como você viu na aula
+<a href="tabela-de-dados.html">Tabela de Dados</a>. O título continua dando contexto; o corpo explica o
+vazio.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. A lista está vazia e a busca também não achou nada. Qual mensagem mostrar?</p>
+<label><input type="radio" name="q1"> “Nenhuma encomenda” sempre</label>
+<label><input type="radio" name="q1"> “Carregando…” sempre</label>
+<label><input type="radio" name="q1"> primeiro a de lista vazia; se houver dados, a de busca sem resultado</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. Por que não mostrar “nenhuma encomenda” durante o carregamento?</p>
+<label><input type="radio" name="q2"> porque ainda não se sabe se há encomendas</label>
+<label><input type="radio" name="q2"> porque o React não permite condicional antes do <code>map</code></label>
+<label><input type="radio" name="q2"> porque a mensagem ocupa espaço demais na tela</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. O que <code>role="status"</code> faz?</p>
+<label><input type="radio" name="q3"> mostra a mensagem em destaque</label>
+<label><input type="radio" name="q3"> faz o leitor de tela anunciar a mudança naquela região</label>
+<label><input type="radio" name="q3"> impede que a mensagem seja apagada</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a condição do vazio</h2>
+<p>Complete a condição que detecta a lista vazia antes de desenhar a mensagem.</p>
+<div class="ex-code">{encomendas.<input aria-label="resposta 1" data-answer="length === 0" placeholder="..."> ? &lt;p&gt;Nenhuma encomenda&lt;/p&gt; : &lt;ul&gt;…&lt;/ul&gt;}</div>
+<p class="ex-dica">Dica: <code>length</code> é o tamanho do array; compare com zero usando três sinais de
+igual.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Estado vazio é a tela de quando não há itens — e ele precisa ser desenhado, porque a área em branco não
+explica nada. O teste é <code>length === 0</code>, mas há quatro situações diferentes: carregando, vazio de
+verdade, vazio de filtro e erro. Teste na ordem certa e cada uma terá a mensagem que merece.</p>
+
+<p>Uma boa mensagem diz o que está vazio, por que e o que fazer. O vazio de filtro mostra o termo e oferece
+“limpar”; o de primeira vez oferece “cadastrar” ou “carregar exemplos”; o de carregamento não diz “nenhum”,
+diz “carregando”. O título da seção fica; só a lista sai.</p>
+
+<p>Para quem usa leitor de tela, <code>role="status"</code> anuncia a mudança. E lembre do desenho geral:
+o vazio é consequência do estado, não uma tela separada — quando o array muda, o ternário troca a tela
+sozinho.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Área em branco não é resposta: diga o que está vazio.</li>
+<li>Quatro situações: carregando, vazio real, filtro sem resultado e erro.</li>
+<li>Teste carregando e erro antes de testar o vazio.</li>
+<li>Use <code>length === 0</code>; esconda a lista, não o título.</li>
+<li>Mensagem = o que está vazio + por quê + o que fazer.</li>
+<li>Vazio de filtro mostra o termo e um botão para limpar.</li>
+<li>Vazio de primeira vez é convite: ação primária clara.</li>
+<li><code>role="status"</code> anuncia a mudança; <code>aria-live="polite"</code> é o equivalente.</li>
+<li>Tabela vazia usa <code>colSpan</code> para a mensagem.</li>
+<li>Estado <code>null</code> é “ainda não sei”; <code>[]</code> é “sei, está vazio”.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
