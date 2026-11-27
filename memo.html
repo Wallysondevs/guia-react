@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O memo | Guia React</title>
+<meta name="description" content="O memo na prática: o que ele compara entre um desenho e outro, por que props recriadas anulam o efeito, quando usar o comparador próprio e quando memo é exagero.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O <span class="hl">memo</span></h1>
+<p class="intro">A Ana ligou o "destacar atualizações" do React DevTools para entender por que o site
+parecia pesado, e levou um susto: cada vez que ela trocava o aviso do dia, o cardápio inteiro piscava. O
+aviso é um parágrafo; o cardápio são quarenta pães. Nesta aula ela conhece o <code>memo</code>, a
+ferramenta que segura o desenho de um componente quando nada do que ele recebe mudou — e aprende as duas
+armadilhas que fazem o <code>memo</code> não servir para nada.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que acontece com os filhos quando o componente de cima desenha de novo.</li>
+  <li>O que o <code>memo</code> compara de verdade entre um desenho e outro.</li>
+  <li>Por que uma prop recriada a cada desenho anula a proteção.</li>
+  <li>Quando o segundo argumento do <code>memo</code> resolve — e por que ele é exceção.</li>
+  <li>A diferença entre <code>memo</code> e cache: o que ele guarda (quase nada).</li>
+  <li>Como o <code>children</code> entra na comparação e por que ele costuma atrapalhar.</li>
+  <li>O que o React Compiler muda nessa história.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o cardápio piscando por causa de um aviso</h2>
+
+<p>O site da Ana tem duas partes na página inicial: o aviso do dia, que muda de tempo em tempo, e o
+cardápio, uma lista longa com preço, foto e descrição de cada pão. Quando ela troca o aviso, o cardápio
+também é redesenhado — mesmo que nenhum preço tenha mudado. No DevTools, as bordas verdes de "atualizou"
+acendem nos quarenta pães.</p>
+
+<p>Isso acontece porque, em React, quem desenha o pai desenha os filhos. O estado do aviso mora no
+componente da página; quando ele muda, a página é chamada de novo, e os filhos dela também. O React não
+sabe que o cardápio é alheio ao aviso: ele só sabe que o pai pediu para desenhar.</p>
+
+<p>Na maioria das vezes isso é bom. O React compara o resultado e mexe só no que mudou no DOM, e o custo
+é pequeno. Mas quando o filho tem uma lista grande, cálculos, ou quando o pai desenha muito por segundo (um
+campo de digitação, um relógio, um arrastar de mouse), o trabalho extra começa a aparecer: a digitação
+engasga, o ventilador liga, a animação perde quadros.</p>
+
+<p>Com um contador de desenhos dentro do cardápio, a cascata fica visível no console: uma linha por
+desenho, e uma nova a cada troca de aviso.</p>
+
+<pre class="term">desenhou o cardápio (1)
+desenhou o cardápio (2)
+desenhou o cardápio (3)</pre>
+
+<p>A pergunta desta aula é: como dizer a um componente "se as suas props forem as mesmas, não precisa
+desenhar de novo". A resposta é o <code>memo</code>, que embrulha o componente e faz essa comparação antes
+de chamá-lo.</p>
+
+<h2>2. O que o React faz quando o pai desenha</h2>
+
+<p>Vale entender o caminho antes da ferramenta. Quando o estado de um componente muda, o React chama
+aquele componente e monta a árvore de elementos de novo. Para cada filho encontrado, ele chama o filho
+também — afinal, a prop do filho pode ter mudado. Isso vale até alguém barrar a descida.</p>
+
+<dl class="anatomy">
+<dt>desenho</dt>
+<dd>Uma execução da função do componente. Nesta aula, contar desenhos é como a Ana mede o problema.</dd>
+<dt>cascata</dt>
+<dd>Quando o pai desenha, os filhos desenham junto. Ninguém pergunta ao filho se ele quer.</dd>
+<dt>props</dt>
+<dd>O que o filho recebe. São elas que o <code>memo</code> olha, uma a uma.</dd>
+<dt><code>memo</code></dt>
+<dd>A função que embrulha um componente e devolve outro: antes de desenhar, ele compara as props.</dd>
+<dt>comparação rasa</dt>
+<dd>Comparar cada prop com <code>Object.is</code>, sem entrar no conteúdo dos objetos.</dd>
+</dl>
+
+<p>A comparação rasa é a chave de quase todos os mal-entendidos da aula. O <code>memo</code> não olha
+dentro do objeto para ver se o conteúdo é igual: ele olha se é o <strong>mesmo</strong> objeto. Um array
+novo com os mesmos elementos é outro array; uma função nova com o mesmo corpo é outra função. Do ponto de
+vista da comparação, mudaram.</p>
+
+<p>E o que o <code>memo</code> faz quando as props são as mesmas? Ele reaproveita o resultado do desenho
+anterior. Não existe uma "atualização parcial" aqui: o componente inteiro é pulado. Por isso o
+<code>memo</code> só faz sentido quando o componente não depende de nada além das props — se ele lê um
+contexto, por exemplo, ele continua sendo atualizado pelo contexto.</p>
+
+<h2>3. <code>memo</code>: as props iguais, o desenho pule</h2>
+
+<p>Na caixa, o cardápio conta os próprios desenhos em uma variável de módulo. Isso é de propósito: um
+contador em estado faria o próprio componente desenhar, e a medida ficaria contaminada. A lista de pães vem
+de uma constante de módulo, então a prop é sempre a mesma referência. Clique em <strong>Trocar
+aviso</strong> e veja o número subir.</p>
+
+<div class="tryreact" data-goal="clique:#trocar;;texto:desenhos do cardápio: 1">
+  <p class="try-task">O cardápio desenha de novo a cada troca de aviso, mesmo recebendo a mesma lista.
+  Embrulhe <code>Cardapio</code> com <code>memo(...)</code> e faça o número continuar em 1 depois do
+  clique.</p>
+  <pre class="jsx">const PAES = ["pão francês", "pão de queijo", "sonho"];
+
+let desenhos = 0;
+
+function Cardapio({ paes }) {
+  desenhos = desenhos + 1;
+  return (
+    &lt;p&gt;desenhos do cardápio: {desenhos} com {paes.length} pães&lt;/p&gt;
+  );
+}
+
+function App() {
+  const [aviso, setAviso] = useState("Padaria aberta");
+
+  return (
+    &lt;div&gt;
+      &lt;button id="trocar" onClick={() =&gt; setAviso("Forno quente até as 10h")}&gt;
+        Trocar aviso
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;Cardapio paes={PAES} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="trocar"&gt;Trocar aviso&lt;/button&gt;
+  &lt;p&gt;Padaria aberta&lt;/p&gt;
+  &lt;p&gt;desenhos do cardápio: 1 com 3 pães&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const PAES = ["pão francês", "pão de queijo", "sonho"];
+
+let desenhos = 0;
+
+const Cardapio = memo(function Cardapio({ paes }) {
+  desenhos = desenhos + 1;
+  return (
+    &lt;p&gt;desenhos do cardápio: {desenhos} com {paes.length} pães&lt;/p&gt;
+  );
+});
+
+function App() {
+  const [aviso, setAviso] = useState("Padaria aberta");
+
+  return (
+    &lt;div&gt;
+      &lt;button id="trocar" onClick={() =&gt; setAviso("Forno quente até as 10h")}&gt;
+        Trocar aviso
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;Cardapio paes={PAES} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel inicial mostra <code>desenhos do cardápio: 1</code> porque o componente desenhou uma vez na
+montagem. Depois do clique, o número vai para 2 no código antigo e fica em 1 na solução. Nada mudou na tela
+além do aviso, e o cardápio não teve trabalho.</p>
+
+<p>Repare na forma: <code>memo</code> recebe a função do componente e devolve um componente novo. Por isso
+a variável precisa ser atribuída (<code>const Cardapio = memo(...)</code>) e a função interna precisa ter
+nome — o nome aparece no DevTools e nas mensagens de erro. Chamar <code>memo(Cardapio)</code> sem guardar
+o resultado é um erro comum: o componente original continua sendo usado e nada muda.</p>
+
+<p>E a comparação é com as props <em>atuais</em> contra as do desenho anterior. Se o pai passar
+<code>paes={PAES}</code> nas duas vezes, é o mesmo array, e a comparação passa. Se o pai passar
+<code>paes={[...PAES]}</code>, é outro array e o <code>memo</code> libera o desenho — que é exatamente o
+assunto da próxima seção.</p>
+
+<h2>4. A prop recriada anula o <code>memo</code></h2>
+
+<p>Aqui a Ana caiu na armadilha que derruba a maioria das tentativas de otimização. Ela embrulhou o
+cardápio com <code>memo</code> e continuou vendo o número subir. A causa estava na chamada:
+<code>&lt;Cardapio config={{ titulo: "Pães de hoje" }} /&gt;</code>. O objeto é criado no corpo do
+<code>App</code>, então cada desenho do pai produz um objeto novo — com o mesmo conteúdo, mas outra
+identidade.</p>
+
+<p>A comparação rasa vê dois objetos diferentes e conclui "mudou". Do ponto de vista do React, está certa:
+ele não tem como saber que o conteúdo é igual sem entrar objeto adentro, e entrar custaria caro. Quem
+escreveu a chamada precisa entregar a mesma referência.</p>
+
+<div class="tryreact" data-goal="clique:#trocar;;texto:desenhos do cardápio: 1">
+  <p class="try-task">O cardápio já está com <code>memo</code>, mas o <code>App</code> cria um objeto novo
+  a cada desenho. Tire a criação do corpo do componente — deixe a configuração em uma constante de módulo
+  — e faça o número continuar em 1 depois do clique.</p>
+  <pre class="jsx">let desenhos = 0;
+
+const Cardapio = memo(function Cardapio({ config }) {
+  desenhos = desenhos + 1;
+  return &lt;p&gt;desenhos do cardápio: {desenhos} ({config.titulo})&lt;/p&gt;;
+});
+
+function App() {
+  const [aviso, setAviso] = useState("Padaria aberta");
+
+  return (
+    &lt;div&gt;
+      &lt;button id="trocar" onClick={() =&gt; setAviso("Forno quente até as 10h")}&gt;
+        Trocar aviso
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;Cardapio config={{ titulo: "Pães de hoje" }} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="trocar"&gt;Trocar aviso&lt;/button&gt;
+  &lt;p&gt;Padaria aberta&lt;/p&gt;
+  &lt;p&gt;desenhos do cardápio: 1 ( Pães de hoje )&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const CONFIG = { titulo: "Pães de hoje" };
+
+let desenhos = 0;
+
+const Cardapio = memo(function Cardapio({ config }) {
+  desenhos = desenhos + 1;
+  return &lt;p&gt;desenhos do cardápio: {desenhos} ({config.titulo})&lt;/p&gt;;
+});
+
+function App() {
+  const [aviso, setAviso] = useState("Padaria aberta");
+
+  return (
+    &lt;div&gt;
+      &lt;button id="trocar" onClick={() =&gt; setAviso("Forno quente até as 10h")}&gt;
+        Trocar aviso
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;Cardapio config={CONFIG} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois do clique, o código antigo mostra <code>desenhos do cardápio: 2</code>; a solução continua em 1.
+A correção mais simples nem passa por otimização: em vez de um objeto, mande as props soltas —
+<code>&lt;Cardapio titulo="Pães de hoje" /&gt;</code> — e a comparação trabalha com textos, que são iguais
+por valor.</p>
+
+<p>Vale a mesma lógica para funções. <code>aoEscolher={() =&gt; setEscolhido(p)}</code> cria uma função
+nova a cada desenho do pai, e o <code>memo</code> do filho deixa de valer. A ferramenta para estabilizar a
+função é o <code>useCallback</code>, assunto da aula de <em>useCallback na prática</em>, e para
+estabilizar objetos e arrays é o <code>useMemo</code>, da aula de <em>useMemo na prática</em>. Aqui basta
+saber que, sem props estáveis, o <code>memo</code> não tem o que proteger.</p>
+
+<h2>5. O comparador próprio</h2>
+
+<p>Existe uma saída quando a prop é um objeto que você não consegue estabilizar — porque vem de uma busca,
+de uma lista, de um cálculo. O <code>memo</code> aceita um segundo argumento: uma função que recebe as
+props antigas e as novas e devolve <code>true</code> quando podem ser consideradas iguais. É o comparador
+próprio.</p>
+
+<div class="tryreact" data-goal="clique:#trocar;;texto:ficha desenhada: 1">
+  <p class="try-task">A ficha recebe um objeto novo a cada desenho. Passe um comparador como segundo
+  argumento do <code>memo</code>, que devolve verdadeiro quando <code>pao.nome</code> e
+  <code>pao.preco</code> são iguais, e faça o número continuar em 1 depois do clique.</p>
+  <pre class="jsx">const PAES = [
+  { nome: "pão de queijo", preco: 4 },
+  { nome: "sonho", preco: 6 },
+];
+
+let desenhos = 0;
+
+const Ficha = memo(function Ficha({ pao }) {
+  desenhos = desenhos + 1;
+  return &lt;p&gt;ficha desenhada: {desenhos} ({pao.nome})&lt;/p&gt;;
+});
+
+function App() {
+  const [aviso, setAviso] = useState("Padaria aberta");
+  const escolhido = PAES[0];
+
+  return (
+    &lt;div&gt;
+      &lt;button id="trocar" onClick={() =&gt; setAviso("Forno quente até as 10h")}&gt;
+        Trocar aviso
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;Ficha pao={{ nome: escolhido.nome, preco: escolhido.preco }} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="trocar"&gt;Trocar aviso&lt;/button&gt;
+  &lt;p&gt;Padaria aberta&lt;/p&gt;
+  &lt;p&gt;ficha desenhada: 1 ( pão de queijo )&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const PAES = [
+  { nome: "pão de queijo", preco: 4 },
+  { nome: "sonho", preco: 6 },
+];
+
+let desenhos = 0;
+
+const Ficha = memo(
+  function Ficha({ pao }) {
+    desenhos = desenhos + 1;
+    return &lt;p&gt;ficha desenhada: {desenhos} ({pao.nome})&lt;/p&gt;;
+  },
+  (antes, agora) =&gt; antes.pao.nome === agora.pao.nome
+);
+
+function App() {
+  const [aviso, setAviso] = useState("Padaria aberta");
+  const escolhido = PAES[0];
+
+  return (
+    &lt;div&gt;
+      &lt;button id="trocar" onClick={() =&gt; setAviso("Forno quente até as 10h")}&gt;
+        Trocar aviso
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;Ficha pao={{ nome: escolhido.nome, preco: escolhido.preco }} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel inicial mostra uma ficha; depois do clique, o código antigo mostra duas e a solução continua em
+uma. O comparador rodou, viu que o nome era o mesmo e disse "pode pular".</p>
+
+<p>Use com parcimônia, e por três razões. A primeira é que o comparador é seu código rodando em todo
+desenho — se ele ficar caro, você trocou um problema por outro. A segunda é que ele é fácil de errar: se
+você comparar só o nome, a ficha deixa de atualizar quando o preço muda, e o bug aparece semanas depois. A
+terceira é que ele esconde a causa: em vez de ensinar o componente de cima a mandar props estáveis, ele
+contorna. A documentação do React chama isso de saída de emergência, e a expressão é justa.</p>
+
+<pre class="term">desenhou o cardápio (2)
+comparador: mesmo nome, pulando o desenho</pre>
+
+<h2>6. <code>memo</code> não é cache</h2>
+
+<p>O nome engana. Um cache guarda um resultado para não calcular de novo; o <code>memo</code> guarda o
+resultado do <em>último desenho</em> do componente e compara as props para decidir se pode reaproveitá-lo.
+Não existe uma tabela de resultados por combinação de props: se a prop mudar e voltar, o componente desenha
+de novo.</p>
+
+<p>Também não existe garantia. O React pode descartar o resultado guardado quando quiser — por exemplo, ao
+liberar memória. A documentação diz que <code>memo</code> é uma otimização de desempenho, não uma promessa
+de comportamento. Nenhuma regra do seu site pode depender de "esse componente não desenhou".</p>
+
+<p>E ele custa alguma coisa: comparar props a cada desenho do pai. Para um componente que recebe duas
+props primitivas, a comparação é barata e o ganho pode ser real. Para um componente que desenha dois
+parágrafos, comparar três props e pular o desenho pode sair mais caro do que desenhar. Como sempre, medir
+primeiro: a aba Profiler do React DevTools mostra quanto cada componente levou e quantas vezes desenhou. E
+vale separar os dois problemas: se o custo está na conta, e não no desenho, a ferramenta é o
+<a href="useMemo.html">useMemo</a>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Prop recebida</th><th>A comparação do <code>memo</code></th><th>Resultado</th></tr>
+<tr><td>texto ou número igual</td><td>igual por valor</td><td>pula o desenho</td></tr>
+<tr><td>array ou objeto de módulo</td><td>mesma referência</td><td>pula o desenho</td></tr>
+<tr><td>objeto criado no corpo do pai</td><td>referência nova</td><td>desenha de novo</td></tr>
+<tr><td>função criada no corpo do pai</td><td>referência nova</td><td>desenha de novo</td></tr>
+<tr><td>elemento JSX passado em <code>children</code></td><td>elemento novo a cada desenho</td><td>desenha de novo</td></tr>
+</table>
+</div>
+
+<p>A última linha é a que mais surpreende, e ela merece a próxima seção: quando você escreve
+<code>&lt;Moldura&gt;&lt;p&gt;oi&lt;/p&gt;&lt;/Moldura&gt;</code>, o <code>&lt;p&gt;oi&lt;/p&gt;</code> é
+um objeto criado no desenho do pai. Para o <code>memo</code> da moldura, é uma prop nova toda vez.</p>
+
+<h2>7. O <code>children</code> e a moldura</h2>
+
+<p>Um componente que recebe <code>children</code> está recebendo elementos, não texto. Cada desenho do pai
+cria aqueles elementos outra vez, mesmo que o JSX seja idêntico. Então <code>memo</code> em cima de um
+layout com <code>children</code> costuma não servir para nada — o que não quer dizer que o layout esteja
+errado; quer dizer que a proteção do <code>memo</code> não é a ferramenta para ele.</p>
+
+<p>Há três saídas, e vale conhecer as três para escolher com calma. A primeira é estabilizar o elemento do
+filho com <code>useMemo</code> no pai, o que mantém a mesma referência enquanto as dependências não mudam —
+o assunto da <a href="use-memo-na-pratica.html">aula seguinte</a>. A segunda é separar o que muda do que
+não muda: em vez de um layout com
+<code>children</code>, um layout com props estáveis e o conteúdo desenhado por dentro, recebendo a página
+por um componente que já estava memoizado. A terceira é aceitar: se o layout desenha pouco, o
+<code>memo</code> nele é ruído.</p>
+
+<p>Uma observação que evita confusão: <code>memo</code> em um componente que tem estado próprio não
+impede o estado de funcionar. Um botão memoizado que guarda "quantas vezes fui clicado" continua
+atualizando quando o clique acontece; o que ele pula é o desenho causado pelo <em>pai</em>. As duas coisas
+são independentes.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você vê</th><th>Causa provável</th><th>Conserto</th></tr>
+<tr><td>o componente memoizado desenha sempre</td><td>prop objeto ou função recriada no pai</td><td>estabilizar com <code>useMemo</code>/<code>useCallback</code> ou mandar primitivas</td></tr>
+<tr><td>o componente memoizado nunca atualiza</td><td>comparador próprio olhando o campo errado</td><td>comparar todas as props usadas</td></tr>
+<tr><td>o layout com <code>memo</code> desenha sempre</td><td><code>children</code> é elemento novo</td><td>memoizar o elemento no pai ou não usar <code>memo</code> ali</td></tr>
+<tr><td>nada melhorou</td><td>o filho desenha pouco: comparação custa mais</td><td>medir no Profiler e remover o <code>memo</code></td></tr>
+</table>
+</div>
+
+<h2>8. O React Compiler e o fim do <code>memo</code> manual</h2>
+
+<p>O React 19 trouxe uma promessa que muda a conversa: o <strong>React Compiler</strong>, um plugin que
+analisa os componentes e insere a memoização automática onde ela faz sentido. Com ele ligado, você escreve
+o código do jeito natural e o compilador cuida de pular o que não mudou — incluindo o caso do
+<code>memo</code>, do <code>useMemo</code> e do <code>useCallback</code>.</p>
+
+<p>Vale ser preciso: o compilador <strong>não</strong> vem ligado por padrão no React 19. Ele é uma
+ferramenta separada, que se configura no projeto — o projeto criado pelo Vite não o traz. Mas a direção é
+clara, e a documentação já recomenda tratar <code>memo</code>, <code>useMemo</code> e
+<code>useCallback</code> como recursos de exceção, para quando a medição mostrar que precisa.</p>
+
+<p>Então por que aprender <code>memo</code> hoje? Porque você vai encontrar código com ele em todo lugar,
+porque entender a comparação de props explica uma família de bugs (o componente que "não atualiza" e o que
+"atualiza demais"), e porque saber quando não usar é metade do trabalho. O instinto saudável é: primeiro
+escreva claro, meça, e só depois embrulhe.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o componente memoizado não atualiza</h3>
+<p>A Ana embrulhou o resumo do pedido com <code>memo</code> e ele parou de acompanhar o total. O
+comparador próprio estava olhando só a quantidade de itens, e o total mudava com o preço. É o risco do
+comparador: você assume a responsabilidade de listar o que importa. Na dúvida, não escreva comparador; se
+escrever, compare todas as props que o componente usa.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a lista com cinquenta itens que trava a digitação</h3>
+<p>O campo de busca do topo atualiza a cada tecla e a lista de cinquenta cards redesenha junto. Embrulhar
+cada card com <code>memo</code> resolve metade: os cards cujas props não mudaram são pulados. A outra
+metade é o array filtrado, que precisa de identidade estável — é onde entra o <code>useMemo</code>. E se a
+digitação continuar pesada, o assunto passa a ser <code>useDeferredValue</code> ou uma lista virtualizada.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: <code>memo</code> em tudo e o site igual</h3>
+<p>Embrulhar todos os componentes "por garantia" não melhora nada e atrapalha a leitura: cada
+<code>memo</code> esconde uma decisão que ninguém mediu. Pior, o comparador de cada um custa tempo em todo
+desenho. Se o Profiler não mostra um problema, a otimização certa é nenhuma.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. O que o <code>memo</code> compara?</p>
+<label><input type="radio" name="q1"> o HTML gerado no desenho anterior</label>
+<label><input type="radio" name="q1"> o estado interno do componente</label>
+<label><input type="radio" name="q1"> cada prop com a do desenho anterior, por referência</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. Por que um objeto criado no corpo do pai anula o <code>memo</code>?</p>
+<label><input type="radio" name="q2"> porque cada desenho cria um objeto novo, com outra referência</label>
+<label><input type="radio" name="q2"> porque o React não aceita objetos como prop</label>
+<label><input type="radio" name="q2"> porque o objeto muda de conteúdo sozinho</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. Quando o segundo argumento do <code>memo</code> é uma boa ideia?</p>
+<label><input type="radio" name="q3"> sempre: ele deixa a comparação mais rápida</label>
+<label><input type="radio" name="q3"> quando a prop é um objeto que não dá para estabilizar e o comparador olha os campos certos</label>
+<label><input type="radio" name="q3"> quando o componente tem estado próprio</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a comparação certa</h2>
+<p>Complete o comparador de uma ficha que só deve redesenhar quando o preço mudar:</p>
+<div class="ex-code">const Ficha = memo(FichaBase, (antes, agora) =&gt; antes.pao.preco === agora.pao.<input aria-label="resposta 1" data-answer="preco" placeholder="...">);</div>
+<p class="ex-dica">Dica: é o campo que você quer comparar nos dois lados — o mesmo nome que aparece em
+<code>antes.pao.preco</code>.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Quando o pai desenha, os filhos desenham junto. O <code>memo</code> embrulha um componente e, antes de
+chamá-lo, compara as props atuais com as do desenho anterior, uma por uma, por referência. Se todas forem
+iguais, o desenho é pulado. Se alguma mudou — inclusive um objeto ou uma função recriada no corpo do pai —
+o componente desenha normalmente.</p>
+
+<p>O segundo argumento permite escrever a comparação à mão. É útil quando a prop é um objeto que não dá
+para estabilizar, e é perigoso quando você esquece de comparar o que importa: o componente para de
+atualizar e o bug demora a aparecer. Antes de chegar nele, prefira props primitivas, constantes de módulo,
+<code>useMemo</code> para valores e <code>useCallback</code> para funções.</p>
+
+<p>E lembre que <code>memo</code> é otimização, não regra de negócio: pode ser descartado quando o React
+quiser, custa uma comparação a cada desenho e, com o React Compiler no horizonte, tende a virar exceção.
+Escreva claro, meça no Profiler, e só então embrulhe.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Pai que desenha faz os filhos desenharem.</li>
+<li><code>memo</code> compara props por referência (<code>Object.is</code>), uma a uma.</li>
+<li>Props iguais: o desenho do componente é pulado inteiro.</li>
+<li>Objeto, array ou função recriados no pai: a comparação falha e o <code>memo</code> não ajuda.</li>
+<li>Prefira props primitivas e constantes de módulo à saída do comparador.</li>
+<li>Comparador próprio é saída de emergência: compare tudo o que o componente usa.</li>
+<li><code>memo</code> não guarda cache de resultados e pode ser descartado pelo React.</li>
+<li>Estado interno continua funcionando em componente memoizado.</li>
+<li><code>children</code> é elemento novo a cada desenho: <code>memo</code> em cima dele raramente serve.</li>
+<li>O React Compiler memoiza sozinho — e não vem ligado por padrão no React 19.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

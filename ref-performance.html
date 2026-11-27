@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Performance | Guia React</title>
+<meta name="description" content="Consulta sobre performance em React: medir antes, por que o componente redesenha, memo, useMemo, useCallback, listas grandes, prioridade e custo fora do React.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Performance</span></h1>
+<p class="intro">“Está lento” é um sintoma, não um diagnóstico. A tela da Ana trava ao digitar na busca, o
+catálogo demora a abrir e o painel de pedidos pisca a cada clique — três problemas diferentes, com três
+consertos diferentes. Esta página é a consulta: como descobrir qual é o seu caso, quais ferramentas existem e,
+principalmente, quando <em>não</em> usá-las.</p>
+
+<div class="note">
+<strong>Como usar esta página</strong>
+<ul>
+  <li>Se você ainda não sabe qual é o gargalo, comece pela seção 1 e meça.</li>
+  <li>A seção 2 responde “por que isso desenhou de novo?”; a 3, “qual hook eu uso?”.</li>
+  <li>As duas caixas rodam com React 19 e contam desenhos: edite, clique em Rodar e leia o painel.</li>
+  <li>Otimização sem medida custa código e não ganha tempo — a seção 8 é sobre isso.</li>
+</ul>
+</div>
+
+<h2>1. Medir antes de mexer</h2>
+
+<p>O navegador tem um cronômetro e o React tem um gravador. Antes de qualquer hook de otimização, vale
+responder a três perguntas: o tempo está no <em>desenho</em> (o seu código rodando), no <em>commit</em> (o
+React escrevendo no DOM) ou fora do React (rede, imagem, fonte)? Cada resposta leva a um conserto
+diferente.</p>
+
+<pre class="file" data-file="Busca.jsx">console.time("filtrar");
+const filtrados = paes.filter((p) =&gt; p.nome.includes(texto));
+console.timeEnd("filtrar");</pre>
+
+<p>O <code>console.time</code> mede um trecho e imprime no console do navegador. Para ver o desenho inteiro,
+o caminho é o React DevTools, aba <em>Profiler</em>: ele grava uma sessão, mostra cada componente que desenhou
+e quanto tempo levou. Para ver o que o navegador faz além do React, o painel <em>Performance</em> do DevTools
+mostra a linha do tempo com script, estilo, layout e pintura.</p>
+
+<pre class="term">filtrar: 12.4 ms
+desenhar lista: 320.8 ms</pre>
+
+<p>Nesse exemplo imaginário, o filtro custa 12 ms e o desenho da lista custa 320 ms. Otimizar o filtro com
+<code>useMemo</code> ganharia 12 ms; reduzir o número de itens desenhados ganharia 300. A medida decide — e é
+por isso que “adicione <code>memo</code> em tudo” costuma dar trabalho e nenhum ganho.</p>
+
+<dl class="anatomy">
+<dt>desenho</dt>
+<dd>A execução do corpo dos componentes. É onde o seu código roda, calcula e devolve JSX.</dd>
+<dt>commit</dt>
+<dd>A fase em que o React compara o resultado novo com o anterior e escreve no DOM só o que mudou.</dd>
+<dt>redesenho</dt>
+<dd>Um novo desenho de um componente que já estava na tela. Não é erro: é o mecanismo normal do React.</dd>
+<dt>memoização</dt>
+<dd>Guardar o resultado de um cálculo ou de um desenho para reaproveitar quando as entradas não mudaram.</dd>
+<dt>identidade</dt>
+<dd>A referência de um valor. É o que <code>memo</code>, <code>useMemo</code> e <code>useCallback</code>
+comparam para decidir se reaproveitam.</dd>
+<dt>profiler</dt>
+<dd>A ferramenta que grava os desenhos e mostra quem desenhou, quantas vezes e por quanto tempo.</dd>
+</dl>
+
+<p>Uma ressalva de ambiente: em modo de desenvolvimento o React faz trabalho extra para ajudar a achar
+problemas — desenha duas vezes de propósito, por exemplo. Medir em desenvolvimento e concluir sobre produção
+é receita para otimizar o que não existe. A aula <a href="build-de-producao.html">Build de Produção</a> mostra
+a diferença, e a <a href="medindo-performance.html">Medindo Performance</a> ensina a ler o Profiler linha por
+linha.</p>
+
+<h2>2. Por que um componente redesenha</h2>
+
+<p>Todo redesenho tem uma causa, e são poucas: o próprio estado mudou, uma prop mudou, o pai desenhou de novo,
+o contexto mudou de identidade, ou o componente foi remontado porque a <code>key</code> mudou. Descobrir qual
+delas é o trabalho — o conserto vem depois e costuma ser óbvio.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Causa</th><th>Como confirmar</th><th>Saída</th></tr>
+<tr><td>estado do próprio componente</td><td>o desenho acontece logo depois do seu clique ou digitação</td><td>é o esperado: nada a fazer</td></tr>
+<tr><td>prop nova do pai</td><td>o pai também desenhou no mesmo instante</td><td><code>memo</code>, ou subir menos estado</td></tr>
+<tr><td>pai desenhou e a prop é igual</td><td>a prop é objeto, array ou função recriada no JSX</td><td><code>useMemo</code>, <code>useCallback</code> ou <code>memo</code></td></tr>
+<tr><td>contexto mudou</td><td>o componente não recebe prop nenhuma e desenha junto com o provider</td><td>valor estável, ou canais separados — <a href="ref-contexto.html">Contexto</a></td></tr>
+<tr><td><code>key</code> mudou</td><td>o estado do item some e volta ao inicial</td><td>chave vinda do dado, estável — <a href="chaves-estaveis.html">Chaves Estáveis</a></td></tr>
+</table>
+</div>
+
+<p>A quarta linha é a que mais surpreende: um componente que só lê contexto redesenha mesmo sem prop nenhuma,
+e <code>memo</code> não o segura. O valor publicado muda de identidade a cada desenho do provider, e todos os
+assinantes voltam. A saída está em <a href="ref-contexto.html">Contexto</a>: primitivo quando der,
+<code>useMemo</code> quando depender de estado, canais separados por assunto.</p>
+
+<p>A quinta linha é a campeã de bugs disfarçados de lentidão: <code>key={Math.random()}</code> ou
+<code>key={indice}</code> em lista que reordena remonta os itens, perde estado e multiplica trabalho. Antes de
+otimizar qualquer lista, confira as chaves — a aula <a href="chaves-estaveis.html">Chaves Estáveis</a> mostra
+o teste de três perguntas.</p>
+
+<h2>3. O trio: memo, useMemo e useCallback</h2>
+
+<p>As três ferramentas fazem a mesma coisa em lugares diferentes: guardam algo entre desenhos e reaproveitam
+quando as entradas não mudaram. A pergunta certa não é “qual usar”, é “o que eu quero reaproveitar”.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ferramenta</th><th>O que guarda</th><th>Ajuda quando</th><th>Atrapalha quando</th></tr>
+<tr><td><code>memo</code></td><td>o resultado do desenho de um componente</td><td>o pai desenha muito e as props do filho raramente mudam</td><td>as props são objeto ou função recriada a cada desenho — <a href="memo.html">O memo</a></td></tr>
+<tr><td><code>useMemo</code></td><td>o resultado de um cálculo</td><td>o cálculo é caro e depende de pouca coisa</td><td>o cálculo é uma conta de duas linhas — <a href="useMemo.html">O useMemo</a></td></tr>
+<tr><td><code>useCallback</code></td><td>a identidade de uma função</td><td>a função é prop de componente com <code>memo</code> ou dependência de efeito</td><td>a função não vai para lugar nenhum — <a href="useCallback.html">O useCallback</a></td></tr>
+</table>
+</div>
+
+<p>O par <code>memo</code> mais <code>useCallback</code> anda junto por um motivo simples: <code>memo</code>
+compara props por referência, e uma função escrita no JSX é nova a cada desenho. Sem estabilizar a função,
+<code>memo</code> nunca encontra props iguais e o componente desenha sempre.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Desenhos da lista: 1">
+  <p class="try-task">A <code>Lista</code> está embrulhada em <code>memo</code>, mas recebe uma função nova a
+  cada desenho. Guarde o manipulador com
+  <code>const aoClicar = useCallback(() =&gt; setPaes((n) =&gt; n + 1), [])</code> e passe
+  <code>aoClicar={aoClicar}</code>.</p>
+  <pre class="jsx">let desenhos = 0;
+
+const Lista = memo(function Lista({ aoClicar }) {
+  desenhos = desenhos + 1;
+  return (
+    &lt;div&gt;
+      &lt;button onClick={aoClicar}&gt;Somar pão&lt;/button&gt;
+      &lt;p&gt;Desenhos da lista: {desenhos}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+});
+
+function App() {
+  const [paes, setPaes] = useState(0);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Pães: {paes}&lt;/p&gt;
+      &lt;Lista aoClicar={() =&gt; setPaes((n) =&gt; n + 1)} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Pães: 0&lt;/p&gt;
+  &lt;div&gt;
+    &lt;button&gt;Somar pão&lt;/button&gt;
+    &lt;p&gt;Desenhos da lista: 1&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">let desenhos = 0;
+
+const Lista = memo(function Lista({ aoClicar }) {
+  desenhos = desenhos + 1;
+  return (
+    &lt;div&gt;
+      &lt;button onClick={aoClicar}&gt;Somar pão&lt;/button&gt;
+      &lt;p&gt;Desenhos da lista: {desenhos}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+});
+
+function App() {
+  const [paes, setPaes] = useState(0);
+  const aoClicar = useCallback(() =&gt; setPaes((n) =&gt; n + 1), []);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Pães: {paes}&lt;/p&gt;
+      &lt;Lista aoClicar={aoClicar} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique uma vez antes de consertar: o contador da lista vai a 2. O número de pães mudou, mas nada na lista
+mudou — ela desenhou porque a prop mudou. Depois do <code>useCallback</code>, o contador fica em 1 e o número
+de pães continua subindo. O <code>memo</code> funcionou porque encontrou a mesma função.</p>
+
+<p>Vale saber quando o <code>memo</code> realmente paga. Ele brilha em componente que desenha muito e
+recebe pouca coisa: uma tabela de duzentas linhas em que cada linha é um componente memoizado, e a página
+inteira desenha a cada tecla de um campo de busca que mora no topo. Ele não ajuda em componente que já desenha
+pouco, nem em componente que recebe <code>children</code> — nesse caso o elemento filho é recriado a cada
+desenho do pai e a comparação falha, a menos que o pai também esteja memoizado.</p>
+
+<p>Um cuidado com a lista de dependências: <code>useCallback(fn, [])</code> congela a função com os valores do
+primeiro desenho. Se a função usa <code>paes</code> do estado, ela vai ler o valor antigo para sempre. Nessas
+horas, use a forma de atualização (<code>setPaes((n) =&gt; n + 1)</code>) e mantenha a lista vazia, ou declare
+a dependência e aceite que a função muda. A aula <a href="use-callback-na-pratica.html">useCallback na
+Prática</a> compara os dois caminhos.</p>
+
+<h2>4. Identidade: o que quebra a memoização</h2>
+
+<p><code>useMemo</code> guarda o resultado de um cálculo e só refaz quando alguma dependência muda. O ganho
+aparece quando o componente desenha por outros motivos — outro estado, uma digitação, um contador — e o
+cálculo poderia ser reaproveitado.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Cálculos: 1">
+  <p class="try-task">Cada clique em “Atualizar” refaz o filtro, que aqui conta quantas vezes rodou. Envolva a
+  conta com <code>useMemo(() =&gt; { ... }, [texto])</code>, deixando o incremento dentro da função do
+  <code>useMemo</code>.</p>
+  <pre class="jsx">let calculos = 0;
+const paes = ["Pão francês", "Pão de queijo", "Baguete"];
+
+function App() {
+  const [texto, setTexto] = useState("pão");
+  const [cliques, setCliques] = useState(0);
+
+  calculos = calculos + 1;
+  const filtrados = paes.filter((p) =&gt;
+    p.toLowerCase().includes(texto.toLowerCase())
+  );
+
+  return (
+    &lt;div&gt;
+      &lt;input value={texto} onChange={(e) =&gt; setTexto(e.target.value)} /&gt;
+      &lt;button onClick={() =&gt; setCliques(cliques + 1)}&gt;Atualizar&lt;/button&gt;
+      &lt;p&gt;Cálculos: {calculos}&lt;/p&gt;
+      &lt;ul&gt;
+        {filtrados.map((p) =&gt; (
+          &lt;li key={p}&gt;{p}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input value="pão"&gt;
+  &lt;button&gt;Atualizar&lt;/button&gt;
+  &lt;p&gt;Cálculos: 1&lt;/p&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Pão francês&lt;/li&gt;
+    &lt;li&gt;Pão de queijo&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">let calculos = 0;
+const paes = ["Pão francês", "Pão de queijo", "Baguete"];
+
+function App() {
+  const [texto, setTexto] = useState("pão");
+  const [cliques, setCliques] = useState(0);
+
+  const filtrados = useMemo(() =&gt; {
+    calculos = calculos + 1;
+    return paes.filter((p) =&gt;
+      p.toLowerCase().includes(texto.toLowerCase())
+    );
+  }, [texto]);
+
+  return (
+    &lt;div&gt;
+      &lt;input value={texto} onChange={(e) =&gt; setTexto(e.target.value)} /&gt;
+      &lt;button onClick={() =&gt; setCliques(cliques + 1)}&gt;Atualizar&lt;/button&gt;
+      &lt;p&gt;Cálculos: {calculos}&lt;/p&gt;
+      &lt;ul&gt;
+        {filtrados.map((p) =&gt; (
+          &lt;li key={p}&gt;{p}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Antes do conserto, o primeiro clique leva o contador a 2: o filtro rodou de novo sem que o texto tivesse
+mudado. Depois, o clique atualiza o contador de cliques e o filtro fica guardado. Digitar no campo continua
+recalculando, como deve — a dependência é <code>texto</code>.</p>
+
+<p>O erro de identidade mais comum em <code>memo</code> é passar objeto ou array escrito no JSX:
+<code>&lt;Item dados={ nome: pao } /&gt;</code> cria um objeto novo a cada desenho do pai, e a
+comparação falha. O conserto é passar primitivos (<code>nome={pao.nome}</code>), criar o objeto fora, ou
+guardar com <code>useMemo</code>. O mesmo vale para <code>style</code> e para listas de dependência de
+efeito.</p>
+
+<p>Há um caso em que nada disso resolve: o componente desenha porque o <strong>pai</strong> desenhou e o pai é
+o <code>App</code>, que guarda estado que muda a cada tecla. A saída é mover o estado para baixo, perto de
+quem usa — o padrão que a aula <a href="quando-quebrar-em-componentes.html">Quando Quebrar em Componentes</a>
+chama de “estado no lugar mais baixo possível”. Mover estado ganha mais que memoizar.</p>
+
+<h2>5. Listas grandes</h2>
+
+<p>Lista é o caso em que otimização tem retorno evidente, porque o custo cresce com o número de itens. A
+ordem de ataque é sempre a mesma: desenhar menos, desenhar por perto, desenhar sem recalcular.</p>
+
+<p><strong>Desenhar menos</strong> é paginar ou cortar com “carregar mais”. Muda o produto, não só o código, e
+resolve de vez — a aula <a href="paginacao.html">Paginação</a> faz a conta do corte e a
+<a href="ref-listas.html">Listas</a> resume as opções. <strong>Desenhar por perto</strong> é a janela
+virtual: só os itens visíveis viram DOM, com um trilho do tamanho total para a barra de rolagem não mentir —
+aula <a href="listas-grandes.html">Listas Grandes</a>. <strong>Desenhar sem recalcular</strong> é
+<code>useMemo</code> no filtro e <code>memo</code> no item, o que só funciona com chave estável.</p>
+
+<p>Memoizar o item só vale a pena quando a lista muda em pedaços: um item marcado, um preço atualizado. Se
+toda a lista muda a cada ação — filtro novo, ordem nova —, o <code>memo</code> do item não segura nada, porque
+todas as props mudam de fato. Nesse cenário, quem resolve é reduzir o número de itens na tela, não o número
+de desenhos por item. É a diferença entre otimizar o desenho e otimizar o produto.</p>
+
+<p>Duas armadilhas comuns em lista longa. A primeira: <code>key</code> pelo índice em lista que ordena,
+fazendo todo item remontar quando a ordem muda. A segunda: função nova por item
+(<code>onClick={() =&gt; abrir(id)}</code>) dentro do <code>map</code>, que quebra o <code>memo</code> de todos
+os itens de uma vez. Nesse caso, o padrão é o item receber o <code>id</code> e a função estável, e chamar
+<code>aoAbrir(id)</code> por dentro.</p>
+
+<h2>6. Prioridade: quando a tela precisa continuar respondendo</h2>
+
+<p>Há um tipo de lentidão que não é volume, é bloqueio: a digitação trava porque o React está ocupado
+calculando outra coisa. Aí não é <code>memo</code> que resolve, é prioridade. O React 19 oferece duas
+ferramentas para isso, e a escolha entre elas depende de você ter a função que muda o estado.</p>
+
+<p><code>useTransition</code> marca uma atualização como não urgente e dá um booleano de “está indo” —
+útil quando a ação espera o servidor. <code>useDeferredValue</code> recebe um valor e devolve uma versão
+atrasada, útil quando o valor vem de prop e você não controla o <code>setEstado</code>. Nos dois casos, o
+campo de texto continua urgente e a lista grande espera.</p>
+
+<pre class="file" data-file="Busca.jsx">const [texto, setTexto] = useState("");
+const atrasado = useDeferredValue(texto);
+const filtrados = paes.filter((p) =&gt; p.nome.includes(atrasado));</pre>
+
+<p>Um jeito de saber se o seu caso é esse: digite rápido em um campo e veja se as letras aparecem
+atrasadas, uma por uma. Se aparecem, o desenho urgente está esperando o desenho caro — é bloqueio, e
+prioridade resolve. Se o campo responde na hora e o que demora é o resultado aparecer, você tem outro
+problema: provavelmente a espera é de rede, e o caminho é estado de carregamento, como em
+<a href="ref-erros.html">Mensagens de Erro</a> e <a href="estados-de-carregamento.html">Estados de
+Carregamento</a>.</p>
+
+<p>O que essas ferramentas <em>não</em> fazem: reduzir o número de consultas ao servidor, cancelar
+requisição ou deixar um cálculo pesado mais rápido. Elas mudam a <em>ordem</em> do trabalho, não a
+quantidade. Para volume de chamadas, o caminho é debounce; para trabalho pesado, é reduzir o trabalho. As
+aulas <a href="useTransition.html">O useTransition</a> e <a href="useDeferredValue.html">O
+useDeferredValue</a> mostram os dois com o contador no painel.</p>
+
+<h2>7. Custo que não é React</h2>
+
+<p>Boa parte do “site lento” não está no componente. Vale olhar para fora antes de mexer no código de
+desenho: o pacote que o navegador baixa, as imagens, as requisições em cascata e os efeitos que rodam sem
+precisar.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde está o custo</th><th>Como investigar</th><th>Como resolver</th></tr>
+<tr><td>pacote grande no primeiro acesso</td><td>aba Network, tamanho de JS transferido</td><td><code>lazy</code> e <code>Suspense</code> — <a href="lazy-e-suspense.html">Lazy e Suspense</a></td></tr>
+<tr><td>imagem pesada</td><td>Network, filtro por imagem</td><td>tamanho certo, formato moderno, <code>loading="lazy"</code></td></tr>
+<tr><td>requisições em cascata</td><td>Network, uma depois da outra</td><td>buscar em paralelo com <code>Promise.all</code> — <a href="async-await.html">Async/Await</a></td></tr>
+<tr><td>efeito que roda demais</td><td>console no corpo do efeito</td><td>dependências corretas — <a href="dependencias.html">As Dependências</a></td></tr>
+<tr><td>cálculo repetido em cada desenho</td><td>Profiler mostrando trabalho no seu componente</td><td><code>useMemo</code> ou mover a conta para fora</td></tr>
+</table>
+</div>
+
+<p>Antes de tudo isso, vale olhar a primeira pintura: fonte que troca no meio do carregamento, imagem que
+não tem tamanho declarado e empurra o layout, script de terceiro no topo do HTML. São problemas de página, não
+de componente, e aparecem no painel Performance como trabalho de layout e pintura. Um <code>width</code> e um
+<code>height</code> na imagem resolvem mais “pulos” do que qualquer hook desta página.</p>
+
+<p>O primeiro item é o que mais muda a percepção de velocidade em site novo: menos JavaScript para baixar e
+interpretar. Dividir a tela em pedaços com <code>lazy</code> faz o painel de pedidos carregar só quando
+alguém abre o painel. O último item é o mais fácil de corrigir e o mais fácil de esquecer: uma conta de
+ordenar dentro do corpo do componente roda a cada tecla.</p>
+
+<h2>8. Otimizações que atrasam</h2>
+
+<p>Memoizar tudo tem custo: cada <code>memo</code> guarda props, cada <code>useMemo</code> guarda valor e
+compara dependências, cada <code>useCallback</code> guarda função. Em componente que desenha uma vez por
+clique, esse custo é maior que o ganho — e o código fica mais difícil de ler.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que se faz</th><th>Por que não ajuda</th><th>O que fazer antes</th></tr>
+<tr><td><code>memo</code> em todo componente</td><td>props novas a cada desenho anulam a comparação</td><td>medir e estabilizar as props</td></tr>
+<tr><td><code>useMemo</code> em conta de duas linhas</td><td>a comparação de dependências custa o mesmo</td><td>deixar a conta no desenho</td></tr>
+<tr><td><code>useCallback</code> em função que não é prop</td><td>ninguém compara a identidade dela</td><td>escrever a função normal</td></tr>
+<tr><td>estado global para tudo</td><td>todo consumidor redesenha junto</td><td>estado perto de quem usa — <a href="elevando-estado.html">Elevando o Estado</a></td></tr>
+<tr><td><code>key</code> sorteada para “forçar atualização”</td><td>remonta o item e perde estado</td><td>corrigir o estado ou a chave — <a href="chaves-estaveis.html">Chaves Estáveis</a></td></tr>
+</table>
+</div>
+
+<p>Existe um caso em que a “lentidão” é um laço: o componente desenha, um efeito muda estado, o estado
+desenha de novo. Em desenvolvimento, o React corta o laço com uma mensagem que vale reconhecer:</p>
+
+<pre class="term">Warning: Maximum update depth exceeded. This can happen when a component calls setState inside useEffect, but useEffect either doesn't have a dependency array, or one of the dependencies changes on every render.</pre>
+
+<p>“Profundidade máxima de atualização excedida”: alguém chama <code>setState</code> dentro de um efeito sem
+lista de dependências, ou com uma dependência que muda a cada desenho — um objeto criado no corpo, por
+exemplo. O sintoma é a aba travando, e o conserto não é otimizar: é corrigir a dependência. A aula
+<a href="quando-nao-usar-efeito.html">Quando Não Usar Efeito</a> mostra os casos em que o efeito nem devia
+existir.</p>
+
+<p>Um padrão que engana: usar <code>useMemo</code> para esconder um estado derivado que na verdade deveria ser
+recalculado a partir de outro estado. Se a dependência está incompleta, o valor congela e o bug aparece dias
+depois. A regra é a mesma da seção 4: a lista de dependências é o que o valor usa, não o que você gostaria.</p>
+
+<p>E o conselho que vale mais que a tabela: otimize o que dói. Se a tela responde bem com trezentos itens,
+não virtualize por precaução; se a digitação trava com três mil, nenhum <code>memo</code> no botão resolve. O
+Profiler mostra onde está o trabalho, e quase sempre está em menos lugares do que parece — a aula
+<a href="medindo-performance.html">Medindo Performance</a> tem o roteiro completo.</p>
+
+<h2>Resumo</h2>
+
+<p>Meça antes: separe desenho, commit e o que está fora do React. Todo redesenho tem causa — estado próprio,
+prop nova, pai, contexto ou <code>key</code> — e o conserto depende da causa. O trio
+<code>memo</code>/<code>useMemo</code>/<code>useCallback</code> reaproveita desenho, cálculo e função, e só
+funciona quando as entradas têm identidade estável.</p>
+
+<p>Lista grande pede menos itens na tela, não mais hooks. Tela que trava ao digitar pede prioridade —
+<code>useTransition</code> ou <code>useDeferredValue</code> — e não memoização. E o custo que mais pesa em
+site novo costuma estar fora do React: pacote, imagem e requisição em cascata. Otimização sem medida é
+código a mais para o mesmo tempo.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Meça no Profiler e no <code>console.time</code>; não adivinhe.</li>
+<li>Desenvolvimento desenha duas vezes: não conclua sobre produção a partir dele.</li>
+<li><code>memo</code> compara props por referência.</li>
+<li><code>useCallback</code> só ajuda se a função for prop de componente memoizado ou dependência de efeito.</li>
+<li><code>useMemo</code> guarda cálculo caro; dependência honesta, sem lista vazia mentirosa.</li>
+<li>Objeto ou função escrita no JSX quebra a memoização do filho.</li>
+<li>Contexto com valor novo redesenha todos os consumidores, mesmo com <code>memo</code>.</li>
+<li>Lista longa: paginar, virtualizar, memoizar — nessa ordem.</li>
+<li><code>useTransition</code> e <code>useDeferredValue</code> mudam prioridade, não quantidade.</li>
+<li>Mover estado para baixo ganha mais que memoizar.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>lazy e Suspense | Guia React</title>
+<meta name="description" content="React.lazy e Suspense na prática: carregar um componente sob demanda, escolher o fallback, colocar a fronteira no lugar certo, cortar por rota e o que dá errado no caminho.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>lazy e <span class="hl">Suspense</span></h1>
+<p class="intro">O site da Ana passou de 300 kB para 1,2 MB quando ela acrescentou a página de relatórios
+— e o cliente que só queria ver o pão da manhã passou a baixar o gráfico de vendas junto. Nesta aula ela
+aprende a mandar o React carregar um componente só quando ele for aparecer, com
+<code>React.lazy</code>, e o que mostrar enquanto o pedaço de código não chega, com
+<code>Suspense</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é baixar código sob demanda e por que isso muda o primeiro acesso.</li>
+  <li>Como declarar um componente com <code>React.lazy</code> e o papel do <code>import()</code>.</li>
+  <li>O que é o <code>fallback</code> do <code>Suspense</code> e o que mostrar nele.</li>
+  <li>Onde colocar a fronteira para não apagar a página inteira durante o carregamento.</li>
+  <li>Por que a rota é o melhor ponto de corte de uma aplicação.</li>
+  <li>Os tropeços: <code>default</code> faltando, erro de rede, fallback que pisca e
+  <code>lazy</code> declarado no lugar errado.</li>
+  <li>Como medir o ganho no build e na aba Network.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o pacote que cresceu</h2>
+
+<p>O site da Ana começou com 300 kB de JavaScript: o React, o roteador e as quatro páginas. Um dia ela
+acrescentou a página de relatórios, com uma biblioteca de gráficos, e o pacote foi para 1,2 MB. O cliente
+que abre o site às seis da manhã para ver o cardápio baixa tudo — inclusive o gráfico que ele nunca vai
+ver.</p>
+
+<p>O problema não é o tamanho do site, e sim o tamanho do <em>primeiro</em> arquivo. Em uma conexão de
+celular, 900 kB a mais significam segundos de tela branca. E segundos de tela branca custam visitas: a
+pessoa fecha antes de ver o pão.</p>
+
+<p>A saída é dividir o código em pedaços e baixar cada um quando ele for aparecer. O React faz isso com
+duas peças que trabalham juntas: <code>React.lazy</code>, que declara um componente que ainda não está no
+pacote, e <code>Suspense</code>, que diz o que mostrar no lugar dele enquanto o arquivo não chega.</p>
+
+<p>Vale saber o que acontece por baixo. O empacotador (o <a href="criar-projeto-vite.html">Vite</a>, no
+projeto da padaria) vê um
+<code>import()</code> dinâmico e separa aquele módulo em um arquivo próprio, um <em>chunk</em>. Quando o
+componente aparece na tela pela primeira vez, o navegador baixa o chunk, o React espera a Promise e só
+então desenha. Da segunda vez em diante, o módulo já está na memória — o chunk não é baixado de novo.</p>
+
+<h2>2. As peças do carregamento sob demanda</h2>
+
+<p>Antes do código, os nomes. Eles aparecem nas mensagens de erro e no painel Network, e confundir um com
+outro atrapalha o diagnóstico: o <code>lazy</code> é do React, o <code>import()</code> é do JavaScript, o
+chunk é do empacotador e o <code>Suspense</code> é a fronteira que decide o que aparece na espera.</p>
+
+<dl class="anatomy">
+<dt><code>React.lazy</code></dt>
+<dd>Uma função que recebe um carregador (função que devolve Promise) e devolve um componente que se
+comporta como os outros.</dd>
+<dt><code>import()</code></dt>
+<dd>O import dinâmico do JavaScript: em vez de carregar no topo do arquivo, carrega na hora em que for
+chamado, e devolve uma Promise.</dd>
+<dt>chunk</dt>
+<dd>O pedaço de código que o empacotador gerou para um <code>import()</code>. Um arquivo separado, baixado
+sob demanda.</dd>
+<dt><code>Suspense</code></dt>
+<dd>O componente que marca uma fronteira: se algo dentro dele ainda não está pronto, ele mostra o
+<code>fallback</code>.</dd>
+<dt>fallback</dt>
+<dd>O que aparece no lugar do conteúdo durante a espera: um texto, um esqueleto, um indicador.</dd>
+</dl>
+
+<p>Uma coisa importante: o <code>lazy</code> espera um módulo, não um componente. O carregador precisa
+devolver um objeto com a chave <code>default</code> — é o formato que o <code>import()</code> entrega, e é
+por isso que o componente do outro arquivo precisa ser exportado como <code>export default</code>. Esse
+detalhe é a causa do erro "element type is invalid" que aparece no primeiro dia de quem usa
+<code>lazy</code>.</p>
+
+<p>Outro detalhe: o <code>lazy</code> tem de ser declarado no <strong>módulo</strong>, fora do componente.
+Declarado dentro, cada desenho cria um componente novo, e o React baixa e monta tudo outra vez. Voltamos a
+isso na seção dos tropeços.</p>
+
+<h2>3. O <code>React.lazy</code> no projeto de verdade</h2>
+
+<p>No projeto da Ana, a página de relatórios fica em um arquivo próprio. O import estático traria o
+arquivo para o pacote inicial; o dinâmico o deixa para depois. A diferença é uma palavra: o
+<code>import()</code> com parênteses devolve uma Promise, e é isso que o <code>lazy</code> consome.</p>
+
+<pre class="file" data-file="App.jsx">// antes: entra no pacote inicial
+import Relatorios from "./Relatorios.jsx";
+
+// depois: vira um chunk, baixado quando aparecer
+const Relatorios = React.lazy(() =&gt; import("./Relatorios.jsx"));
+
+function App() {
+  const [rota, setRota] = useState("/");
+
+  return (
+    &lt;div&gt;
+      &lt;Menu irPara={setRota} /&gt;
+      &lt;React.Suspense fallback={&lt;p&gt;carregando os relatórios…&lt;/p&gt;}&gt;
+        {rota === "/relatorios" &amp;&amp; &lt;Relatorios /&gt;}
+      &lt;/React.Suspense&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Neste guia não há rede dentro das caixas, então os exemplos trocam o <code>import()</code> por uma
+Promise que se resolve com um atraso — a mesma forma que o <code>lazy</code> espera. O comportamento que
+você observa é o mesmo; muda só a origem do arquivo. No projeto, quem resolve a Promise é o navegador
+baixando o chunk.</p>
+
+<p>Vale notar que o <code>lazy</code> não é exclusivo de rotas: dá para usá-lo em um modal que só abre ao
+clicar, em uma tabela pesada que só aparece depois de um filtro, em um editor de texto de uma tela
+secundária. A pergunta é sempre a mesma: esse componente é necessário no primeiro desenho? Se não, ele pode
+chegar depois.</p>
+
+<h2>4. O que mostrar enquanto baixa</h2>
+
+<p>Na caixa, o cardápio é <code>lazy</code> e a fronteira existe — mas o <code>fallback</code> é
+<code>null</code>. Durante os primeiros instantes, a área do cardápio simplesmente não existe: o cliente vê
+o topo e um vazio. É o mesmo problema da rota 404, com outra causa: a tela não diz nada.</p>
+
+<div class="tryreact" data-goal="texto:assando o cardápio…">
+  <p class="try-task">A <code>fronteira</code> tem <code>fallback={null}</code> e a espera fica invisível.
+  Troque por um parágrafo com o texto <strong>assando o cardápio…</strong> e clique em Rodar.</p>
+  <pre class="jsx">const Cardapio = React.lazy(() =&gt; new Promise((ok) =&gt; {
+  setTimeout(() =&gt; ok({ default: CardapioDoDia }), 200);
+}));
+
+function CardapioDoDia() {
+  return &lt;p&gt;pão de queijo, croissant, sonho&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;React.Suspense fallback={null}&gt;
+        &lt;Cardapio /&gt;
+      &lt;/React.Suspense&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const Cardapio = React.lazy(() =&gt; new Promise((ok) =&gt; {
+  setTimeout(() =&gt; ok({ default: CardapioDoDia }), 200);
+}));
+
+function CardapioDoDia() {
+  return &lt;p&gt;pão de queijo, croissant, sonho&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;React.Suspense fallback={&lt;p&gt;assando o cardápio…&lt;/p&gt;}&gt;
+        &lt;Cardapio /&gt;
+      &lt;/React.Suspense&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel do código inicial mostra só o título; o da solução mostra o título e o aviso. É o retrato dos
+primeiros instantes: em duzentos milissegundos o cardápio chega e o aviso sai de cena. Deixar o
+<code>fallback</code> nulo é aceitável quando o carregamento é quase instantâneo (um clique que já tem o
+chunk em cache); é ruim quando é a primeira visita.</p>
+
+<p>Um bom <code>fallback</code> tem o tamanho aproximado do conteúdo que vai chegar. Um parágrafo de texto
+em uma área que vai virar uma tabela de dez linhas faz a página "pular" quando o conteúdo entra — o famoso
+deslocamento de layout. Um esqueleto cinza do tamanho certo evita o pulo e ainda dá a sensação de
+progresso.</p>
+
+<h2>5. Onde colocar a fronteira</h2>
+
+<p>O <code>Suspense</code> é uma fronteira: tudo o que está dentro dela fica escondido enquanto qualquer
+coisa ali dentro estiver esperando. Colocada no topo da árvore, ela esconde a página inteira — topo, menu,
+título — por causa de um pedaço que ainda não chegou. Colocada em volta do conteúdo, só o conteúdo
+desaparece.</p>
+
+<div class="tryreact" data-goal="texto:Padaria da Ana;;texto:assando o cardápio…">
+  <p class="try-task">A fronteira está envolvendo a página inteira, e o título desaparece durante o
+  carregamento. Deixe o <code>&lt;h1&gt;</code> fora e envolva só o <code>&lt;Cardapio /&gt;</code> com o
+  <code>Suspense</code>.</p>
+  <pre class="jsx">const Cardapio = React.lazy(() =&gt; new Promise((ok) =&gt; {
+  setTimeout(() =&gt; ok({ default: CardapioDoDia }), 200);
+}));
+
+function CardapioDoDia() {
+  return &lt;p&gt;pão de queijo, croissant, sonho&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;React.Suspense fallback={&lt;p&gt;assando o cardápio…&lt;/p&gt;}&gt;
+      &lt;div&gt;
+        &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+        &lt;Cardapio /&gt;
+      &lt;/div&gt;
+    &lt;/React.Suspense&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;p&gt;assando o cardápio…&lt;/p&gt;
+</pre>
+  <pre class="solucao">const Cardapio = React.lazy(() =&gt; new Promise((ok) =&gt; {
+  setTimeout(() =&gt; ok({ default: CardapioDoDia }), 200);
+}));
+
+function CardapioDoDia() {
+  return &lt;p&gt;pão de queijo, croissant, sonho&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;React.Suspense fallback={&lt;p&gt;assando o cardápio…&lt;/p&gt;}&gt;
+        &lt;Cardapio /&gt;
+      &lt;/React.Suspense&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel do código inicial mostra apenas o aviso: o título foi engolido pela fronteira. Depois da
+missão, aparecem o título e o aviso, e é possível ler onde está o problema. Duas fronteiras — uma no topo
+para o que é essencial, outra por área — dão resultados melhores do que uma fronteira enorme.</p>
+
+<p>Existe uma exceção que vale conhecer: em navegação, esconder a página inteira por um instante é pior do
+que manter a página antiga até a nova chegar. O React 19 faz isso quando a atualização vem de uma
+transição (o <code>startTransition</code>, ou o <code>useTransition</code> da aula de transições): a
+fronteira não mostra o <code>fallback</code> se já havia conteúdo na tela. O assunto é do nível de
+transições, mas o efeito prático é esse — a navegação não pisca.</p>
+
+<h2>6. A rota é o melhor ponto de corte</h2>
+
+<p>Onde cortar? A resposta mais rentável é a rota: cada página vira um chunk, e o cliente baixa a página
+que pediu. A página inicial continua pequena; a de relatórios chega só quando alguém abre relatórios. É a
+divisão que combina com o que o cliente faz — ele navega.</p>
+
+<p>Na caixa, o cardápio é importado direto: ele entra no pacote inicial e aparece junto com o título. A
+missão é trocar a chamada direta por um <code>lazy</code> e mostrar o aviso da espera. Quando o aviso
+aparecer no painel, você acabou de provar que o cardápio deixou de vir no pacote inicial.</p>
+
+<div class="tryreact" data-goal="texto:assando o cardápio…;;texto:Padaria da Ana">
+  <p class="try-task">O cardápio entra no pacote inicial. Troque o uso direto de
+  <code>&lt;CardapioDoDia /&gt;</code> por um componente criado com <code>React.lazy</code> (atraso de 200
+  ms) e envolva-o em <code>Suspense</code> com o <code>fallback</code>
+  <strong>assando o cardápio…</strong>.</p>
+  <pre class="jsx">function CardapioDoDia() {
+  return &lt;p&gt;pão de queijo, croissant, sonho&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;CardapioDoDia /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;pão de queijo, croissant, sonho&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function CardapioDoDia() {
+  return &lt;p&gt;pão de queijo, croissant, sonho&lt;/p&gt;;
+}
+
+const Cardapio = React.lazy(() =&gt; new Promise((ok) =&gt; {
+  setTimeout(() =&gt; ok({ default: CardapioDoDia }), 200);
+}));
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;React.Suspense fallback={&lt;p&gt;assando o cardápio…&lt;/p&gt;}&gt;
+        &lt;Cardapio /&gt;
+      &lt;/React.Suspense&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel do código inicial mostra o cardápio imediatamente — porque ele já estava ali. O da solução
+mostra o aviso: o componente agora chega depois. Na prévia, duzentos milissegundos depois o cardápio
+aparece; o painel guarda o retrato do primeiro instante, que é justamente o que interessa nesta aula.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde cortar</th><th>Quando vale a pena</th><th>Exemplo na padaria</th></tr>
+<tr><td>por rota</td><td>quase sempre: é o que o cliente pede de cada vez</td><td>relatórios, cardápio, encomendas</td></tr>
+<tr><td>modal ou painel</td><td>abre por um clique e traz biblioteca pesada</td><td>pagamento, mapa de entrega</td></tr>
+<tr><td>biblioteca</td><td>só uma tela usa (gráficos, editor, PDF)</td><td>gráfico de vendas do mês</td></tr>
+<tr><td>aba interna</td><td>a segunda aba é raramente visitada</td><td>histórico de preços</td></tr>
+<tr><td>componente pequeno</td><td>quase nunca: gera requisição sem ganho</td><td>um botão, um selo</td></tr>
+</table>
+</div>
+
+<p>Uma nota sobre expectativa: dividir por rota não deixa a <em>primeira</em> página mais leve se ela
+carrega tudo o que as outras precisam em comum. O ganho vem de tirar do pacote inicial o que só algumas
+rotas usam — gráficos, editores, mapas, tabelas grandes. Um projeto bem cortado costuma ter um pacote
+inicial pequeno e vários chunks médios.</p>
+
+<h2>7. Os tropeços do caminho</h2>
+
+<p>O primeiro é esquecer o <code>default</code>. O <code>lazy</code> espera um módulo com essa chave; um
+carregador que devolve o componente direto produz o erro "element type is invalid" na hora de desenhar. No
+projeto, isso acontece quando o arquivo exporta sem <code>default</code> — a correção é ajustar o export, e
+não o <code>lazy</code>.</p>
+
+<p>O segundo é o erro de rede. O chunk é um arquivo como outro qualquer: se a conexão cair no meio, ou se
+uma publicação nova trocar o nome do arquivo, o download falha e a Promise é rejeitada. O
+<code>Suspense</code> não pega esse erro — quem pega é um <em>error boundary</em>, um componente que
+envolve a área e mostra uma mensagem quando algo quebra. Sem ele, a página inteira some.</p>
+
+<pre class="term">GET https://loja.test/assets/Cardapio-3f9c1a.js net::ERR_ABORTED 404
+Uncaught Error: Failed to fetch dynamically imported module: /assets/Cardapio-3f9c1a.js</pre>
+
+<p>O terceiro é o <code>fallback</code> que pisca. Se o chunk demora 40 ms e o seu aviso tem uma animação de
+meio segundo, o cliente vê um flash desagradável a cada navegação. Duas saídas: manter a página anterior
+até a nova chegar (transição) ou atrasar a exibição do aviso por um instante, mostrando-o só quando a espera
+passar de, digamos, 150 ms.</p>
+
+<p>O quarto é o <code>lazy</code> declarado dentro do componente. Como ele é uma fábrica de componentes,
+declarar no corpo cria um tipo novo a cada desenho: o React descarta o anterior, pede o módulo de novo (do
+cache do navegador, mas ainda assim) e remonta. O sintoma é o aviso aparecendo a cada clique, mesmo com o
+código já baixado. Declare sempre no módulo, como as caixas fazem.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você vê</th><th>Causa provável</th><th>Conserto</th></tr>
+<tr><td>"element type is invalid"</td><td>o carregador não devolve <code>{ default }</code></td><td>usar <code>import()</code> ou exportar com <code>default</code></td></tr>
+<tr><td>a página some quando a rede falha</td><td>não há error boundary</td><td>envolver a área com um boundary</td></tr>
+<tr><td>o aviso pisca a cada navegação</td><td><code>fallback</code> visível por poucos milissegundos</td><td>transição ou atraso para exibir o aviso</td></tr>
+<tr><td>o aviso volta a cada clique</td><td><code>React.lazy</code> declarado dentro do componente</td><td>declarar no módulo</td></tr>
+<tr><td>nada mudou no tamanho do pacote</td><td>o componente continua importado de forma estática</td><td>trocar o import estático pelo dinâmico</td></tr>
+</table>
+</div>
+
+<h2>8. Medindo o ganho</h2>
+
+<p>O <a href="build-de-producao.html">build</a> mostra os chunks e o tamanho de cada um. Antes de dividir,
+havia um arquivo grande; depois,
+um arquivo inicial menor e alguns pedaços. O número que importa é o do primeiro — o resto só é baixado se o
+cliente pedir.</p>
+
+<pre class="term">dist/assets/index-9a1c2f.js        312.44 kB │ gzip: 101.02 kB
+dist/assets/Relatorios-7e4b9d.js   648.11 kB │ gzip: 198.30 kB
+dist/assets/Cardapio-3f9c1a.js      12.08 kB │ gzip:   4.61 kB</pre>
+
+<p>Repare na coluna do gzip: é o que o navegador baixa de verdade. E repare que o chunk grande continua
+grande — a divisão não fez o código encolher, só mudou <em>quando</em> ele é baixado. Se o relatório é
+aberto por dez por cento dos clientes, a conta fecha; se todos abrem na primeira tela, dividir não ajuda em
+nada.</p>
+
+<p>A aba Network do navegador mostra o mesmo na prática: um arquivo no primeiro acesso, outro quando você
+abre a rota. Vale olhar também o "cache": na segunda visita, o chunk vem do cache do navegador com uma
+resposta de poucos bytes. E vale desconfiar de chunks minúsculos demais — um arquivo por componente gera
+dezenas de requisições e o ganho vira custo de protocolo.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o site ficou mais lento depois de dividir</h3>
+<p>Acontece quando o corte é fino demais: vinte chunks de 3 kB e vinte requisições, cada uma com a sua
+latência. O primeiro acesso piora. O bom corte agrupa por área: uma rota inteira, um modal grande, uma
+biblioteca pesada. Se o chunk tem menos de 10 kB, provavelmente não valia a pena separar.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o cliente atualizou o site no meio da navegação</h3>
+<p>A Ana publicou uma versão nova e os nomes dos chunks mudaram. Um cliente com a página aberta clicou em
+"relatórios" e o arquivo antigo já não existia: 404 no chunk e a página sumiu. A defesa é um error boundary
+com "recarregue a página" e manter os arquivos antigos no ar por um tempo após a publicação.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o modal que demora na primeira abertura</h3>
+<p>O modal de pagamento é <code>lazy</code> e, na primeira vez, o cliente vê o esqueleto por meio segundo;
+na segunda, abre na hora. É o comportamento esperado — o chunk fica em memória. Se a primeira abertura for
+frequente e crítica, vale baixar o chunk antes, quando a página estiver ociosa, com um
+<code>import()</code> disparado por um efeito; o React 19 tem até uma função de pré-carregamento para
+isso.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que o <code>React.lazy</code> recebe?</p>
+<label><input type="radio" name="q1"> um componente já importado</label>
+<label><input type="radio" name="q1"> uma função que devolve uma Promise com um módulo que tem <code>default</code></label>
+<label><input type="radio" name="q1"> o caminho do arquivo em texto</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. O que o <code>fallback</code> do <code>Suspense</code> faz?</p>
+<label><input type="radio" name="q2"> aparece no lugar do conteúdo enquanto ele não está pronto</label>
+<label><input type="radio" name="q2"> substitui o conteúdo quando dá erro</label>
+<label><input type="radio" name="q2"> recarrega o chunk que faltou</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">3. Por que declarar <code>React.lazy</code> dentro do componente é um problema?</p>
+<label><input type="radio" name="q3"> porque o React proíbe hooks ali</label>
+<label><input type="radio" name="q3"> porque o chunk fica maior</label>
+<label><input type="radio" name="q3"> porque cada desenho cria um componente novo e remonta o conteúdo</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o carregador que o <code>lazy</code> espera</h2>
+<p>Complete o carregador do módulo que será baixado sob demanda:</p>
+<div class="ex-code">const Relatorios = React.lazy(() =&gt; <input aria-label="resposta 1" data-answer="import(&quot;./Relatorios.jsx&quot;)|import('./Relatorios.jsx')" placeholder="...">);</div>
+<p class="ex-dica">Dica: é o import dinâmico, com parênteses, apontando para o arquivo do componente.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Baixar código sob demanda é dividir o pacote em chunks e carregar cada um quando ele for aparecer. No
+React, a declaração fica no módulo: <code>const X = React.lazy(() =&gt; import("./X.jsx"))</code>. O
+componente se comporta como qualquer outro, com uma diferença: na primeira vez ele precisa esperar o
+arquivo, e durante essa espera o <code>Suspense</code> mostra o <code>fallback</code>.</p>
+
+<p>A fronteira é a decisão de projeto mais importante. Envolver a página inteira apaga o topo e o menu por
+causa de um pedaço; envolver só a área que espera mantém o resto legível. Na navegação, a transição evita o
+pisca-pisca. E o melhor ponto de corte costuma ser a rota: o cliente baixa o que pediu.</p>
+
+<p>Os tropeços são previsíveis: <code>default</code> faltando, erro de rede sem error boundary,
+<code>fallback</code> que pisca e <code>lazy</code> declarado dentro do componente. Com a medição no build e
+na aba Network, dá para saber se a divisão valeu — e vale lembrar que ela não deixa o código menor, só muda
+o momento em que ele chega.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>React.lazy</code> recebe um carregador que devolve Promise com <code>default</code>.</li>
+<li>O <code>import()</code> dinâmico é o que gera o chunk no build.</li>
+<li>Declare o <code>lazy</code> no módulo, nunca dentro do componente.</li>
+<li><code>Suspense</code> mostra o <code>fallback</code> enquanto o conteúdo não está pronto.</li>
+<li>A fronteira esconde tudo o que está dentro: coloque-a perto do que espera.</li>
+<li>Na navegação, transição evita trocar a página pelo aviso.</li>
+<li><code>fallback</code> com o tamanho do conteúdo evita o pulo de layout.</li>
+<li><code>Suspense</code> não trata erro: para isso existe o error boundary.</li>
+<li>O corte mais rentável é por rota; chunks minúsculos demais custam requisições.</li>
+<li>Medir no build (tamanho + gzip) e na aba Network.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

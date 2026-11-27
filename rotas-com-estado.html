@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rotas com Estado | Guia React</title>
+<meta name="description" content="Roteamento com estado no React: guardar a tela atual num useState, trocar telas sem recarregar, mapa de telas e o que essa rota não resolve.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Rotas com <span class="hl">Estado</span></h1>
+<p class="intro">O site da padaria tem três telas: a vitrine, a lista de pães e o contato. No site
+antigo, eram três arquivos <code>.html</code> e um clique carregava outro documento. No projeto React só
+existe <strong>um</strong> <code>index.html</code>, e trocar de tela virou uma decisão do próprio
+componente. Nesta aula a Ana monta o roteador mais simples que existe: um estado que guarda qual tela
+está na frente — sem recarregar a página e sem instalar nada.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que um projeto React precisa de rotas, se só existe um HTML.</li>
+  <li>Como guardar a tela atual num <code>useState</code> e trocá-la com um clique.</li>
+  <li>O mapa de telas, que substitui a cadeia de <code>if</code>.</li>
+  <li>Como marcar na navegação em que tela você está.</li>
+  <li>O que essa rota faz — e as três coisas que ela não faz.</li>
+  <li>Quando o estado basta e quando é hora de chamar a URL.</li>
+</ul>
+</div>
+
+<h2>1. A cena: três telas e um arquivo só</h2>
+
+<p>No site antigo, cada tela era um arquivo. Clicar em "Pães" pedia
+<code>paes.html</code> ao servidor, o navegador apagava a página e desenhava outra. Funcionava, e cada
+clique custava um pedido de rede e um piscar de tela.</p>
+
+<p>No projeto React, o build gera um <code>index.html</code> só. O JavaScript monta o
+<code>App</code>, e o <code>App</code> decide o que desenhar. Se a Ana quiser três telas, alguém precisa
+guardar "qual delas está na frente" — e, no React, guardar algo que muda com o tempo é trabalho de
+estado.</p>
+
+<p>Chamamos de <strong>rota</strong> a combinação de duas coisas: qual tela mostrar e como o usuário
+chegou até ela. A primeira parte é a que interessa agora, e ela cabe numa linha de
+<code>useState</code>.</p>
+
+<p>Vale dizer desde já: esta aula constrói a versão mínima, de propósito. Ela ensina o mecanismo que
+está por baixo de qualquer biblioteca de rotas — e mostra, no fim, o que ela não resolve. As três aulas
+seguintes acrescentam a parte que falta: o endereço, o link e os parâmetros.</p>
+
+<h2>2. O que é uma rota, na prática</h2>
+
+<p>Uma rota responde a duas perguntas: "qual tela desenhar?" e "como eu sei onde estou?". Numa rota por
+estado, as duas saem do mesmo lugar: uma variável de estado com o nome da tela atual,
+<code>"inicio"</code>, <code>"paes"</code> ou <code>"contato"</code>.</p>
+
+<p>Com esse nome em mãos, desenhar a tela certa é renderização condicional — o mesmo
+<code>{condicao &amp;&amp; &lt;Componente /&gt;}</code> das aulas de lista e de condicional. Não há mágica
+nova: rota é estado mais um <code>if</code> bem colocado.</p>
+
+<dl class="anatomy">
+<dt>rota</dt>
+<dd>A regra que liga um lugar (ou um nome) a uma tela. Aqui, o valor do estado à tela correspondente.</dd>
+<dt>tela</dt>
+<dd>O que aparece na área principal. Pode ser um componente inteiro ou um parágrafo; o roteador não se
+importa.</dd>
+<dt>estado de navegação</dt>
+<dd>O estado que guarda a tela atual. Trocar de tela é chamar o setter.</dd>
+<dt>mapa de telas</dt>
+<dd>Um objeto que liga o nome da tela ao elemento que a representa: <code>{ "paes": &lt;Paes /&gt; }</code>.</dd>
+<dt>URL</dt>
+<dd>O endereço que aparece na barra do navegador. Na rota por estado ela não muda — e é aí que mora o
+limite desta aula.</dd>
+</dl>
+
+<p>Repare que a rota não é um lugar do código: é um acordo. Em algum momento você combina que
+<code>"paes"</code> significa a lista de pães, e todo mundo que trocar de tela usa esse nome. Se um botão
+escrever <code>"pão"</code> com acento e outro escrever <code>"paes"</code>, o acordo quebra — e a tela
+some sem erro nenhum. Guarde essa frase, porque ela explica metade dos bugs de rota.</p>
+
+<h2>3. A primeira versão: um estado e dois botões</h2>
+
+<p>O roteador mínimo tem três peças: o estado da tela atual, dois botões que trocam o valor e um
+<code>if</code> que desenha a tela correspondente. É o suficiente para a vitrine e a lista de pães.</p>
+
+<div class="tryreact" data-goal="clique:nav button:last-child;;texto:Pão francês, broa e pão de queijo">
+  <p class="try-task">O botão "Pães" está mudando o estado para um nome que nenhuma condição conhece, e a
+  tela fica em branco. Corrija o nome e a missão mostrará a lista de pães ao clique.</p>
+  <pre class="jsx">function App() {
+  const [pagina, setPagina] = useState("inicio");
+
+  return (
+    &lt;div&gt;
+      &lt;nav&gt;
+        &lt;button onClick={() =&gt; setPagina("inicio")}&gt;Início&lt;/button&gt;
+        &lt;button onClick={() =&gt; setPagina("pao")}&gt;Pães&lt;/button&gt;
+      &lt;/nav&gt;
+
+      {pagina === "inicio" &amp;&amp; &lt;p&gt;Bem-vindo à Padaria da Ana&lt;/p&gt;}
+      {pagina === "paes" &amp;&amp; &lt;p&gt;Pão francês, broa e pão de queijo&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;nav&gt;
+    &lt;button&gt;Início&lt;/button&gt;
+    &lt;button&gt;Pães&lt;/button&gt;
+  &lt;/nav&gt;
+  &lt;p&gt;Bem-vindo à Padaria da Ana&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [pagina, setPagina] = useState("inicio");
+
+  return (
+    &lt;div&gt;
+      &lt;nav&gt;
+        &lt;button onClick={() =&gt; setPagina("inicio")}&gt;Início&lt;/button&gt;
+        &lt;button onClick={() =&gt; setPagina("paes")}&gt;Pães&lt;/button&gt;
+      &lt;/nav&gt;
+
+      {pagina === "inicio" &amp;&amp; &lt;p&gt;Bem-vindo à Padaria da Ana&lt;/p&gt;}
+      {pagina === "paes" &amp;&amp; &lt;p&gt;Pão francês, broa e pão de queijo&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Ao clicar em "Pães", o estado vira <code>"paes"</code>, o componente roda de novo, a primeira condição
+fica falsa, a segunda fica verdadeira e o parágrafo da vitrine é trocado pelo da lista. Nenhum pedido de
+rede, nenhum piscar: o React só mudou o que precisava na página.</p>
+
+<p>O bug do código inicial é o que mais aparece na prática. O botão grava <code>"pao"</code>, as duas
+condições testam outros nomes, nenhuma casa e a área de conteúdo fica vazia — com a navegação intacta,
+sem mensagem de erro e sem nada no console. Quando a tela sumir depois de um clique, olhe o valor que o
+botão está gravando.</p>
+
+<pre class="term">console: pagina: inicio
+console: pagina: paes</pre>
+
+<p>Um <code>console.log("pagina:", pagina)</code> antes do <code>return</code> mostra a troca acontecendo,
+uma linha por desenho. É o jeito mais rápido de conferir se o problema está no estado (o log mostra o
+valor errado) ou na condição (o log mostra o valor certo e a tela não muda).</p>
+
+<h2>4. O mapa de telas</h2>
+
+<p>Duas telas cabem em dois <code>if</code>. Com cinco, a cadeia de condições vira uma escada e cada tela
+nova pede uma linha nova. A alternativa é um objeto que liga nome a tela — o mapa —, consultado com o
+valor do estado.</p>
+
+<pre class="file" data-file="App.jsx">const telas = {
+  inicio: &lt;p&gt;Bem-vindo à Padaria da Ana&lt;/p&gt;,
+  paes: &lt;p&gt;Pão francês, broa e pão de queijo&lt;/p&gt;,
+  contato: &lt;p&gt;Fale com a Ana: 9999-0000&lt;/p&gt;
+};
+
+function App() {
+  const [pagina, setPagina] = useState("inicio");
+  return &lt;div&gt;{telas[pagina]}&lt;/div&gt;;
+}</pre>
+
+<p>A consulta <code>telas[pagina]</code> devolve o elemento da tela atual. Se o valor não existir no
+mapa, devolve <code>undefined</code> — e o React não desenha nada. É o mesmo sintoma da seção anterior,
+com outra causa: lá o botão gravava um nome errado; aqui pode faltar a chave no mapa.</p>
+
+<div class="tryreact" data-goal="clique:nav button:last-child;;texto:Fale com a Ana: 9999-0000">
+  <p class="try-task">O menu tem um botão de contato, mas o mapa não tem a tela correspondente: ao clicar,
+  a área de conteúdo fica vazia. Acrescente a tela de contato ao mapa.</p>
+  <pre class="jsx">const telas = {
+  inicio: &lt;p&gt;Bem-vindo à Padaria da Ana&lt;/p&gt;,
+  paes: &lt;p&gt;Pão francês, broa e pão de queijo&lt;/p&gt;
+};
+
+function App() {
+  const [pagina, setPagina] = useState("inicio");
+
+  return (
+    &lt;div&gt;
+      &lt;nav&gt;
+        &lt;button onClick={() =&gt; setPagina("inicio")}&gt;Início&lt;/button&gt;
+        &lt;button onClick={() =&gt; setPagina("paes")}&gt;Pães&lt;/button&gt;
+        &lt;button onClick={() =&gt; setPagina("contato")}&gt;Contato&lt;/button&gt;
+      &lt;/nav&gt;
+      {telas[pagina]}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;nav&gt;
+    &lt;button&gt;Início&lt;/button&gt;
+    &lt;button&gt;Pães&lt;/button&gt;
+    &lt;button&gt;Contato&lt;/button&gt;
+  &lt;/nav&gt;
+  &lt;p&gt;Bem-vindo à Padaria da Ana&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const telas = {
+  inicio: &lt;p&gt;Bem-vindo à Padaria da Ana&lt;/p&gt;,
+  paes: &lt;p&gt;Pão francês, broa e pão de queijo&lt;/p&gt;,
+  contato: &lt;p&gt;Fale com a Ana: 9999-0000&lt;/p&gt;
+};
+
+function App() {
+  const [pagina, setPagina] = useState("inicio");
+
+  return (
+    &lt;div&gt;
+      &lt;nav&gt;
+        &lt;button onClick={() =&gt; setPagina("inicio")}&gt;Início&lt;/button&gt;
+        &lt;button onClick={() =&gt; setPagina("paes")}&gt;Pães&lt;/button&gt;
+        &lt;button onClick={() =&gt; setPagina("contato")}&gt;Contato&lt;/button&gt;
+      &lt;/nav&gt;
+      {telas[pagina]}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Acrescentar uma tela passou a ser acrescentar uma linha no objeto. O botão já existia e não precisou
+mudar; a condição também não. Essa é a vantagem prática do mapa: o menu e o conteúdo crescem em lugares
+diferentes, sem uma escada de <code>if</code> no meio.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Como escolher a tela</th><th>Fica bom com</th><th>Problema</th></tr>
+<tr><td><code>if</code> / <code>&amp;&amp;</code> em cadeia</td><td>duas ou três telas</td><td>com cinco, a leitura vira escada</td></tr>
+<tr><td>Mapa de telas</td><td>três ou mais telas fixas</td><td>cada tela precisa de uma chave, e a chave é o acordo</td></tr>
+<tr><td><code>switch</code> numa função</td><td>telas que precisam de lógica antes de desenhar</td><td>mais linhas para o mesmo resultado</td></tr>
+</table>
+</div>
+
+<p>O mapa tem uma vantagem que aparece quando o site cresce: o valor do estado passa a ser uma chave de
+dados, e a área de conteúdo é derivada dele. Isso é <a href="estado-derivado.html">estado derivado</a>
+puro — nada de guardar "a tela que está na frente" duas vezes.</p>
+
+<h2>5. A navegação vira um componente</h2>
+
+<p>Os botões não precisam estar no <code>App</code>. Como quase tudo em React, eles podem virar um
+componente que recebe o que precisa: a lista de telas e a função que troca. Quem guarda o estado continua
+sendo o <code>App</code> — o menu só pede a troca.</p>
+
+<pre class="file" data-file="App.jsx">function Menu({ pagina, irPara }) {
+  return (
+    &lt;nav&gt;
+      {["inicio", "paes", "contato"].map((nome) =&gt; (
+        &lt;button
+          key={nome}
+          onClick={() =&gt; irPara(nome)}
+          aria-current={pagina === nome ? "page" : undefined}
+        &gt;
+          {nome}
+        &lt;/button&gt;
+      ))}
+    &lt;/nav&gt;
+  );
+}</pre>
+
+<p>Essa separação é a mesma de <a href="elevando-estado.html">elevando o estado</a>: o dado mora no pai,
+o filho recebe o valor e a função. O menu não sabe desenhar a tela nem guarda nada; ele só avisa "o
+cliente pediu a tela paes".</p>
+
+<p>Um detalhe que faz diferença para quem usa leitor de tela: <code>aria-current="page"</code> no botão
+da tela atual. Visualmente, uma classe de destaque; semanticamente, a informação de onde a pessoa está.
+Sem isso, a navegação é uma fileira de botões iguais.</p>
+
+<div class="tryreact" data-goal="attr:nav button:first-child|aria-current=page;;clique:nav button:last-child;;attr:nav button:last-child|aria-current=page">
+  <p class="try-task">A navegação funciona, mas nenhum botão diz onde a pessoa está. Marque o botão da tela
+  atual com <code>aria-current="page"</code> — e deixe a marca acompanhar o clique.</p>
+  <pre class="jsx">function App() {
+  const [pagina, setPagina] = useState("inicio");
+  const nomes = ["inicio", "paes", "contato"];
+
+  return (
+    &lt;div&gt;
+      &lt;nav&gt;
+        {nomes.map((nome) =&gt; (
+          &lt;button key={nome} onClick={() =&gt; setPagina(nome)}&gt;
+            {nome}
+          &lt;/button&gt;
+        ))}
+      &lt;/nav&gt;
+      &lt;p&gt;Tela atual: {pagina}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;nav&gt;
+    &lt;button&gt;inicio&lt;/button&gt;
+    &lt;button&gt;paes&lt;/button&gt;
+    &lt;button&gt;contato&lt;/button&gt;
+  &lt;/nav&gt;
+  &lt;p&gt;Tela atual: inicio&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [pagina, setPagina] = useState("inicio");
+  const nomes = ["inicio", "paes", "contato"];
+
+  return (
+    &lt;div&gt;
+      &lt;nav&gt;
+        {nomes.map((nome) =&gt; (
+          &lt;button
+            key={nome}
+            onClick={() =&gt; setPagina(nome)}
+            aria-current={pagina === nome ? "page" : undefined}
+          &gt;
+            {nome}
+          &lt;/button&gt;
+        ))}
+      &lt;/nav&gt;
+      &lt;p&gt;Tela atual: {pagina}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O atributo é <strong>derivado</strong> da página atual: existe no botão cujo nome bate com o estado e
+some nos outros. Repare no <code>undefined</code>: no React, um atributo com valor
+<code>undefined</code> não é escrito no HTML, enquanto <code>aria-current={false}</code> escreveria
+<code>aria-current="false"</code> — uma string que o leitor de tela interpreta como "sim". Detalhe
+pequeno, diferença grande.</p>
+
+<h2>6. O que essa rota não faz</h2>
+
+<p>Aqui está a parte que separa um protótipo de um site: a rota por estado troca a tela, mas não mexe no
+endereço. Para o navegador, nada aconteceu — a barra de endereço continua em <code>/</code>, e o histórico
+de navegação não ganha uma entrada.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pergunta</th><th>Rota por estado</th><th>Consequência</th></tr>
+<tr><td>Troca de tela sem recarregar?</td><td>sim</td><td>rápido e suave</td></tr>
+<tr><td>O endereço muda?</td><td>não</td><td>nenhum link aponta para a tela</td></tr>
+<tr><td>Recarregar mantém a tela?</td><td>não</td><td>o estado nasce de novo em <code>"inicio"</code></td></tr>
+<tr><td>O botão voltar do navegador funciona?</td><td>não</td><td>ele sai do site em vez de voltar uma tela</td></tr>
+<tr><td>Dá para mandar o link de uma tela?</td><td>não</td><td>todo link leva à vitrine</td></tr>
+</table>
+</div>
+
+<pre class="term">clique em Pães → pagina = "paes", caminho = "/"
+depois do F5   → pagina = "inicio", caminho = "/"</pre>
+
+<p>As duas linhas saem de um <code>console.log</code> que imprime a tela atual e o caminho do navegador.
+O caminho é sempre <code>"/"</code>: nada do que a Ana fez chegou ao endereço. É por isso que o F5
+recomeça do início — a única informação que o navegador guarda é o caminho, e ele não sabe da
+tela.</p>
+
+<p>Nada disso é defeito de implementação: é a definição da técnica. O endereço é a única coisa que o
+navegador guarda e compartilha; se a tela não está nele, ela não sobrevive ao F5 nem à conversa de
+WhatsApp. Para um painel interno, aberto na mesma sessão, tudo bem. Para a padaria, que quer mandar o link
+da lista de pães no grupo, não serve.</p>
+
+<p>Note que o estado da tela é local ao componente. Se o <code>App</code> desmontar — porque o usuário
+trocou de aba e o navegador descartou, ou porque outro componente o tirou da árvore —, o valor se perde
+junto. Estado não é armazenamento: é memória do desenho.</p>
+
+<h2>7. Marcar onde estou</h2>
+
+<p>Com a tela trocando por estado, "onde estou" existe apenas dentro do componente. Ainda assim, dá para
+comunicar bem: destaque visual no item atual, <code>aria-current</code> para leitores de tela e um
+título claro no topo de cada tela.</p>
+
+<p>Um cuidado de implementação: não mexa no <code>document.title</code> durante o desenho. O corpo do
+componente deve ser puro — desenhar não é lugar de efeito colateral. Se o título da aba precisar
+acompanhar a tela, isso é trabalho de <code>useEffect</code>, com a página atual na lista de
+dependências.</p>
+
+<p>O mesmo vale para rolagem: se a lista de pães é longa e você troca de tela, o navegador continua na
+mesma posição. Rolar para o topo quando a rota muda é outro efeito, e das duas uma: ou você aceita a
+posição, ou trata no efeito. O importante é não fazer isso no meio do JSX.</p>
+
+<h2>8. Quando o estado basta</h2>
+
+<p>A rota por estado tem um nicho honesto. Serve para telas que não precisam de link próprio: um painel
+de caixa, uma aba interna, um formulário em etapas, um assistente de pedido. Nesses casos, o endereço não
+significa nada para o usuário e ninguém vai compartilhá-lo.</p>
+
+<p>Deixa de servir no momento em que uma dessas perguntas aparece: "posso mandar o link desta tela?",
+"como o cliente volta para a tela anterior?", "como o Google indexa a lista de pães?", "o cliente pode
+favoritar esta página?". Todas têm a mesma resposta: a tela precisa estar no endereço.</p>
+
+<p>E é possível ter as duas coisas ao mesmo tempo: o estado decide o que desenhar, e a URL guarda qual é
+esse estado. A ponte entre os dois é o assunto da próxima aula, com o <code>hash</code> — a parte do
+endereço que o navegador não envia ao servidor e que, por isso, funciona em qualquer host estático.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o F5 que volta para a vitrine</h3>
+<p>A Ana estava na lista de pães, ajustou o preço e recarregou para ver o resultado. Voltou para a
+vitrine. O estado da rota nasce com <code>"inicio"</code> em todo carregamento, porque recarregar recria a
+página e o componente do zero. Não é cache nem bug: a informação nunca esteve no endereço.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o voltar do navegador que sai do site</h3>
+<p>A cliente entrou na lista de pães, clicou em contato e quis voltar. O botão do navegador a levou para
+o site anterior, porque a troca de tela não criou uma entrada no histórico — para o navegador, ela nunca
+saiu de <code>/</code>. Cada troca de rota de verdade entra no histórico; a de estado, não.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: a área em branco depois do clique</h3>
+<p>Ela acrescentou a tela de contato, mas clicou em "Contato" e viu a área de conteúdo vazia, com o menu
+no lugar. O botão gravava <code>"contato"</code> e o mapa tinha a chave <code>"contatos"</code>, com
+plural. O teste de chave deu <code>undefined</code> e o React não desenhou nada. Sem erro, sem aviso —
+só o silêncio que a aula de <a href="depurando-no-navegador.html">depurar no navegador</a> ensinou a
+investigar.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="1"><p class="mc-q">1. Numa rota por estado, quem guarda a tela atual?</p>
+<label><input type="radio" name="q1"> um <code>useState</code> com o nome da tela</label>
+<label><input type="radio" name="q1"> a URL, que o React lê sozinho</label>
+<label><input type="radio" name="q1"> uma variável global fora do componente</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que a rota por estado <strong>não</strong> faz?</p>
+<label><input type="radio" name="q2"> trocar a tela sem recarregar a página</label>
+<label><input type="radio" name="q2"> desenhar componentes diferentes conforme o valor</label>
+<label><input type="radio" name="q2"> mudar o endereço e entrar no histórico do navegador</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. A área de conteúdo ficou vazia depois do clique. Primeira suspeita?</p>
+<label><input type="radio" name="q3"> falta uma <code>key</code> na lista de botões</label>
+<label><input type="radio" name="q3"> o valor gravado não existe no mapa nem em nenhuma condição</label>
+<label><input type="radio" name="q3"> o React precisa de um <code>useEffect</code> para trocar de tela</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o mapa e o botão</h2>
+<p>Complete o mapa de telas e o botão que troca para a lista de pães.</p>
+<div class="ex-code">const telas = {
+  inicio: &lt;p&gt;Bem-vindo à Padaria da Ana&lt;/p&gt;,
+  <input aria-label="resposta 1" data-answer="paes" placeholder="...">: &lt;p&gt;Pão francês, broa e pão de queijo&lt;/p&gt;
+};
+
+&lt;button onClick={() =&gt; <input aria-label="resposta 2" data-answer="setPagina(&quot;paes&quot;)" placeholder="...">}&gt;Pães&lt;/button&gt;</div>
+<p class="ex-dica">Dica: a chave do mapa é o mesmo nome que o botão grava no estado; o botão chama o setter
+com esse nome.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Um projeto React tem um <code>index.html</code>, e trocar de tela é uma decisão do componente. A rota
+mais simples guarda o nome da tela atual num <code>useState</code> e escolhe o que desenhar com uma
+condição ou com um mapa de telas. O menu vira um componente que recebe o valor e a função, e
+<code>aria-current</code> marca em que tela você está.</p>
+
+<p>Essa rota é rápida e suficiente para painéis e formulários internos. Ela não mexe no endereço — e é
+daí que vêm as três limitações: o F5 volta ao início, o botão voltar do navegador sai do site e nenhum
+link aponta para uma tela específica. Não é defeito: é a definição da técnica.</p>
+
+<p>Quando o link precisa funcionar, a tela tem de estar no endereço. A próxima aula dá esse passo com o
+<a href="rotas-por-hash.html">hash</a>: o pedaço do endereço depois do <code>#</code>, que o navegador
+guarda sem perguntar nada ao servidor — e que já resolve F5, histórico e link compartilhado.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Rota é "qual tela mostrar" — e no React isso começa com um estado.</li>
+<li>Trocar de tela é chamar o setter; o desenho é renderização condicional.</li>
+<li>O mapa de telas troca a escada de <code>if</code> por um objeto nome → tela.</li>
+<li>Chave errada no mapa devolve <code>undefined</code>: área vazia, sem erro.</li>
+<li>O menu recebe a função de troca; o estado mora no pai.</li>
+<li><code>aria-current="page"</code> diz ao leitor de tela onde a pessoa está.</li>
+<li>A rota por estado não muda a URL nem cria histórico.</li>
+<li>F5 recria o estado: a tela volta para o valor inicial.</li>
+<li><code>document.title</code> e rolagem são efeitos, não código de desenho.</li>
+<li>Painel interno: estado basta. Link compartilhável: precisa da URL.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

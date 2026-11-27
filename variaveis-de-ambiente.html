@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Variáveis de Ambiente | Guia React</title>
+<meta name="description" content="Como funcionam as variáveis de ambiente no Vite: arquivos .env, o prefixo VITE_, import.meta.env, modos e precedência, segredos que não podem ir para o navegador.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Variáveis de <span class="hl">Ambiente</span></h1>
+<p class="intro">O site da Ana funciona no notebook dela e quebra quando é publicado. O motivo não está no
+React: está num endereço de API escrito à mão dentro de um componente. Nesta aula ela aprende a tirar os
+valores que mudam de ambiente do código, a guardá-los em arquivos <code>.env</code>, a ler com
+<code>import.meta.env</code> e a entender por que uma chave secreta jamais pode ir para o navegador. É o
+último degrau do nível de React de verdade, e o que separa um projeto de estudo de um projeto que
+sobrevive ao primeiro dia em produção.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que configuração não deve morar no código.</li>
+  <li>Como o Vite lê os arquivos <code>.env</code> e as quatro variações deles.</li>
+  <li>Por que só o que começa com <code>VITE_</code> chega ao navegador.</li>
+  <li>O que existe dentro de <code>import.meta.env</code> e como usar no componente.</li>
+  <li>Modos, precedência e <code>--mode</code> para separar teste de produção.</li>
+  <li>Por que segredo no front não existe e o que fazer no lugar.</li>
+  <li>Que todo valor chega como texto e o que isso quebra.</li>
+</ul>
+</div>
+
+<h2>1. A cena: dois endereços e uma chave</h2>
+
+<p>O site da padaria tem uma página de encomendas que busca os pedidos numa API. Enquanto a Ana testava, a
+API rodava no computador do sobrinho dela, na rede de casa, e o componente tinha o endereço escrito assim:
+<code>fetch("http://192.0.2.10:4000/pedidos")</code>. Funcionava. No dia em que o site foi publicado, a
+página abriu vazia e o console mostrou um erro de rede.</p>
+
+<p>O endereço de produção era outro. A solução que ela tentou primeiro foi editar o arquivo, trocar o
+endereço, rodar o build e enviar. Funcionou uma vez. Na semana seguinte ela precisou testar de novo, esqueceu
+de reverter, e publicou um site que tentava buscar pedidos na rede da casa dela — um endereço que só existe
+dentro daquela casa. O erro não aparece no build, não aparece nos testes automáticos e não aparece no
+computador de quem programou. Aparece só para o cliente.</p>
+
+<p>O segundo problema era pior. Para calcular o frete, a Ana colou no componente uma chave de acesso ao
+serviço de mapas que ela paga por mês. A chave foi junto no pacote publicado. Qualquer pessoa podia abrir as
+ferramentas do navegador, procurar e encontrar. Em duas semanas a conta triplicou.</p>
+
+<p>Os dois casos têm a mesma raiz: um valor que muda conforme o lugar onde o site roda estava escrito junto
+com a lógica, que não muda. A aula inteira é sobre separar essas duas coisas. O Vite tem um mecanismo
+pequeno e bem pensado para isso, e ele tem armadilhas específicas do navegador que valem conhecer antes de
+errar.</p>
+
+<h2>2. O que é variável de ambiente no front</h2>
+
+<p>Variável de ambiente é um valor que existe fora do código, fornecido pelo lugar onde o programa roda.
+Trocando o valor, o mesmo código se comporta diferente: aponta para outro banco, usa outra porta, liga um
+modo de depuração. É uma ideia antiga, dos tempos em que programas rodavam em servidores e liam variáveis do
+sistema operacional com <code>process.env</code>.</p>
+
+<p>No navegador, essa ideia não existe. Não há sistema operacional do outro lado, não há
+<code>process.env</code>, e o JavaScript que chega ao cliente é só um arquivo. Quando o Vite fala de
+"variáveis de ambiente", ele está falando de outra coisa: valores guardados em arquivos do projeto, lidos no
+momento do build, e <strong>escritos dentro do JavaScript final</strong> no lugar de cada referência.</p>
+
+<p>Vale entender o mecanismo, porque ele explica quase todos os tropeços. Você escreve
+<code>import.meta.env.VITE_API</code>. O Vite encontra esse texto e substitui pelo valor literal, como um
+editor de texto faria num "localizar e substituir". O resultado no arquivo publicado é
+<code>"https://api.loja.test"</code>, uma string comum. Não há consulta em tempo de execução, não há leitura
+de arquivo, não há configuração escondida.</p>
+
+<p>Disso saem três consequências. Primeira: o valor fica congelado no build; mudar o arquivo no servidor
+depois de publicado não muda nada. Segunda: como é substituição de texto, a referência precisa ser escrita
+por inteiro — <code>import.meta.env[nomeDaVariavel]</code> não funciona, porque o Vite não tem como adivinhar
+qual texto trocar. Terceira: tudo o que você colocar ali é publicável, porque vai literalmente para o
+arquivo que o visitante baixa. Guarde essa terceira, ela volta na seção 7.</p>
+
+<h2>3. O arquivo <code>.env</code> e a família de arquivos</h2>
+
+<p>O lugar combinado para esses valores é um arquivo chamado <code>.env</code> na raiz do projeto, ao lado do
+<code>package.json</code>. O formato é o mais simples possível: uma linha por variável, nome, sinal de igual
+e valor. O Vite lê esse arquivo ao iniciar o servidor e ao rodar o build.</p>
+
+<pre class="file" data-file=".env"># dados públicos da loja
+VITE_NOME_LOJA=Padaria da Ana
+VITE_WHATSAPP=11 90000-0000
+VITE_API=https://api.loja.test
+
+# isto aqui NÃO vai para o navegador
+CHAVE_MAPA=map_9f2a7c1b</pre>
+
+<p>Cada pedaço de uma linha tem um papel, e vale conhecer os cinco:</p>
+
+<dl class="anatomy">
+<dt><code>VITE_</code></dt>
+<dd>O prefixo que autoriza o valor a chegar ao navegador. Sem ele, a variável existe para o build, mas não
+aparece no código do cliente.</dd>
+<dt>nome</dt>
+<dd>Letras maiúsculas e sublinhado, sem espaço e sem acento. É o que você digita depois do ponto em
+<code>import.meta.env</code>.</dd>
+<dt><code>=</code></dt>
+<dd>Separa nome e valor. Sem espaços em volta: o que vem depois do sinal, até o fim da linha, é o valor
+inteiro.</dd>
+<dt>valor</dt>
+<dd>Texto puro, sem aspas por padrão. Se precisar de espaço no começo ou no fim, ou de um <code>#</code>
+dentro do valor, use aspas duplas.</dd>
+<dt><code>#</code></dt>
+<dd>Começa um comentário. Linha em branco e linha comentada são ignoradas — e comentário é bom lugar para
+dizer de onde veio o valor.</dd>
+</dl>
+
+<p>Só que um arquivo só não resolve tudo. O Vite procura quatro nomes diferentes e junta o que encontra,
+nesta ordem de importância:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Arquivo</th><th>Quando é lido</th><th>Vai para o Git?</th><th>Força</th></tr>
+<tr><td><code>.env</code></td><td>sempre</td><td>sim</td><td>a menor</td></tr>
+<tr><td><code>.env.local</code></td><td>sempre</td><td>não</td><td>média</td></tr>
+<tr><td><code>.env.production</code></td><td>só no modo production</td><td>sim</td><td>alta</td></tr>
+<tr><td><code>.env.production.local</code></td><td>só no modo production</td><td>não</td><td>a maior</td></tr>
+</table>
+</div>
+
+<p>A lógica é simples quando você olha pelo nome: quanto mais específico o arquivo, mais forte ele é. O
+<code>.env</code> traz o que vale para todo mundo; o <code>.env.local</code> traz o que é só seu, com valor
+que você não quer versionar; os arquivos com o nome do modo trazem o que vale quando o site é construído
+naquele modo. E o sufixo <code>.local</code>, em qualquer combinação, é o ajuste pessoal que vence o resto.</p>
+
+<p>Se dois arquivos definem a mesma variável, o mais forte vence — não há soma, há substituição do valor
+inteiro. Isso permite escrever o <code>.env</code> com valores genéricos e sobrescrever só o que muda em
+cada situação.</p>
+
+<h2>4. O prefixo <code>VITE_</code></h2>
+
+<p>A pergunta que todo mundo faz primeiro: por que preciso desse prefixo? Resposta curta: porque nem tudo
+que está no <code>.env</code> pode virar código público. O mesmo arquivo serve ao projeto inteiro, e outras
+ferramentas podem guardar ali endereço de banco, senha de e-mail, token de integração. Se o Vite entregasse
+tudo ao navegador, um <code>DATABASE_URL</code> escaparia para o cliente sem ninguém pedir.</p>
+
+<p>O prefixo é, então, uma assinatura: quem escreve <code>VITE_</code> está declarando "este valor pode ser
+visto por qualquer pessoa". É um aviso no próprio nome, e é por isso que ele é obrigatório e não opcional.
+Existe como mudar o prefixo na configuração (<code>envPrefix</code>), mas não vale a pena: você perde a
+convenção que todo projeto Vite do mundo reconhece.</p>
+
+<p>O exercício abaixo mostra a regra em ação. A caixa simula o objeto que o Vite monta a partir do
+<code>.env</code>; falta filtrar o que pode ser publicado.</p>
+
+<div class="tryreact" data-goal="texto:só o que tem prefixo;;conta:li=2">
+  <p class="try-task">A lista mostra as três variáveis, incluindo a chave secreta. Filtre o objeto para
+  ficarem só as que começam com <code>VITE_</code> e troque o título para
+  <strong>só o que tem prefixo</strong>.</p>
+  <pre class="jsx">const env = {
+  VITE_NOME_LOJA: "Padaria da Ana",
+  VITE_ABERTURA: "6h",
+  CHAVE_PAGAMENTO: "sk_live_9f2a7c",
+};
+
+function App() {
+  const tudo = Object.entries(env);
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;tudo que está no .env&lt;/h2&gt;
+      &lt;ul&gt;
+        {tudo.map(([nome, valor]) =&gt; (
+          &lt;li key={nome}&gt;{nome}: {valor}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h2&gt;tudo que está no .env&lt;/h2&gt;
+  &lt;ul&gt;
+    &lt;li&gt;VITE_NOME_LOJA : Padaria da Ana&lt;/li&gt;
+    &lt;li&gt;VITE_ABERTURA : 6h&lt;/li&gt;
+    &lt;li&gt;CHAVE_PAGAMENTO : sk_live_9f2a7c&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const env = {
+  VITE_NOME_LOJA: "Padaria da Ana",
+  VITE_ABERTURA: "6h",
+  CHAVE_PAGAMENTO: "sk_live_9f2a7c",
+};
+
+function App() {
+  const publicas = Object.entries(env).filter(([nome]) =&gt; nome.startsWith("VITE_"));
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;só o que tem prefixo&lt;/h2&gt;
+      &lt;ul&gt;
+        {publicas.map(([nome, valor]) =&gt; (
+          &lt;li key={nome}&gt;{nome}: {valor}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No projeto de verdade você não escreve esse filtro: o Vite já faz. O valor da caixa é fixar a regra na
+cabeça, porque ela explica o sintoma mais comum de quem está começando — a variável existe no
+<code>.env</code>, o código compila, e <code>import.meta.env.VITE_API</code> chega como
+<code>undefined</code> porque o nome foi digitado sem o prefixo. Quando isso acontecer, olhe o nome antes de
+suspeitar do React.</p>
+
+<h2>5. Lendo com <code>import.meta.env</code></h2>
+
+<p>No componente, o acesso é direto e parece uma propriedade comum. O objeto <code>import.meta.env</code> é
+montado pelo Vite e reúne as variáveis com prefixo mais um punhado de chaves que ele mesmo define:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Chave</th><th>Exemplo</th><th>Para que serve</th></tr>
+<tr><td><code>MODE</code></td><td><code>"development"</code></td><td>o modo atual do servidor ou do build</td></tr>
+<tr><td><code>DEV</code></td><td><code>true</code></td><td>booleano, verdadeiro rodando <code>npm run dev</code></td></tr>
+<tr><td><code>PROD</code></td><td><code>false</code></td><td>booleano, verdadeiro no build de produção</td></tr>
+<tr><td><code>BASE_URL</code></td><td><code>"/"</code></td><td>o caminho base configurado, útil para montar links</td></tr>
+<tr><td><code>VITE_*</code></td><td><code>"Padaria da Ana"</code></td><td>cada variável sua, sempre como texto</td></tr>
+</table>
+</div>
+
+<p>Um <code>console.log(import.meta.env)</code> dentro do <code>App</code>, com o servidor de
+desenvolvimento rodando, imprime algo assim no console do navegador:</p>
+
+<pre class="term">console.log(import.meta.env)
+{
+  BASE_URL: "/",
+  DEV: true,
+  MODE: "development",
+  PROD: false,
+  SSR: false,
+  VITE_API: "https://api.loja.test",
+  VITE_NOME_LOJA: "Padaria da Ana",
+  VITE_WHATSAPP: "11 90000-0000"
+}</pre>
+
+<p>Repare que a chave sem prefixo não aparece. Se ela estivesse no arquivo, continuaria fora desta lista — é
+o filtro da seção 4 funcionando. Repare também que <code>DEV</code> e <code>PROD</code> são booleanos de
+verdade, enquanto as suas variáveis são texto. Essa diferença é a origem de um bug clássico, que a seção 8
+desmonta.</p>
+
+<p>No componente, o uso mais comum é guardar o endereço da API num lugar só e importar de lá. Um arquivo
+pequeno, tipo <code>src/config.js</code>, evita repetir o nome comprido em cada <code>fetch</code> e dá um
+único ponto para conferir:</p>
+
+<pre class="file" data-file="src/config.js">export const API = import.meta.env.VITE_API;
+export const WHATSAPP = import.meta.env.VITE_WHATSAPP ?? "11 90000-0000";
+export const NOME_DA_LOJA = import.meta.env.VITE_NOME_LOJA ?? "Padaria";</pre>
+
+<p>Dali em diante, o componente importa <code>API</code> e usa normalmente. Quem lê o código entende que o
+endereço vem de fora; quem troca de ambiente mexe no <code>.env</code>, não no componente. É a separação que
+a Ana precisava na seção 1, com três linhas de código.</p>
+
+<h2>6. Modos, precedência e o <code>--mode</code></h2>
+
+<p>Modo é o nome que o Vite dá à situação em que o projeto está sendo executado. Os dois que você já usa sem
+saber são <code>development</code>, quando roda <code>npm run dev</code>, e <code>production</code>, quando
+roda <code>npm run build</code>. O modo decide quais arquivos <code>.env</code> entram e qual valor fica em
+<code>import.meta.env.MODE</code>.</p>
+
+<p>Você pode criar os seus. A padaria tem um servidor de testes, separado do site de verdade; a Ana cria
+<code>.env.staging</code> com o endereço da API de teste e constrói com
+<code>npm run build -- --mode staging</code>. O <code>--</code> duplo passa o argumento adiante, como você
+viu na aula de <a href="scripts-do-package.html">scripts do package.json</a>. O Vite então carrega <code>.env</code>, <code>.env.local</code>,
+<code>.env.staging</code> e <code>.env.staging.local</code>, nesta ordem de força.</p>
+
+<pre class="term">$ npm run build -- --mode staging
+
+&gt; padaria@0.0.0 build
+&gt; vite build --mode staging
+
+vite v7.1.0 building for staging...
+✓ 34 modules transformed.
+dist/index.html                 0.46 kB │ gzip:  0.30 kB
+dist/assets/index-9f8e7d6c.js  142.31 kB │ gzip: 45.62 kB
+✓ built in 1.21s
+
+$ grep -o "https://api-staging.loja.test" dist/assets/index-*.js
+https://api-staging.loja.test</pre>
+
+<p>A primeira linha da saída confirma o modo: "building for staging". O <code>grep</code> no fim é a prova
+que importa: o endereço de teste está escrito dentro do arquivo publicado. Não há arquivo de configuração
+sendo lido em produção — o valor virou texto no pacote. É por isso que a seção 2 insistiu tanto no
+"congelado".</p>
+
+<p>A caixa seguinte mostra a ordem de força em forma de código. Os três arquivos são aplicados do mais fraco
+para o mais forte, e o último a escrever na mesma chave ganha.</p>
+
+<div class="tryreact" data-goal="texto:https://api.loja.test">
+  <p class="try-task">A função <code>juntar</code> está invertida e o valor de <code>.env</code> está
+  vencendo os outros. Faça o arquivo mais específico vencer, de modo que a tela mostre
+  <strong>https://api.loja.test</strong>.</p>
+  <pre class="jsx">const arquivos = [
+  { nome: ".env", valores: { VITE_API: "http://192.0.2.10:4000" } },
+  { nome: ".env.local", valores: { VITE_API: "http://localhost:4000" } },
+  { nome: ".env.production", valores: { VITE_API: "https://api.loja.test" } },
+];
+
+function juntar(lista) {
+  return lista.reduce((acc, arquivo) =&gt; ({ ...arquivo.valores, ...acc }), {});
+}
+
+function App() {
+  const env = juntar(arquivos);
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;endereço da API&lt;/h2&gt;
+      &lt;p&gt;{env.VITE_API}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h2&gt;endereço da API&lt;/h2&gt;
+  &lt;p&gt;http://192.0.2.10:4000&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const arquivos = [
+  { nome: ".env", valores: { VITE_API: "http://192.0.2.10:4000" } },
+  { nome: ".env.local", valores: { VITE_API: "http://localhost:4000" } },
+  { nome: ".env.production", valores: { VITE_API: "https://api.loja.test" } },
+];
+
+function juntar(lista) {
+  return lista.reduce((acc, arquivo) =&gt; ({ ...acc, ...arquivo.valores }), {});
+}
+
+function App() {
+  const env = juntar(arquivos);
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;endereço da API&lt;/h2&gt;
+      &lt;p&gt;{env.VITE_API}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Há um detalhe que costuma confundir: o <code>vite.config.js</code> roda em Node, antes de o navegador
+existir, e ali <code>import.meta.env</code> não está preenchido. Se a configuração precisa de um valor do
+<code>.env</code> — o endereço do proxy, por exemplo —, use <code>loadEnv</code>:</p>
+
+<pre class="file" data-file="vite.config.js">import { defineConfig, loadEnv } from "vite";
+
+export default defineConfig(({ mode }) =&gt; {
+  const env = loadEnv(mode, process.cwd(), "");
+  return {
+    server: {
+      proxy: {
+        "/api": { target: env.VITE_API, changeOrigin: true },
+      },
+    },
+  };
+});</pre>
+
+<p>O terceiro argumento vazio (<code>""</code>) desliga o filtro do prefixo. Aqui pode, porque esse valor
+não vai para o navegador: ele só configura o servidor de desenvolvimento. Se um dia precisar de uma
+constante pública definida à mão na configuração, existe a opção <code>define</code>, que substitui textos
+no build — mas <code>import.meta.env</code> já resolve o caso normal, e misturar os dois confunde.</p>
+
+<h2>7. Segredo no cliente não existe</h2>
+
+<p>Esta é a seção que evita prejuízo. Tudo o que o navegador executa está no computador do visitante. Não
+existe "esconder" código: o arquivo pode estar minificado, com nomes de variáveis reduzidos a uma letra, e
+ainda assim é um texto que qualquer pessoa abre nas ferramentas de desenvolvedor e lê. Se o valor está no
+pacote, ele é público, ponto.</p>
+
+<p>Consequência direta: <strong>nunca</strong> coloque no <code>.env</code> com prefixo uma chave secreta. Nem
+senha de banco, nem token com permissão de escrita, nem chave privada de serviço pago. O prefixo
+<code>VITE_</code> é justamente o contrário de um cofre — é uma placa dizendo "isto é público".</p>
+
+<p>O que pode ir para o cliente: endereço de API pública, nome da loja, telefone, identificador de
+acompanhamento de analytics, e as chaves ditas "publicáveis" — as que o fornecedor entrega sabendo que vão
+aparecer no navegador e que só funcionam a partir do seu domínio. Se a documentação do serviço não disser
+claramente "publishable" ou "public key", trate como segredo.</p>
+
+<p>Quando o valor precisa mesmo ser secreto, ele fica do outro lado. A Ana trocou a chave do serviço de
+mapas por uma função no servidor: o componente chama <code>/api/frete</code>, essa função guarda a chave e
+conversa com o serviço, e devolve só o resultado. O navegador nunca vê a chave. Isso vale para qualquer
+integração paga, envio de e-mail, cobrança e escrita em banco.</p>
+
+<p>E se a chave já vazou, o conserto não é apagar o arquivo: é revogar a chave no painel do serviço e gerar
+outra. O valor antigo está em builds publicados, em cache de navegador e no histórico de quem baixou. Trocar
+a variável e reconstruir resolve para o futuro; revogar resolve o presente.</p>
+
+<p>Sobre versionamento, uma regra prática que combina com o <code>.gitignore</code> da aula de estrutura:
+<code>.env.local</code> e qualquer arquivo terminado em <code>.local</code> ficam fora do repositório — é o
+lugar do valor pessoal e do segredo de desenvolvimento. O <code>.env</code> sem segredo pode ser versionado,
+porque é documentação do que o projeto espera.</p>
+
+<h2>8. Tudo chega como texto</h2>
+
+<p>O <code>.env</code> não tem tipo. Não existe número, booleano ou lista ali dentro: existe texto. O Vite
+lê a linha, guarda o que está depois do sinal de igual como string e entrega assim ao código. Quando você
+escreve <code>VITE_MOSTRAR_PROMO=false</code>, o valor é a string <code>"false"</code> — quatro letras, não
+o booleano falso. E string não vazia é sempre verdadeira em JavaScript, então
+<code>if (import.meta.env.VITE_MOSTRAR_PROMO)</code> entra no bloco mesmo com o valor "false". É o bug que a
+caixa a seguir reproduz.</p>
+
+<div class="tryreact" data-goal="texto:Hoje sem promoção.">
+  <p class="try-task">A variável vale <code>"false"</code>, mas o aviso de promoção aparece. Corrija a
+  comparação para que a tela mostre <strong>Hoje sem promoção.</strong></p>
+  <pre class="jsx">const env = {
+  VITE_MOSTRAR_PROMO: "false",
+};
+
+function App() {
+  const mostrar = env.VITE_MOSTRAR_PROMO;
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Padaria da Ana&lt;/h2&gt;
+      {mostrar ? (
+        &lt;p className="promo"&gt;Pão de queijo em promoção: R$ 3,50&lt;/p&gt;
+      ) : (
+        &lt;p&gt;Hoje sem promoção.&lt;/p&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h2&gt;Padaria da Ana&lt;/h2&gt;
+  &lt;p class="promo"&gt;Pão de queijo em promoção: R$ 3,50&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const env = {
+  VITE_MOSTRAR_PROMO: "false",
+};
+
+function App() {
+  const mostrar = env.VITE_MOSTRAR_PROMO === "true";
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Padaria da Ana&lt;/h2&gt;
+      {mostrar ? (
+        &lt;p className="promo"&gt;Pão de queijo em promoção: R$ 3,50&lt;/p&gt;
+      ) : (
+        &lt;p&gt;Hoje sem promoção.&lt;/p&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Para número, a mesma ideia: <code>Number(import.meta.env.VITE_TAXA)</code> ou
+<code>parseFloat</code>. Cuidado com a conversão silenciosa — <code>Number("")</code> dá zero, e uma variável
+esquecida deixa de dar erro para virar um valor errado. Prefira converter num único lugar, no
+<code>config.js</code>, e conferir se o resultado faz sentido antes de usar.</p>
+
+<p>Para valor ausente, o operador <code>??</code> é o mais seguro: ele só cai no padrão quando o lado
+esquerdo é <code>undefined</code> ou <code>null</code>, e não quando é string vazia ou zero. É o que o
+<code>config.js</code> da seção 5 faz com o telefone. Usar <code>||</code> no lugar funciona na maioria dos
+casos, mas troca zero e vazio pelo padrão sem avisar.</p>
+
+<p>Outra armadilha é a substituição estática. <code>import.meta.env.VITE_API</code> funciona;
+<code>const chave = "VITE_API"; import.meta.env[chave]</code> devolve <code>undefined</code>. O Vite troca
+texto, e um nome guardado em variável é invisível para ele. Se você precisa montar nomes dinamicamente, o
+caminho é um objeto explícito no <code>config.js</code>.</p>
+
+<p>Em projeto com TypeScript, o arquivo <code>src/vite-env.d.ts</code> declara os tipos e ganha-se
+autocompletar e erro de digitação. Vale mesmo em JavaScript puro, porque o editor passa a sugerir os nomes
+certos:</p>
+
+<pre class="file" data-file="src/vite-env.d.ts">/// &lt;reference types="vite/client" /&gt;
+
+interface ImportMetaEnv {
+  readonly VITE_API: string;
+  readonly VITE_WHATSAPP: string;
+  readonly VITE_NOME_LOJA: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}</pre>
+
+<p>Por último, o detalhe operacional que mais custa tempo: o valor é lido quando o servidor inicia. Nas
+versões recentes, salvar um arquivo <code>.env</code> faz o Vite reiniciar sozinho; se o valor novo não
+aparecer, pare com <code>Ctrl+C</code> e rode <code>npm run dev</code> de novo. E lembre que o build não
+recarrega nada: mudou o <code>.env</code>, rode <code>npm run build</code> outra vez, senão o pacote antigo
+continua com o valor antigo — é o mesmo ciclo do <a href="build-de-producao.html">build de produção</a>.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: funciona na minha máquina, quebra na do colega</h3>
+<p>O colega clonou o projeto e a página abriu em branco. O <code>.env.local</code> dele não existia, porque
+arquivo <code>.local</code> não vai para o repositório — e é justamente ali que estava o endereço da API de
+desenvolvimento. O conserto foi versionar um <code>.env.example</code> com as chaves e valores vazios, e
+dizer no README: copie para <code>.env.local</code> e preencha. Quem entra no projeto passa a saber o que
+falta antes de rodar.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o site publicado chamando localhost</h3>
+<p>A encomenda não carregava no site oficial e o console mostrava erro em
+<code>http://localhost:4000</code>. O build tinha rodado sem o modo certo, e o <code>.env.local</code> da
+máquina da Ana venceu. O conserto foi construir com <code>--mode production</code> e conferir com um
+<code>grep</code> no arquivo de <code>dist</code> antes de enviar. Virou passo do script de publicação:
+procurar <code>localhost</code> no pacote e falhar se encontrar.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: a chave que apareceu no pacote</h3>
+<p>Ela colou a chave do serviço de mapas como <code>VITE_CHAVE_MAPA</code> e publicou. Dias depois, uma
+pessoa abriu as ferramentas do navegador, buscou "map_" e achou. A chave foi revogada no mesmo dia e a
+chamada passou a sair de uma função no servidor, que guarda o segredo e devolve só o resultado. A lição
+ficou: se o prefixo é <code>VITE_</code>, o valor é público.</p>
+</div>
+
+<p>Duas práticas pequenas fecham o assunto. A primeira é o <code>.env.example</code>: um arquivo versionado,
+com as chaves e sem os valores, que serve de contrato para o time e para o servidor de integração contínua.
+A segunda é injetar os valores no build pela plataforma — todo serviço de publicação tem um lugar para
+cadastrar variáveis que existem só durante o build, o que evita guardar segredo no repositório e deixa
+rastro de quem mudou o quê.</p>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Por que uma variável sem o prefixo <code>VITE_</code> não
+aparece no navegador?</p>
+<label><input type="radio" name="q1"> porque o nome está curto demais para o objeto</label>
+<label><input type="radio" name="q1"> porque o Vite só entrega ao cliente o que foi marcado como público</label>
+<label><input type="radio" name="q1"> porque o navegador não lê arquivos <code>.env</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que acontece com <code>VITE_TAXA=0.1</code> dentro do
+código?</p>
+<label><input type="radio" name="q2"> vira o número 0.1 automaticamente</label>
+<label><input type="radio" name="q2"> vira <code>undefined</code>, porque número não é aceito</label>
+<label><input type="radio" name="q2"> chega como texto e precisa de <code>Number()</code> para virar número</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Qual arquivo vence quando dois definem a mesma
+variável?</p>
+<label><input type="radio" name="q3"> o mais específico, como <code>.env.production.local</code></label>
+<label><input type="radio" name="q3"> o <code>.env</code>, que é o principal</label>
+<label><input type="radio" name="q3"> o que foi salvo por último no editor</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o prefixo que falta</h2>
+<p>Complete o nome da variável que precisa chegar ao navegador para o componente ler o endereço da API:</p>
+<div class="ex-code"><input aria-label="resposta 1" data-answer="VITE_" placeholder="...">API=https://api.loja.test</div>
+<p class="ex-dica">Dica: cinco letras em maiúsculas e um sublinhado, o mesmo prefixo que aparece em todas as
+variáveis públicas do <code>.env</code> e na tabela da seção 5.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Configuração não mora no código. O que muda entre desenvolvimento, teste e produção vai para arquivos
+<code>.env</code>, lidos pelo Vite no início do servidor e no build. O <code>.env</code> guarda o que vale
+para todos; o <code>.env.local</code> guarda o ajuste pessoal e não é versionado; os arquivos com o nome do
+modo valem só naquele modo, e o mais específico vence.</p>
+
+<p>Só o que tem o prefixo <code>VITE_</code> chega ao navegador, e isso é uma proteção, não uma limitação.
+O acesso é por <code>import.meta.env</code>, que traz também <code>MODE</code>, <code>DEV</code>,
+<code>PROD</code> e <code>BASE_URL</code>. O valor é substituído no build, como texto, então a referência
+precisa ser escrita por inteiro e mudar o arquivo depois de publicado não muda nada.</p>
+
+<p>Segredo no cliente não existe: se o valor está no pacote, qualquer pessoa lê. Chave privada fica no
+servidor, e o navegador conversa com uma função que a guarda. Todo valor chega como texto, o que transforma
+<code>"false"</code> em verdadeiro e obriga a comparar ou converter de propósito.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Valor que muda de ambiente fica no <code>.env</code>, não no componente.</li>
+<li><code>VITE_</code> na frente é a placa de "pode ser público".</li>
+<li><code>.env.local</code> não vai para o Git; <code>.env.example</code> vai.</li>
+<li>Precedência: <code>.env</code> &lt; <code>.env.local</code> &lt; <code>.env.[modo]</code> &lt;
+<code>.env.[modo].local</code>.</li>
+<li><code>import.meta.env.MODE</code>, <code>DEV</code>, <code>PROD</code> e <code>BASE_URL</code> vêm de
+graça.</li>
+<li>O valor é assado no build: trocar depois no servidor não adianta.</li>
+<li>Nome sem prefixo chega como <code>undefined</code> no navegador.</li>
+<li>Tudo é string: <code>"false"</code> é verdadeiro, número precisa de conversão.</li>
+<li>Acesso dinâmico (<code>import.meta.env[nome]</code>) não funciona.</li>
+<li>Chave secreta vive no servidor; no pacote, ela é pública.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

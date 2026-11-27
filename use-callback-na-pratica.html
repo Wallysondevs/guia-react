@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>useCallback na Prática | Guia React</title>
+<meta name="description" content="useCallback na prática: a dupla com useMemo para segurar filhos memoizados, ações estáveis saindo de hooks próprios, dependências curtas com a forma funcional e quando não usar.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>useCallback na <span class="hl">Prática</span></h1>
+<p class="intro">A Ana já sabe que o <code>useCallback</code> guarda uma função entre desenhos. O que ela
+ainda não sabia é quanto isso custa quando falta: a cada tecla no campo de busca, dois componentes
+memoizados desenham de novo porque recebem uma função nova. Nesta aula ela usa o <code>useCallback</code>
+onde ele realmente importa — na dupla com o <code>useMemo</code>, nas ações que saem de hooks próprios e
+nas dependências curtas com a forma funcional do <code>set</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que uma função criada no corpo do componente derruba o <code>memo</code> do filho.</li>
+  <li>A ajustar a dupla: <code>useMemo</code> para os dados, <code>useCallback</code> para as ações.</li>
+  <li>A devolver ações estáveis de um hook próprio.</li>
+  <li>Como manter o array de dependências curto usando a forma funcional do <code>set</code>.</li>
+  <li>Onde o <code>useCallback</code> importa de verdade: prop, efeito, listener e contexto.</li>
+  <li>Quando ele é exagero e o que o React Compiler muda nessa conversa.</li>
+  <li>Como ler a corrente de dependências sem se perder.</li>
+</ul>
+</div>
+
+<h2>1. A cena: cada tecla redesenha a lista</h2>
+
+<p>A página de busca da padaria tem um campo, um filtro e uma lista. O campo guarda o texto; a lista
+filtra os pães; o filtro é um botão que alterna entre doces e salgados. A Ana digitou "queijo" e sentiu o
+campo engasgar. No console, com um contador de desenhos, viu a lista desenhar uma vez por tecla.</p>
+
+<p>No console, o contador dentro da lista mostrava a cascata:</p>
+
+<pre class="term">desenhou a lista (2)
+desenhou a lista (3)
+desenhou a lista (4)</pre>
+
+<p>O que a incomodou foi o motivo. A lista recebe os pães filtrados, e os pães não mudaram por causa da
+letra digitada. O botão de filtro recebe a função que troca o filtro, e essa função também não mudou de
+comportamento. Os dois componentes estavam embrulhados com <code>memo</code>. Mesmo assim, desenhavam.</p>
+
+<p>A causa é a mesma das duas aulas anteriores, vista do outro lado: o <code>memo</code> compara as props
+por referência, e o pai recria o array e a função a cada desenho. O array precisa de
+<code>useMemo</code>; a função, de <code>useCallback</code>. Sem os dois, o <code>memo</code> dos filhos é
+decoração.</p>
+
+<p>Esta aula é sobre o segundo. E sobre uma coisa que ninguém conta: o <code>useCallback</code> também
+pode ser exagero. Função inline não é problema por si só; ela é problema quando cruza uma fronteira que
+compara referências.</p>
+
+<h2>2. Toda função nasce nova</h2>
+
+<p>Dentro do corpo de um componente, uma função declarada é criada a cada desenho. Não é um detalhe de
+implementação: é o que permite a função enxergar o estado daquele desenho. <code>() =&gt; setFiltro("doce")</code>
+criada no desenho 7 carrega o <code>setFiltro</code> do desenho 7; no desenho 8, outra função é criada.</p>
+
+<p>Para o JavaScript, tudo certo. Para o <a href="memo.html"><code>memo</code></a> de um filho, é uma prop
+nova a cada vez. E a
+comparação que o filho faz não olha o corpo da função: olha a referência. Duas funções com o mesmo corpo e
+referências diferentes são props diferentes.</p>
+
+<dl class="anatomy">
+<dt>função inline</dt>
+<dd>A função escrita direto na prop: <code>onClick={() =&gt; setX(1)}</code>. Nova a cada desenho.</dd>
+<dt><code>useCallback</code></dt>
+<dd>Guarda a função entre desenhos e devolve a mesma referência enquanto as dependências não mudam.</dd>
+<dt>dependências</dt>
+<dd>O array que decide quando a função é recriada. Liste o que a função lê de fora.</dd>
+<dt>ação estável</dt>
+<dd>Uma função que não muda de referência entre desenhos: o que hooks próprios costumam devolver.</dd>
+<dt>corrente</dt>
+<dd>A sequência de dependências que liga um valor ao outro: um array memoizado que depende de uma função
+memoizada, que depende de um estado.</dd>
+</dl>
+
+<p>Vale repetir o que o <code>useCallback</code> <em>não</em> faz: ele não impede a função de ser chamada,
+não congela o valor que ela lê e não deixa o componente mais rápido por si só. Ele só devolve a mesma
+referência entre desenhos. Quem aproveita isso é outra coisa — o <code>memo</code> do filho, a lista de
+dependências de um efeito, o comparador de um contexto.</p>
+
+<h2>3. A dupla: dados com <code>useMemo</code>, ações com <code>useCallback</code></h2>
+
+<p>Na caixa, a lista e o filtro são componentes memoizados. O pai cria o array filtrado e a função de
+filtrar no corpo, então as duas props mudam a cada desenho — inclusive quando o que muda é só o aviso.
+Clique em <strong>Trocar aviso</strong> e veja os dois contadores subirem.</p>
+
+<div class="tryreact" data-goal="clique:#trocar;;texto:lista desenhada: 1;;texto:filtro desenhado: 1">
+  <p class="try-task">A lista e o filtro desenham a cada troca de aviso. Envolva o <code>filter</code> em
+  <code>useMemo</code> com <code>[filtro]</code> e a função <code>aoFiltrar</code> em
+  <code>useCallback</code> com <code>[]</code>. Depois clique em Trocar aviso.</p>
+  <pre class="jsx">const PAES = [
+  { nome: "sonho", tipo: "doce" },
+  { nome: "pão francês", tipo: "salgado" },
+  { nome: "pão de queijo", tipo: "salgado" },
+];
+
+let desenhosLista = 0;
+let desenhosFiltro = 0;
+
+const Lista = memo(function Lista({ itens }) {
+  desenhosLista = desenhosLista + 1;
+  return &lt;p&gt;lista desenhada: {desenhosLista} ({itens.length} pão(es))&lt;/p&gt;;
+});
+
+const Filtro = memo(function Filtro({ aoFiltrar }) {
+  desenhosFiltro = desenhosFiltro + 1;
+  return (
+    &lt;div&gt;
+      &lt;p&gt;filtro desenhado: {desenhosFiltro}&lt;/p&gt;
+      &lt;button id="doce" onClick={() =&gt; aoFiltrar("doce")}&gt;Só doces&lt;/button&gt;
+    &lt;/div&gt;
+  );
+});
+
+function App() {
+  const [filtro, setFiltro] = useState("todos");
+  const [aviso, setAviso] = useState("Padaria aberta");
+
+  const itens = PAES.filter((p) =&gt; filtro === "todos" || p.tipo === filtro);
+  const aoFiltrar = (valor) =&gt; setFiltro(valor);
+
+  return (
+    &lt;div&gt;
+      &lt;button id="trocar" onClick={() =&gt; setAviso(aviso === "Padaria aberta" ? "Forno quente" : "Padaria aberta")}&gt;
+        Trocar aviso
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;Filtro aoFiltrar={aoFiltrar} /&gt;
+      &lt;Lista itens={itens} /&gt;
+      &lt;p&gt;filtro atual: {filtro}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="trocar"&gt;Trocar aviso&lt;/button&gt;
+  &lt;p&gt;Padaria aberta&lt;/p&gt;
+  &lt;div&gt;
+    &lt;p&gt;filtro desenhado: 1&lt;/p&gt;
+    &lt;button id="doce"&gt;Só doces&lt;/button&gt;
+  &lt;/div&gt;
+  &lt;p&gt;lista desenhada: 1 ( 3 pão(es))&lt;/p&gt;
+  &lt;p&gt;filtro atual: todos&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const PAES = [
+  { nome: "sonho", tipo: "doce" },
+  { nome: "pão francês", tipo: "salgado" },
+  { nome: "pão de queijo", tipo: "salgado" },
+];
+
+let desenhosLista = 0;
+let desenhosFiltro = 0;
+
+const Lista = memo(function Lista({ itens }) {
+  desenhosLista = desenhosLista + 1;
+  return &lt;p&gt;lista desenhada: {desenhosLista} ({itens.length} pão(es))&lt;/p&gt;;
+});
+
+const Filtro = memo(function Filtro({ aoFiltrar }) {
+  desenhosFiltro = desenhosFiltro + 1;
+  return (
+    &lt;div&gt;
+      &lt;p&gt;filtro desenhado: {desenhosFiltro}&lt;/p&gt;
+      &lt;button id="doce" onClick={() =&gt; aoFiltrar("doce")}&gt;Só doces&lt;/button&gt;
+    &lt;/div&gt;
+  );
+});
+
+function App() {
+  const [filtro, setFiltro] = useState("todos");
+  const [aviso, setAviso] = useState("Padaria aberta");
+
+  const itens = useMemo(
+    () =&gt; PAES.filter((p) =&gt; filtro === "todos" || p.tipo === filtro),
+    [filtro]
+  );
+  const aoFiltrar = useCallback((valor) =&gt; setFiltro(valor), []);
+
+  return (
+    &lt;div&gt;
+      &lt;button id="trocar" onClick={() =&gt; setAviso(aviso === "Padaria aberta" ? "Forno quente" : "Padaria aberta")}&gt;
+        Trocar aviso
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;Filtro aoFiltrar={aoFiltrar} /&gt;
+      &lt;Lista itens={itens} /&gt;
+      &lt;p&gt;filtro atual: {filtro}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel do código inicial mostra os dois contadores em 1, porque só houve a montagem. Depois do clique,
+o código antigo mostra 2 nos dois; a solução continua em 1. Duas props estáveis, dois filhos parados.</p>
+
+<p>Repare nas dependências diferentes: o <code>useMemo</code> depende de <code>[filtro]</code>, porque o
+array muda quando o filtro muda; o <code>useCallback</code> tem <code>[]</code>, porque a função só usa
+<code>setFiltro</code>, que o React garante ser sempre o mesmo. Essa assimetria é normal e é o assunto da
+seção 5.</p>
+
+<p>E repare no que acontece quando você clica em <strong>Só doces</strong>: o <code>filtro</code> muda, o
+array é recalculado, a lista desenha de novo — agora sim por um motivo. O <code>Filtro</code> continua
+parado, porque a função dele não mudou. É o comportamento que se quer: trabalho só onde houve mudança
+real.</p>
+
+<h2>4. Ações que vêm de hooks próprios</h2>
+
+<p>Quando o estado e as ações saem para um hook próprio, o <code>useCallback</code> vira quase
+obrigatório. Um hook que devolve <code>{ itens, adicionar }</code> cria <code>adicionar</code> a cada
+desenho do componente que o usa — e todos os filhos que recebem essa função desenham junto. O hook é o
+lugar certo para estabilizar: quem devolve a ação garante a referência.</p>
+
+<div class="tryreact" data-goal="clique:#add;;clique:#add;;texto:botão desenhado: 1;;texto:itens na sacola: 2">
+  <p class="try-task">O botão está com <code>memo</code>, mas <code>adicionar</code> é recriada a cada
+  desenho do hook. Envolva a função em <code>useCallback</code> com <code>[]</code> e use a forma funcional
+  no <code>setItens</code>. Depois clique duas vezes em Adicionar sonho.</p>
+  <pre class="jsx">function useCarrinho() {
+  const [itens, setItens] = useState([]);
+  const adicionar = (nome) =&gt; {
+    setItens((lista) =&gt; [...lista, nome]);
+  };
+  return { itens, adicionar };
+}
+
+let desenhos = 0;
+const Botao = memo(function Botao({ adicionar }) {
+  desenhos = desenhos + 1;
+  return (
+    &lt;div&gt;
+      &lt;button id="add" onClick={() =&gt; adicionar("sonho")}&gt;Adicionar sonho&lt;/button&gt;
+      &lt;p&gt;botão desenhado: {desenhos}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+});
+
+function App() {
+  const { itens, adicionar } = useCarrinho();
+
+  return (
+    &lt;div&gt;
+      &lt;Botao adicionar={adicionar} /&gt;
+      &lt;p&gt;itens na sacola: {itens.length}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;div&gt;
+    &lt;button id="add"&gt;Adicionar sonho&lt;/button&gt;
+    &lt;p&gt;botão desenhado: 1&lt;/p&gt;
+  &lt;/div&gt;
+  &lt;p&gt;itens na sacola: 0&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function useCarrinho() {
+  const [itens, setItens] = useState([]);
+  const adicionar = useCallback((nome) =&gt; {
+    setItens((lista) =&gt; [...lista, nome]);
+  }, []);
+  return { itens, adicionar };
+}
+
+let desenhos = 0;
+const Botao = memo(function Botao({ adicionar }) {
+  desenhos = desenhos + 1;
+  return (
+    &lt;div&gt;
+      &lt;button id="add" onClick={() =&gt; adicionar("sonho")}&gt;Adicionar sonho&lt;/button&gt;
+      &lt;p&gt;botão desenhado: {desenhos}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+});
+
+function App() {
+  const { itens, adicionar } = useCarrinho();
+
+  return (
+    &lt;div&gt;
+      &lt;Botao adicionar={adicionar} /&gt;
+      &lt;p&gt;itens na sacola: {itens.length}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel depois dos dois cliques mostra o contraste: no código antigo, <code>botão desenhado: 3</code>
+(uma montagem e dois cliques); na solução, <code>botão desenhado: 1</code> e
+<code>itens na sacola: 2</code>. A sacola cresceu, o botão não redesenhou — ele só chama uma função que não
+mudou.</p>
+
+<p>Note que a função usa a forma funcional do <code>set</code> (<code>(lista) =&gt; [...lista, nome]</code>).
+Não é detalhe de estilo: sem ela, a função precisaria ler <code>itens</code>, e aí <code>itens</code> teria
+de estar nas dependências — o que recriaria a função a cada item adicionado, e o <code>memo</code> do botão
+cairia. A forma funcional é o que permite o <code>[]</code> honesto.</p>
+
+<h2>5. Dependências curtas com a forma funcional</h2>
+
+<p>A terceira caixa mostra o padrão que mais aparece em código revisado: um <code>useCallback</code> com a
+dependência <code>total</code>, que muda a cada clique e recria a função. O filho memoizado desenha sempre.
+A missão é trocar para a forma funcional e esvaziar o array.</p>
+
+<div class="tryreact" data-goal="clique:#somar;;clique:#somar;;texto:botão somar desenhado: 1;;texto:total: 2">
+  <p class="try-task">A função <code>somar</code> depende de <code>total</code>, então muda a cada clique.
+  Use <code>setTotal((t) =&gt; t + 1)</code> e deixe as dependências <code>[]</code>. Depois clique duas
+  vezes em Somar um pão.</p>
+  <pre class="jsx">let desenhos = 0;
+const BotaoSomar = memo(function BotaoSomar({ somar }) {
+  desenhos = desenhos + 1;
+  return (
+    &lt;div&gt;
+      &lt;button id="somar" onClick={somar}&gt;Somar um pão&lt;/button&gt;
+      &lt;p&gt;botão somar desenhado: {desenhos}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+});
+
+function App() {
+  const [total, setTotal] = useState(0);
+  const somar = useCallback(() =&gt; setTotal(total + 1), [total]);
+
+  return (
+    &lt;div&gt;
+      &lt;BotaoSomar somar={somar} /&gt;
+      &lt;p&gt;total: {total}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;div&gt;
+    &lt;button id="somar"&gt;Somar um pão&lt;/button&gt;
+    &lt;p&gt;botão somar desenhado: 1&lt;/p&gt;
+  &lt;/div&gt;
+  &lt;p&gt;total: 0&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">let desenhos = 0;
+const BotaoSomar = memo(function BotaoSomar({ somar }) {
+  desenhos = desenhos + 1;
+  return (
+    &lt;div&gt;
+      &lt;button id="somar" onClick={somar}&gt;Somar um pão&lt;/button&gt;
+      &lt;p&gt;botão somar desenhado: {desenhos}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+});
+
+function App() {
+  const [total, setTotal] = useState(0);
+  const somar = useCallback(() =&gt; setTotal((t) =&gt; t + 1), []);
+
+  return (
+    &lt;div&gt;
+      &lt;BotaoSomar somar={somar} /&gt;
+      &lt;p&gt;total: {total}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois dos dois cliques, o código antigo mostra <code>botão somar desenhado: 3</code> e a solução
+<code>1</code>, com <code>total: 2</code> nos dois. O resultado é o mesmo; o trabalho é que muda.</p>
+
+<p>A regra que fecha a seção: <strong>se a função só precisa do valor anterior, use a forma
+funcional</strong>. Ela deixa o array vazio e a referência estável. Se a função precisa de outro valor —
+um nome digitado, um filtro escolhido —, esse valor entra nas dependências, e aí a função muda quando ele
+muda, o que costuma ser o correto: o filho deve desenhar porque a ação agora é outra.</p>
+
+<h2>6. Onde o <code>useCallback</code> importa de verdade</h2>
+
+<p>Quatro lugares, e vale reconhecer cada um. O primeiro é a prop de um componente com <code>memo</code>,
+que você acabou de ver. O segundo é a lista de dependências de um <code>useEffect</code>: uma função nova a
+cada desenho faz o efeito rodar em todo desenho, e efeitos costumam fazer coisas caras — buscar, inscrever,
+medir.</p>
+
+<p>O terceiro é o listener. Um efeito que faz <code>document.addEventListener("keydown", aoTeclar)</code>
+depende da função para remover o listener antigo; sem estabilidade, cada desenho remove e inscreve de novo,
+e o console mostra o vaivém:</p>
+
+<pre class="term">inscrevi o listener (1)
+removi o listener (1)
+inscrevi o listener (2)</pre>
+
+<p>O quarto é o contexto. Um provider que publica <code>{ cliente, sair }</code> cria um objeto novo a
+cada desenho, e todos os consumidores desenham junto. A receita é <code>useMemo</code> no objeto e
+<code>useCallback</code> nas funções que ele carrega — os dois juntos, sempre na mesma ordem.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde a função entra</th><th>Sem estabilidade</th><th>Ferramenta</th></tr>
+<tr><td>prop de componente com <code>memo</code></td><td>o filho desenha a cada desenho do pai</td><td><code>useCallback</code></td></tr>
+<tr><td>dependência de <code>useEffect</code></td><td>o efeito roda em todo desenho</td><td><code>useCallback</code></td></tr>
+<tr><td>listener adicionado no efeito</td><td>remove e inscreve a cada desenho</td><td><code>useCallback</code></td></tr>
+<tr><td>ação publicada em contexto</td><td>todos os consumidores desenham</td><td><code>useCallback</code> + <code>useMemo</code></td></tr>
+</table>
+</div>
+
+<p>Fora desses quatro, o <code>useCallback</code> raramente paga. Um <code>onClick</code> em um
+<code>&lt;button&gt;</code> comum não tem comparação de props a fazer: a função nova é descartada no
+desenho seguinte e o custo é irrelevante. Embrulhar cada handler "por garantia" só deixa o componente mais
+difícil de ler.</p>
+
+<h2>7. O custo e o exagero</h2>
+
+<p>O <a href="useCallback.html"><code>useCallback</code></a> guarda a função e compara as dependências a
+cada desenho. O custo é pequeno,
+mas não é zero — e, principalmente, cada um deles é uma chance de errar a lista de dependências. Uma
+dependência a menos produz a clássica função que lê o valor antigo; uma a mais recria a função sem
+necessidade e anula o <code>memo</code> que ela deveria proteger.</p>
+
+<p>Há também um efeito colateral na leitura do código: quando tudo é <code>useCallback</code>, o componente
+deixa de parecer uma função que desenha e passa a parecer um quebra-cabeça de referências. Quem chega
+depois precisa reconstruir o raciocínio. O comentário curto ("estável para o <code>BotaoSomar</code>")
+resolve boa parte disso.</p>
+
+<p>E o mesmo recado das outras aulas: com o React Compiler ligado no projeto, a memoização de funções passa
+a ser automática. Ele não vem ligado por padrão no React 19, e a recomendação oficial é usar
+<code>useCallback</code> como exceção, quando a medição ou o contrato de uma prop memoizada exigirem. Sem o
+compilador, a regra prática é: estabilize funções que cruzam uma fronteira de comparação; deixe as outras
+em paz.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Efeito de estabilizar</th><th>Vale?</th></tr>
+<tr><td><code>onClick</code> de um botão comum</td><td>nada muda para quem compara</td><td>não</td></tr>
+<tr><td>prop de filho com <code>memo</code></td><td>o filho para de desenhar à toa</td><td>sim</td></tr>
+<tr><td>dependência de efeito com busca</td><td>uma busca por mudança real</td><td>sim</td></tr>
+<tr><td>função com dependência que muda a cada clique</td><td>continua mudando: estabilizar não resolve</td><td>trocar por forma funcional</td></tr>
+<tr><td>ação dentro de objeto de contexto</td><td>consumidores param de desenhar</td><td>sim, com <code>useMemo</code></td></tr>
+</table>
+</div>
+
+<h2>8. Lendo a corrente de dependências</h2>
+
+<p>Quando um valor memoizado alimenta outro, as dependências formam uma corrente. Um array memoizado que
+usa uma função memoizada depende daquela função; se a função muda, o array refaz. Ler a corrente de baixo
+para cima evita a maior parte dos bugs de identidade.</p>
+
+<pre class="file" data-file="App.jsx">const aoFiltrar = useCallback((valor) =&gt; setFiltro(valor), []);
+const itens = useMemo(() =&gt; filtrar(filtro), [filtro]);
+const resumo = useMemo(() =&gt; resumir(itens), [itens]);
+const ctx = useMemo(() =&gt; ({ itens, aoFiltrar }), [itens, aoFiltrar]);</pre>
+
+<p>Nesse trecho, <code>aoFiltrar</code> não depende de nada e nunca muda; <code>itens</code> depende do
+filtro; <code>resumo</code> depende de <code>itens</code>; e o objeto do contexto depende dos dois. Se
+alguém trocar o <code>useCallback</code> por uma função inline, a corrente inteira se rompe: a função muda,
+o contexto muda, todos os consumidores desenham — e o sintoma aparece longe da causa.</p>
+
+<p>Duas dicas de leitura. A primeira: se um <code>useMemo</code> depende de um objeto que veio de outro
+<code>useMemo</code>, confira se o de baixo está estável; um objeto novo em baixo derruba tudo em cima. A
+segunda: prefira dependências primitivas. Um <code>useMemo</code> que depende de <code>filtro</code> (texto)
+é mais fácil de acertar do que um que depende de um objeto de configuração inteiro.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o <code>useCallback</code> resolveu a lista e quebrou o filtro</h3>
+<p>A Ana estabilizou a função de filtrar e a lista parou de redesenhar. Só que o filtro mostrava sempre o
+primeiro valor: a função tinha dependências <code>[]</code> e lia um estado. O clássico valor velho. O
+conserto é incluir o valor lido no array — e aceitar que a função mude quando ele muda, que é o correto
+naquele caso.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o efeito que busca a cada tecla</h3>
+<p>A busca estava em um efeito com dependência <code>[aoBuscar]</code>, e <code>aoBuscar</code> era criada
+no corpo do componente. Resultado: uma requisição por tecla, inclusive quando a tecla era do campo de
+CEP. Estabilizar a função com <code>useCallback</code>, com o termo nas dependências, deixou uma busca por
+mudança real de termo.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o botão que nunca atualiza o rótulo</h3>
+<p>Um botão memoizado recebia <code>aoEnviar</code> estável e <code>texto</code>; o texto vinha de uma prop
+que o pai montava com uma função memoizada de dependências vazias, e o rótulo ficou congelado. O problema
+não era o <code>useCallback</code> do botão: era o <code>useMemo</code> do pai com dependências
+incompletas. Corrente quebrada em cima, sintoma embaixo.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="1"><p class="mc-q">1. O que o <code>useCallback</code> devolve?</p>
+<label><input type="radio" name="q1"> a mesma função entre desenhos, enquanto as dependências não mudarem</label>
+<label><input type="radio" name="q1"> o resultado da função</label>
+<label><input type="radio" name="q1"> uma função assíncrona com cache</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Para que serve a forma funcional <code>setTotal((t) =&gt; t + 1)</code> dentro de um <code>useCallback</code>?</p>
+<label><input type="radio" name="q2"> para o <code>set</code> ficar mais rápido</label>
+<label><input type="radio" name="q2"> para o valor total ser recalculado no render</label>
+<label><input type="radio" name="q2"> para a função não precisar ler <code>total</code> e poder ficar com <code>[]</code></label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. Quando o <code>useCallback</code> costuma não valer a pena?</p>
+<label><input type="radio" name="q3"> em funções passadas para componentes com <code>memo</code></label>
+<label><input type="radio" name="q3"> em handlers de botões comuns, sem comparação de props do outro lado</label>
+<label><input type="radio" name="q3"> em dependências de <code>useEffect</code></label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a ação estável da sacola</h2>
+<p>Complete o hook para a função <code>adicionar</code> manter a mesma referência entre desenhos:</p>
+<div class="ex-code">const adicionar = useCallback((nome) =&gt; { setItens((l) =&gt; [...l, nome]); }, [<input aria-label="resposta 1" data-answer="]" placeholder="...">);</div>
+<p class="ex-dica">Dica: a forma funcional já resolve a leitura do estado, então o array fica vazio. Falta
+o colchete que fecha o array.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Toda função criada no corpo do componente é nova a cada desenho. O <code>useCallback</code> guarda essa
+função e devolve a mesma referência enquanto as dependências não mudam. Ele serve para quem compara
+referências: o <code>memo</code> de um filho, a lista de dependências de um efeito, o listener que precisa
+ser removido com a mesma função, o objeto publicado em um contexto.</p>
+
+<p>A dupla produtiva é <code>useMemo</code> para os dados e <code>useCallback</code> para as ações; um sem
+o outro deixa a otimização pela metade. Dentro de hooks próprios, a responsabilidade é de quem devolve a
+ação: o hook entrega funções estáveis. E a forma funcional do <code>set</code> é o que permite manter o
+array vazio sem ler valor velho.</p>
+
+<p>Como sempre: medir, estabilizar o que cruza fronteira e deixar o resto em paz. Função inline não é
+pecado; ela só custa caro quando encontra uma comparação de props do outro lado. E, com o React Compiler no
+futuro, boa parte disso vira automático — o que não dispensa entender a corrente de dependências, porque é
+ela que explica os bugs de hoje.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Função no corpo do componente nasce de novo a cada desenho.</li>
+<li><code>useCallback(fn, [deps])</code> devolve a mesma referência enquanto as deps não mudam.</li>
+<li>Ele não guarda resultado nem impede a chamada: só estabiliza a referência.</li>
+<li>Dupla certa: <code>useMemo</code> para dados, <code>useCallback</code> para ações.</li>
+<li>Hook próprio que devolve ação deve devolver ação estável.</li>
+<li>Forma funcional no <code>set</code> permite <code>[]</code> sem valor velho.</li>
+<li>Importa em: prop de <code>memo</code>, dep de efeito, listener, contexto.</li>
+<li>Não importa em: <code>onClick</code> de botão comum, função que ninguém compara.</li>
+<li>Corrente de dependências: objeto novo embaixo derruba tudo em cima.</li>
+<li>React Compiler memoiza sozinho — e não vem ligado por padrão.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

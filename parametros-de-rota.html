@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parâmetros de Rota | Guia React</title>
+<meta name="description" content="Parâmetros de rota no React: quebrar o hash em segmentos, casar rotas com :id, validar o que vem da URL e usar key para remontar a tela.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Parâmetros de <span class="hl">Rota</span></h1>
+<p class="intro">A Ana tem a lista de pedidos e quer mandar o link de um pedido específico para o
+entregador. Hoje a rota é só <code>#/pedidos</code>: todo mundo cai na lista e precisa procurar o número.
+O endereço precisa carregar mais informação — <code>#/pedidos/3</code> — e o componente precisa saber ler
+esse <strong>3</strong>. Nesta aula o hash vira uma pequena tabela de rotas, com parâmetros, validação e
+um detalhe de <code>key</code> que evita o clássico "o pedido anterior ficou na tela".</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um parâmetro de rota e quando ele substitui a query string.</li>
+  <li>Como quebrar <code>#/pedidos/3</code> em segmentos e ler a parte que muda.</li>
+  <li>Como casar o primeiro segmento com a tela e passar o segundo como prop.</li>
+  <li>Por que o parâmetro chega como texto e o que validar antes de usar.</li>
+  <li>O que acontece com o estado do componente quando só o parâmetro muda.</li>
+  <li>Como a <code>key</code> força um componente novo — e por que isso é o certo aqui.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o link de um pedido só</h2>
+
+<p>Na aula de <a href="link-e-navegacao.html">link e navegação</a>, o site da Ana passou a ter links de
+verdade. O menu leva à vitrine, à lista de pães e ao contato — rotas fixas, cada uma com um nome. A lista
+de pedidos, porém, é diferente: cada pedido tem o seu próprio endereço, e o nome da tela é sempre o
+mesmo.</p>
+
+<p>A cliente liga perguntando do pedido 3. A Ana quer mandar <code>https://loja.test/#/pedidos/3</code>,
+o entregador abrir e ver aquele pedido, com o nome, o valor e a hora. Com uma rota fixa, só existe
+<code>#/pedidos</code>, e o endereço não diz qual pedido é.</p>
+
+<p>A ideia do parâmetro de rota é simples: o caminho tem partes fixas e partes variáveis.
+<code>#/pedidos/3</code> tem a parte fixa <code>pedidos</code> e a parte variável <code>3</code>. Quem
+escreve a rota marca onde a variável entra; quem lê a URL descobre o valor e entrega ao componente.</p>
+
+<h2>2. Parâmetro, rota fixa e query string</h2>
+
+<p>Existem três jeitos de carregar informação no endereço, e eles não competem: cada um responde a uma
+pergunta diferente. O parâmetro diz <em>qual</em> recurso; a query diz <em>como</em> mostrá-lo; a rota
+fixa diz apenas onde você está.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>Responde</th><th>Quando usar</th></tr>
+<tr><td>Rota fixa</td><td><code>#/pedidos</code></td><td>onde estou</td><td>telas que não mudam de conteúdo</td></tr>
+<tr><td>Parâmetro</td><td><code>#/pedidos/3</code></td><td>qual item</td><td>uma página por item: pedido, pão, cliente</td></tr>
+<tr><td>Query string</td><td><code>#/pedidos?ordem=preco</code></td><td>como listar</td><td>filtro, ordem, página, aba</td></tr>
+</table>
+</div>
+
+<p>A confusão comum é usar query para identificar: <code>#/pedido?id=3</code>. Funciona, e é pior de
+compartilhar, de indexar e de ler. O identificador do recurso pertence ao caminho; o resto é ajuste de
+exibição. Se você precisa das duas coisas, elas convivem: <code>#/pedidos/3?aba=itens</code> é o pedido
+3, na aba de itens.</p>
+
+<p>Na rota por hash, o "caminho" é o que vem depois de <code>#/</code>. A mecânica é a mesma de um
+roteador de verdade: separar por barras, casar o primeiro segmento com uma tela e entregar os demais como
+parâmetros.</p>
+
+<dl class="anatomy">
+<dt>rota</dt>
+<dd>O caminho que aparece depois do <code>#</code>: em <code>#/pedidos/3</code>, a rota é
+<code>pedidos/3</code>.</dd>
+<dt>segmento</dt>
+<dd>Cada pedaço entre barras. <code>pedidos/3</code> tem dois segmentos: <code>"pedidos"</code> e
+<code>"3"</code>.</dd>
+<dt>parâmetro</dt>
+<dd>O segmento que muda de página para página e carrega a identidade do item. Na tabela de rotas aparece
+como <code>:id</code>.</dd>
+<dt>rota dinâmica</dt>
+<dd>Um padrão com um coringa no lugar do valor fixo, como <code>pedidos/:id</code>. Casa com
+<code>pedidos/3</code>, <code>pedidos/9</code>, <code>pedidos/abc</code>.</dd>
+<dt>query string</dt>
+<dd>O que vem depois do <code>?</code>: <code>?aba=itens</code>. Não é parâmetro de rota e precisa ser
+separada antes do <code>split("/")</code>.</dd>
+<dt>key</dt>
+<dd>Prop especial que diz ao React se aquele componente é o mesmo da renderização anterior. Valor
+diferente, componente novo — e estado interno zerado.</dd>
+</dl>
+
+<h2>3. Quebrando o hash em segmentos</h2>
+
+<p>O primeiro passo é transformar a string da rota numa lista. O <code>split("/")</code> faz isso: cada
+barra vira uma divisória, e cada pedaço vira um item do array.</p>
+
+<pre class="file" data-file="App.jsx">function analisar(rota) {
+  const partes = rota.split("/").filter(Boolean);   // remove vazios
+  return {
+    tela: partes[0] || "inicio",
+    id: partes[1] || null
+  };
+}</pre>
+
+<p>O <code>filter(Boolean)</code> tira pedaços vazios — útil quando alguém abre <code>#/pedidos/</code>
+com barra no fim ou <code>#//pedidos</code> com barra dupla. Sem ele, <code>("pedidos/").split("/")</code>
+devolve <code>["pedidos", ""]</code> e o parâmetro vem vazio em vez de ausente.</p>
+
+<div class="tryreact" data-goal="texto:Pedido 3">
+  <p class="try-task">A rota é <code>pedidos/3</code> e a tela trata a string inteira como nome de tela,
+  então nenhum caso casa. Quebre a rota em segmentos e use o segundo como número do pedido.</p>
+  <pre class="jsx">const janela = new EventTarget();
+janela.hash = "#/pedidos/3";
+
+function irPara(hash) {
+  janela.hash = hash;
+  janela.dispatchEvent(new Event("hashchange"));
+}
+
+function useRota() {
+  const [rota, setRota] = useState(janela.hash);
+
+  useEffect(() =&gt; {
+    const aoMudar = () =&gt; setRota(janela.hash);
+    janela.addEventListener("hashchange", aoMudar);
+    return () =&gt; janela.removeEventListener("hashchange", aoMudar);
+  }, []);
+
+  return rota.replace(/^#\/?/, "") || "inicio";
+}
+
+function App() {
+  const rota = useRota();
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Rota: {rota}&lt;/p&gt;
+      {rota === "pedidos" ? &lt;p&gt;Lista de pedidos&lt;/p&gt; : &lt;p&gt;Pedido {rota}&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Rota: pedidos/3&lt;/p&gt;
+  &lt;p&gt;Pedido pedidos/3&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const janela = new EventTarget();
+janela.hash = "#/pedidos/3";
+
+function irPara(hash) {
+  janela.hash = hash;
+  janela.dispatchEvent(new Event("hashchange"));
+}
+
+function useRota() {
+  const [rota, setRota] = useState(janela.hash);
+
+  useEffect(() =&gt; {
+    const aoMudar = () =&gt; setRota(janela.hash);
+    janela.addEventListener("hashchange", aoMudar);
+    return () =&gt; janela.removeEventListener("hashchange", aoMudar);
+  }, []);
+
+  return rota.replace(/^#\/?/, "") || "inicio";
+}
+
+function App() {
+  const rota = useRota();
+  const [tela, id] = rota.split("/");
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Rota: {rota}&lt;/p&gt;
+      {id ? &lt;p&gt;Pedido {id}&lt;/p&gt; : &lt;p&gt;Lista de pedidos&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Repare que a condição mudou de <code>rota === "pedidos"</code> para <code>id</code>: se existe um
+segundo segmento, é um pedido; se não existe, é a lista. A desestruturação
+<code>const [tela, id] = rota.split("/")</code> só funciona porque a ordem é garantida — primeiro a tela,
+depois o parâmetro.</p>
+
+<pre class="term">rota crua: "pedidos/3"
+segmentos: ["pedidos", "3"]</pre>
+
+<p>Essas duas linhas saem de um <code>console.log(rota, rota.split("/"))</code> antes do
+<code>return</code>. Quando a tela mostra o valor errado, esse log diz na hora se o problema é a leitura
+(o array está certo) ou o desenho (o array está errado).</p>
+
+<h2>4. Uma tabela de rotas</h2>
+
+<p>Com duas telas e um parâmetro, o <code>if</code> resolve. Quando o site cresce, uma tabela de rotas
+deixa tudo num lugar só: cada linha tem o padrão (com o parâmetro marcado por <code>:id</code>) e a tela
+correspondente.</p>
+
+<pre class="file" data-file="App.jsx">const rotas = [
+  { padrao: "inicio", tela: "inicio" },
+  { padrao: "pedidos", tela: "lista" },
+  { padrao: "pedidos/:id", tela: "pedido" }
+];
+
+function casar(rota) {
+  const partes = rota.split("/").filter(Boolean);
+  for (const r of rotas) {
+    const alvo = r.padrao.split("/");
+    if (alvo.length !== partes.length) continue;
+    const casa = alvo.every((p, i) =&gt; p.startsWith(":") || p === partes[i]);
+    if (casa) return { tela: r.tela, params: { id: partes[1] } };
+  }
+  return { tela: "nao-encontrada", params: {} };
+}</pre>
+
+<p>O casador compara segmento por segmento e trata o que começa com <code>:</code> como coringa. A ordem
+importa: a rota <code>pedidos/:id</code> precisa vir depois de <code>pedidos</code>? Não —
+<code>pedidos</code> tem um segmento e <code>pedidos/:id</code> tem dois, então o tamanho já separa as
+duas. Mas, se você tivesse <code>pedidos/:id</code> e <code>pedidos/novo</code>, a ordem decidiria qual
+ganha — a mais específica primeiro.</p>
+
+<p>É esse desenho que as bibliotecas de rota entregam pronto, com um hook <code>useParams</code> devolvendo
+o objeto. Aqui o objeto vem da sua própria função — a ideia é a mesma, e agora você sabe o que acontece
+por baixo.</p>
+
+<p>Repare que o <code>params</code> do exemplo é montado à mão com <code>id: partes[1]</code>, o que
+funciona enquanto houver um único parâmetro. Para generalizar, percorra o padrão e guarde o valor de cada
+posição que começa com <code>:</code>: a posição do coringa é a posição do valor. Com esse laço, a mesma
+função serve para <code>pedidos/:id</code>, <code>pedidos/:id/itens/:item</code> e qualquer padrão futuro,
+sem uma linha nova por rota.</p>
+
+<h2>5. Passando o parâmetro para o componente</h2>
+
+<p>Encontrada a tela e o parâmetro, o trabalho é o de sempre: passar por prop. O componente da tela do
+pedido não sabe de URL nem de hash; ele recebe um <code>id</code> e desenha o que aquele id
+significa.</p>
+
+<pre class="file" data-file="App.jsx">function Pedido({ id }) {
+  return (
+    &lt;section&gt;
+      &lt;h1&gt;Pedido {id}&lt;/h1&gt;
+      &lt;p&gt;Retirada às 18h&lt;/p&gt;
+    &lt;/section&gt;
+  );
+}</pre>
+
+<p>Essa separação é o que torna a tela testável e reutilizável: para ver o pedido 3, basta renderizar
+<code>&lt;Pedido id="3" /&gt;</code>. Quem lida com endereço é o <code>App</code>; quem desenha o pedido é
+o <code>Pedido</code>.</p>
+
+<p>O parâmetro chega sempre como texto, porque veio de uma string. Se você precisa somar, comparar com
+número ou usar como índice de array, converta com <code>Number(id)</code> — e trate o caso em que a
+conversão falha, porque o endereço é digitável por qualquer pessoa.</p>
+
+<div class="tryreact" data-goal="texto:Pedido não encontrado">
+  <p class="try-task">O endereço <code>#/pedidos/9</code> aponta para um pedido que não existe, e a tela
+  fica com "Pedido:" vazio. Trate o caso: quando o id não estiver na lista, mostre "Pedido não
+  encontrado".</p>
+  <pre class="jsx">const janela = new EventTarget();
+janela.hash = "#/pedidos/9";
+
+function irPara(hash) {
+  janela.hash = hash;
+  janela.dispatchEvent(new Event("hashchange"));
+}
+
+function useRota() {
+  const [rota, setRota] = useState(janela.hash);
+
+  useEffect(() =&gt; {
+    const aoMudar = () =&gt; setRota(janela.hash);
+    janela.addEventListener("hashchange", aoMudar);
+    return () =&gt; janela.removeEventListener("hashchange", aoMudar);
+  }, []);
+
+  return rota.replace(/^#\/?/, "") || "inicio";
+}
+
+const pedidos = { 1: "Pão francês", 2: "Broa de milho", 3: "Pão de queijo" };
+
+function App() {
+  const [, id] = useRota().split("/");
+  const nome = pedidos[id];
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Pedido: {nome}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Pedido:&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const janela = new EventTarget();
+janela.hash = "#/pedidos/9";
+
+function irPara(hash) {
+  janela.hash = hash;
+  janela.dispatchEvent(new Event("hashchange"));
+}
+
+function useRota() {
+  const [rota, setRota] = useState(janela.hash);
+
+  useEffect(() =&gt; {
+    const aoMudar = () =&gt; setRota(janela.hash);
+    janela.addEventListener("hashchange", aoMudar);
+    return () =&gt; janela.removeEventListener("hashchange", aoMudar);
+  }, []);
+
+  return rota.replace(/^#\/?/, "") || "inicio";
+}
+
+const pedidos = { 1: "Pão francês", 2: "Broa de milho", 3: "Pão de queijo" };
+
+function App() {
+  const [, id] = useRota().split("/");
+  const nome = pedidos[id];
+
+  return (
+    &lt;div&gt;
+      {nome ? &lt;p&gt;Pedido: {nome}&lt;/p&gt; : &lt;p&gt;Pedido não encontrado&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O <code>id</code> chegou do endereço, não do seu código. Isso muda o nível de confiança: qualquer pessoa
+digita o que quiser depois da barra, e o seu componente precisa aguentar. A regra é a mesma de qualquer
+dado externo: procure, e se não achar, mostre uma mensagem — nunca deixe a tela muda nem o valor
+<code>undefined</code> aparecer.</p>
+
+<h2>6. O estado que sobrevive à troca de parâmetro</h2>
+
+<p>Aqui está a pegadinha da aula. Quando o parâmetro muda — de <code>#/pedidos/1</code> para
+<code>#/pedidos/2</code> —, o React vê <strong>o mesmo componente no mesmo lugar da árvore</strong>. Ele
+não desmonta e monta de novo: ele atualiza as props. E estado interno, como a quantidade escolhida,
+continua de onde estava.</p>
+
+<p>Na prática, o cliente escolhe 2 pães no pedido 1, clica no pedido 2 e encontra a quantidade 2 já
+preenchida. Não é bug do React: é a definição de "mesmo componente". A solução é dizer ao React que, para
+efeitos de identidade, aquele componente é outro: a <code>key</code>.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Quantidade: 2;;clique:a;;texto:Quantidade: 1">
+  <p class="try-task">Aumente a quantidade e clique no link do pedido 2: a quantidade continua 2, porque o
+  componente foi reaproveitado. Use a <code>key</code> para o React montar um componente novo a cada
+  pedido.</p>
+  <pre class="jsx">const janela = new EventTarget();
+janela.hash = "#/pedidos/1";
+
+function irPara(hash) {
+  janela.hash = hash;
+  janela.dispatchEvent(new Event("hashchange"));
+}
+
+function useRota() {
+  const [rota, setRota] = useState(janela.hash);
+
+  useEffect(() =&gt; {
+    const aoMudar = () =&gt; setRota(janela.hash);
+    janela.addEventListener("hashchange", aoMudar);
+    return () =&gt; janela.removeEventListener("hashchange", aoMudar);
+  }, []);
+
+  return rota.replace(/^#\/?/, "") || "inicio";
+}
+
+function Pedido({ id }) {
+  const [qtd, setQtd] = useState(1);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Pedido {id}&lt;/p&gt;
+      &lt;p&gt;Quantidade: {qtd}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setQtd(qtd + 1)}&gt;Mais um&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const [, id] = useRota().split("/");
+
+  return (
+    &lt;div&gt;
+      &lt;nav&gt;
+        &lt;a href="#/pedidos/2" onClick={(e) =&gt; { e.preventDefault(); irPara("#/pedidos/2"); }}&gt;
+          Pedido 2
+        &lt;/a&gt;
+      &lt;/nav&gt;
+      &lt;Pedido id={id} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;nav&gt;&lt;a href="#/pedidos/2"&gt;Pedido 2&lt;/a&gt;&lt;/nav&gt;
+  &lt;div&gt;
+    &lt;p&gt;Pedido 1&lt;/p&gt;
+    &lt;p&gt;Quantidade: 1&lt;/p&gt;
+    &lt;button&gt;Mais um&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const janela = new EventTarget();
+janela.hash = "#/pedidos/1";
+
+function irPara(hash) {
+  janela.hash = hash;
+  janela.dispatchEvent(new Event("hashchange"));
+}
+
+function useRota() {
+  const [rota, setRota] = useState(janela.hash);
+
+  useEffect(() =&gt; {
+    const aoMudar = () =&gt; setRota(janela.hash);
+    janela.addEventListener("hashchange", aoMudar);
+    return () =&gt; janela.removeEventListener("hashchange", aoMudar);
+  }, []);
+
+  return rota.replace(/^#\/?/, "") || "inicio";
+}
+
+function Pedido({ id }) {
+  const [qtd, setQtd] = useState(1);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Pedido {id}&lt;/p&gt;
+      &lt;p&gt;Quantidade: {qtd}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setQtd(qtd + 1)}&gt;Mais um&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const [, id] = useRota().split("/");
+
+  return (
+    &lt;div&gt;
+      &lt;nav&gt;
+        &lt;a href="#/pedidos/2" onClick={(e) =&gt; { e.preventDefault(); irPara("#/pedidos/2"); }}&gt;
+          Pedido 2
+        &lt;/a&gt;
+      &lt;/nav&gt;
+      &lt;Pedido key={id} id={id} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A <code>key</code> é a mesma ferramenta das listas, com outro uso: quando o valor muda, o React descarta
+o componente antigo e monta um novo, com o estado inicial. Aqui ela diz "o pedido 2 é outra tela, não a
+mesma tela com outro número".</p>
+
+<pre class="term">sem key → Quantidade: 2 (o componente foi reaproveitado)
+com key → Quantidade: 1 (componente novo, estado inicial)</pre>
+
+<p>Cuidado para não exagerar: colocar <code>key</code> em tudo remonta componentes sem necessidade e
+derruba o foco do teclado a cada mudança. Use quando a identidade do conteúdo muda — o id do pedido, o
+id do pão, o usuário logado. Se o estado interno deve sobreviver à troca, não use.</p>
+
+<h2>7. Dois segmentos, três telas</h2>
+
+<p>Com o parâmetro no lugar, o mesmo prefixo desenha telas diferentes conforme o que vem depois. Vale
+enxergar a tabela completa do site da Ana:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Endereço</th><th>Segmentos</th><th>Tela</th></tr>
+<tr><td><code>#/</code></td><td><code>[]</code></td><td>vitrine</td></tr>
+<tr><td><code>#/pedidos</code></td><td><code>["pedidos"]</code></td><td>lista de pedidos</td></tr>
+<tr><td><code>#/pedidos/3</code></td><td><code>["pedidos", "3"]</code></td><td>pedido 3</td></tr>
+<tr><td><code>#/pedidos/3?aba=itens</code></td><td><code>["pedidos", "3"]</code> + query</td><td>pedido 3, aba de itens</td></tr>
+</table>
+</div>
+
+<p>Note que a query não entra no <code>split("/")</code> — ela vem depois do <code>?</code> e precisa ser
+separada antes, com <code>split("?")</code>. Se você esquecer, o parâmetro vira <code>"3?aba=itens"</code>
+e nada casa. Ordem certa: primeiro tire a query, depois separe os segmentos.</p>
+
+<p>Vale pensar também no formato do id. Números são o caso fácil; nomes de pão como
+<code>pao-de-queijo</code> exigem cuidado com acentos e espaços, porque o endereço só aceita uma faixa de
+caracteres e o resto precisa ser codificado com <code>encodeURIComponent</code> na hora de montar o link.
+Se o id é gerado pelo sistema, prefira algo simples e estável — o contador do pedido ou um código curto —
+em vez de derivar do nome do cliente, que muda e cria endereços quebrados.</p>
+
+<p>Com três linhas na tabela, o <code>if</code> ainda é legível. Com dez, a tabela de rotas da seção 4
+passa a valer. O limite é o mesmo de sempre: quando você começa a repetir a mesma estrutura de comparação,
+é hora de transformar em dado.</p>
+
+<h2>8. Parâmetro na mão e parâmetro de biblioteca</h2>
+
+<p>Bibliotecas de rota fazem exatamente o que você fez aqui: leem o endereço, casam com uma tabela,
+extraem os parâmetros e entregam num hook. A diferença é o acabamento — casamento com curingas, rotas
+aninhadas, transições, carregamento sob demanda — e a quantidade de casos que já resolveram por você.</p>
+
+<p>Saber o mecanismo muda o jeito de depurar. Quando o <code>useParams</code> devolve vazio, você sabe que
+o problema está no padrão da rota (o <code>:id</code> não está lá), não no componente. Quando o valor vem
+certo e a tela não muda, você sabe que é a <code>key</code> ou o próprio desenho. E quando o endereço tem
+query, você sabe que ela não está nos segmentos.</p>
+
+<p>Para um site de três telas, o roteador caseiro desta sequência é honesto e suficiente. Para uma
+aplicação com dez rotas, permissões e carregamento por tela, a biblioteca paga o próprio peso — e você vai
+lê-la sabendo o que procurar.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o link do pedido 3 abria a lista</h3>
+<p>A Ana mandou <code>#/pedidos/3</code> e o entregador viu a lista. O código comparava a rota inteira com
+<code>"pedidos"</code>: <code>"pedidos/3"</code> não é igual, e a tela caía no caso padrão. Separar em
+segmentos e testar o segundo resolveu — e o mesmo erro explica a tela em branco em qualquer rota de dois
+níveis.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a quantidade do pedido anterior</h3>
+<p>O cliente escolhia 2 pães no pedido 1, abria o pedido 2 pelo link e a quantidade continuava 2. O
+componente era o mesmo, só a prop tinha mudado; o estado interno sobreviveu. A <code>key={id}</code>
+resolveu na hora, porque força o React a montar um componente novo para cada pedido.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o pedido 9 que ninguém pediu</h3>
+<p>Um cliente digitou <code>#/pedidos/9</code> por curiosidade e viu "Pedido:" sem nada depois. O id veio
+da URL e o código confiou nele. Procurar na lista e mostrar "Pedido não encontrado" — ou redirecionar
+para a lista — é parte do trabalho da rota, não um detalhe de acabamento.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Em <code>#/pedidos/3</code>, o que é o <code>3</code>?</p>
+<label><input type="radio" name="q1"> uma query string que filtra a lista</label>
+<label><input type="radio" name="q1"> o parâmetro da rota: o identificador do pedido</label>
+<label><input type="radio" name="q1"> o nome do componente que vai desenhar</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. Como o componente descobre o valor do parâmetro?</p>
+<label><input type="radio" name="q2"> quebrando a rota em segmentos e pegando a posição certa</label>
+<label><input type="radio" name="q2"> lendo <code>window.location.query</code></label>
+<label><input type="radio" name="q2"> com um <code>useEffect</code> que busca o id no servidor</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">3. Para que serve <code>key={id}</code> no componente da tela?</p>
+<label><input type="radio" name="q3"> para o React validar o parâmetro automaticamente</label>
+<label><input type="radio" name="q3"> para o endereço mudar quando o id mudar</label>
+<label><input type="radio" name="q3"> para remontar o componente quando o id muda, zerando o estado interno</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: ler o parâmetro e remontar</h2>
+<p>Complete a leitura do segundo segmento e a prop que força um componente novo a cada pedido.</p>
+<div class="ex-code">const partes = useRota().split("/");
+const id = partes[<input aria-label="resposta 1" data-answer="1" placeholder="...">];
+
+&lt;Pedido id={id} <input aria-label="resposta 2" data-answer="key={id}" placeholder="..."> /&gt;</div>
+<p class="ex-dica">Dica: a primeira posição é a tela; o parâmetro vem depois. A segunda resposta é a prop
+especial que o React usa para decidir se um componente é o mesmo.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Parâmetro de rota é a parte variável do caminho: em <code>#/pedidos/3</code>, o <code>3</code>
+identifica o pedido. Ele vem antes da query na ordem de leitura — primeiro separe a query, depois quebre o
+resto em segmentos com <code>split("/")</code> (e <code>filter(Boolean)</code> para ignorar barras
+sobrando). O primeiro segmento escolhe a tela; os seguintes viram props.</p>
+
+<p>O valor chega como texto e veio de fora: converta quando for número e valide antes de usar, mostrando
+uma mensagem quando o recurso não existe. Para o componente, o parâmetro é só uma prop — quem lida com
+endereço é o pai, e é isso que deixa a tela fácil de testar.</p>
+
+<p>Quando só o parâmetro muda, o React reaproveita o componente e o estado interno sobrevive; a
+<code>key</code> com o id força um componente novo e é o que se quer numa tela por item. Com isso, as
+rotas do site da Ana ficam completas — falta combinar com o que fazer quando o endereço não corresponde a
+nada, que é o assunto da <a href="rota-404.html">rota 404</a>.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Parâmetro diz <em>qual</em> item; query diz <em>como</em> mostrar.</li>
+<li><code>split("/")</code> quebra a rota; <code>filter(Boolean)</code> tira segmento vazio.</li>
+<li>Primeiro segmento escolhe a tela; o segundo vira prop.</li>
+<li>Ordem de leitura: tire a query (<code>?</code>), depois separe os segmentos.</li>
+<li>O parâmetro chega como texto: converta com <code>Number</code> quando precisar de número.</li>
+<li>Id que não existe pede mensagem, não tela vazia.</li>
+<li>Mudar só o parâmetro não remonta o componente: o estado interno fica.</li>
+<li><code>key={id}</code> força componente novo — e estado inicial.</li>
+<li>Não use <code>key</code> onde o estado deve sobreviver à troca.</li>
+<li>Bibliotecas de rota fazem o mesmo; o mecanismo é este.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

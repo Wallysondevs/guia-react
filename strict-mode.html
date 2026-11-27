@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O Strict Mode | Guia React</title>
+<meta name="description" content="O Strict Mode do React: por que o desenho e os efeitos rodam duas vezes em desenvolvimento, o que é desmontagem de teste e como usar o aviso para achar bugs.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">O Strict Mode</span></h1>
+<p class="intro">A Ana abriu o site da padaria, apertou F12 e viu o console falando duas vezes a mesma coisa:
+“buscando os pães”. Depois viu o contador de pedidos da tela pular de dois em dois. Ela passou a manhã
+procurando um componente duplicado no código, e não havia nenhum. Quem falava duas vezes era o
+<code>React.StrictMode</code> — um modo de treino que o React liga em desenvolvimento para mostrar, cedo,
+os efeitos que não sabem se desfazer. Nesta aula você aprende a ler esse barulho em vez de desligá-lo.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que o Strict Mode faz de verdade em desenvolvimento, e o que ele não faz em produção.</li>
+  <li>Por que o React chama o seu componente duas vezes de propósito.</li>
+  <li>O ciclo monta, desmonta e monta de novo — e o que ele cobra do seu efeito.</li>
+  <li>Como reconhecer um desenho impuro e como tirar a escrita de dentro do render.</li>
+  <li>Como escrever a função de limpeza que desfaz o que o efeito fez.</li>
+  <li>O que o Strict Mode <em>não</em> pega, para não confiar demais nele.</li>
+  <li>Por que desligar o modo é quase sempre o conserto errado.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o console conta a mesma história duas vezes</h2>
+
+<p>O site da Ana estava pronto havia uma semana. Ela abriu o notebook, entrou na página de encomendas e
+viu, no console, duas linhas iguais: “buscando os pães”. Clicou em recarregar e vieram duas de novo. No
+painel do servidor da padaria, dois pedidos iguais no mesmo segundo. A primeira conclusão foi a mais
+natural: alguém chamou o componente duas vezes, ou o arquivo foi incluído em dois lugares.</p>
+
+<p>Ela procurou. O <code>main.jsx</code> tinha um único <code>createRoot</code>, uma única chamada de
+<code>render</code>. O componente aparecia uma vez no arquivo. Nada duplicado. Foi então que reparou no
+envelope em volta do app: <code>&lt;React.StrictMode&gt;</code>. Comentou a linha, salvou, e o console
+ficou quieto — uma linha só. Alívio por trinta segundos, até ela perceber o que tinha acabado de fazer:
+desligou o detector de fumaça porque a fumaça incomodava.</p>
+
+<p>A explicação é simples e vale para o resto da aula. Em desenvolvimento, o React roda cada componente
+duas vezes de propósito. Não é bug, não é código duplicado e não é o seu computador. É um teste: se o seu
+componente se comporta diferente quando chamado duas vezes, ele tem uma escrita escondida no meio do
+desenho — e essa escrita vai dar problema em produção, só que sem aviso.</p>
+
+<p>A Ana não desligou o modo. Ela leu o aviso e consertou o efeito que buscava os pães sem cancelar o
+pedido anterior. O console ficou quieto de novo, agora porque o código estava certo. As aulas de
+<a href="buscando-dados.html">Buscando dados</a> e de <a href="suspense-de-dados.html">Suspense de
+Dados</a> já mostraram o lado da busca; aqui o assunto é por que o React insiste em rodar tudo duas
+vezes.</p>
+
+<h2>2. O que o Strict Mode faz de verdade</h2>
+
+<p>O <code>StrictMode</code> não desenha nada. Ele não cria elemento no HTML, não põe classe, não aparece
+no inspetor. É um envelope que liga verificações extras — e o único lugar onde ele existe é no modo
+desenvolvimento. O arquivo de entrada de um projeto criado com Vite costuma ser assim:</p>
+
+<pre class="file" data-file="src/main.jsx">import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App.jsx";
+
+createRoot(document.getElementById("root")).render(
+  &lt;StrictMode&gt;
+    &lt;App /&gt;
+  &lt;/StrictMode&gt;
+);</pre>
+
+<p>Duas coisas importantes nesse trecho. Primeiro: o envelope está em volta do app inteiro, então tudo o
+que está dentro passa pelas verificações. Segundo: ele não gera markup. Se você abrir o inspetor, vê
+exatamente o HTML que o <code>App</code> produziu, sem nenhuma camada a mais. Não existe
+<code>&lt;strict-mode&gt;</code> na página, e nenhum CSS precisa saber que ele está ali.</p>
+
+<p>Em desenvolvimento, o React faz três coisas com cada componente montado: chama o desenho duas vezes,
+chama os inicializadores de estado duas vezes e, para cada efeito, roda a sequência <em>prepara</em>,
+<em>limpa</em>, <em>prepara de novo</em>. Refs de callback também são anexadas, removidas e anexadas de
+novo. Tudo isso uma única vez, na montagem — não a cada atualização. Em produção, o mesmo envelope não faz
+nada: o build final chama o desenho uma vez, roda o efeito uma vez e segue a vida.</p>
+
+<dl class="anatomy">
+<dt>Strict Mode</dt>
+<dd>Envelope opcional que liga verificações extras em desenvolvimento. Não desenha nada e não aparece no
+HTML final.</dd>
+<dt>dupla invocação</dt>
+<dd>O React chama a função do componente duas vezes seguidas, com o mesmo estado e as mesmas props, para
+ver se o resultado é o mesmo.</dd>
+<dt>desmontagem de teste</dt>
+<dd>Logo depois de montar, o React desmonta o componente e monta de novo. Serve para provar que o efeito
+sabe se desfazer.</dd>
+<dt>idempotente</dt>
+<dd>Operação que pode ser repetida sem mudar o resultado. É o que se espera de um efeito bem escrito:
+rodar duas vezes tem de deixar a tela igual a rodar uma.</dd>
+<dt>função de limpeza</dt>
+<dd>O que o seu efeito devolve. Roda quando o componente sai da tela e antes da próxima execução do mesmo
+efeito.</dd>
+<dt>desenho puro</dt>
+<dd>Função que só lê props e estado e devolve JSX. Não muda variável de fora, não escreve em arquivo, não
+chama rede.</dd>
+<dt>modo desenvolvimento</dt>
+<dd>O que roda com <code>npm run dev</code>. O build de produção é outro arquivo, com outras garantias e
+sem as verificações do Strict Mode.</dd>
+</dl>
+
+<p>Nenhuma dessas verificações muda o resultado visual: elas mudam o <em>número de vezes</em> que o seu
+código roda. Por isso o modo é invisível para quem usa o site e barulhento para quem programa.</p>
+
+<h2>3. Desenho puro: a regra que o modo cobra primeiro</h2>
+
+<p>Um componente é uma função que recebe props e devolve JSX. Como toda função que devolve tela, ela
+precisa ser previsível: mesmas props, mesmo estado, mesmo resultado. Se o desenho escreve em algo de fora
+— uma variável do módulo, um contador global, um arquivo —, a segunda chamada encontra o mundo diferente
+da primeira. E aí a tela passa a depender de quantas vezes o React desenhou.</p>
+
+<p>A caixa abaixo tem esse erro no formato mais bobo possível: um número de pedido que sai de um contador
+de módulo, incrementado durante o desenho. Digite um nome no campo e veja o número mudar sem que ninguém
+tenha feito um pedido novo.</p>
+
+<div class="tryreact" data-goal="digite:input=Maria;;texto:Pedido 1">
+  <p class="try-task">Digite <code>Maria</code> no campo e clique em Rodar. O número do pedido deveria
+  continuar 1: ele é do dia, não da digitação. Tire a escrita de dentro do desenho para que o número pare
+  de mudar a cada letra.</p>
+  <pre class="jsx">let proximo = 1;
+
+function App() {
+  const [nome, setNome] = useState("");
+  const pedido = proximo;
+  proximo = proximo + 1;
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Pedido {pedido}&lt;/p&gt;
+      &lt;label htmlFor="cliente"&gt;Cliente&lt;/label&gt;
+      &lt;input id="cliente" value={nome} onChange={function (e) { setNome(e.target.value); }} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Pedido 1&lt;/p&gt;
+  &lt;label for="cliente"&gt;Cliente&lt;/label&gt;
+  &lt;input id="cliente" value=""&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const pedido = 1;
+
+function App() {
+  const [nome, setNome] = useState("");
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Pedido {pedido}&lt;/p&gt;
+      &lt;label htmlFor="cliente"&gt;Cliente&lt;/label&gt;
+      &lt;input id="cliente" value={nome} onChange={function (e) { setNome(e.target.value); }} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No painel, o texto sai “Pedido 5” depois de quatro letras. Cada letra gerou um desenho, cada desenho
+gastou um número. Em desenvolvimento, o Strict Mode teria dobrado o consumo antes de você digitar
+qualquer coisa: o primeiro desenho já sairia com 2, e a Ana teria visto o número do pedido do dia começar
+em 2 sem motivo. A solução não é “guardar o número num <code>useState</code> para ele não mudar” — isso
+esconde o sintoma. A solução é tirar do desenho a responsabilidade de criar o número: ele vem de fora,
+uma vez, e o componente só mostra.</p>
+
+<p>Vale a mesma regra para qualquer escrita escondida no render: <code>push</code> num array de módulo,
+<code>localStorage.setItem</code>, <code>console.log</code> que depende de contador, sortear um id com
+<code>Math.random()</code> no corpo, somar num objeto compartilhado. Todos parecem inofensivos até o React
+desenhar duas vezes — e ele faz isso de propósito em desenvolvimento, e pode fazer de novo em produção.</p>
+
+<p>Se o número precisa mesmo ser criado na hora, o lugar é o pai, ou o servidor, ou uma função que roda
+fora do componente. O desenho recebe o valor pronto. É o mesmo princípio que a aula de
+<a href="useState.html">O useState</a> já usou para separar o que é dado do que é tela.</p>
+
+<h2>4. Todo efeito precisa saber se desfazer</h2>
+
+<p>O segundo teste do Strict Mode é o mais útil e o que mais assusta. Na montagem, o React roda o efeito,
+roda a limpeza e roda o efeito outra vez. Se o seu efeito abre uma assinatura, cria um intervalo, liga um
+ouvinte de evento ou começa uma busca, a limpeza tem de fechar, desligar, remover e cancelar. Quando a
+limpeza existe e está certa, o resultado final é idêntico ao de uma execução só. Quando ela falta, o
+efeito se acumula.</p>
+
+<pre class="term">montou o painel
+desmontou o painel
+montou o painel</pre>
+
+<p>Essas três linhas são o que aparece no console de um componente com <code>console.log</code> no efeito
+e na limpeza, em desenvolvimento. A leitura errada é “o React está montando duas vezes, então meu código
+está errado”. A leitura certa é “o React me deu a chance de ver, sem esperar um usuário trocar de tela, se
+a minha limpeza funciona”. Em produção esse mesmo componente monta uma vez e a linha do meio nunca
+aparece — mas o efeito sem limpeza continua vazando.</p>
+
+<p>Há um detalhe de tempo que confunde muita gente. O ciclo de teste acontece na montagem, não a cada
+atualização. Um efeito com lista de dependências vazia roda uma vez em produção; em desenvolvimento roda,
+limpa e roda de novo. Um efeito com dependências roda de novo quando elas mudam, e o React também limpa
+antes de rodar a versão nova — esse comportamento não é do Strict Mode, é do próprio
+<code>useEffect</code>. Ou seja: você precisa de limpeza de qualquer jeito, com ou sem modo estrito.</p>
+
+<p>A função de limpeza é sempre o contrário do que foi feito. Se você chamou <code>setInterval</code>,
+volte com <code>clearInterval</code>. Se chamou <code>addEventListener</code>, volte com
+<code>removeEventListener</code> e a mesma referência de função. Se assinou um canal, cancele a assinatura.
+Se começou um <code>fetch</code>, aborte com <code>AbortController</code>. Se ligou uma animação, cancele
+o quadro. E se não há nada a desfazer, não devolva nada — um efeito sem limpeza é legítimo quando não
+abriu nada.</p>
+
+<h2>5. A caixa: o efeito que desenha à mão</h2>
+
+<p>O caso clássico de efeito sem saber se desfazer é o que mexe no DOM diretamente. A caixa abaixo tem um
+efeito sem lista de dependências que cria um item e o pendura na lista toda vez que o componente desenha.
+Clique em “Desenhar de novo” e conte os itens.</p>
+
+<div class="tryreact" data-goal="clique:button;;conta:li=1">
+  <p class="try-task">Clique em Desenhar de novo. A cesta deveria continuar com um pão só. Faça a lista
+  sair do próprio desenho, sem efeito nenhum criando elementos à mão.</p>
+  <pre class="jsx">function App() {
+  const [versao, setVersao] = useState(1);
+  const lista = useRef(null);
+
+  useEffect(function () {
+    const li = document.createElement("li");
+    li.textContent = "Pão na cesta";
+    lista.current.appendChild(li);
+  });
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Versão: {versao}&lt;/p&gt;
+      &lt;button onClick={function () { setVersao(versao + 1); }}&gt;Desenhar de novo&lt;/button&gt;
+      &lt;ul ref={lista}&gt;&lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Versão: 1&lt;/p&gt;
+  &lt;button&gt;Desenhar de novo&lt;/button&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Pão na cesta&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [versao, setVersao] = useState(1);
+  const paes = ["Pão na cesta"];
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Versão: {versao}&lt;/p&gt;
+      &lt;button onClick={function () { setVersao(versao + 1); }}&gt;Desenhar de novo&lt;/button&gt;
+      &lt;ul&gt;
+        {paes.map(function (pao) { return &lt;li key={pao}&gt;{pao}&lt;/li&gt;; })}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A cesta termina com dois pães depois de um clique, e com três depois de dois. O efeito rodou de novo
+porque não tinha lista de dependências: sem a lista, ele roda depois de <em>todo</em> desenho. Cada
+execução criou um <code>li</code> novo e o pendurou no mesmo <code>ul</code> — sem limpar o anterior,
+porque limpar exigiria saber qual remover, e o efeito nem guardou a referência.</p>
+
+<p>Em desenvolvimento, o Strict Mode mostraria o problema antes do primeiro clique: monta, roda o efeito,
+desmonta (sem limpeza, os dois itens ficam) e monta de novo. A lista nasceria com dois pães. Esse é o tipo
+de bug que aparece só na tela do cliente, depois de navegar de uma página para outra três vezes — e que
+ninguém consegue reproduzir na própria máquina.</p>
+
+<p>O conserto tem duas partes. A primeira é parar de desenhar à mão: o React já sabe transformar uma lista
+de dados em uma lista de elementos, e o <code>map</code> com <code>key</code> faz isso melhor que qualquer
+<code>appendChild</code>. A segunda é: se a cesta não muda, ela nem precisa de estado. A constante
+<code>paes</code> é recriada a cada desenho, o que é barato e correto; o que importa é que o resultado na
+tela é sempre igual para o mesmo estado.</p>
+
+<p>Quando o efeito tem mesmo de mexer no DOM — medir um elemento, integrar um mapa, inicializar um
+componente de terceiros —, a regra continua: liste dependências honestas e devolva a limpeza que desfaz.</p>
+
+<h2>6. A caixa: a assinatura sem desassinatura</h2>
+
+<p>O terceiro caso é o que a Ana viu no painel do servidor: um ouvinte registrado a cada montagem e nunca
+removido. A caixa imita um canal de avisos da padaria. Cada montagem adiciona um ouvinte; o botão
+“Reiniciar” troca a chave do contador e força uma montagem nova; o botão da campainha dispara todos os
+ouvintes vivos.</p>
+
+<div class="tryreact" data-goal="clique:.reiniciar;;clique:.reiniciar;;clique:.alvo;;texto:Pedidos: 1">
+  <p class="try-task">Clique duas vezes em Reiniciar e depois em Tocar a campainha. Um toque deveria contar
+  um pedido. Devolva do efeito a função que remove o ouvinte.</p>
+  <pre class="jsx">let pedidos = 0;
+const campainha = { ouvintes: [] };
+
+function Contador() {
+  const [n, setN] = useState(pedidos);
+
+  useEffect(function () {
+    function tocar() {
+      pedidos = pedidos + 1;
+      setN(pedidos);
+    }
+    campainha.ouvintes.push(tocar);
+  }, []);
+
+  return &lt;p&gt;Pedidos: {n}&lt;/p&gt;;
+}
+
+function App() {
+  const [versao, setVersao] = useState(1);
+  return (
+    &lt;div&gt;
+      &lt;Contador key={versao} /&gt;
+      &lt;button className="reiniciar" onClick={function () { setVersao(versao + 1); }}&gt;Reiniciar&lt;/button&gt;
+      &lt;button className="alvo" onClick={function () { campainha.ouvintes.forEach(function (f) { f(); }); }}&gt;Tocar a campainha&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Pedidos: 0&lt;/p&gt;
+  &lt;button class="reiniciar"&gt;Reiniciar&lt;/button&gt;
+  &lt;button class="alvo"&gt;Tocar a campainha&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">let pedidos = 0;
+const campainha = { ouvintes: [] };
+
+function Contador() {
+  const [n, setN] = useState(pedidos);
+
+  useEffect(function () {
+    function tocar() {
+      pedidos = pedidos + 1;
+      setN(pedidos);
+    }
+    campainha.ouvintes.push(tocar);
+    return function () {
+      campainha.ouvintes = campainha.ouvintes.filter(function (f) { return f !== tocar; });
+    };
+  }, []);
+
+  return &lt;p&gt;Pedidos: {n}&lt;/p&gt;;
+}
+
+function App() {
+  const [versao, setVersao] = useState(1);
+  return (
+    &lt;div&gt;
+      &lt;Contador key={versao} /&gt;
+      &lt;button className="reiniciar" onClick={function () { setVersao(versao + 1); }}&gt;Reiniciar&lt;/button&gt;
+      &lt;button className="alvo" onClick={function () { campainha.ouvintes.forEach(function (f) { f(); }); }}&gt;Tocar a campainha&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Com o código inicial, a tela mostra “Pedidos: 3” depois dos dois reinícios e de um toque. Três ouvintes
+vivos: o da primeira montagem, o da segunda e o da terceira. Cada toque da campainha passa por todos, e o
+contador sobe de três em três. Ninguém fez nada de errado no clique — o erro está no efeito que não
+devolveu nada.</p>
+
+<p>A solução é a função de limpeza, e ela precisa remover <em>a mesma</em> função que foi adicionada. Por
+isso <code>tocar</code> é declarada dentro do efeito: cada execução tem a sua referência, e a limpeza
+daquela execução sabe exatamente qual remover. Se você escrevesse
+<code>campainha.ouvintes.pop()</code> a limpeza funcionaria por acaso aqui e falharia em qualquer outro
+lugar. Guardar a referência é o que garante o par certo.</p>
+
+<p>O mesmo desenho aparece com <code>fetch</code>: em desenvolvimento, o Strict Mode dispara a busca, a
+limpeza e a busca de novo. Com <code>AbortController</code>, a primeira é cancelada e o servidor recebe
+uma:</p>
+
+<pre class="file" data-file="src/Encomendas.jsx">useEffect(function () {
+  const controle = new AbortController();
+
+  fetch("/api/encomendas", { signal: controle.signal })
+    .then(function (resposta) { return resposta.json(); })
+    .then(function (dados) { setEncomendas(dados); })
+    .catch(function (erro) {
+      if (erro.name !== "AbortError") setErro("Não deu para carregar.");
+    });
+
+  return function () { controle.abort(); };
+}, []);</pre>
+
+<p>O <code>catch</code> ignora o erro de cancelamento de propósito: abortar não é falha, é limpeza. Sem
+esse detalhe, a tela da Ana mostraria “Não deu para carregar” toda vez que ela trocasse de página no meio
+da busca — e ela ia passar horas procurando um problema de rede que não existe.</p>
+
+<h2>7. Desenvolvimento e produção: duas conversas diferentes</h2>
+
+<p>A confusão mais comum é achar que o Strict Mode muda o comportamento do site. Ele não muda. O que muda
+entre os dois modos é a quantidade de vezes que o seu código é chamado, e o que existe de verificação
+extra. Esta tabela resume o que vale em cada lado.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que acontece</th><th>Em desenvolvimento</th><th>No build de produção</th></tr>
+<tr><td>função do componente chamada</td><td>duas vezes seguidas na montagem</td><td>uma vez</td></tr>
+<tr><td>inicializador de <code>useState</code></td><td>duas vezes</td><td>uma vez</td></tr>
+<tr><td>efeito na montagem</td><td>prepara, limpa, prepara</td><td>prepara uma vez</td></tr>
+<tr><td>ref de callback</td><td>anexa, remove, anexa</td><td>anexa uma vez</td></tr>
+<tr><td>elemento no HTML</td><td>nenhum</td><td>nenhum</td></tr>
+<tr><td>avisos de API antiga</td><td>aparecem no console</td><td>não existem</td></tr>
+<tr><td>o que o usuário vê</td><td>o mesmo</td><td>o mesmo</td></tr>
+</table>
+</div>
+
+<p>Repare na última linha. O objetivo do modo é que as duas colunas terminem no mesmo lugar. Se o seu
+componente desenha diferente quando chamado duas vezes, a coluna da direita vai mostrar o resultado de uma
+chamada só — e o bug vai aparecer na casa do cliente, num aparelho que você não tem. É por isso que
+“funciona na minha máquina” e “funciona em produção” podem ser frases verdadeiras ao mesmo tempo e ainda
+assim esconder um problema.</p>
+
+<p>Também vale saber que o envelope não some do código quando você compila. O que some é o efeito dele: no
+arquivo final, <code>StrictMode</code> é um componente que devolve os filhos e nada mais. Você pode deixá-lo
+no <code>main.jsx</code> para sempre; ele não custa nada em produção e continua te avisando quando você
+volta a desenvolver.</p>
+
+<p>Uma última diferença prática: o modo estrito é por árvore, não global. Você pode envolver só uma parte
+do app, útil quando uma biblioteca de terceiros faz barulho.</p>
+
+<h2>8. O que o Strict Mode não pega</h2>
+
+<p>Confiar demais no modo é o erro seguinte. Ele é um detector bom, não completo: encontra escrita no
+desenho e falta de limpeza, e só. Esta tabela separa o que ele cobre do que continua sendo trabalho seu.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sintoma</th><th>O Strict Mode pega?</th><th>O que fazer</th></tr>
+<tr><td>variável de módulo alterada no desenho</td><td>sim, o valor dobra</td><td>tirar a escrita do render</td></tr>
+<tr><td>efeito sem limpeza</td><td>sim, o efeito roda duas vezes</td><td>devolver a função que desfaz</td></tr>
+<tr><td>lista de dependências errada</td><td>não</td><td>conferir o que o efeito lê</td></tr>
+<tr><td>estado que deveria estar no pai</td><td>não</td><td>subir o estado, como em <a href="elevando-estado.html">Elevando o Estado</a></td></tr>
+<tr><td>condição de corrida entre duas buscas</td><td>não</td><td>abortar a anterior e ignorar resposta velha</td></tr>
+<tr><td><code>memo</code> inútil com prop nova a cada desenho</td><td>não</td><td>medir antes de memorizar</td></tr>
+</table>
+</div>
+
+<p>As três primeiras linhas já foram vistas nesta aula. A quarta é a mais traiçoeira: um efeito que lê
+<code>filtro</code> e tem <code>[]</code> na lista de dependências funciona no primeiro dia e para de
+funcionar quando alguém muda o filtro. Nenhum aviso aparece, porque o React não sabe o que o seu efeito
+quis dizer; ele só sabe quando rodar. A conferência é manual: para cada valor que o efeito lê, ele está na
+lista?</p>
+
+<p>Já a condição de corrida merece um parágrafo. Duas buscas disparadas em sequência podem voltar fora de
+ordem, e a resposta velha sobrescreve a nova. Abortar a anterior resolve metade; a outra metade é ignorar
+resultado que chegou depois de o componente já ter mudado de ideia. O padrão é guardar um sinalizador
+dentro do efeito e desligá-lo na limpeza:</p>
+
+<pre class="file" data-file="src/Busca.jsx">useEffect(function () {
+  let vivo = true;
+
+  fetch("/api/paes?q=" + filtro)
+    .then(function (r) { return r.json(); })
+    .then(function (dados) { if (vivo) setPaes(dados); });
+
+  return function () { vivo = false; };
+}, [filtro]);</pre>
+
+<p>Com esse desenho, a resposta que chega atrasada não mexe mais na tela. É o tipo de cuidado que o Strict
+Mode não cobra, mas que o modo estrito ajuda a testar: como cada mudança de <code>filtro</code> limpa a
+execução anterior, você vê na hora se a limpeza está no lugar.</p>
+
+<p>Fechando a conferência, dá para rodar um resumo no console depois de navegar pela padaria e voltar. A
+ideia é olhar os três números que mais denunciam efeito acumulado: ouvintes, temporizadores e itens na
+lista.</p>
+
+<pre class="term">canal: 1 ouvinte
+lista: 1 item
+pedido do dia: 1</pre>
+
+<p>Um em cada. Se o canal tiver três ouvintes, alguma montagem não limpou. Se a lista tiver itens repetidos,
+alguém desenhou à mão em vez de derivar do estado. Se o pedido do dia estiver em 2, alguma coisa escreveu
+durante o desenho. Os três números cabem numa linha de <code>console.log</code> e valem mais do que uma
+tarde de leitura de código.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o “Carregando” que piscava duas vezes</h3>
+<p>A tela de encomendas da Ana mostrava o texto “Carregando…” e, meio segundo depois, os pedidos. Em
+desenvolvimento, o texto aparecia duas vezes: a busca saía, o Strict Mode limpava e a busca saía de novo,
+zerando o estado no meio. O conserto não foi tirar o envelope: foi cancelar a primeira busca e manter o
+estado enquanto a segunda acontecia. O usuário nunca viu diferença; o servidor parou de receber pedido
+dobrado.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a lista de tarefas que dobrava ao abrir</h3>
+<p>Um componente de tarefas do painel administrativo criava os itens com <code>appendChild</code> dentro de
+um efeito sem limpeza. Ao abrir e fechar a aba três vezes, cada tarefa aparecia em triplicata. Em produção
+o bug era raro, porque dependia de navegar; em desenvolvimento aparecia sempre, na primeira abertura. A
+correção foi a mesma da caixa 2: a lista passou a sair do estado com <code>map</code>.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o time que desligou o modo</h3>
+<p>Um colega da Ana comentou o <code>StrictMode</code> do <code>main.jsx</code> porque “o console ficava
+cheio”. Dois meses depois, um vazamento de memória derrubava a aba do navegador depois de vinte minutos de
+uso: um intervalo criado a cada visita à página e nunca limpo. O aviso estava ali desde o primeiro dia. A
+lição do time foi cara e simples: barulho no console em desenvolvimento é dívida, não incômodo.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Quando o Strict Mode roda o seu componente duas vezes?</p>
+<label><input type="radio" name="q1"> sempre, em desenvolvimento e em produção</label>
+<label><input type="radio" name="q1"> só em desenvolvimento, na montagem</label>
+<label><input type="radio" name="q1"> só quando a página é recarregada pelo usuário</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que o <code>StrictMode</code> coloca no HTML da página?</p>
+<label><input type="radio" name="q2"> um elemento invisível em volta do app</label>
+<label><input type="radio" name="q2"> um atributo <code>data-strict</code> na raiz</label>
+<label><input type="radio" name="q2"> nada: ele não desenha elemento nenhum</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O efeito registrou um ouvinte de evento. O que ele deve devolver?</p>
+<label><input type="radio" name="q3"> a função que remove o mesmo ouvinte</label>
+<label><input type="radio" name="q3"> o valor <code>true</code> para confirmar que rodou</label>
+<label><input type="radio" name="q3"> nada, porque o React limpa sozinho</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: ensine o efeito a se desfazer</h2>
+<p>O relógio da padaria liga um intervalo a cada montagem e nunca o desliga. Complete o <code>return</code>
+que desfaz exatamente o que o efeito fez.</p>
+<div class="ex-code">useEffect(() =&gt; {
+  const id = setInterval(tique, 1000);
+  return <input aria-label="resposta 1" data-answer="() =&gt; clearInterval(id)|() => { clearInterval(id); }|function () { clearInterval(id); }|function () { clearInterval(id) }" placeholder="...">;
+}, []);</div>
+<p class="ex-dica">Dica: a função devolvida é o contrário do que foi feito. Se ligou um intervalo com
+<code>setInterval</code>, desligue com <code>clearInterval</code> usando o mesmo <code>id</code>.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O Strict Mode é um envelope de desenvolvimento que não desenha nada. Ele chama o seu componente duas
+vezes, roda os inicializadores duas vezes e, para cada efeito, faz prepara, limpa e prepara de novo — uma
+vez, na montagem. Em produção ele é inerte, e o mesmo código roda uma vez só. O objetivo não é te
+incomodar: é fazer o bug aparecer na sua máquina, e não na casa do cliente.</p>
+
+<p>O que ele cobra é pequeno e vale para toda a vida do projeto. Desenho puro: mesma entrada, mesma saída,
+sem escrita em variável de fora. Efeito com limpeza: o contrário exato do que foi feito, com a mesma
+referência de função. Quando as duas coisas estão no lugar, o console fica quieto e a dupla invocação passa
+despercebida — que é exatamente o sinal de que está tudo certo.</p>
+
+<p>E o que ele não pega continua sendo seu: lista de dependências, estado no lugar errado, corrida entre
+buscas, memorização inútil. Na próxima aula o assunto muda de lado: em vez de caçar bug no navegador, você
+vai escrever testes que repetem essa conferência sozinhas, em <a href="testando-componentes.html">Testando
+Componentes</a>.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>StrictMode</code> só age em desenvolvimento; não desenha elemento e não aparece no HTML.</li>
+<li>Na montagem, o desenho roda duas vezes e cada efeito roda prepara, limpa, prepara.</li>
+<li>Desenho puro: nada de escrever em variável de módulo, storage ou console durante o render.</li>
+<li>Todo efeito que abre algo devolve a função que fecha — com a mesma referência.</li>
+<li>Abortar busca é limpeza, não erro: o <code>catch</code> deve ignorar <code>AbortError</code>.</li>
+<li>Em produção o envelope é inerte; o código roda uma vez e o bug escondido aparece.</li>
+<li>Não pega dependências erradas, estado no lugar errado nem condição de corrida.</li>
+<li>Desligar o modo para “parar o barulho” adia o problema para o usuário.</li>
+<li>Se o console fica quieto com o modo ligado, o efeito provavelmente está bem escrito.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

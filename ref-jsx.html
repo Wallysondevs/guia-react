@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JSX | Guia React</title>
+<meta name="description" content="Consulta rápida de JSX no React 19: as cinco regras, o que cabe dentro das chaves, atributos que mudam de nome, condicionais, listas com key e os erros comuns.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">JSX</span></h1>
+<p class="intro">JSX é a escrita que parece HTML e vira JavaScript. Esta página é a consulta rápida do
+assunto: as cinco regras que o compilador cobra, o que cabe dentro das chaves, os atributos que mudam de
+nome, listas com <code>key</code>, condicionais e as mensagens de erro mais comuns. A Ana usa JSX desde o
+primeiro componente — aqui está, em uma página, tudo o que ela precisa lembrar de uma vez, com exemplos
+que rodam na caixa e links para a aula longa de cada item.</p>
+
+<div class="note">
+<strong>Como usar esta página</strong>
+<ul>
+  <li>Cada seção responde a uma pergunta prática; as tabelas são para consultar no meio do código.</li>
+  <li>As duas caixas rodam React 19 de verdade: mude o código, clique em Rodar e leia o painel.</li>
+  <li>O painel mostra o HTML gerado, uma tag por linha — é assim que você confere o que o JSX virou.</li>
+  <li>Para o assunto completo, siga o link da coluna "Aula" de cada tabela.</li>
+</ul>
+</div>
+
+<h2>1. O que é JSX, em uma frase</h2>
+
+<p>JSX é uma escrita parecida com HTML que o compilador transforma em chamadas de função. Não é HTML, não
+é texto e não é template string: é JavaScript com uma cara mais confortável. Quando você escreve
+<code>&lt;h1&gt;Pão&lt;/h1&gt;</code>, o compilador do projeto — no Vite com React, o Babel — troca isso
+por <code>React.createElement("h1", null, "Pão")</code>. O navegador nunca vê JSX; ele vê o resultado
+dessa transformação.</p>
+
+<p>Essa troca explica tudo o que parece estranho no começo. Um elemento JSX é um objeto, não uma string,
+então dá para guardá-lo numa variável, devolvê-lo de uma função, passá-lo como argumento e colocá-lo
+dentro de um array. É por isso que componente é função que devolve JSX: o retorno é um valor como outro
+qualquer.</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const titulo = &lt;h1&gt;Padaria da Ana&lt;/h1&gt;;
+  const aviso = &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;;
+
+  return (
+    &lt;div&gt;
+      {titulo}
+      {aviso}
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>O JSX acima é a receita; o que o compilador produz é a chamada de função. Para um elemento simples, a
+conversão é literal:</p>
+
+<pre class="term">React.createElement("h1", null, "Padaria da Ana")
+React.createElement("p", null, "Aberto das 6h às 18h")</pre>
+
+<p>O primeiro argumento é o tipo (a tag ou o componente), o segundo são as props — <code>null</code>
+quando não há nenhuma — e o terceiro em diante são os filhos. Um <code>&lt;div&gt;</code> com dois filhos
+vira uma chamada com dois argumentos a mais. Entender essa forma ajuda a ler mensagens de erro que falam
+de "elemento" e de "filho" em vez de tag.</p>
+
+<p>Duas consequências práticas. Primeira: como é JavaScript, você pode usar variáveis, contas e funções
+dentro das chaves — o assunto da seção 3. Segunda: como o resultado é um objeto, o React consegue
+comparar, guardar e reaproveitar elementos sem tocar no DOM até a hora de desenhar. O JSX é a superfície;
+o objeto é o que circula por dentro.</p>
+
+<p>Vale saber que JSX é opcional: o mesmo componente pode ser escrito com
+<code>React.createElement</code> direto. Ninguém faz isso no dia a dia — a escrita fica ilegível —, mas
+saber que o JSX é só açúcar ajuda quando você vê a saída do compilador ou uma biblioteca que gera
+elementos por função.</p>
+
+<dl class="anatomy">
+<dt>JSX</dt>
+<dd>A escrita parecida com HTML dentro do JavaScript. Não é string nem HTML: é sintaxe transformada no
+build.</dd>
+<dt>elemento</dt>
+<dd>O objeto que o JSX representa: tipo, props e filhos. É o que o React compara e desenha.</dd>
+<dt>expressão</dt>
+<dd>Qualquer coisa que produza um valor e possa ficar entre chaves: <code>{preco * 2}</code>.</dd>
+<dt>fragmento</dt>
+<dd>O pai invisível <code>&lt;&gt;...&lt;/&gt;</code>, que agrupa irmãos sem criar nó no HTML.</dd>
+<dt><code>key</code></dt>
+<dd>O identificador de um item de lista. Não vira prop nem atributo; serve para o React reconhecer o
+item.</dd>
+</dl>
+
+<h2>2. As cinco regras que o compilador cobra</h2>
+
+<p>São poucas e sempre as mesmas. Quem aprende estas cinco para de brigar com o compilador.</p>
+
+<p><strong>1. Toda tag fecha.</strong> <code>&lt;br&gt;</code>, <code>&lt;img&gt;</code> e
+<code>&lt;input&gt;</code> viram <code>&lt;br /&gt;</code>, <code>&lt;img /&gt;</code> e
+<code>&lt;input /&gt;</code>. Em JSX não existe tag aberta sem fechamento, mesmo as que o HTML aceita
+vazias.</p>
+
+<p><strong>2. Um pai só.</strong> O <code>return</code> devolve um elemento. Para mostrar dois irmãos,
+embrulhe em <code>&lt;div&gt;</code> ou em <code>&lt;&gt;...&lt;/&gt;</code> — o fragmento, que não cria
+nó no HTML. É o erro "Adjacent JSX elements must be wrapped in an enclosing tag".</p>
+
+<p><strong>3. Aspas para texto, chaves para JavaScript.</strong> <code>nome="Ana"</code> passa a string
+"Ana"; <code>preco={2.5}</code> passa o número. A regra vale para atributos e para filhos: texto solto é
+texto; <code>{expressao}</code> é JavaScript.</p>
+
+<p><strong>4. Os nomes não são os do HTML.</strong> <code>className</code>, <code>htmlFor</code>,
+<code>onClick</code>, <code>tabIndex</code>, <code>style</code> com objeto. O React usa camelCase porque
+esses nomes são propriedades de um objeto JavaScript, não atributos de uma string de HTML.</p>
+
+<p><strong>5. Comentário é chaves com barra e asterisco.</strong> <code>{/* assim */}</code> dentro do
+JSX; <code>//</code> e <code>/* */</code> valem fora dele. Um comentário HTML
+<code>&lt;!-- --&gt;</code> aparece na tela como texto.</p>
+
+<pre class="file" data-file="Cartao.jsx">function Cartao() {
+  const preco = 2.5;
+
+  return (
+    &lt;&gt;
+      &lt;h2 className="titulo"&gt;Pão de queijo&lt;/h2&gt;
+      &lt;label htmlFor="qtd"&gt;Quantos?&lt;/label&gt;
+      &lt;input id="qtd" type="number" defaultValue={1} /&gt;
+      &lt;img src="pao.png" alt="Pão de queijo na cesta" /&gt;
+      &lt;p style={{ fontWeight: "bold" }}&gt;R$ {preco}&lt;/p&gt;
+      {/* o fragmento &lt;&gt; não cria nó no HTML */}
+    &lt;/&gt;
+  );
+}</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No HTML</th><th>No JSX</th><th>Por quê</th><th>Aula</th></tr>
+<tr><td><code>class="preco"</code></td><td><code>className="preco"</code></td><td><code>class</code> é palavra reservada do JavaScript</td><td><a href="atributos-e-classname.html">Atributos e className</a></td></tr>
+<tr><td><code>for="nome"</code></td><td><code>htmlFor="nome"</code></td><td><code>for</code> também é do JavaScript</td><td><a href="formulario-acessivel.html">Formulário Acessível</a></td></tr>
+<tr><td><code>onclick="salvar()"</code></td><td><code>onClick={salvar}</code></td><td>o valor é uma função, não um texto</td><td><a href="eventos-onclick.html">Eventos e onClick</a></td></tr>
+<tr><td><code>style="color: red"</code></td><td><code>style={{ color: "red" }}</code></td><td>estilo é objeto com chaves camelCase</td><td><a href="style-inline.html">style Inline</a></td></tr>
+<tr><td><code>tabindex="1"</code></td><td><code>tabIndex={1}</code></td><td>atributo composto vira camelCase</td><td><a href="formulario-acessivel.html">Formulário Acessível</a></td></tr>
+<tr><td><code>&lt;br&gt;</code></td><td><code>&lt;br /&gt;</code></td><td>toda tag fecha</td><td><a href="jsx-regras.html">As Regras do JSX</a></td></tr>
+<tr><td><code>&lt;!-- nota --&gt;</code></td><td><code>{/* nota */}</code></td><td>comentário HTML vira texto na tela</td><td><a href="jsx-regras.html">As Regras do JSX</a></td></tr>
+</table>
+</div>
+
+<p>Repare que <code>aria-*</code> e <code>data-*</code> ficam como estão: são atributos livres, sem
+tradução. O que muda é só o que colide com palavra reservada do JavaScript ou com a API do DOM.</p>
+
+<h2>3. O que cabe dentro das chaves</h2>
+
+<p>Dentro de <code>{ }</code> cabe uma <strong>expressão</strong>: qualquer coisa que produza um valor.
+Nome de variável, conta, chamada de função, acesso a propriedade, ternário, comparação, template string,
+<code>map</code>. Não cabe <strong>comando</strong>: <code>if</code>, <code>for</code>,
+<code>return</code>, declaração de variável. Se você precisa de um <code>if</code>, calcule antes do
+<code>return</code> ou use um ternário.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Dentro de <code>{ }</code></th><th>Exemplo</th><th>Resultado</th><th>Aula</th></tr>
+<tr><td>variável</td><td><code>{nome}</code></td><td>o valor da variável</td><td><a href="expressoes-no-jsx.html">Expressões no JSX</a></td></tr>
+<tr><td>conta</td><td><code>{preco * quantidade}</code></td><td>o número calculado</td><td><a href="expressoes-no-jsx.html">Expressões no JSX</a></td></tr>
+<tr><td>ternário</td><td><code>{pago ? "sim" : "não"}</code></td><td>um dos dois textos</td><td><a href="renderizacao-condicional.html">Renderização Condicional</a></td></tr>
+<tr><td><code>&amp;&amp;</code></td><td><code>{pronto &amp;&amp; &lt;p&gt;saiu&lt;/p&gt;}</code></td><td>o elemento ou nada</td><td><a href="renderizacao-condicional.html">Renderização Condicional</a></td></tr>
+<tr><td><code>map</code></td><td><code>{lista.map((p) =&gt; ...)}</code></td><td>uma lista de elementos</td><td><a href="listas-com-map.html">Listas com map</a></td></tr>
+<tr><td>chamada de função</td><td><code>{formatar(preco)}</code></td><td>o retorno da função</td><td><a href="expressoes-no-jsx.html">Expressões no JSX</a></td></tr>
+<tr><td>objeto</td><td><code>{pedido}</code></td><td>erro: objeto não é filho válido</td><td><a href="props-com-objetos.html">Props com Objetos</a></td></tr>
+<tr><td><code>if</code> ou <code>for</code></td><td><code>{if (x) ...}</code></td><td>erro de sintaxe</td><td><a href="jsx-regras.html">As Regras do JSX</a></td></tr>
+</table>
+</div>
+
+<p>O caso do objeto merece atenção porque o erro é claro mas o motivo não: o React aceita texto, número,
+elemento, array e <code>null</code> como filho. Um objeto não tem como ser desenhado — quais campos
+apareceriam? — então ele reclama. Para mostrar um objeto, escolha os campos:
+<code>{pedido.nome}</code>.</p>
+
+<p>Outro detalhe que pega iniciante: <code>0</code> e <code>""</code> são filhos válidos. Em
+<code>{quantidade &amp;&amp; &lt;p&gt;itens&lt;/p&gt;}</code>, quando a quantidade é zero o React desenha
+o número 0 na tela, porque <code>0</code> é o valor da expressão. Use
+<code>{quantidade &gt; 0 &amp;&amp; ...}</code> quando o zero não deve aparecer.</p>
+
+<div class="tryreact" data-goal="texto:produto: PÃO DE QUEIJO;;texto:total: R$ 7.5">
+  <p class="try-task">O total está escrito à mão e o nome aparece em minúsculas. Use expressões:
+  <code>{pao.toUpperCase()}</code> no produto e <code>{preco * quantidade}</code> no total.</p>
+  <pre class="jsx">function App() {
+  const pao = "pão de queijo";
+  const preco = 2.5;
+  const quantidade = 3;
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;produto: {pao}&lt;/p&gt;
+      &lt;p&gt;total: R$ 0&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;produto: pão de queijo&lt;/p&gt;
+  &lt;p&gt;total: R$ 0&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const pao = "pão de queijo";
+  const preco = 2.5;
+  const quantidade = 3;
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;produto: {pao.toUpperCase()}&lt;/p&gt;
+      &lt;p&gt;total: R$ {preco * quantidade}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra o texto final, não a expressão. Essa é a leitura mais útil do JSX: você escreve a
+conta, o React escreve o resultado no DOM. Se o número sair com muitas casas decimais, formate antes —
+<code>{(preco * quantidade).toFixed(2)}</code> —, porque o JSX não arredonda nada por você.</p>
+
+<h2>4. Atributos: aspas, chaves e os nomes que mudam</h2>
+
+<p>A regra é a mesma dos filhos: aspas entregam texto, chaves entregam JavaScript. <code>id="nome"</code>
+é string; <code>value={nome}</code> é a variável; <code>preco={2.5}</code> é número;
+<code>itens={lista}</code> é array. Misturar os dois é o erro mais comum: <code>preco="{2.5}"</code>
+entrega a string <code>"{2.5}"</code>, com chaves no meio.</p>
+
+<p>Atributos booleanos têm atalho: <code>disabled</code> sozinho vale <code>true</code>, e
+<code>disabled={false}</code> desliga. O mesmo vale para <code>required</code>,
+<code>checked</code> e <code>hidden</code>. <code>checked</code> e <code>value</code> são especiais em
+formulário: sem <code>onChange</code>, o campo fica travado — o React avisa no console.</p>
+
+<pre class="file" data-file="Botao.jsx">function Botao(props) {
+  return (
+    &lt;button
+      type="button"
+      className="primario"
+      disabled={props.carregando}
+      aria-label="Salvar pedido"
+      onClick={props.aoClicar}
+    &gt;
+      {props.carregando ? "Salvando..." : "Salvar"}
+    &lt;/button&gt;
+  );
+}
+
+// spread: repassa todas as props de uma vez
+&lt;Botao {...props} /&gt;</pre>
+
+<p>O <code>style</code> é o único atributo que sempre pede objeto: as chaves são as propriedades CSS em
+camelCase, e os valores são strings ou números. <code>style={{ marginTop: 8 }}</code> vira
+<code>margin-top: 8px</code>. Para várias classes condicionais, monte a string:
+<code>className={"card " + (destaque ? "card--destaque" : "")}</code>.</p>
+
+<p>Por último, o <code>key</code>. Ele aparece no JSX como atributo, mas não chega ao componente como
+prop: o React o usa para identificar o item na lista e o remove do objeto de props. Se você precisa do
+identificador dentro do componente, passe-o com outro nome — <code>id={pedao.id}</code> — e deixe a
+<code>key</code> só para a lista.</p>
+
+<p>Um par de atributos que confunde na consulta: <code>value</code> e <code>defaultValue</code>. Com
+<code>value</code>, o campo é controlado e precisa de <code>onChange</code>; sem ele, o campo fica
+travado e o React avisa no console. Com <code>defaultValue</code>, o valor é só o ponto de partida e o
+navegador cuida do resto — o campo não controlado. O mesmo par existe em <code>checked</code> e
+<code>defaultChecked</code> para caixas e rádios, e a escolha entre os dois é o assunto da aula
+<a href="controlado-e-nao-controlado.html">controlado e não controlado</a>.</p>
+
+<h2>5. Listas com map e a key</h2>
+
+<p>Lista em JSX é <code>map</code>. O <code>map</code> devolve um array de elementos, e o React sabe
+desenhar um array de filhos. Cada elemento precisa de uma <code>key</code> única entre os irmãos, para o
+React reconhecer quem é quem entre um desenho e outro.</p>
+
+<pre class="file" data-file="Lista.jsx">const PAES = [
+  { id: 1, nome: "pão francês", preco: 0.9 },
+  { id: 2, nome: "pão de queijo", preco: 2.5 },
+];
+
+function Lista() {
+  return (
+    &lt;ul&gt;
+      {PAES.map((pao) =&gt; (
+        &lt;li key={pao.id}&gt;
+          {pao.nome} — R$ {pao.preco.toFixed(2)}
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+
+<p>A <code>key</code> certa é o identificador estável do dado: o <code>id</code> que veio do banco, o
+código do produto, o e-mail. Índice do array só serve para lista fixa, que nunca muda de ordem nem ganha
+item no meio — e, mesmo assim, é melhor evitar. Com índice, remover o primeiro item faz o React achar que
+todos mudaram, e o estado de cada linha vai para o vizinho errado.</p>
+
+<p>O aviso "Each child in a list should have a unique key" só aparece em desenvolvimento; em produção, a
+lista sem <code>key</code> desenha, mas perde a otimização e pode trocar estados de lugar. Vale tratar
+como erro. Outro detalhe: <code>key</code> não é prop e não aparece no HTML gerado — no painel, você vê o
+<code>li</code> sem nenhum atributo.</p>
+
+<p>Se a lista vem de um filtro ou de uma ordenação, a <code>key</code> continua sendo o id do dado, nunca
+a posição. E se o item é um componente, a <code>key</code> vai no componente:
+<code>&lt;Linha key={p.id} pedido={p} /&gt;</code>.</p>
+
+<h2>6. Condicionais: três formas de escolher</h2>
+
+<p>Como <code>if</code> não cabe dentro das chaves, o JSX resolve escolha de três jeitos: ternário para
+duas opções, <code>&amp;&amp;</code> para mostrar ou não, e <code>return</code> antecipado para sair do
+componente antes de desenhar.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Quando usar</th><th>Exemplo</th><th>Aula</th></tr>
+<tr><td>ternário</td><td>duas alternativas visíveis</td><td><code>{pago ? "Pago" : "Em aberto"}</code></td><td><a href="renderizacao-condicional.html">Renderização Condicional</a></td></tr>
+<tr><td><code>&amp;&amp;</code></td><td>mostrar ou não mostrar</td><td><code>{erro &amp;&amp; &lt;p&gt;{erro}&lt;/p&gt;}</code></td><td><a href="renderizacao-condicional.html">Renderização Condicional</a></td></tr>
+<tr><td><code>return</code> antecipado</td><td>a tela inteira depende da condição</td><td><code>if (!dados) return &lt;p&gt;Carregando...&lt;/p&gt;;</code></td><td><a href="estados-vazios.html">Estados Vazios</a></td></tr>
+<tr><td><code>null</code></td><td>não desenhar nada de propósito</td><td><code>{aviso ? &lt;p&gt;{aviso}&lt;/p&gt; : null}</code></td><td><a href="renderizacao-condicional.html">Renderização Condicional</a></td></tr>
+<tr><td>variável antes do return</td><td>condição composta ou várias linhas</td><td><code>const texto = pago ? "sim" : "não";</code></td><td><a href="estado-derivado.html">Estado Derivado</a></td></tr>
+</table>
+</div>
+
+<p>O <code>&amp;&amp;</code> tem uma pegadinha que vale decorar: ele devolve o valor da esquerda quando ela
+é falsa. Com <code>0</code>, <code>""</code> ou <code>NaN</code>, esse valor aparece na tela. Por isso a
+comparação explícita — <code>{itens.length &gt; 0 &amp;&amp; ...}</code> — é mais segura do que
+<code>{itens.length &amp;&amp; ...}</code>. Com <code>null</code>, <code>undefined</code>,
+<code>false</code> e <code>true</code>, nada é desenhado.</p>
+
+<div class="tryreact" data-goal="conta:li=2;;texto:pão de queijo (esgotado)">
+  <p class="try-task">A lista mostra os dois pães, mas não avisa qual acabou. Use
+  <code>{!pao.pronto &amp;&amp; "(esgotado)"}</code> dentro do <code>li</code> e clique em Rodar.</p>
+  <pre class="jsx">const PAES = [
+  { id: 1, nome: "pão francês", pronto: true },
+  { id: 2, nome: "pão de queijo", pronto: false },
+];
+
+function App() {
+  return (
+    &lt;ul&gt;
+      {PAES.map((pao) =&gt; (
+        &lt;li key={pao.id}&gt;{pao.nome}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul&gt;
+  &lt;li&gt;pão francês&lt;/li&gt;
+  &lt;li&gt;pão de queijo&lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">const PAES = [
+  { id: 1, nome: "pão francês", pronto: true },
+  { id: 2, nome: "pão de queijo", pronto: false },
+];
+
+function App() {
+  return (
+    &lt;ul&gt;
+      {PAES.map((pao) =&gt; (
+        &lt;li key={pao.id}&gt;
+          {pao.nome} {!pao.pronto &amp;&amp; "(esgotado)"}
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p>No painel, o segundo <code>li</code> mostra "pão de queijo (esgotado)". O primeiro não mostra nada
+porque <code>!true</code> é <code>false</code>, e <code>false</code> não vira texto. Se você quisesse
+escrever "disponível" no primeiro, o ternário seria a escolha:
+<code>{pao.pronto ? "(disponível)" : "(esgotado)"}</code>.</p>
+
+<h2>7. As mensagens de erro mais comuns</h2>
+
+<p>Quase todo erro de JSX cai em uma destas linhas. O painel do guia mostra a mensagem do compilador
+quando o código não compila; o console do navegador mostra as do React em desenvolvimento.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem ou sintoma</th><th>Causa</th><th>Conserto</th><th>Aula</th></tr>
+<tr><td>"Adjacent JSX elements must be wrapped in an enclosing tag"</td><td>dois elementos soltos no mesmo <code>return</code></td><td>embrulhar em <code>&lt;div&gt;</code> ou <code>&lt;&gt;...&lt;/&gt;</code></td><td><a href="fragment.html">O Fragment</a></td></tr>
+<tr><td>"Objects are not valid as a React child"</td><td><code>{pedido}</code> em vez de <code>{pedido.nome}</code></td><td>escolher os campos que aparecem</td><td><a href="props-com-objetos.html">Props com Objetos</a></td></tr>
+<tr><td>"Unterminated JSX contents"</td><td>tag sem fechamento ou chave sem par</td><td>fechar a tag, contar as chaves</td><td><a href="jsx-regras.html">As Regras do JSX</a></td></tr>
+<tr><td>"Expected corresponding JSX closing tag"</td><td>abriu <code>&lt;section&gt;</code> e fechou <code>&lt;/div&gt;</code></td><td>casar abertura e fechamento</td><td><a href="jsx-regras.html">As Regras do JSX</a></td></tr>
+<tr><td>"Invalid DOM property <code>class</code>. Did you mean <code>className</code>?"</td><td>atributo com nome do HTML</td><td>usar o nome do React</td><td><a href="atributos-e-classname.html">Atributos e className</a></td></tr>
+<tr><td>"Each child in a list should have a unique key"</td><td>item de <code>map</code> sem <code>key</code></td><td><code>key={item.id}</code></td><td><a href="a-key.html">A key</a></td></tr>
+</table>
+</div>
+
+<p>Um erro de objeto em filho, no console do navegador, aparece assim:</p>
+
+<pre class="term">Objects are not valid as a React child (found: object with keys {nome, preco}).</pre>
+
+<p>A leitura é direta: alguém tentou desenhar um objeto inteiro. O React lista as chaves justamente para
+você reconhecer qual objeto era. O conserto quase sempre é apontar o campo certo, e o resto da mensagem
+— "use an array instead" — só se aplica quando você realmente queria uma lista.</p>
+
+<p>Duas mensagens não impedem a página de rodar: o aviso de <code>class</code> e o de <code>key</code>
+são avisos de desenvolvimento. O atributo é ignorado e a lista desenha; o problema aparece depois, em
+comportamento estranho. Já erro de sintaxe — tag sem fechar, chave sem par — impede a compilação e o
+painel mostra "não compilou".</p>
+
+<h2>8. JSX no projeto: do arquivo ao DOM</h2>
+
+<p>Em um projeto com Vite, o JSX vive em arquivos <code>.jsx</code> e é transformado no build. O navegador
+recebe JavaScript comum. Por isso o JSX nunca aparece numa string, num
+<code>innerHTML</code> ou num arquivo <code>.html</code>: ele precisa passar pelo compilador antes.</p>
+
+<pre class="file" data-file="main.jsx">import { createRoot } from "react-dom/client";
+import App from "./App.jsx";
+
+createRoot(document.getElementById("raiz")).render(&lt;App /&gt;);</pre>
+
+<p>O <code>App</code> é um componente, e <code>&lt;App /&gt;</code> é a chamada dele. Essa é a única
+linha que o projeto precisa para começar: o resto é componente chamando componente. Nas caixas deste
+guia, o motor já renderiza <code>&lt;App /&gt;</code> e remove <code>import</code> e
+<code>export default</code>, então você escreve só a função.</p>
+
+<p>Três hábitos que evitam a maior parte dos problemas. Primeiro: mantenha um componente por arquivo e o
+JSX do <code>return</code> com recuo consistente — erro de tag fechada aparece na hora. Segundo: extraia
+um componente quando o JSX passa de umas trinta linhas ou quando o mesmo bloco se repete. Terceiro: quando
+o painel mostrar um HTML diferente do que você esperava, compare com o JSX e procure a expressão que
+devolveu outro valor; o JSX não erra sozinho, ele desenha o que você pediu.</p>
+
+<h2>Resumo</h2>
+
+<p>JSX é JavaScript com roupa de HTML: o compilador troca cada tag por uma chamada
+<code>React.createElement</code>, e o que circula são objetos. As cinco regras são tag fechada, um pai só,
+aspas para texto e chaves para JavaScript, nomes em camelCase e comentário entre chaves. Dentro das chaves
+cabe expressão — variável, conta, ternário, <code>&amp;&amp;</code>, <code>map</code>, chamada de
+função —, nunca comando como <code>if</code> ou <code>for</code>.</p>
+
+<p>Listas saem de <code>map</code> com uma <code>key</code> estável, de preferência o id do dado.
+Condicionais saem de ternário, de <code>&amp;&amp;</code> ou de um <code>return</code> antecipado, e o
+<code>&amp;&amp;</code> pede comparação explícita quando o valor pode ser zero. As mensagens de erro
+falam de elementos adjacentes, objeto como filho, tag sem fechar e <code>key</code> ausente — cada uma
+aponta para uma regra desta página.</p>
+
+<p>Para consultar rápido: se o JSX não compila, é sintaxe (tag, chave, irmãos soltos). Se compila e a
+tela mostra outra coisa, é expressão. Se compila e o console reclama, é nome de atributo ou
+<code>key</code>. Com essas três perguntas, você resolve a maior parte sem abrir a documentação.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>JSX vira <code>React.createElement(tipo, props, filhos)</code> no build.</li>
+<li>Toda tag fecha; irmãos soltos pedem <code>&lt;div&gt;</code> ou <code>&lt;&gt;...&lt;/&gt;</code>.</li>
+<li>Aspas = texto; chaves = JavaScript; <code>className</code> e <code>htmlFor</code> substituem
+<code>class</code> e <code>for</code>.</li>
+<li>Nas chaves cabe expressão, não comando.</li>
+<li>Objeto não é filho válido: mostre <code>{objeto.campo}</code>.</li>
+<li><code>0</code> e <code>""</code> aparecem na tela; <code>false</code>, <code>null</code> e
+<code>undefined</code> não.</li>
+<li><code>map</code> precisa de <code>key</code> estável; índice só em lista fixa.</li>
+<li><code>key</code> não chega como prop.</li>
+<li><code>style</code> é objeto com camelCase.</li>
+<li>Erro de sintaxe impede compilar; aviso de atributo ou key só reclama no console.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

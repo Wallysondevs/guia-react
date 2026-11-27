@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erros Comuns | Guia React</title>
+<meta name="description" content="Os erros mais comuns em React e como reconhecer cada um: mutação de estado, estado que copia prop, key por índice e efeitos que repetem trabalho.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Erros <span class="hl">Comuns</span></h1>
+<p class="intro">Numa semana, a Ana caçou três bugs que pareciam impossíveis: a lista que não atualizava, o
+preço que ficava velho e a marcação que pulava de linha. Nenhum deles deu mensagem de erro. Todos eram o
+mesmo tipo de problema — uma ideia errada sobre o que o React compara para decidir redesenhar. Nesta aula
+ela aprende a reconhecer os três pelo sintoma e a corrigir sem tentativa e erro.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que a maioria dos erros de React não aparece no console.</li>
+  <li>O que é mutação de estado e por que o React não percebe.</li>
+  <li>Por que um estado que copia a prop nunca acompanha a prop.</li>
+  <li>O que a <code>key</code> realmente faz e por que o índice é uma escolha ruim.</li>
+  <li>Como o React compara o valor antigo com o novo.</li>
+  <li>Outros cinco erros silenciosos que aparecem em todo projeto.</li>
+  <li>Um roteiro de investigação para achar o culpado em minutos.</li>
+</ul>
+</div>
+
+<h2>1. A cena: três bugs sem mensagem</h2>
+
+<p>O primeiro: a Ana clicava em “Adicionar pão” e nada acontecia na tela. O console mostrava o array com
+dois itens; a lista continuava com um. O segundo: o preço ficava sempre no valor antigo, mesmo quando o
+pai mandava outro. O terceiro: ela marcava a primeira linha da lista, removia aquela linha e a segunda
+aparecia marcada, sem ninguém ter marcado.</p>
+
+<p>Os três têm uma coisa em comum: o código roda sem erro. Não há exceção, não há aviso, não há tela
+vermelha. O React fez exatamente o que foi mandado, e o resultado ficou errado porque a instrução estava
+errada. É o tipo de bug que faz a pessoa concluir “React é imprevisível” — quando o problema é uma regra
+que ninguém contou.</p>
+
+<p>A regra é uma só, e vale para os três casos: <strong>o React compara referências, não conteúdos</strong>.
+Ele guarda o valor antigo de cada estado, compara com o novo usando igualdade de referência e decide se
+redesenha. Array, objeto e função são comparados pelo endereço na memória — não pelo que estão por dentro.
+Quem mexe no mesmo objeto e devolve o mesmo endereço não mudou nada, aos olhos do React.</p>
+
+<h2>2. As palavras que explicam os bugs</h2>
+
+<p>Cinco termos dão nome ao que você vai ver nesta aula. Eles aparecem em toda documentação e em toda
+conversa de trabalho, então vale fixar agora.</p>
+
+<dl class="anatomy">
+<dt>mutação</dt>
+<dd>Alterar o objeto ou array que já está no estado: <code>lista.push(x)</code>,
+<code>objeto.nome = "Ana"</code>. A referência continua a mesma.</dd>
+<dt>estado derivado</dt>
+<dd>Um estado que poderia ser calculado a partir de outro. Guardar uma cópia costuma criar duas versões
+que se desencontram.</dd>
+<dt>key</dt>
+<dd>O identificador que o React usa para saber qual item da lista é qual entre um desenho e outro.</dd>
+<dt>closure velha</dt>
+<dd>Uma função que guardou o valor de um estado de um desenho anterior. Ela lê o passado, não o
+presente.</dd>
+<dt>efeito sem retorno</dt>
+<dd>Um <code>useEffect</code> que cria algo (timer, listener, pedido) e não devolve a função que
+desfaz.</dd>
+<dt>identidade</dt>
+<dd>O que faz o React tratar dois valores como “o mesmo”. Para objetos, é o endereço.</dd>
+</dl>
+
+<p>Há uma diferença importante entre “errado” e “mutado”. Um valor errado é um valor calculado mal: o
+React redesenha, você vê o resultado e corrige a conta. Um valor mutado é um valor que não mudou de
+identidade, então o React nem tenta redesenhar. O primeiro bug se vê; o segundo se procura. É por isso que
+esta aula insiste tanto em referência antes de mostrar código.</p>
+
+<p>Repare que nenhuma dessas palavras fala de biblioteca ou de ferramenta. São conceitos de JavaScript:
+referência, cópia, identidade. O React só usa essas regras para decidir o que redesenhar. Quem entende
+de referência entende metade dos bugs de React.</p>
+
+<p>Vale também saber por que o console fica quieto. Em produção, o React remove quase todos os avisos de
+desenvolvimento para a página ficar menor e mais rápida. Um erro que apareceria no seu notebook pode não
+aparecer no site publicado — e vice-versa. Por isso o roteiro de investigação da seção 8 não depende de
+mensagem: depende de comparar o que você esperava com o que a tela mostra.</p>
+
+<h2>3. A caixa: a lista que não muda</h2>
+
+<p>O clássico número um. A função adiciona um item com <code>push</code> — que altera o array original — e
+depois entrega esse mesmo array ao <code>setPaes</code>. Para o React, o valor novo é o valor antigo: mesma
+referência, nenhum redesenho.</p>
+
+<div class="tryreact" data-goal="clique:button;;conta:li=2">
+  <p class="try-task">O clique adiciona o pão ao array, mas a tela não muda. Troque o
+  <code>push</code> por um array novo — <code>paes.concat("Pão de queijo")</code> — e clique em
+  Adicionar pão.</p>
+  <pre class="jsx">function App() {
+  const [paes, setPaes] = useState(["Pão francês"]);
+
+  function adicionar() {
+    paes.push("Pão de queijo");
+    setPaes(paes);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={adicionar}&gt;Adicionar pão&lt;/button&gt;
+      &lt;ul&gt;{paes.map(function (pao) { return &lt;li key={pao}&gt;{pao}&lt;/li&gt;; })}&lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Adicionar pão&lt;/button&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Pão francês&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [paes, setPaes] = useState(["Pão francês"]);
+
+  function adicionar() {
+    setPaes(paes.concat("Pão de queijo"));
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={adicionar}&gt;Adicionar pão&lt;/button&gt;
+      &lt;ul&gt;{paes.map(function (pao) { return &lt;li key={pao}&gt;{pao}&lt;/li&gt;; })}&lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois do conserto, o clique muda a tela porque <code>concat</code> devolve um array <strong>novo</strong>.
+O antigo continua intacto, e o React vê duas referências diferentes. O mesmo vale para objeto: em vez de
+<code>pedido.status = "pago"</code>, escreva <code>setPedido({ ...pedido, status: "pago" })</code>. O
+espalhamento cria um objeto novo com os campos antigos e o campo trocado.</p>
+
+<p>Uma consequência que confunde: a mutação “funciona” em outros lugares. Se outro estado mudar no mesmo
+clique, o React redesenha e a lista aparece com o item novo — porque o desenho aconteceu por outro motivo.
+Isso cria o pior tipo de bug: o que funciona às vezes. A regra é nunca alterar o que está no estado, nem
+“só para testar”.</p>
+
+<h2>4. A caixa: o preço que ficou velho</h2>
+
+<p>O segundo clássico é mais sutil porque o código parece cuidadoso: o componente guarda o valor recebido
+num estado, “para poder mudar depois”. O problema é que o <code>useState(valor)</code> usa o valor apenas
+na primeira renderização. Nas seguintes, ele devolve o que está guardado e ignora a prop nova.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:R$ 12,00">
+  <p class="try-task">O botão muda o valor no pai, mas o preço continua 10. Pare de copiar a prop para o
+  estado: use <code>valor</code> direto no componente e clique em Mudar o preço.</p>
+  <pre class="jsx">function Preco({ valor }) {
+  const [preco, setPreco] = useState(valor);
+  return &lt;p&gt;{"R$ " + preco + ",00"}&lt;/p&gt;;
+}
+
+function App() {
+  const [valor, setValor] = useState(10);
+  return (
+    &lt;div&gt;
+      &lt;button onClick={function () { setValor(valor === 10 ? 12 : 10); }}&gt;Mudar o preço&lt;/button&gt;
+      &lt;Preco valor={valor} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Mudar o preço&lt;/button&gt;
+  &lt;p&gt;R$ 10,00&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Preco({ valor }) {
+  const preco = valor;
+  return &lt;p&gt;{"R$ " + preco + ",00"}&lt;/p&gt;;
+}
+
+function App() {
+  const [valor, setValor] = useState(10);
+  return (
+    &lt;div&gt;
+      &lt;button onClick={function () { setValor(valor === 10 ? 12 : 10); }}&gt;Mudar o preço&lt;/button&gt;
+      &lt;Preco valor={valor} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A correção é apagar o estado. Se o valor vem de fora e o componente não precisa mudá-lo, ele é prop e
+pronto — derivar não é guardar. Guardar cópia de prop cria duas fontes de verdade: a prop, que muda, e o
+estado, que fica. Quem lê o código vê duas variáveis parecidas e não sabe qual manda.</p>
+
+<p>Existe um caso em que copiar faz sentido: quando o valor inicial é só um ponto de partida e a pessoa
+pode editá-lo sem avisar o pai — um formulário de rascunho, por exemplo. Mesmo aí, o nome ajuda:
+<code>useState(valorInicial)</code> deixa claro que aquilo é semente, não espelho. E se a prop precisar
+recomeçar o estado, o caminho é uma <code>key</code> no componente, não um efeito que copia.</p>
+
+<h2>5. A caixa: a marcação que pulou de linha</h2>
+
+<p>O terceiro é o erro que ninguém acredita até ver. Cada linha tem o próprio estado de “marcado”, e a
+lista usa <code>key={i}</code>, o índice. Quando a primeira linha sai, a segunda passa a ocupar a posição
+zero — e o React entrega a ela o estado que era da primeira.</p>
+
+<div class="tryreact" data-goal="clique:.marcar;;clique:.remover;;conta:.marcado=0">
+  <p class="try-task">Marque o primeiro pão, remova o primeiro e veja a marcação ficar na linha errada.
+  Troque <code>key={i}</code> por <code>key={pao}</code> e repita a operação.</p>
+  <pre class="jsx">function Linha({ pao }) {
+  const [marcado, setMarcado] = useState(false);
+  return (
+    &lt;li className={marcado ? "marcado" : ""}&gt;
+      {pao} &lt;button className="marcar" onClick={function () { setMarcado(true); }}&gt;Marcar&lt;/button&gt;
+    &lt;/li&gt;
+  );
+}
+
+function App() {
+  const [paes, setPaes] = useState(["francês", "queijo"]);
+  return (
+    &lt;div&gt;
+      &lt;button className="remover" onClick={function () { setPaes(paes.slice(1)); }}&gt;Remover o primeiro&lt;/button&gt;
+      &lt;ul&gt;
+        {paes.map(function (pao, i) { return &lt;Linha key={i} pao={pao} /&gt;; })}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button class="remover"&gt;Remover o primeiro&lt;/button&gt;
+  &lt;ul&gt;
+    &lt;li class=""&gt;
+      francês
+      &lt;button class="marcar"&gt;Marcar&lt;/button&gt;
+    &lt;/li&gt;
+    &lt;li class=""&gt;
+      queijo
+      &lt;button class="marcar"&gt;Marcar&lt;/button&gt;
+    &lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Linha({ pao }) {
+  const [marcado, setMarcado] = useState(false);
+  return (
+    &lt;li className={marcado ? "marcado" : ""}&gt;
+      {pao} &lt;button className="marcar" onClick={function () { setMarcado(true); }}&gt;Marcar&lt;/button&gt;
+    &lt;/li&gt;
+  );
+}
+
+function App() {
+  const [paes, setPaes] = useState(["francês", "queijo"]);
+  return (
+    &lt;div&gt;
+      &lt;button className="remover" onClick={function () { setPaes(paes.slice(1)); }}&gt;Remover o primeiro&lt;/button&gt;
+      &lt;ul&gt;
+        {paes.map(function (pao) { return &lt;Linha key={pao} pao={pao} /&gt;; })}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A <code>key</code> não é um detalhe de lista: é a identidade do item. Com o índice, a identidade é a
+posição — e posição muda quando alguém remove ou reordena. Com o nome do pão, a identidade acompanha o
+item, e o estado vai junto. Em dados de verdade, use o <code>id</code> que veio do servidor; o nome serve
+quando ele é único e estável.</p>
+
+<p>Uma regra que evita o problema: a <code>key</code> precisa ser estável, única entre irmãos e
+independente da ordem. Índice só é aceitável quando a lista nunca muda de ordem nem perde itens — uma
+lista fixa de meses, por exemplo. Em qualquer lista que cresce, encolhe ou é ordenada, use o
+identificador do dado.</p>
+
+<h2>6. O catálogo dos silenciosos</h2>
+
+<p>Os três da aula são os mais comuns, mas não são os únicos. Estes cinco aparecem em todo projeto e
+quase nunca dão mensagem clara.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você escreveu</th><th>O sintoma</th><th>O conserto</th></tr>
+<tr><td>estado atualizado dentro do render</td><td>redesenho infinito, às vezes “Maximum update depth”</td><td>calcular no corpo ou atualizar em evento/efeito</td></tr>
+<tr><td><code>useEffect</code> sem lista de dependências</td><td>o efeito roda em todo desenho</td><td><code>[]</code> ou as dependências reais</td></tr>
+<tr><td>efeito que busca dados sem cancelar</td><td>resposta velha sobrescreve a nova</td><td>limpar no retorno do efeito</td></tr>
+<tr><td>objeto novo inline numa prop de memo</td><td>o filho redesenha sempre</td><td>criar fora do JSX ou memorizar</td></tr>
+<tr><td>componente definido dentro de outro componente</td><td>o filho desmonta e perde o estado a cada desenho</td><td>mover a definição para fora</td></tr>
+</table>
+</div>
+
+<p>A última linha merece um exemplo, porque o efeito é dramático. Se você escreve
+<code>function Dentro() { … }</code> dentro do corpo de <code>App</code>, cada desenho cria uma função
+nova. Para o React, é um tipo de componente diferente — então ele desmonta o anterior e monta outro. Todo
+o estado interno do filho se perde, e os efeitos rodam de novo. A cura é sempre mover a definição para
+fora da função do pai.</p>
+
+<p>Vale um comentário sobre o <code>memo</code>, que aparece na quarta linha. Memorizar um componente só
+ajuda quando as props continuam iguais entre um desenho e outro. Passar um objeto criado direto no JSX
+cria uma referência nova a cada desenho, e o filho redesenha sempre — o <code>memo</code> vira decoração.
+A aula de <a href="memo.html">O memo</a> mostra como medir antes de memorizar.</p>
+
+<p>Já as duas primeiras linhas pertencem à mesma família: efeito que faz demais. Um <code>useEffect</code>
+sem dependências roda depois de cada desenho, e se ele atualiza um estado, provoca outro desenho, que
+provoca outro efeito. O React interrompe depois de algumas dezenas de voltas com a mensagem “Maximum
+update depth exceeded”, que é o único aviso desta lista que você vai ver de fato.</p>
+
+<h2>7. O que grita e o que sussurra</h2>
+
+<p>Vale separar os erros em dois grupos, porque a estratégia de investigação é diferente. Os que gritam
+interrompem o desenho e deixam a tela vazia; os que sussurram produzem uma tela quase certa.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Grupo</th><th>Exemplos</th><th>Como achar</th></tr>
+<tr><td>gritam</td><td>componente com nome errado, <code>undefined</code> no lugar de componente, erro de sintaxe</td><td>a mensagem aponta o arquivo e a linha</td></tr>
+<tr><td>sussurram</td><td>mutação, estado copiado, key por índice, closure velha</td><td>comparar o esperado com o desenhado, com log no ponto certo</td></tr>
+</table>
+</div>
+
+<h2>8. O roteiro de investigação</h2>
+
+<p>Para os que sussurram, o log precisa estar no lugar certo. Logar no componente que <em>usa</em> o
+dado, não no que repassa, é o que separa “não chegou” de “chegou e eu desenhei errado”. E imprimir a
+referência, não só o conteúdo, revela mutação na hora:</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const [paes, setPaes] = useState(["Pão francês"]);
+
+  function adicionar() {
+    console.log("antes: " + paes.length + " item(ns)");
+    paes.push("Pão de queijo");
+    console.log("depois: " + paes.length + " item(ns)");
+    setPaes(paes);
+  }
+  console.log("desenhando com " + paes.length + " item(ns)");
+  return &lt;button onClick={adicionar}&gt;Adicionar pão&lt;/button&gt;;
+}</pre>
+
+<p>Com um clique, o console mostra o desencontro sem nenhuma ambiguidade:</p>
+
+<pre class="term">antes: 1 item(ns)
+depois: 2 item(ns)
+desenhando com 1 item(ns)</pre>
+
+<p>O array tem dois itens, e o React desenhou com um. Isso só acontece quando o valor entregue ao
+<code>set</code> é o mesmo objeto de antes. Se o log dissesse “desenhando com 2”, o problema estaria no
+JSX — e a investigação mudaria de lado.</p>
+
+<p>O outro extremo é o desenho disparado em laço. Quando um efeito atualiza estado sem parar, o React
+interrompe e mostra no console a única mensagem desta aula que aparece em produção:</p>
+
+<pre class="term">Maximum update depth exceeded. This can happen when a component repeatedly calls setState inside useEffect.</pre>
+
+<p>“Profundidade máxima de atualização excedida” — traduzindo: um desenho pediu outro, que pediu outro.
+As causas comuns são três: efeito sem lista de dependências que atualiza estado, efeito que atualiza um
+estado que está na própria lista de dependências e <code>set</code> chamado no corpo do render. Em todos,
+a saída é a mesma pergunta: quem deveria ser o dono deste valor? Se for o pai, o estado vai para lá; se
+for cálculo, vira constante no corpo.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a encomenda que aparecia duas vezes</h3>
+<p>Ao adicionar um pão, a lista mostrava o item duplicado. O culpado era um <code>push</code> dentro de
+um laço que rodava duas vezes no modo de desenvolvimento. A mutação não era só invisível: ela acumulava.
+Depois do conserto com <code>concat</code>, cada clique produzia exatamente um item novo.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o cliente que trocava e o cupom que não</h3>
+<p>O componente de cupom copiava o nome do cliente para um estado. Quando a pessoa entrava com outra
+conta, o cupom continuava no nome antigo. O <code>useEffect</code> que “sincronizava” os dois rodava
+depois de cada desenho e criava um laço. A solução foi apagar o estado e ler a prop direto.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: a lista de encomendas que embaralhava os checks</h3>
+<p>As encomendas eram desenhadas com <code>key={i}</code>. Ao filtrar por “entregues”, os checkboxes
+marcados pulavam para outras linhas. Trocar a chave pelo número do pedido resolveu — e mostrou que o
+problema existia desde o começo, só não tinha aparecido porque ninguém removia item da lista.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Por que <code>lista.push(x); setLista(lista)</code> não redesenha?</p>
+<label><input type="radio" name="q1"> porque <code>push</code> não funciona em arrays do React</label>
+<label><input type="radio" name="q1"> porque a referência é a mesma e o React não vê mudança</label>
+<label><input type="radio" name="q1"> porque o estado precisa ser um objeto, não um array</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que serve como <code>key</code> numa lista que muda?</p>
+<label><input type="radio" name="q2"> o índice do item na lista</label>
+<label><input type="radio" name="q2"> <code>Math.random()</code>, para ser sempre diferente</label>
+<label><input type="radio" name="q2"> um identificador estável e único do dado, como <code>pao.id</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que <code>useState(valor)</code> faz quando a prop <code>valor</code> muda?</p>
+<label><input type="radio" name="q1"> nada: o estado guarda o valor da primeira renderização</label>
+<label><input type="radio" name="q1"> atualiza o estado para o novo valor</label>
+<label><input type="radio" name="q1"> reinicia o componente inteiro</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a chave estável</h2>
+<p>A lista de pães precisa de uma <code>key</code> que acompanhe o item. Complete a expressão.</p>
+<div class="ex-code">paes.map(function (pao) { return &lt;li key={<input aria-label="resposta 1" data-answer="pao.id" placeholder="...">}&gt;{pao.nome}&lt;/li&gt;; })</div>
+<p class="ex-dica">Dica: é o identificador que vem do servidor, não a posição na lista. Com ele, remover
+ou ordenar não embaralha o estado de cada linha.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Quase todo bug silencioso de React nasce da mesma confusão: o React compara referências. Mudar o array
+com <code>push</code> mantém a referência e não redesenha; criar outro com <code>concat</code> ou
+espalhamento muda e redesenha. Copiar prop para estado guarda o valor do primeiro desenho e ignora os
+seguintes; ler a prop direto acompanha sempre.</p>
+
+<p>A <code>key</code> é a identidade do item, não um número de ordem. Índice muda quando a lista muda, e
+o estado de cada linha vai junto para o lugar errado. Use o <code>id</code> do dado. E deixe o
+<code>useEffect</code> para o que é de fora do React: timer, listener, pedido — sempre com o retorno que
+desfaz.</p>
+
+<p>Para investigar, compare o esperado com o desenhado e logue no ponto certo, imprimindo o tamanho ou o
+conteúdo antes e depois da atualização. Quando o log mostra o dado novo e a tela mostra o velho, o
+problema é referência. Quando mostra os dois iguais, o problema é o JSX. Na próxima aula o assunto é a
+ferramenta que revela esses bugs no modo de desenvolvimento: <a href="strict-mode.html">O Strict Mode</a>.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>O React compara referências; array e objeto contam pelo endereço.</li>
+<li><code>push</code> e atribuição direta são mutação: não redesenham.</li>
+<li><code>concat</code>, espalhamento e <code>map</code> criam valor novo.</li>
+<li><code>useState(prop)</code> usa a prop só na primeira vez.</li>
+<li>Se o valor vem de fora e não muda aqui, é prop — não estado.</li>
+<li><code>key</code> é identidade: use <code>id</code>, não índice.</li>
+<li>Definir componente dentro de componente recria o tipo e perde o estado.</li>
+<li>Efeito sem retorno deixa timer, listener e pedido vivos.</li>
+<li>Log no componente que usa o dado mostra se o problema é acima ou abaixo.</li>
+<li>“Maximum update depth exceeded” é o aviso de estado atualizado em laço.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

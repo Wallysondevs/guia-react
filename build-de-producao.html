@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Build de Produção | Guia React</title>
+<meta name="description" content="O que o vite build faz com o projeto: empacotamento, tree-shaking, minificação, hash no nome, divisão em chunks, sourcemaps e o que muda entre dev e produção.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Build de <span class="hl">Produção</span></h1>
+<p class="intro">O <code>npm run build</code> da vitrine da Ana terminou com uma pasta <code>dist</code> de
+quatro arquivos — e ela esperava trinta e quatro. O <code>index.html</code> ficou com 0,46 kB, o JavaScript
+virou um nome estranho com letras e números, e o site funcionou. Nesta aula ela abre a pasta, entende de
+onde veio cada arquivo, por que o pacote é menor que a soma das partes e o que muda no React quando o
+código vai para produção.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que o <code>vite build</code> faz, etapa por etapa.</li>
+  <li>O que sai em <code>dist/</code> e por que os nomes ganham letras e números.</li>
+  <li>Tree-shaking e minificação: por que o pacote final é menor que a soma dos arquivos.</li>
+  <li>Como o <code>import()</code> dinâmico divide o site em chunks.</li>
+  <li>O que muda no React entre desenvolvimento e produção.</li>
+  <li>Como conferir o resultado com <code>preview</code> e com sourcemaps.</li>
+</ul>
+</div>
+
+<h2>1. A cena: trinta e quatro arquivos viram quatro</h2>
+
+<p>Durante o desenvolvimento, o navegador da Ana pede dezenas de arquivos: <code>main.jsx</code>,
+<code>App.jsx</code>, cada componente, cada CSS. O Vite transforma cada um na hora e entrega. É rápido
+porque não há empacotamento — e é ótimo para trabalhar, mas seria péssimo para o visitante do site, que
+pagaria dezenas de idas ao servidor por uma página.</p>
+
+<p>Na publicação, a conta é outra. O visitante quer a página em um ou dois segundos, no celular, com
+internet média. O <code>npm run build</code> faz essa tradução: pega o grafo inteiro, descarta o que não é
+usado, junta o que faz sentido junto, encolhe o texto e escreve o resultado em <code>dist</code>. É o mesmo
+site, embalado para viagem.</p>
+
+<p>Entender esse processo resolve três tipos de dúvida que aparecem sempre: por que o site que funcionava
+no dev quebrou no build, por que o nome do arquivo mudou e como fazer o pacote parar de crescer. As três
+respostas estão nas etapas que você vai ver a seguir.</p>
+
+<h2>2. O que o vite build faz</h2>
+
+<p>O comando chama o Rollup, o empacotador que o Vite usa em produção. Ele começa pelo
+<code>index.html</code>, segue cada <code>import</code> até o fim e monta um mapa de tudo o que a página
+realmente usa. Depois aplica quatro transformações, nesta ordem de ideia: remove o que não é alcançável,
+junta os módulos em poucos arquivos, minifica o texto e renomeia com um hash do conteúdo.</p>
+
+<pre class="term">$ npm run build
+
+vite v7.1.0 building for production...
+✓ 34 modules transformed.
+dist/index.html                 0.46 kB │ gzip:  0.30 kB
+dist/assets/index-a1b2c3d4.css  8.21 kB │ gzip:  2.14 kB
+dist/assets/index-9f8e7d6c.js  142.31 kB │ gzip: 45.62 kB
+✓ built in 1.18s</pre>
+
+<p>A saída conta a história. "34 modules transformed" é o número de arquivos que entraram no grafo.
+Depois vêm os arquivos gerados, com o tamanho bruto e o tamanho comprimido com gzip — a coluna que importa
+para quem visita, porque é assim que o servidor costuma enviar. E, no fim, o tempo total. Um projeto
+pequeno fica em torno de 1 segundo; um grande, em dezenas.</p>
+
+<p>Repare que só existem três arquivos em <code>dist</code>: o HTML, um CSS e um JavaScript. O HTML é o
+mesmo <code>index.html</code> do projeto, com a diferença de que a tag <code>script</code> agora aponta
+para o arquivo com hash. O CSS de todos os componentes foi junto num só. E o JavaScript é o grafo
+empacotado.</p>
+
+<p>Vale destrinchar cada pedaço daquela listagem, porque você vai ler essa saída muitas vezes:</p>
+
+<dl class="anatomy">
+<dt>34 modules transformed</dt>
+<dd>Quantos arquivos entraram no grafo, contando os seus componentes e os pacotes de terceiros. Não é o
+número de arquivos em <code>dist</code> — esse é o de baixo.</dd>
+<dt>dist/index.html</dt>
+<dd>O HTML final, com a tag <code>script</code> apontando para o arquivo com hash. É o único que mantém
+nome previsível.</dd>
+<dt>142.31 kB</dt>
+<dd>O tamanho bruto do arquivo, do jeito que ele fica no disco do servidor.</dd>
+<dt>gzip: 45.62 kB</dt>
+<dd>O mesmo arquivo depois da compressão que o servidor costuma aplicar antes de enviar. É este número
+que mede o que o visitante baixa.</dd>
+<dt>built in 1.18s</dt>
+<dd>O tempo que o comando levou. Só interessa quando começa a atrapalhar o seu ciclo de trabalho.</dd>
+</dl>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Etapa</th><th>O que faz</th><th>Efeito prático</th></tr>
+<tr><td>grafo</td><td>segue os imports a partir do <code>index.html</code></td><td>só entra o que a página alcança</td></tr>
+<tr><td>tree-shaking</td><td>descarta export não usado</td><td>biblioteca inteira não vai junto</td></tr>
+<tr><td>minificação</td><td>encurta nomes e remove espaços</td><td>arquivo de 300 kB vira 100 kB</td></tr>
+<tr><td>hash</td><td>renomeia com base no conteúdo</td><td>cache do navegador acerta sempre</td></tr>
+<tr><td>chunks</td><td>separa o que é carregado depois</td><td>primeira tela mais leve</td></tr>
+</table>
+</div>
+
+<p>O tree-shaking é o mais subestimado. Ele funciona porque os módulos ES são estáticos: o empacotador
+sabe, antes de executar, quais importações existem. Se você importa uma função de uma biblioteca de 200, e
+o resto não é usado em lugar nenhum, o resto sai do pacote. Isso vale para o seu código também: componente
+que ninguém importa não entra no build.</p>
+
+<h2>3. O hash no nome e o cache</h2>
+
+<p>O nome <code>index-9f8e7d6c.js</code> não é enfeite. O pedaço depois do hífen é calculado a partir do
+conteúdo do arquivo: mudou uma vírgula, muda o nome. A razão é o cache do navegador. Um arquivo com nome
+fixo pode ficar guardado por meses; quando você publica uma versão nova com o mesmo nome, o visitante
+continua vendo a antiga. Com o hash, o navegador vê um nome novo, baixa o novo e mantém o antigo em cache
+para quem ainda não atualizou.</p>
+
+<p>O mesmo raciocínio vale para as imagens em <code>src/assets</code>, que ganham hash, e não vale para
+<code>public</code>, que mantém o nome. É por isso que a imagem que muda com frequência deve ficar em
+<code>src/assets</code>: ela ganha um nome novo quando muda, e o cache não atrapalha.</p>
+
+<div class="tryreact" data-goal="conta:.mesmo=1;;conta:.diferente=1">
+  <p class="try-task">A função <code>hash</code> devolve sempre o mesmo texto, então os dois casos parecem
+  iguais. Faça ela calcular um número a partir do conteúdo: o mesmo texto precisa gerar o mesmo nome, e
+  textos diferentes precisam gerar nomes diferentes.</p>
+  <pre class="jsx">function hash(texto) {
+  return "abc123";
+}
+
+const casos = [
+  { a: "Pão do dia", b: "Pão do dia" },
+  { a: "Pão do dia", b: "Pão do dia — edição" }
+];
+
+function App() {
+  return (
+    &lt;ul&gt;
+      {casos.map((c) =&gt; {
+        const igual = hash(c.a) === hash(c.b);
+
+        return (
+          &lt;li key={c.b} className={igual ? "mesmo" : "diferente"}&gt;
+            app-{hash(c.a)}.js e app-{hash(c.b)}.js — {igual ? "mesmo nome" : "nome diferente"}
+          &lt;/li&gt;
+        );
+      })}
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul&gt;
+  &lt;li class="mesmo"&gt;app- abc123 .js e app- abc123 .js — mesmo nome&lt;/li&gt;
+  &lt;li class="mesmo"&gt;app- abc123 .js e app- abc123 .js — mesmo nome&lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">function hash(texto) {
+  let h = 0;
+
+  for (let i = 0; i &lt; texto.length; i++) {
+    h = (h * 31 + texto.charCodeAt(i)) % 100000;
+  }
+
+  return h.toString(36);
+}
+
+const casos = [
+  { a: "Pão do dia", b: "Pão do dia" },
+  { a: "Pão do dia", b: "Pão do dia — edição" }
+];
+
+function App() {
+  return (
+    &lt;ul&gt;
+      {casos.map((c) =&gt; {
+        const igual = hash(c.a) === hash(c.b);
+
+        return (
+          &lt;li key={c.b} className={igual ? "mesmo" : "diferente"}&gt;
+            app-{hash(c.a)}.js e app-{hash(c.b)}.js — {igual ? "mesmo nome" : "nome diferente"}
+          &lt;/li&gt;
+        );
+      })}
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p>O algoritmo é uma versão de brinquedo de um hash de verdade: percorre os caracteres, combina cada um com
+o acumulado e corta o número. O importante é a propriedade, não o algoritmo: mesma entrada, mesma saída;
+entrada diferente, saída diferente. É isso que o build usa para decidir o nome do arquivo.</p>
+
+<p>Um detalhe de leitura: o painel mostra os dois nomes lado a lado justamente para você comparar. Na
+segunda linha, o texto tem um sufixo e o nome muda — é o que faria o navegador baixar de novo a versão
+nova.</p>
+
+<h2>4. Tree-shaking e minificação na conta</h2>
+
+<p>A diferença entre "soma dos arquivos" e "tamanho do pacote" assusta. Um projeto com 34 arquivos
+totalizando 750 kB pode gerar um pacote de 88 kB comprimido. Não é mágica: é a soma de três efeitos que se
+multiplicam — o que ninguém importa sai, o que sobra é minificado, e o servidor envia comprimido.</p>
+
+<div class="tryreact" data-goal="texto:88 kB">
+  <p class="try-task">A conta de produção está devolvendo o mesmo que a de desenvolvimento. Faça
+  <code>totalProd</code> considerar só os módulos usados e aplicar a redução para 40% do tamanho bruto —
+  com os dados atuais, o resultado precisa ser <strong>88 kB</strong>.</p>
+  <pre class="jsx">const modulos = [
+  { nome: "react", kb: 140, usado: true },
+  { nome: "date-fns", kb: 60, usado: true },
+  { nome: "lodash", kb: 530, usado: false },
+  { nome: "estilos", kb: 20, usado: true }
+];
+
+function totalDev() {
+  return modulos.reduce((soma, m) =&gt; soma + m.kb, 0) + " kB";
+}
+
+function totalProd() {
+  return totalDev();
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;p&gt;desenvolvimento: {totalDev()}&lt;/p&gt;
+      &lt;p&gt;produção: {totalProd()}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;desenvolvimento: 750 kB&lt;/p&gt;
+  &lt;p&gt;produção: 750 kB&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const modulos = [
+  { nome: "react", kb: 140, usado: true },
+  { nome: "date-fns", kb: 60, usado: true },
+  { nome: "lodash", kb: 530, usado: false },
+  { nome: "estilos", kb: 20, usado: true }
+];
+
+function totalDev() {
+  return modulos.reduce((soma, m) =&gt; soma + m.kb, 0) + " kB";
+}
+
+function totalProd() {
+  const usados = modulos.filter((m) =&gt; m.usado);
+  const bruto = usados.reduce((soma, m) =&gt; soma + m.kb, 0);
+
+  return Math.round(bruto * 0.4) + " kB";
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;p&gt;desenvolvimento: {totalDev()}&lt;/p&gt;
+      &lt;p&gt;produção: {totalProd()}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A conta tem duas etapas: filtrar o que é usado e aplicar a redução. O <code>lodash</code> de 530 kB
+sozinho explica a maior parte da diferença — é o exemplo clássico de biblioteca enorme importada inteira
+para usar uma função. O <code>0.4</code> representa a minificação somada à compressão; na vida real, cada
+arquivo encolhe um pouco diferente, e é aí que entra a análise do build.</p>
+
+<p>Vale reparar que <code>totalDev</code> continua somando tudo. É o retrato do desenvolvimento: o servidor
+não se importa com tamanho, serve arquivo por arquivo. A comparação lado a lado é justamente o que dá a
+noção de quanto o build economizou.</p>
+
+<h2>5. Chunks: carregando o que é preciso, quando é preciso</h2>
+
+<p>Empacotar tudo num arquivo só tem um limite: a primeira tela passa a esperar por código que talvez
+nunca seja usado. A solução é dividir em <strong>chunks</strong> — pedaços separados, baixados sob demanda.
+A ferramenta para isso é o <code>import()</code> dinâmico, que o Vite transforma num chunk próprio.</p>
+
+<pre class="file" data-file="src/pages/Encomendas.jsx">import { useState } from "react";
+
+export function Encomendas() {
+  const [relatorio, setRelatorio] = useState(null);
+
+  async function abrirRelatorio() {
+    const modulo = await import("../lib/relatorio.js");
+    setRelatorio(modulo.montarRelatorio());
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={abrirRelatorio}&gt;Ver relatório&lt;/button&gt;
+      {relatorio &amp;&amp; &lt;pre&gt;{relatorio}&lt;/pre&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>O <code>relatorio.js</code> sai do pacote principal e vira um arquivo à parte. Quem abre a página não
+baixa esse código; quem clica no botão baixa, com uma pequena espera. Em troca, a primeira tela fica
+menor — que é o que decide se o visitante espera ou vai embora.</p>
+
+<div class="tryreact" data-goal="texto:200 kB;;texto:130 kB">
+  <p class="try-task">A tela inicial está somando todos os módulos, inclusive os que só são carregados
+  depois. Faça a conta do primeiro carregamento somar apenas os módulos com
+  <code>dinamico: false</code> — ela precisa mostrar <strong>200 kB</strong>, e o carregamento posterior,
+  <strong>130 kB</strong>.</p>
+  <pre class="jsx">const modulos = [
+  { nome: "react", kb: 140, dinamico: false },
+  { nome: "date-fns", kb: 60, dinamico: false },
+  { nome: "relatorio", kb: 90, dinamico: true },
+  { nome: "exportar", kb: 40, dinamico: true }
+];
+
+function tamanho(lista) {
+  return lista.reduce((soma, m) =&gt; soma + m.kb, 0) + " kB";
+}
+
+function App() {
+  const inicial = tamanho(modulos);
+  const depois = tamanho(modulos.filter((m) =&gt; m.dinamico));
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;primeiro carregamento: {inicial}&lt;/p&gt;
+      &lt;p&gt;ao abrir o relatório: {depois}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;primeiro carregamento: 330 kB&lt;/p&gt;
+  &lt;p&gt;ao abrir o relatório: 130 kB&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const modulos = [
+  { nome: "react", kb: 140, dinamico: false },
+  { nome: "date-fns", kb: 60, dinamico: false },
+  { nome: "relatorio", kb: 90, dinamico: true },
+  { nome: "exportar", kb: 40, dinamico: true }
+];
+
+function tamanho(lista) {
+  return lista.reduce((soma, m) =&gt; soma + m.kb, 0) + " kB";
+}
+
+function App() {
+  const inicial = tamanho(modulos.filter((m) =&gt; !m.dinamico));
+  const depois = tamanho(modulos.filter((m) =&gt; m.dinamico));
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;primeiro carregamento: {inicial}&lt;/p&gt;
+      &lt;p&gt;ao abrir o relatório: {depois}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O mesmo filtro de antes, agora com a condição invertida. A diferença é conceitual: aqui não se trata de
+tirar o que não é usado, e sim de adiar o que não é necessário agora. Os 90 kB do relatório continuam
+existindo — só não entram na primeira conta. Quando o botão é clicado, o navegador baixa o chunk e o
+código roda.</p>
+
+<p>A regra prática: divida o que é raro ou pesado (relatórios, editor de texto, gráficos, telas
+secundárias) e mantenha no principal o que toda página precisa (React, layout, tema). Dividir demais cria
+dezenas de requisições pequenas e piora o tempo total; dividir de menos faz o visitante baixar o site
+inteiro para ver a capa.</p>
+
+<h2>6. O que muda no React em produção</h2>
+
+<p>Existe uma diferença que confunde muita gente: o comportamento do React não é idêntico nos dois modos.
+Em desenvolvimento, ele roda com avisos, verificações extras e o StrictMode chamando efeitos duas vezes de
+propósito. Em produção, tudo isso sai para o pacote ficar menor e o código rodar mais rápido.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Desenvolvimento</th><th>Produção</th></tr>
+<tr><td>avisos no console</td><td>sim: key, props inválidas, efeitos</td><td>não: foram removidos</td></tr>
+<tr><td>StrictMode</td><td>efeitos rodam duas vezes de propósito</td><td>roda uma vez</td></tr>
+<tr><td>mensagens de erro</td><td>texto completo e dica</td><td>código minificado com link</td></tr>
+<tr><td>tamanho</td><td>maior, com código de diagnóstico</td><td>menor</td></tr>
+</table>
+</div>
+
+<p>Isso explica os dois sustos mais comuns. O primeiro: um aviso que aparecia no dev desaparece no build —
+ele não foi corrigido, só não é impresso. O segundo: um erro que no dev dizia "Target container is not a
+DOM element" vira <code>Minified React error #299</code>. O número não é um mistério: o endereço que vem
+junto (<code>react.dev/errors/299</code>) leva à explicação completa.</p>
+
+<p>O StrictMode merece uma nota: ele só existe em desenvolvimento e serve para revelar efeitos que não
+sabem lidar com montar, desmontar e montar de novo. Se um efeito faz uma chamada de rede sem limpar, o dev
+mostra duas e a produção uma — e o bug aparece só em produção, num caso de navegação. É por isso que a
+recomendação é manter o StrictMode ligado e escrever efeitos que suportem rodar duas vezes.</p>
+
+<h2>7. Conferindo o build</h2>
+
+<p>O build gera arquivos, não uma página pronta para abrir com dois cliques. Para ver o resultado, existe
+o <code>npm run preview</code>, que sobe um servidor local em cima de <code>dist</code>:</p>
+
+<pre class="term">$ npm run preview
+
+  VITE v7.1.0  ready in 205 ms
+
+  ➜  Local:   http://localhost:4173/
+  ➜  press h + enter to show help</pre>
+
+<p>A porta padrão é 4173, diferente da 5173 do desenvolvimento, justamente para os dois poderem rodar
+juntos. Abra, navegue, confira imagens e rotas. Se algo não aparecer, o problema está no build — e é
+melhor descobrir ali do que depois de publicar.</p>
+
+<p>Quando o erro só acontece em produção, o sourcemap ajuda. Ele é um arquivo que liga o código minificado
+ao original, permitindo que o navegador mostre a linha real no depurador. Por padrão, o Vite não gera
+sourcemap no build; para gerar, acrescente <code>build.sourcemap: true</code> na configuração. O arquivo
+resultante é grande e não deve ser servido ao público em produção — o lugar dele é o serviço de
+monitoramento de erros.</p>
+
+<p>E para saber o que está pesando, existem duas abordagens. A primeira é olhar a saída do build: os
+arquivos aparecem em ordem de tamanho, e o maior costuma ser o culpado. A segunda é usar um analisador
+visual, como o <code>rollup-plugin-visualizer</code>, que gera um mapa do pacote mostrando quanto cada
+biblioteca ocupa. Em projeto pequeno, a saída do terminal basta.</p>
+
+<h2>8. Por que o build quebra e o dev não</h2>
+
+<p>Três diferenças entre os dois ambientes explicam quase todos os "funcionava no dev". A primeira é que o
+build resolve todos os imports de uma vez: um caminho com maiúscula errada, que o Windows aceitava, falha
+no Linux do build. A segunda é que o build exige que todo import exista — no dev, um arquivo ausente pode
+passar despercebido até ser aberto.</p>
+
+<p>A terceira é a variável de ambiente. No dev, o Vite injeta o que estiver no <code>.env</code>; no build,
+ele injeta os valores do modo de produção, e uma variável ausente vira <code>undefined</code> — sem erro
+no terminal, e um site quebrado no navegador. É o assunto da próxima aula, mas já vale a regra: quando o
+build gera um site estranho, confira as variáveis antes de suspeitar do React.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o CSS e as imagens dão 404</h3>
+<p>Ela publicou o site numa subpasta e a página abriu sem estilo. O HTML pedia
+<code>/assets/index-a1b2.css</code>, com barra na frente, e a subpasta ficava em
+<code>/padaria/</code>. O conserto foi <code>base: "/padaria/"</code> no <code>vite.config.js</code> e um
+novo build. Sempre que o site não fica na raiz do domínio, o <code>base</code> precisa acompanhar.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o pacote cresceu 500 kB de um dia para o outro</h3>
+<p>A Ana importou uma biblioteca de gráficos para um único painel e o pacote principal saltou. A saída do
+build mostrava o arquivo grande, mas não o culpado. O caminho foi mover o painel para um
+<code>import()</code> dinâmico: o gráfico virou um chunk separado e a primeira tela voltou ao tamanho
+anterior.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o erro que só aparece publicado</h3>
+<p>O console do site publicado mostrava <code>Minified React error #418</code>, e no dev nada aparecia. A
+mensagem é de hidratação, um problema que só existe quando o HTML vem do servidor. Para investigar, ela
+publicou uma versão com sourcemap e reproduziu o caminho; o número, traduzido no site de erros do React,
+apontou a linha.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que o tree-shaking faz?</p>
+<label><input type="radio" name="q1"> comprime o arquivo com gzip antes de enviar</label>
+<label><input type="radio" name="q1"> remove do pacote o código que não é usado</label>
+<label><input type="radio" name="q1"> divide o site em vários arquivos</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Para que serve o hash no nome do arquivo?</p>
+<label><input type="radio" name="q2"> para esconder o nome real do arquivo</label>
+<label><input type="radio" name="q2"> para o servidor saber qual arquivo é mais novo</label>
+<label><input type="radio" name="q2"> para o cache do navegador se renovar quando o conteúdo muda</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Por que um aviso do React some no build?</p>
+<label><input type="radio" name="q3"> porque a versão de produção remove os avisos</label>
+<label><input type="radio" name="q3"> porque o build corrige os avisos sozinho</label>
+<label><input type="radio" name="q3"> porque o console do navegador fica desligado em produção</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a pasta do build</h2>
+<p>Complete o caminho da configuração que muda a pasta onde o build escreve os arquivos finais:</p>
+<div class="ex-code">export default defineConfig({ build: { outDir: "<input aria-label="resposta 1" data-answer="dist" placeholder="...">" } })</div>
+<p class="ex-dica">Dica: é o nome que o Vite usa por padrão — o mesmo que aparece na saída do build e no
+<code>.gitignore</code>. Quem serve esses arquivos é o <code>npm run preview</code>.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O build pega o grafo que começa no <code>index.html</code>, descarta o que não é usado, junta os módulos,
+minifica, comprime e escreve em <code>dist</code> com nomes que incluem um hash do conteúdo. O resultado é
+menor que a soma das partes por três motivos somados: tree-shaking, minificação e compressão.</p>
+
+<p>O hash existe para o cache: mudou o conteúdo, mudou o nome, e o navegador baixa de novo. O
+<code>import()</code> dinâmico cria chunks para adiar o que não é necessário na primeira tela. Em produção,
+o React perde os avisos, roda o StrictMode uma vez e mostra erros minificados com um link para a
+explicação.</p>
+
+<p>E o build é o momento da verdade: import com maiúscula errada, arquivo ausente, variável de ambiente
+faltando — tudo o que o dev perdoava aparece ali. Conferir com <code>npm run preview</code> antes de
+publicar é o hábito que evita descobrir no ar. Falta justamente combinar a configuração que muda entre os
+ambientes, e é o que a próxima aula faz com as variáveis de ambiente.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>npm run build</code> gera <code>dist/</code>: HTML, CSS e JavaScript empacotados.</li>
+<li>Tree-shaking remove o que ninguém importa; minificação encurta o que fica.</li>
+<li>O hash no nome vem do conteúdo e serve para o cache do navegador.</li>
+<li><code>import()</code> dinâmico cria um chunk separado, carregado sob demanda.</li>
+<li>Em produção, avisos do React não aparecem e erros viram código com link.</li>
+<li>StrictMode roda efeitos duas vezes só no desenvolvimento.</li>
+<li><code>npm run preview</code> serve o <code>dist</code> na porta 4173.</li>
+<li><code>build.sourcemap</code> gera o mapa para depurar produção — não sirva ao público.</li>
+<li><code>base</code> precisa acompanhar a subpasta onde o site vai morar.</li>
+<li>Build quebra no que o dev perdoava: caminho, maiúscula e variável de ambiente.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

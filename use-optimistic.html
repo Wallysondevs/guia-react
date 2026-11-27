@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O useOptimistic | Guia React</title>
+<meta name="description" content="O useOptimistic do React 19: mostrar o resultado antes da resposta do servidor, desfazer sozinho quando a resposta é não e as regras do hook.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O <span class="hl">useOptimistic</span></h1>
+<p class="intro">A Ana já sabe pintar o resultado antes de ele existir — ela fez isso à mão, com um estado
+de itens provisórios e um desfazer no <code>catch</code>. Funcionou, mas cada lista nova pedia o mesmo
+código de novo. O React 19 traz esse padrão como hook: você desenha o item na hora, o servidor confirma
+depois, e se a resposta for “não” o item sai da tela sozinho. Nesta aula a Ana troca o esquema manual pelo
+<code>useOptimistic</code> e aprende as duas regras que fazem o hook funcionar.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que <code>useOptimistic</code> devolve e por que ele não é um <code>useState</code>.</li>
+  <li>O reducer que transforma o estado real no estado que a pessoa vê.</li>
+  <li>Como o item provisório desaparece sozinho quando o servidor recusa.</li>
+  <li>Por que a função só pode ser chamada dentro de uma ação ou de uma transição.</li>
+  <li>Como atualizar um item que já existe — não só adicionar.</li>
+  <li>O que precisa ser verdade para o otimismo não virar mentira na tela.</li>
+  <li>As armadilhas: item que fica “enviando” para sempre, clique duplo, chave repetida.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o pão que ainda não existe</h2>
+
+<p>Na padaria da Ana, adicionar um pão ao catálogo é uma conversa com o servidor: ele confere o nome,
+verifica se não é duplicado, grava. Enquanto a resposta não chega, nada muda na tela. A cliente digita
+“broa”, clica em adicionar, olha a lista — e a lista está igual. Ela clica de novo. Agora existem duas
+requisições iguais a caminho, e uma delas vai voltar dizendo que já existe.</p>
+
+<p>O problema não é a lentidão: é o silêncio. A pessoa fez a ação e não viu retorno nenhum, então conclui
+que o clique não funcionou. A solução é mostrar o item <strong>antes</strong> de o servidor responder —
+o que se chama de atualização otimista, porque você aposta que a resposta vai ser “sim”.</p>
+
+<p>A Ana já fez isso no nível anterior, à mão. Ela guardava duas listas: a real, que vinha do servidor,
+e a dos provisórios, que ela mesma acrescentava no clique. Na hora de desenhar, juntava as duas. Quando o
+servidor respondia, promovia o provisório a definitivo; quando recusava, filtrava o provisório fora. Deu
+certo — e custou uns vinte de linhas por lista, com um <code>catch</code> que ela podia esquecer.</p>
+
+<p>O <code>useOptimistic</code> é esse mesmo esquema dentro do React. Você continua com uma lista só (a
+real) e diz ao React como ela deve parecer quando tem uma atualização otimista em andamento. Terminada a
+transição, o React volta a mostrar a lista real — com o item novo, se o servidor confirmou, ou sem ele, se
+não confirmou.</p>
+
+<h2>2. O que o hook faz por você</h2>
+
+<p>A chamada tem a forma
+<code>const [lista, adicionar] = React.useOptimistic(estadoReal, reducer)</code>. O primeiro item é o que
+você desenha na tela — a lista já com as atualizações otimistas aplicadas. O segundo é uma função para
+pedir uma atualização, chamada dentro da ação que conversa com o servidor.</p>
+
+<dl class="anatomy">
+<dt>estado real</dt>
+<dd>A fonte da verdade: a lista que veio do servidor e vive em um <code>useState</code>.</dd>
+<dt>reducer</dt>
+<dd><code>(estadoAtual, valorPedido) =&gt; novoEstado</code>. Diz ao React como aplicar o pedido por cima
+do estado real.</dd>
+<dt>lista (estado otimista)</dt>
+<dd>O que a pessoa vê. É o estado real, ou o real com o pedido aplicado enquanto a transição não
+termina.</dd>
+<dt>adicionar</dt>
+<dd>A função que dispara o pedido. Só vale dentro de uma ação de formulário ou de uma
+<code>startTransition</code>.</dd>
+<dt>transição</dt>
+<dd>O intervalo entre o pedido e a resposta. Quando ela fecha, o estado otimista é descartado e o real
+assume.</dd>
+</dl>
+
+<p>Repare no que o hook <em>não</em> faz: ele não guarda o item, não chama o servidor e não desfaz nada
+manualmente. Ele deriva um estado de exibição a partir do estado real e de um pedido temporário. É por isso
+que o desfazer é automático — não existe “item provisório” guardado em lugar nenhum para você remover
+depois.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na mão (o que a Ana fazia)</th><th>Com o hook</th></tr>
+<tr><td>duas listas: real e provisórios</td><td>uma lista real e um reducer</td></tr>
+<tr><td><code>setProvisorios([...provisorios, novo])</code></td><td><code>adicionar(novo)</code></td></tr>
+<tr><td>juntar as duas na hora de desenhar</td><td>a lista já vem pronta</td></tr>
+<tr><td><code>catch</code> que filtra o provisório</td><td>o React descarta sozinho</td></tr>
+<tr><td>marcar cada provisório com <code>enviando: true</code></td><td>o reducer marca</td></tr>
+<tr><td>limpar a lista provisória no sucesso</td><td>nada a fazer</td></tr>
+</table>
+</div>
+
+<p>Como o <code>useOptimistic</code> não está no escopo das caixas deste guia, o código escreve
+<code>React.useOptimistic</code>. No seu projeto você importa: <code>import { useOptimistic } from
+"react"</code>. E o <code>startTransition</code> também: <code>import { startTransition } from
+"react"</code>.</p>
+
+<h2>3. O item entra na lista na hora</h2>
+
+<p>A primeira caixa é a cena da padaria. O formulário envia o nome, a ação espera a resposta do servidor
+e só então acrescenta o pão à lista real. Enquanto isso, a lista não muda — e o item que a pessoa acabou
+de digitar não aparece.</p>
+
+<p>A missão é desenhar a broa imediatamente, marcada como “enviando”, e deixar o React trocar pela versão
+definitiva quando o servidor responder. O botão “servidor responde” faz o papel da rede: enquanto ninguém
+clica nele, a resposta não chegou.</p>
+
+<div class="tryreact" data-goal="digite:input=Broa;;clique:button;;conta:li=2;;texto:Broa (enviando)">
+  <p class="try-task">O pão só aparece depois da resposta. Use <code>React.useOptimistic</code> para
+  desenhar o item novo na hora, com o texto <code>Broa (enviando)</code>, mantendo o
+  <code>useState</code> como fonte da verdade.</p>
+  <pre class="jsx">let responder = null;
+
+function enviar(nome) {
+  return new Promise((ok) =&gt; {
+    responder = () =&gt; ok();
+  });
+}
+
+function App() {
+  const [paes, setPaes] = useState([{ nome: "Pão francês" }]);
+
+  return (
+    &lt;form action={async (dados) =&gt; {
+      const nome = String(dados.get("nome") || "").trim();
+      if (!nome) return;
+      await enviar(nome);
+      setPaes((atual) =&gt; [...atual, { nome: nome }]);
+    }}&gt;
+      &lt;input name="nome" /&gt;
+      &lt;button&gt;Adicionar&lt;/button&gt;
+      &lt;button type="button" id="responder" onClick={() =&gt; responder &amp;&amp; responder()}&gt;
+        servidor responde
+      &lt;/button&gt;
+      &lt;ul&gt;
+        {paes.map((p) =&gt; (
+          &lt;li key={p.nome}&gt;{p.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;form action="javascript:throw new Error('A React form was unexpectedly submitted. If you called form.submit() manually, consider using form.requestSubmit() instead. If you\'re trying to use event.stopPropagation() in a submit event handler, consider also calling event.preventDefault().')"&gt;
+  &lt;input name="nome"&gt;
+  &lt;button&gt;Adicionar&lt;/button&gt;
+  &lt;button type="button" id="responder"&gt;servidor responde&lt;/button&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Pão francês&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/form&gt;
+</pre>
+  <pre class="solucao">let responder = null;
+
+function enviar(nome) {
+  return new Promise((ok) =&gt; {
+    responder = () =&gt; ok();
+  });
+}
+
+function App() {
+  const [paes, setPaes] = useState([{ nome: "Pão francês" }]);
+  const [lista, adicionar] = React.useOptimistic(paes, (atual, nome) =&gt; [
+    ...atual,
+    { nome: nome, enviando: true },
+  ]);
+
+  return (
+    &lt;form action={async (dados) =&gt; {
+      const nome = String(dados.get("nome") || "").trim();
+      if (!nome) return;
+      adicionar(nome);
+      await enviar(nome);
+      setPaes((atual) =&gt; [...atual, { nome: nome }]);
+    }}&gt;
+      &lt;input name="nome" /&gt;
+      &lt;button&gt;Adicionar&lt;/button&gt;
+      &lt;button type="button" id="responder" onClick={() =&gt; responder &amp;&amp; responder()}&gt;
+        servidor responde
+      &lt;/button&gt;
+      &lt;ul&gt;
+        {lista.map((p) =&gt; (
+          &lt;li key={p.nome}&gt;{p.enviando ? p.nome + " (enviando)" : p.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+</div>
+
+<p>Assim que o clique acontece, a lista tem dois itens: o pão francês e a broa marcada como enviando.
+Depois que o servidor responde, o item otimista é descartado e a lista real — agora com a broa de verdade —
+assume o lugar. Mesmo texto, mesma posição, sem piscar.</p>
+
+<p>Note a ordem das três linhas dentro da ação: primeiro <code>adicionar(nome)</code>, depois a espera,
+depois o <code>setPaes</code>. Se você chamar <code>adicionar</code> depois do <code>await</code>, a
+atualização otimista só aparece quando já não serve para nada. E se esquecer o <code>setPaes</code>, o
+item some quando a transição fecha — o otimista nunca substitui o estado real, ele só o enfeita.</p>
+
+<h2>4. Quando o servidor diz não</h2>
+
+<p>Otimismo tem hora que dói: o servidor recusa, e o item que estava na tela precisa sair. No esquema
+manual, isso era um <code>filter</code> no <code>catch</code>. Com o hook, não é nada — o item otimista
+deixa de existir quando a transição termina, tenha ela dado certo ou não. O que você ainda precisa
+escrever é a <strong>mensagem</strong>, para a pessoa entender por que o pão não entrou.</p>
+
+<p>A caixa tem o mesmo formulário, com um servidor que recusa. A missão é mostrar a broa na hora e
+devolver a lista ao que era quando a recusa chega, com o aviso “Não enviado: sem estoque”.</p>
+
+<div class="tryreact" data-goal="digite:input=Broa;;clique:button;;conta:li=2;;clique:#recusar;;conta:li=1;;texto:Não enviado: sem estoque">
+  <p class="try-task">Use <code>React.useOptimistic</code> para a broa aparecer na hora e sair sozinha
+  quando o servidor recusar. No <code>catch</code>, mostre <code>Não enviado: sem estoque</code>.</p>
+  <pre class="jsx">let responder = null;
+
+function enviar(nome) {
+  return new Promise((ok, falha) =&gt; {
+    responder = () =&gt; falha(new Error("sem estoque"));
+  });
+}
+
+function App() {
+  const [paes, setPaes] = useState([{ nome: "Pão francês" }]);
+  const [recado, setRecado] = useState("");
+
+  return (
+    &lt;form action={async (dados) =&gt; {
+      const nome = String(dados.get("nome") || "").trim();
+      if (!nome) return;
+      try {
+        await enviar(nome);
+      } catch (e) {
+        setRecado("Não enviado: sem estoque");
+        return;
+      }
+      setRecado("");
+      setPaes((atual) =&gt; [...atual, { nome: nome }]);
+    }}&gt;
+      &lt;input name="nome" /&gt;
+      &lt;button&gt;Adicionar&lt;/button&gt;
+      &lt;button type="button" id="recusar" onClick={() =&gt; responder &amp;&amp; responder()}&gt;
+        servidor recusa
+      &lt;/button&gt;
+      &lt;p&gt;{recado}&lt;/p&gt;
+      &lt;ul&gt;
+        {paes.map((p) =&gt; (
+          &lt;li key={p.nome}&gt;{p.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;form action="javascript:throw new Error('A React form was unexpectedly submitted. If you called form.submit() manually, consider using form.requestSubmit() instead. If you\'re trying to use event.stopPropagation() in a submit event handler, consider also calling event.preventDefault().')"&gt;
+  &lt;input name="nome"&gt;
+  &lt;button&gt;Adicionar&lt;/button&gt;
+  &lt;button type="button" id="recusar"&gt;servidor recusa&lt;/button&gt;
+  &lt;p&gt;&lt;/p&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Pão francês&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/form&gt;
+</pre>
+  <pre class="solucao">let responder = null;
+
+function enviar(nome) {
+  return new Promise((ok, falha) =&gt; {
+    responder = () =&gt; falha(new Error("sem estoque"));
+  });
+}
+
+function App() {
+  const [paes, setPaes] = useState([{ nome: "Pão francês" }]);
+  const [recado, setRecado] = useState("");
+  const [lista, adicionar] = React.useOptimistic(paes, (atual, nome) =&gt; [
+    ...atual,
+    { nome: nome, enviando: true },
+  ]);
+
+  return (
+    &lt;form action={async (dados) =&gt; {
+      const nome = String(dados.get("nome") || "").trim();
+      if (!nome) return;
+      adicionar(nome);
+      try {
+        await enviar(nome);
+      } catch (e) {
+        setRecado("Não enviado: sem estoque");
+        return;
+      }
+      setRecado("");
+      setPaes((atual) =&gt; [...atual, { nome: nome }]);
+    }}&gt;
+      &lt;input name="nome" /&gt;
+      &lt;button&gt;Adicionar&lt;/button&gt;
+      &lt;button type="button" id="recusar" onClick={() =&gt; responder &amp;&amp; responder()}&gt;
+        servidor recusa
+      &lt;/button&gt;
+      &lt;p&gt;{recado}&lt;/p&gt;
+      &lt;ul&gt;
+        {lista.map((p) =&gt; (
+          &lt;li key={p.nome}&gt;{p.enviando ? p.nome + " (enviando)" : p.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+</div>
+
+<p>Na prévia: dois itens enquanto a resposta não chega, um item depois da recusa — e nenhuma linha de
+código removendo o item. O <code>catch</code> só escreve o recado; quem tira a broa da tela é o fim da
+transição.</p>
+
+<p>Isso muda o que você precisa testar. No esquema manual, dava para errar o desfazer e deixar um item
+fantasma na lista. Aqui, o risco é o contrário: esquecer o <code>catch</code> e a pessoa ver o item
+desaparecer sem explicação nenhuma. O <code>try</code>/<code>catch</code> continua obrigatório — não para
+desfazer, mas para <strong>contar</strong> o que aconteceu.</p>
+
+<h2>5. Onde a função pode ser chamada</h2>
+
+<p>Esta é a regra que faz o hook funcionar e a que mais gera erro de iniciante: a função que pede a
+atualização otimista só pode ser chamada dentro de uma transição — uma ação de formulário ou um
+<code>startTransition</code>. Fora disso, o React recusa na hora.</p>
+
+<pre class="term">Uncaught Error: An optimistic state update occurred outside a transition or action. To fix, move the update to an action, or wrap with startTransition.</pre>
+
+<p>A mensagem é literal e diz o conserto: envolva em <code>startTransition</code> ou mova para uma ação. O
+motivo é que o hook precisa saber quando a aposta começou e quando terminou; sem uma transição, não existe
+intervalo para medir, e o estado otimista ficaria para sempre.</p>
+
+<p>Por isso a ação de formulário é o lugar natural. Ela já roda dentro de uma transição, e o
+<code>adicionar</code> encontra o intervalo aberto. Quando você quer otimismo a partir de um clique — um
+botão “pagar”, por exemplo —, abre a transição na mão com <code>startTransition</code>.</p>
+
+<p>Duas armadilhas vêm junto. A primeira: a função não pode ser chamada dentro de um efeito para “adiantar”
+o desenho; efeito não é transição. A segunda: uma chamada fora da transição não é ignorada em silêncio —
+ela quebra a renderização, e a página fica em branco. Se a sua tela sumiu depois de um clique, procure um
+<code>adicionar</code> solto no <code>onClick</code>.</p>
+
+<h2>6. Atualizar um item que já existe</h2>
+
+<p>Otimismo não é só acrescentar. O reducer recebe o estado real e o pedido, e pode devolver qualquer
+coisa: um item marcado como pago, um item com o texto editado, vários itens de uma vez. A caixa mostra a
+lista de encomendas da Ana com um botão “pagar” por linha.</p>
+
+<p>O código inicial espera o servidor para marcar, e a linha fica “em aberto” durante a espera. A missão é
+marcar na hora, com a palavra “enviando” ao lado, e voltar ao normal quando o servidor responder. Aqui a
+transição abre no clique, com <code>React.startTransition</code>.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Maria: pago (enviando);;clique:#responder;;texto:Maria: pago">
+  <p class="try-task">O pagamento só aparece depois da resposta. Use <code>React.useOptimistic</code> com
+  um reducer que marque o item pelo <code>id</code> e <code>React.startTransition</code> no clique: a
+  linha deve mostrar <code>Maria: pago (enviando)</code> antes de o servidor responder.</p>
+  <pre class="jsx">let responder = null;
+
+function enviarPagamento() {
+  return new Promise((ok) =&gt; {
+    responder = () =&gt; ok();
+  });
+}
+
+const encomendas = [
+  { id: 1, cliente: "Maria", pago: false },
+  { id: 2, cliente: "Joana", pago: true },
+];
+
+function App() {
+  const [pedidos, setPedidos] = useState(encomendas);
+
+  function pagar(id) {
+    React.startTransition(async () =&gt; {
+      await enviarPagamento();
+      setPedidos((atual) =&gt;
+        atual.map((p) =&gt; (p.id === id ? { ...p, pago: true } : p))
+      );
+    });
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;ul&gt;
+        {pedidos.map((p) =&gt; (
+          &lt;li key={p.id}&gt;
+            {p.cliente + ": " + (p.pago ? "pago" : "em aberto")}
+            {p.pago ? null : &lt;button onClick={() =&gt; pagar(p.id)}&gt;Pagar&lt;/button&gt;}
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+      &lt;button type="button" id="responder" onClick={() =&gt; responder &amp;&amp; responder()}&gt;
+        servidor responde
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;ul&gt;
+    &lt;li&gt;
+      Maria: em aberto
+      &lt;button&gt;Pagar&lt;/button&gt;
+    &lt;/li&gt;
+    &lt;li&gt;Joana: pago&lt;/li&gt;
+  &lt;/ul&gt;
+  &lt;button type="button" id="responder"&gt;servidor responde&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">let responder = null;
+
+function enviarPagamento() {
+  return new Promise((ok) =&gt; {
+    responder = () =&gt; ok();
+  });
+}
+
+const encomendas = [
+  { id: 1, cliente: "Maria", pago: false },
+  { id: 2, cliente: "Joana", pago: true },
+];
+
+function App() {
+  const [pedidos, setPedidos] = useState(encomendas);
+  const [lista, marcar] = React.useOptimistic(pedidos, (atual, id) =&gt;
+    atual.map((p) =&gt; (p.id === id ? { ...p, pago: true, enviando: true } : p))
+  );
+
+  function pagar(id) {
+    React.startTransition(async () =&gt; {
+      marcar(id);
+      await enviarPagamento();
+      setPedidos((atual) =&gt;
+        atual.map((p) =&gt; (p.id === id ? { ...p, pago: true } : p))
+      );
+    });
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;ul&gt;
+        {lista.map((p) =&gt; (
+          &lt;li key={p.id}&gt;
+            {p.cliente + ": " + (p.pago ? "pago" : "em aberto")}
+            {p.enviando ? " (enviando)" : ""}
+            {p.pago ? null : &lt;button onClick={() =&gt; pagar(p.id)}&gt;Pagar&lt;/button&gt;}
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+      &lt;button type="button" id="responder" onClick={() =&gt; responder &amp;&amp; responder()}&gt;
+        servidor responde
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O <code>map</code> do reducer é o mesmo que você usaria no estado real: percorre, acha o item pelo
+<code>id</code> e devolve uma cópia com o campo trocado. A diferença é o <code>enviando: true</code>, que
+só existe na versão otimista — ele é a informação de que aquele item ainda não é verdade.</p>
+
+<p>A chave continua sendo o <code>id</code>, e é isso que faz o React reaproveitar a linha em vez de
+recriá-la: o item otimista e o real são o mesmo item, com um campo diferente. Se você usasse o índice como
+chave, a lista funcionaria, mas qualquer reordenação no servidor trocaria o conteúdo das linhas.</p>
+
+<h2>7. Otimista não é mentira</h2>
+
+<p>Pintar antes de confirmar só é honesto se três coisas forem verdade. A primeira: o estado real é a
+fonte, e a ação sempre o atualiza no fim. Sem isso, o item otimista desaparece quando a transição fecha, e
+a pessoa vê o que acabou de criar evaporar.</p>
+
+<p>A segunda: o item otimista precisa ser identificável. Use um <code>id</code> que exista nos dois lados
+— ou um texto único, como nas caixas. Se dois itens tiverem a mesma chave, o React avisa no console e
+escolhe um; a lista fica com menos linhas do que você escreveu.</p>
+
+<p>A terceira: a tela precisa distinguir o provisório do definitivo. “(enviando)” não é enfeite — é o que
+permite à pessoa entender por que aquele item está diferente, e é o que evita a sensação de que a página
+mentiu se a resposta demorar. Sem a marca, o item parece definitivo e some sozinho alguns segundos depois.</p>
+
+<p>O que o hook não resolve é o que depende do servidor: dois cliques rápidos geram duas apostas, e as
+duas aparecem. Se o envio é lento, desabilite o botão com o pendente da <code>useTransition</code> — o
+primeiro item do par — ou com o pendente da ação, como você viu na aula do <code>useActionState</code>.</p>
+
+<h2>8. As armadilhas</h2>
+
+<p>A tabela reúne os tropeços que aparecem em código real. O mais comum é o primeiro: esquecer de atualizar
+o estado real e achar que o hook está quebrado.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O sintoma</th><th>A causa</th><th>O conserto</th></tr>
+<tr><td>o item aparece e some depois de um tempo</td><td>a ação não atualizou o estado real</td><td>chamar <code>setPaes</code> com o item confirmado</td></tr>
+<tr><td>a página fica em branco ao clicar</td><td>a função foi chamada fora de uma transição</td><td>mover para a ação ou envolver em <code>startTransition</code></td></tr>
+<tr><td>dois itens iguais na lista</td><td>duas apostas para o mesmo envio</td><td>desabilitar o botão enquanto está pendente</td></tr>
+<tr><td>o item fica “enviando” para sempre</td><td>a promessa nunca resolve (nem rejeita)</td><td>tratar erro de rede e pôr um tempo limite no pedido</td></tr>
+<tr><td>a lista inteira pisca a cada envio</td><td>chave pelo índice ou item recriado</td><td>chave estável, como o <code>id</code></td></tr>
+</table>
+</div>
+
+<p>O caso do “enviando para sempre” merece atenção. Se o pedido não tem tempo limite, uma rede ruim deixa
+a transição aberta indefinidamente — e enquanto ela está aberta, o estado otimista vale. A linha fica
+marcada como enviando até a pessoa recarregar a página. Um limite de alguns segundos, com rejeição, devolve
+a lista ao real e mostra o aviso.</p>
+
+<pre class="term">clique em Adicionar
+  lista: Pão francês, Broa (enviando)
+servidor respondeu
+  lista: Pão francês, Broa
+  transição fechada: o item otimista foi descartado</pre>
+
+<p>Repare que o segundo desenho não é “o item otimista virou definitivo”: é a lista real, que já contém a
+broa, sendo desenhada sem o pedido pendente. O hook não promove nada; ele só para de aplicar a aposta.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o botão que aceitava dois cliques</h3>
+<p>A Ana deixou o botão “adicionar” habilitado durante o envio, e a cliente ansiosa clicou três vezes. A
+lista mostrou três broas enviando e, quando as respostas chegaram, uma delas voltou com “já existe”. O
+conserto foi o pendente da transição: <code>disabled={pendente}</code> enquanto a aposta está aberta. Um
+envio por vez, uma aposta por vez.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o pedido que ficou pendurado</h3>
+<p>O servidor da padaria caiu no meio de um envio e a promessa nunca resolveu. A linha ficou “(enviando)”
+até a página ser recarregada — e a Ana só descobriu porque uma cliente reclamou. Ela passou a usar um
+tempo limite no pedido: depois de oito segundos, a promessa rejeita e a linha volta ao estado real com um
+aviso.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o item que sumia ao confirmar</h3>
+<p>Ela chamou <code>adicionar(nome)</code>, esperou a resposta e esqueceu o <code>setPaes</code>. A broa
+aparecia na hora e desaparecia três segundos depois — o pior dos dois mundos. O hook não tinha culpa: sem
+atualizar a fonte da verdade, o estado otimista é a única coisa que existia, e ele é temporário por
+definição.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que o <code>useOptimistic</code> devolve?</p>
+<label><input type="radio" name="q1"> a lista real e a função que a substitui</label>
+<label><input type="radio" name="q1"> a lista a desenhar e a função que pede uma atualização otimista</label>
+<label><input type="radio" name="q1"> o pendente da transição e o erro da última ação</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Onde a função de atualização otimista pode ser chamada?</p>
+<label><input type="radio" name="q2"> em qualquer lugar do componente</label>
+<label><input type="radio" name="q2"> dentro de um <code>useEffect</code></label>
+<label><input type="radio" name="q2"> dentro de uma ação de formulário ou de um <code>startTransition</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Quando o item otimista sai da tela, se o servidor recusou?</p>
+<label><input type="radio" name="q3"> quando a transição termina e o estado real volta a valer</label>
+<label><input type="radio" name="q3"> só quando você o remove com um <code>filter</code></label>
+<label><input type="radio" name="q3"> nunca; ele fica até a página recarregar</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o hook e a transição</h2>
+<p>Complete as duas linhas. Na primeira, o nome do hook; na segunda, a função que abre uma transição a
+partir de um clique:</p>
+<div class="ex-code">const [lista, adicionar] = React.<input aria-label="resposta 1" data-answer="useOptimistic" placeholder="...">(
+  paes,
+  (atual, nome) =&gt; [...atual, { nome: nome, enviando: true }]
+);
+
+function pagar(id) {
+  React.<input aria-label="resposta 2" data-answer="startTransition|React.startTransition" placeholder="...">(async () =&gt; {
+    marcar(id);
+    await enviarPagamento();
+    setPedidos((atual) =&gt; atual.map((p) =&gt; (p.id === id ? { ...p, pago: true } : p)));
+  });
+}</div>
+<p class="ex-dica">Dica: a primeira é o nome do hook do título. A segunda é a função do React que abre uma
+transição sem precisar do par da <code>useTransition</code> — a mesma que a mensagem de erro manda usar.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O <code>useOptimistic</code> devolve a lista que você desenha e uma função para pedir uma atualização
+antes da resposta. O reducer diz como aplicar o pedido por cima do estado real, que continua sendo a fonte
+da verdade. Quando a transição fecha, o estado otimista é descartado: se o servidor confirmou, o item já
+está no estado real; se recusou, ele simplesmente deixa de existir. O desfazer é automático.</p>
+
+<p>A função só funciona dentro de uma ação de formulário ou de um <code>startTransition</code> — fora
+disso, o React lança “An optimistic state update occurred outside a transition or action”. Por isso a ação
+é o lugar natural, e o clique precisa abrir a transição na mão. Dentro da ação, a ordem é sempre:
+<code>adicionar</code> primeiro, espera depois, <code>set</code> do estado real no fim.</p>
+
+<p>O reducer serve para mais do que acrescentar: com um <code>map</code> pelo <code>id</code>, você marca
+um item existente e sinaliza o provisório com um campo como <code>enviando</code>. Três condições mantêm o
+otimismo honesto: atualizar o estado real no fim, ter chave estável e mostrar na tela que o item ainda não
+é definitivo.</p>
+
+<p>Com isso o trio do React 19 está completo: <code>action</code> para enviar sem estado paralelo,
+<code>useActionState</code> para o resultado voltar pela ação e <code>useOptimistic</code> para a tela
+responder antes do servidor. O próximo passo é o desempenho — medir antes de otimizar, para não trocar
+clareza por velocidade que ninguém sente.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>React.useOptimistic(estadoReal, reducer)</code> devolve <code>[lista, adicionar]</code>.</li>
+<li>O estado real é a fonte; o otimista é uma projeção temporária dele.</li>
+<li>A função só vale em ação de formulário ou <code>startTransition</code>.</li>
+<li>Fim da transição: o otimista é descartado e o real assume — sem desfazer manual.</li>
+<li>Ordem na ação: <code>adicionar</code>, <code>await</code>, <code>set</code> do estado real.</li>
+<li>Reducer com <code>map</code> pelo <code>id</code> atualiza item existente.</li>
+<li>Marque o provisório na tela: <code>{p.enviando ? " (enviando)" : ""}</code>.</li>
+<li>Chave estável e um envio por vez (<code>disabled={pendente}</code>).</li>
+<li>Sem tempo limite, a transição pode ficar aberta para sempre.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

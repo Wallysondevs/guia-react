@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Medindo Performance | Guia React</title>
+<meta name="description" content="Medir performance no React em vez de adivinhar: contar chamadas de cálculo, contar desenhos de componente, comparar duas versões com performance.now e ler o Profiler.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Medindo <span class="hl">Performance</span></h1>
+<p class="intro">O site da Ana está lento e ela já sabe o culpado: “é o <code>map</code>”, diz ela. Duas
+horas depois, o <code>map</code> tinha sido reescrito três vezes e a página continuava lenta. Nesta aula
+ela aprende o caminho oposto ao chute: medir. Contar quantas vezes um cálculo roda, contar quantas vezes
+um componente é desenhado, cronometrar duas versões do mesmo código e comparar números — em vez de
+trocar linhas e torcer.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que “está lento” não é uma medida e o que medir no lugar.</li>
+  <li>A contar chamadas de uma função com um contador simples.</li>
+  <li>A contar desenhos de um componente e a descobrir o que os provoca.</li>
+  <li>A cronometrar com <code>performance.now()</code> e comparar duas versões.</li>
+  <li>O que o Profiler do React DevTools mostra e como ler o que ele diz.</li>
+  <li>Por que o número do desenvolvimento não é o número do usuário.</li>
+  <li>Como transformar medida em decisão — e quando parar de otimizar.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o chute que custou duas horas</h2>
+
+<p>A página do catálogo da Ana demora a responder. Ela fez o que todo mundo faz: olhou o código, achou
+uma parte suspeita — o <code>map</code> de dois mil itens — e mexeu ali. Trocou por um <code>for</code>,
+depois por um <code>reduce</code>, depois voltou para o <code>map</code> com uma variável auxiliar. A
+página continuou igual, porque o tempo nunca esteve no <code>map</code>.</p>
+
+<p>O problema de “está lento” é que ninguém discorda e ninguém consegue consertar. É uma sensação, não
+uma medida. Medida tem número, unidade e um antes e um depois: “o desenho da lista levava 180 ms e agora
+leva 8 ms”. Com uma frase dessas, a discussão acaba — e, mais importante, você sabe se o que você fez
+serviu para alguma coisa.</p>
+
+<p>Em React, três medidas resolvem quase todos os casos do dia a dia. Quantas vezes a minha conta roda?
+Quantas vezes o meu componente é desenhado? Quanto tempo o trecho demora? Cada uma responde a uma
+pergunta diferente, e as três cabem em menos de dez linhas de código.</p>
+
+<p>Há também uma medida que não é sua: o que o usuário sente. Uma página pode demorar 300 ms para
+desenhar e parecer instantânea, e outra pode demorar 30 ms e travar na hora do clique. O navegador mede
+isso com as métricas de experiência — a primeira pintura, a resposta ao toque. Elas são o norte; as
+medidas de dentro do componente são o mapa.</p>
+
+<h2>2. O que medir, e o que é ruído</h2>
+
+<p>Antes das ferramentas, vale separar medida de ruído. Uma medida é um número que se repete quando você
+roda o mesmo código na mesma máquina, com a mesma quantidade de dados. Ruído é tudo o que muda entre uma
+execução e outra: uma aba do navegador aberta, o antivírus varrendo o disco, o notebook no modo
+econômico, o primeiro desenho depois de abrir a página.</p>
+
+<dl class="anatomy">
+<dt>medição</dt>
+<dd>Um número com unidade e contexto: 40 ms, 3 desenhos, 2 chamadas. Sem contexto, número não diz
+nada.</dd>
+<dt>performance.now()</dt>
+<dd>A leitura do relógio do navegador, em milissegundos, com precisão de fração. Serve para
+cronometrar um trecho.</dd>
+<dt>desenho</dt>
+<dd>Uma execução da função componente. Contar desenhos é a forma mais direta de saber se algo está
+sendo refeito sem necessidade.</dd>
+<dt>Profiler</dt>
+<dd>A aba do React DevTools que grava os desenhos e mostra quais componentes custaram quanto.</dd>
+<dt>ruído</dt>
+<dd>A variação que não vem do seu código. Uma medição só vale se puder ser repetida.</dd>
+</dl>
+
+<p>Com essas cinco palavras, a tabela de decisão fica curta. Repare que a pergunta “está lento?” não
+aparece em nenhuma linha: ela é substituída por uma pergunta que tem resposta numérica.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>A pergunta</th><th>A medida</th><th>A ferramenta</th></tr>
+<tr><td>a conta está rodando mais de uma vez?</td><td>número de chamadas da função</td><td>um contador no módulo</td></tr>
+<tr><td>o componente está sendo redesenhado à toa?</td><td>número de desenhos</td><td>um <code>useRef</code> no corpo, ou o Profiler</td></tr>
+<tr><td>esta versão é mais rápida que aquela?</td><td>milissegundos de cada uma</td><td><code>performance.now()</code> em volta</td></tr>
+<tr><td>o usuário espera?</td><td>métricas de experiência</td><td>aba Performance e Lighthouse</td></tr>
+</table>
+</div>
+
+<p>Uma advertência que economiza frustração: meça uma coisa por vez. Quem troca a lista, o filtro e o
+estado de uma vez não sabe qual das três mudanças trouxe o ganho — e, quando o número piorar, não sabe
+qual desfazer. Alterar, medir, decidir; depois alterar de novo.</p>
+
+<h2>3. Contar chamadas de um cálculo</h2>
+
+<p>O primeiro suspeito de qualquer lentidão é uma conta que roda mais vezes do que deveria. No código da
+Ana, o resumo do catálogo — a soma dos preços — era chamado duas vezes na mesma renderização: uma para
+o total e outra para a média. Duas passadas pelos mesmos oitocentos itens, para produzir números que
+saem do mesmo total.</p>
+
+<p>A medida é um contador de módulo, daqueles que ficam fora do componente e não são estado. Cada
+chamada da função soma um; um efeito sem dependências imprime o total depois que a tela foi desenhada.
+Se o número for maior que um, alguma coisa chamou a conta mais de uma vez — e o console diz quantas.</p>
+
+<div class="tryreact" data-goal="console:chamadas do resumo: 1;;texto:média: R$">
+  <p class="try-task">O resumo roda duas vezes por desenho: uma no total e outra na média. Calcule uma
+  vez em uma constante e use as duas saídas dela, para o console mostrar
+  <code>chamadas do resumo: 1</code>.</p>
+  <pre class="jsx">let chamadas = 0;
+
+const itens = Array.from({ length: 800 }, (_, i) =&gt; ({
+  id: i + 1,
+  preco: (i % 9) + 1
+}));
+
+function resumo(lista) {
+  chamadas = chamadas + 1;
+  let total = 0;
+  for (const item of lista) total = total + item.preco;
+  return total;
+}
+
+function App() {
+  useEffect(() =&gt; {
+    console.log("chamadas do resumo: " + chamadas);
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{"total: R$ " + resumo(itens) + ",00"}&lt;/p&gt;
+      &lt;p&gt;{"média: R$ " + (resumo(itens) / itens.length).toFixed(2)}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;total: R$ 3996,00&lt;/p&gt;
+  &lt;p&gt;média: R$ 5.00&lt;/p&gt;
+&lt;/div&gt;
+console: chamadas do resumo: 2
+</pre>
+  <pre class="solucao">let chamadas = 0;
+
+const itens = Array.from({ length: 800 }, (_, i) =&gt; ({
+  id: i + 1,
+  preco: (i % 9) + 1
+}));
+
+function resumo(lista) {
+  chamadas = chamadas + 1;
+  let total = 0;
+  for (const item of lista) total = total + item.preco;
+  return total;
+}
+
+function App() {
+  const total = resumo(itens);
+
+  useEffect(() =&gt; {
+    console.log("chamadas do resumo: " + chamadas);
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{"total: R$ " + total + ",00"}&lt;/p&gt;
+      &lt;p&gt;{"média: R$ " + (total / itens.length).toFixed(2)}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel do código inicial mostra a mesma tela e, abaixo, a linha <code>console: chamadas do resumo:
+2</code>. Depois da solução, <code>1</code>. A tela é idêntica nos dois casos — e é exatamente por isso que
+a medição importa: o olho não vê a segunda passada, o contador vê.</p>
+
+<p>Duas coisas para guardar desse padrão. A primeira: o contador é uma variável de módulo, não
+<code>useState</code>; ele não deve provocar desenho nenhum. A segunda: o <code>console.log</code> fica
+dentro de um <code>useEffect</code> sem dependências, para rodar uma vez, depois do primeiro desenho —
+se ele ficasse no corpo do componente, cada desenho imprimiria uma linha e a leitura viraria uma pilha
+de números.</p>
+
+<p>Esse mesmo contador responde a outra pergunta frequente: “a minha função roda de novo quando o estado
+muda?”. Ponha o contador, clique, leia o número. Se ele crescer sem parar, você achou um laço; se ficar
+parado, a conta está sendo lembrada em algum lugar.</p>
+
+<h2>4. Contar desenhos de um componente</h2>
+
+<p>A segunda medida é sobre o componente, não sobre a função solta. Um <code>useRef</code> criado no
+corpo e incrementado a cada desenho funciona como contador de visitas: <code>useRef(0)</code> guarda o
+número entre um desenho e outro, sem provocar um novo desenho quando muda — que é justamente o que um
+contador precisa.</p>
+
+<p>No site da Ana, o resumo do catálogo é uma caixa pesada e estável; o campo de busca é leve e muda a
+cada tecla. Os dois moram no mesmo componente, então cada letra digitada redesenha o resumo junto. A
+medida mostra o desperdício, e a correção é de desenho, não de velocidade: separar o que muda do que não
+muda.</p>
+
+<div class="tryreact" data-goal="digite:input=1;;texto:desenhos do resumo: 1">
+  <p class="try-task">O campo de busca e o resumo estão no mesmo componente, e cada tecla redesenha o
+  resumo. Mova o campo (e o estado <code>busca</code>) para um componente <code>Busca</code>, deixando
+  o <code>Resumo</code> no <code>App</code>: depois de digitar, ele deve mostrar
+  <code>desenhos do resumo: 1</code>.</p>
+  <pre class="jsx">const catalogo = Array.from({ length: 200 }, (_, i) =&gt; ({
+  id: i + 1,
+  nome: "Pão " + (i + 1)
+}));
+
+function Resumo({ paes }) {
+  const desenhos = useRef(0);
+  desenhos.current = desenhos.current + 1;
+
+  return &lt;p&gt;{"desenhos do resumo: " + desenhos.current + " | itens: " + paes.length}&lt;/p&gt;;
+}
+
+function App() {
+  const [busca, setBusca] = useState("");
+  const encontrados = catalogo.filter((p) =&gt; p.nome.includes(busca));
+
+  return (
+    &lt;div&gt;
+      &lt;input value={busca} onChange={(e) =&gt; setBusca(e.target.value)} /&gt;
+      &lt;p&gt;{"encontrados: " + encontrados.length}&lt;/p&gt;
+      &lt;Resumo paes={catalogo} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input value=""&gt;
+  &lt;p&gt;encontrados: 200&lt;/p&gt;
+  &lt;p&gt;desenhos do resumo: 1 | itens: 200&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const catalogo = Array.from({ length: 200 }, (_, i) =&gt; ({
+  id: i + 1,
+  nome: "Pão " + (i + 1)
+}));
+
+function Resumo({ paes }) {
+  const desenhos = useRef(0);
+  desenhos.current = desenhos.current + 1;
+
+  return &lt;p&gt;{"desenhos do resumo: " + desenhos.current + " | itens: " + paes.length}&lt;/p&gt;;
+}
+
+function Busca({ itens }) {
+  const [busca, setBusca] = useState("");
+  const encontrados = itens.filter((p) =&gt; p.nome.includes(busca));
+
+  return (
+    &lt;div&gt;
+      &lt;input value={busca} onChange={(e) =&gt; setBusca(e.target.value)} /&gt;
+      &lt;p&gt;{"encontrados: " + encontrados.length}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Busca itens={catalogo} /&gt;
+      &lt;Resumo paes={catalogo} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No código inicial, digitar “1” faz o resumo ir para dois desenhos: um da montagem, outro da tecla. Na
+solução, ele fica em um — a tecla mexeu só no componente <code>Busca</code>, e o React não teve motivo
+para redesenhar o irmão. O ganho não veio de uma biblioteca nem de um hook novo: veio de o estado morar
+junto de quem o usa.</p>
+
+<p>Duas ressalvas honestas sobre essa técnica. A primeira: incrementar um <code>useRef</code> durante a
+renderização é um truque de medição, não um padrão de código — a renderização deveria ser pura. Tire o
+contador depois de medir. A segunda: em desenvolvimento, com StrictMode, o React desenha duas vezes de
+propósito, e o seu contador vai mostrar o dobro. Isso não é bug do seu componente; é o modo de
+desenvolvimento fazendo o trabalho dele.</p>
+
+<h2>5. Cronometrar e comparar</h2>
+
+<p>A terceira medida é tempo. <code>performance.now()</code> devolve o relógio do navegador em
+milissegundos, com fração — diferente de <code>Date.now()</code>, que só tem precisão de segundo. Duas
+leituras em volta de um trecho dão a duração; a subtração é sua.</p>
+
+<p>Um número sozinho, porém, não decide nada. “Levou 40 ms” é bom ou ruim? Depende do que rodava antes e
+do que roda depois. A medição só vira decisão quando comparada: a versão A contra a versão B, na mesma
+máquina, com os mesmos dados. É isso que a Ana faz na caixa a seguir — duas versões de “tirar os
+repetidos” da lista de preços, uma com busca linear dentro de um laço, outra com <code>Set</code>.</p>
+
+<div class="tryreact" data-goal="console:mais rápida: a segunda;;console:mesmo resultado: true">
+  <p class="try-task">As duas versões existem, mas ninguém mediu. Cronometre cada uma com
+  <code>performance.now()</code> e escreva no console qual foi mais rápida e se as duas devolveram o
+  mesmo resultado.</p>
+  <pre class="jsx">const numeros = Array.from({ length: 4000 }, (_, i) =&gt; (i * 7) % 5000);
+
+function semRepetirLenta(lista) {
+  const saida = [];
+  for (const n of lista) {
+    if (saida.indexOf(n) === -1) saida.push(n);
+  }
+  return saida;
+}
+
+function semRepetirRapida(lista) {
+  return Array.from(new Set(lista));
+}
+
+function App() {
+  useEffect(() =&gt; {
+    console.log("medição: ainda não feita");
+  }, []);
+
+  return &lt;p&gt;{"itens na lista: " + numeros.length}&lt;/p&gt;;
+}</pre>
+  <pre class="out">
+&lt;p&gt;itens na lista: 4000&lt;/p&gt;
+console: medição: ainda não feita
+</pre>
+  <pre class="solucao">const numeros = Array.from({ length: 4000 }, (_, i) =&gt; (i * 7) % 5000);
+
+function semRepetirLenta(lista) {
+  const saida = [];
+  for (const n of lista) {
+    if (saida.indexOf(n) === -1) saida.push(n);
+  }
+  return saida;
+}
+
+function semRepetirRapida(lista) {
+  return Array.from(new Set(lista));
+}
+
+function App() {
+  useEffect(() =&gt; {
+    const t1 = performance.now();
+    const lenta = semRepetirLenta(numeros);
+    const d1 = performance.now() - t1;
+
+    const t2 = performance.now();
+    const rapida = semRepetirRapida(numeros);
+    const d2 = performance.now() - t2;
+
+    console.log("mesmo resultado: " + (lenta.length === rapida.length));
+    console.log("mais rápida: " + (d1 &lt; d2 ? "a primeira" : "a segunda"));
+    console.log("tempos: " + d1.toFixed(1) + " ms e " + d2.toFixed(1) + " ms");
+  }, []);
+
+  return &lt;p&gt;{"itens na lista: " + numeros.length}&lt;/p&gt;;
+}</pre>
+</div>
+
+<p>O painel da solução mostra as três linhas. A segunda é a que importa — e ela é escrita de propósito
+sem números, porque “a segunda foi mais rápida” continua verdade amanhã, enquanto “41,2 ms” muda a cada
+máquina. No console do seu projeto, os tempos aparecem assim, com o número que a sua máquina produziu:</p>
+
+<pre class="term">tempos: 41.2 ms e 0.9 ms</pre>
+
+<p>A diferença é de ordem de grandeza, não de detalhe: a versão com <code>indexOf</code> dentro do laço
+compara cada item com todos os anteriores — o custo cresce com o quadrado do tamanho —, enquanto o
+<code>Set</code> resolve em uma passada. Esse é o tipo de ganho que vale a pena: quarenta vezes menos
+trabalho. Trocar duas expressões equivalentes costuma render 5%, que ninguém sente.</p>
+
+<p>E o <code>toFixed(1)</code>? Ele arredonda para uma casa decimal, que é o bastante para comparar
+tempos de milissegundos. Sem arredondar, você lê <code>41.19999996948242</code> e perde tempo com
+números que não significam nada. A precisão do relógio não é a precisão da sua decisão.</p>
+
+<h2>6. O Profiler do React DevTools</h2>
+
+<p>As três medidas acima são caseiras e funcionam. Para ver o quadro inteiro, existe o Profiler, que vem
+na extensão React DevTools (a mesma que mostra as props de cada componente). Ele grava uma sessão,
+desenha a sua interação e depois apresenta dois números por componente: quanto tempo aquele componente
+levou e por que ele foi desenhado.</p>
+
+<p>O “por que” é a parte mais útil e a menos conhecida. O Profiler marca cada desenho com uma causa:
+mudou o estado, mudou o pai, mudou o contexto, ou nada mudou e ainda assim desenhou. Quando a causa é
+“o pai mudou”, você já sabe o caminho: o estado está alto demais na árvore. Quando a causa é “mudou o
+contexto”, o valor do contexto está sendo recriado a cada desenho — outro clássico.</p>
+
+<p>O gráfico de chamas — <em>flamegraph</em> — mostra as barras empilhadas por tempo. Uma barra larga é
+um componente caro; uma barra estreita repetida muitas vezes é um componente que desenha demais. Nenhuma
+das duas leituras exige decorar número: exige procurar a barra mais larga e a mais repetida.</p>
+
+<p>Vale a ressalva de sempre: o Profiler mede o que você gravou. Se você gravar abrindo a página, ele
+mostra a montagem; se gravar digitando, mostra a digitação. Grave a interação que incomoda o usuário, não
+a que é fácil de gravar.</p>
+
+<h2>7. O número do desenvolvimento não é o do usuário</h2>
+
+<p>Há uma diferença que engana muita gente boa. Em desenvolvimento, o React roda verificações extras,
+avisa no console, guarda nomes de componente e desenha duas vezes com StrictMode. O mesmo componente que
+leva 30 ms em desenvolvimento pode levar 6 ms no build de produção. Medir no modo de desenvolvimento e
+concluir “meu site é lento” é comparar o treino com a corrida.</p>
+
+<p>Um mesmo componente, medido nas duas versões na mesma máquina, conta essa história:</p>
+
+<pre class="term">desenvolvimento: 31.7 ms
+build de produção: 6.2 ms</pre>
+
+<p>Os seus números serão outros; a proporção, não. A regra prática: use o desenvolvimento para descobrir
+<em>o que</em> está caro — as proporções se mantêm — e o build de produção para saber <em>quanto</em>. No projeto com Vite, isso é
+<code>npm run build</code> e <code>npm run preview</code>, que serve a versão final localmente. Os números
+do <code>preview</code> são os que se aproximam do que o cliente da Ana vai sentir.</p>
+
+<p>Outro cuidado: o primeiro desenho de uma página é sempre mais caro, porque o navegador está baixando
+o código, compilando e criando a estrutura. A segunda visita é mais rápida. Se você medir uma vez, vai
+medir o pior caso — e concluir que o site é lento quando ele só é lento na primeira vez, o que é normal
+e muitas vezes aceitável.</p>
+
+<p>Por último: meça com dados realistas. Uma lista de dez itens responde em zero milissegundo em
+qualquer versão, e você não descobre nada. Use o tamanho que o cliente usa — dois mil pães, quarenta
+encomendas por dia —, senão a medição vira teatro.</p>
+
+<h2>8. Da medida para a decisão</h2>
+
+<p>Medir não é o fim: é o começo de uma decisão. O roteiro que funciona tem quatro passos e cabe em uma
+frase cada. Primeiro, meça o que o usuário sente. Segundo, ache o componente ou a conta que mais pesa.
+Terceiro, mude uma coisa e meça de novo. Quarto, se o ganho não aparecer, desfaça.</p>
+
+<p>O quarto passo é o que quase ninguém faz, e é o que evita o pior resultado possível: código mais
+complicado com a mesma velocidade. Uma otimização que não move o número é dívida técnica pura — mais
+linhas para ler, mais lugares para quebrar. Desfazer também é engenharia.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que a medida mostrou</th><th>O que isso costuma significar</th><th>O próximo passo</th></tr>
+<tr><td>a mesma conta rodando duas vezes por desenho</td><td>cálculo repetido dentro do JSX</td><td>calcular uma vez em uma constante</td></tr>
+<tr><td>um componente desenhando a cada tecla</td><td>estado alto demais na árvore</td><td>mover o estado para o componente que o usa</td></tr>
+<tr><td>um componente caro desenhando sozinho</td><td>trabalho que não depende do estado novo</td><td>separar a parte pesada ou guardar o resultado</td></tr>
+<tr><td>todos os componentes caros na montagem</td><td>muita coisa desenhada de uma vez</td><td>dividir a tela e adiar o que não é urgente</td></tr>
+</table>
+</div>
+
+<p>Vale ter um alvo antes de começar. Para interação, o número clássico é 16 ms por quadro: se o
+trabalho do clique cabe nesse orçamento, a sensação é de resposta imediata. Para a abertura da página,
+o alvo é mais generoso e depende do conteúdo. Sem alvo, “mais rápido” nunca termina — e você acaba
+micro-otimizando um trecho que ninguém espera.</p>
+
+<p>E há a decisão mais barata de todas: mudar o desenho em vez do código. A Ana não precisava de uma
+lista de dois mil itens na tela; precisava de vinte e de uma busca. A aula de listas grandes mostrou o
+caminho; esta mostra como saber se ele funcionou.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o contador que mostrou o dobro</h3>
+<p>A Ana pôs um contador de desenhos no topo da página e viu o número crescer aos pulos ao rolar a
+lista. Descobriu que o componente pai guardava a posição da rolagem e redesenha a árvore inteira a cada
+pixel. A correção foi mover a posição para um componente pequeno, que só desenha a barra — o contador
+voltou a crescer de um em um.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a otimização que não mudou nada</h3>
+<p>Ela trocou três <code>filter</code> encadeados por um único laço, certa de que ganharia tempo. Mediu
+antes e depois: 1,2 ms contra 1,1 ms. Em dois mil itens, três passadas são baratas; o caro era o desenho
+dos dois mil nós, que continuava igual. Ela desfez a mudança e foi atrás do desenho — dessa vez com
+ganho de verdade.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o número que só existia no notebook dela</h3>
+<p>No notebook novo, a página abria em 300 ms e ela comemorou. No celular do balcão, levava dois
+segundos. O número do desenvolvimento, na máquina mais rápida, esconde o problema do cliente. Medir no
+aparelho parecido com o de quem usa — e no build de produção — é parte da medida, não um detalhe.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Qual é a primeira coisa a fazer quando a página “está lenta”?</p>
+<label><input type="radio" name="q1"> trocar o <code>map</code> por um <code>for</code></label>
+<label><input type="radio" name="q1"> medir onde o tempo está indo</label>
+<label><input type="radio" name="q1"> instalar uma biblioteca de performance</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Para que serve o contador com <code>useRef</code> dentro do componente?</p>
+<label><input type="radio" name="q2"> para acelerar o componente em produção</label>
+<label><input type="radio" name="q2"> para guardar o resultado de um cálculo caro</label>
+<label><input type="radio" name="q2"> para contar quantas vezes o componente foi desenhado</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Por que comparar duas versões em vez de olhar um tempo isolado?</p>
+<label><input type="radio" name="q3"> porque “40 ms” sozinho não diz se é bom ou ruim</label>
+<label><input type="radio" name="q3"> porque o <code>performance.now()</code> só funciona duas vezes</label>
+<label><input type="radio" name="q3"> porque o React apaga a medição anterior</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o cronômetro</h2>
+<p>Complete as duas linhas. Na primeira, a leitura do relógio do navegador antes do trecho; na segunda, o
+arredondamento para uma casa decimal na hora de imprimir:</p>
+<div class="ex-code">const inicio = <input aria-label="resposta 1" data-answer="performance.now()|performance.now" placeholder="...">;
+const duracao = performance.now() - inicio;
+console.log("levou " + duracao.<input aria-label="resposta 2" data-answer="toFixed" placeholder="...">(1) + " ms");</div>
+<p class="ex-dica">Dica: a primeira é a função que devolve o tempo em milissegundos com fração — existe no
+navegador e não precisa de import. A segunda é o método que transforma o número em texto com a
+quantidade de casas que você pedir entre parênteses.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Performance começa com uma pergunta que tem número. Em React, três medidas resolvem a maior parte:
+contar chamadas de uma conta, contar desenhos de um componente e cronometrar um trecho com
+<code>performance.now()</code>. As três cabem em poucas linhas, não precisam de biblioteca e respondem a
+perguntas diferentes — qual conta repete, qual componente redesenha, qual versão é mais rápida.</p>
+
+<p>O Profiler do React DevTools dá o quadro completo: barras por componente, tempo de cada uma e a causa
+do desenho. Ele é melhor para achar <em>quem</em> está caro; o contador é melhor para provar uma
+suspeita pontual. E nenhum dos dois substitui a comparação: um número isolado não é uma decisão.</p>
+
+<p>Meça no lugar certo. Desenvolvimento serve para achar proporções; produção, para saber o tempo real.
+Aparelho parecido com o do cliente, dados do tamanho do cliente, e depois de mexer uma coisa só. Se o
+número não mudou, desfaça — código mais complicado com a mesma velocidade é prejuízo.</p>
+
+<p>E guarde a lição da Ana: o chute custou duas horas e não resolveu nada. A medição custou dez minutos
+e apontou o culpado de verdade. Quem mede escolhe onde gastar esforço; quem chuta gasta onde é mais fácil
+mexer.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>“Está lento” não é medida; “180 ms no desenho da lista” é.</li>
+<li>Contador de chamadas: variável de módulo somando dentro da função.</li>
+<li>Contador de desenhos: <code>useRef(0)</code> no corpo, tirado depois de medir.</li>
+<li><code>performance.now()</code> dá milissegundos com fração; subtraia as duas leituras.</li>
+<li>Compare versões na mesma máquina, com os mesmos dados.</li>
+<li>Profiler mostra tempo por componente e a causa do desenho.</li>
+<li>Desenvolvimento infla os números; confira no build de produção.</li>
+<li>Otimização que não move o número deve ser desfeita.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

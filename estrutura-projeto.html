@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estrutura do Projeto | Guia React</title>
+<meta name="description" content="Como organizar um projeto React que cresce: components e pages, hooks e lib, src/assets e public, o atalho @ nos imports, barrels e nomes que o Linux cobra.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Estrutura do <span class="hl">Projeto</span></h1>
+<p class="intro">A vitrine de encomendas da Ana passou de dez arquivos para trinta e quatro, e a pasta
+<code>src</code> virou um depósito: componentes misturados com imagens, uma função de data perdida no meio
+de um arquivo de tela, imports com quatro <code>../</code> seguidos. Nesta aula ela organiza o projeto com
+critério — e descobre por que duas pastas parecem guardar imagens, por que o Linux recusa um import que o
+Windows aceitava e quando um <code>index.js</code> ajuda ou atrapalha.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>As duas formas de agrupar arquivos e quando cada uma vale a pena.</li>
+  <li>O que é tela (<code>pages</code>) e o que é peça (<code>components</code>).</li>
+  <li>Onde guardar lógica reaproveitável: <code>hooks</code> e <code>lib</code>.</li>
+  <li>A diferença entre <code>src/assets</code> e <code>public</code> — e por que existem as duas.</li>
+  <li>Como criar o atalho <code>@</code> para não escrever <code>../../..</code>.</li>
+  <li>Por que maiúscula em nome de arquivo derruba o build no servidor.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a pasta que virou depósito</h2>
+
+<p>No começo era fácil: <code>src/App.jsx</code>, <code>src/main.jsx</code> e mais dois ou três
+componentes. Trinta e quatro arquivos depois, a Ana abre a pasta e não sabe onde está nada. O botão que ela
+procura chama <code>Botao.jsx</code> e está ao lado de <code>logo.svg</code>, de
+<code>formatarData.js</code> e de uma cópia de <code>Cardapio.jsx</code> que ela não lembra de ter feito.</p>
+
+<p>Organizar não é enfeite: é o que decide se você acha um arquivo em cinco segundos ou em cinco minutos,
+e se o próximo a mexer no projeto vai entender o mapa sem perguntar. Também não é uma ciência exata — não
+existe uma estrutura "oficial" do React. O que existe são convenções que funcionam, e o critério para
+escolher entre elas.</p>
+
+<h2>2. As duas perguntas antes de criar uma pasta</h2>
+
+<p>Toda pasta responde a uma pergunta sobre os arquivos que guarda. Há duas formas de responder. A
+primeira é <strong>por tipo</strong>: tudo o que é componente em <code>components/</code>, tudo o que é
+gancho em <code>hooks/</code>, tudo o que é utilitário em <code>lib/</code>. A segunda é <strong>por
+assunto</strong>: tudo o que é da vitrine em <code>vitrine/</code>, tudo o que é do cardápio em
+<code>cardapio/</code> — cada pasta com os componentes, o CSS e as funções daquele assunto.</p>
+
+<p>Projetos pequenos e médios vivem bem com a divisão por tipo: é simples, previsível e todo mundo
+reconhece. A divisão por assunto brilha quando o projeto tem áreas bem separadas e muita gente mexendo ao
+mesmo tempo — cada pessoa trabalha na sua pasta. O erro comum é misturar as duas sem critério: uma pasta
+<code>components</code> com subpastas por assunto, e outra <code>features</code> fazendo a mesma coisa.</p>
+
+<dl class="anatomy">
+<dt>módulo</dt>
+<dd>Cada arquivo que exporta alguma coisa e pode ser importado por outro.</dd>
+<dt>página</dt>
+<dd>O componente que representa uma tela inteira: <code>Cardapio.jsx</code>,
+<code>Encomendas.jsx</code>.</dd>
+<dt>hook</dt>
+<dd>Função que usa estado ou efeito e começa com <code>use</code>: <code>useEncomendas.js</code>.</dd>
+<dt>alias</dt>
+<dd>Um apelido de caminho, como <code>@</code>, que aponta sempre para a mesma pasta.</dd>
+<dt>asset</dt>
+<dd>Um arquivo que não é código: imagem, fonte, ícone. Passa pelo build quando está em
+<code>src</code>.</dd>
+<dt>barrel</dt>
+<dd>Um <code>index.js</code> que reexporta os irmãos da pasta para encurtar imports.</dd>
+</dl>
+
+<p>Para o projeto da Ana, a divisão por tipo resolve. O mapa fica assim:</p>
+
+<pre class="file" data-file="estrutura">padaria/
+├── public/
+│   ├── favicon.svg
+│   └── robots.txt
+├── src/
+│   ├── assets/
+│   │   └── pao.jpg
+│   ├── components/
+│   │   ├── Botao.jsx
+│   │   └── Cabecalho.jsx
+│   ├── hooks/
+│   │   └── useEncomendas.js
+│   ├── lib/
+│   │   └── formatarData.js
+│   ├── pages/
+│   │   ├── Cardapio.jsx
+│   │   └── Encomendas.jsx
+│   ├── styles/
+│   │   └── global.css
+│   ├── App.jsx
+│   └── main.jsx
+├── package.json
+└── vite.config.js</pre>
+
+<p>Falta combinar o que <em>não</em> pertence ao código. <code>node_modules</code> é depósito do npm e não
+vai para o Git. <code>dist</code> é resultado do build e não vai para o Git — ele é gerado de novo a cada
+publicação. Arquivos <code>.env</code> com valores locais não vão para o Git. E nada disso deve ficar
+dentro de <code>src</code>, porque <code>src</code> é o que você escreve, não o que a ferramenta gera.</p>
+
+<pre class="file" data-file=".gitignore">node_modules
+dist
+.env.local
+*.log</pre>
+
+<p>O <code>.gitignore</code> do template do Vite já vem com <code>node_modules</code> e
+<code>dist</code>. Acrescentar <code>.env.local</code> e arquivos de log é o ajuste que quase todo projeto
+precisa. E vale conferir de vez em quando: um <code>dist</code> versionado por engano faz o repositório
+crescer sem parar e esconde o fato de que o build está sendo gerado.</p>
+
+<p>O que <em>pode</em> ficar na raiz: <code>README.md</code>, <code>.gitignore</code>,
+<code>index.html</code>, <code>package.json</code>, <code>vite.config.js</code>, <code>jsconfig.json</code>
+e as pastas <code>public</code> e <code>src</code>. Se uma pasta nova aparecer na raiz, pergunte a que
+ferramenta ela pertence — se a resposta for "a nenhuma", o lugar dela provavelmente é
+<code>src</code>.</p>
+
+
+<p>Repare no que está na raiz e no que está dentro de <code>src</code>. Na raiz ficam os arquivos que
+configuram o projeto e a pasta pública. Dentro de <code>src</code> fica o código que vira o site. Essa
+separação é o primeiro filtro: se o arquivo é código de aplicação, é <code>src</code>; se é configuração,
+imagem pública ou documentação, é raiz.</p>
+
+<h2>3. components e pages</h2>
+
+<p>Um <strong>componente</strong> é uma peça que pode aparecer em qualquer lugar: o botão, o cabeçalho, o
+cartão de pão. Uma <strong>página</strong> é a tela inteira de uma rota: o cardápio, as encomendas, o
+contato. A distinção parece óbvia e economiza muita confusão, porque as duas coisas se parecem no código —
+as duas são funções que devolvem JSX.</p>
+
+<p>O critério é o que a peça conhece. Um componente recebe props e não sabe onde está sendo usado. Uma
+página conhece os dados da tela, chama as peças e monta o layout. Se você tem dificuldade de decidir,
+pergunte: "isso aparece em duas telas?". Se sim, é componente. Se só existe em uma, é página.</p>
+
+<div class="tryreact" data-goal="conta:li=9;;texto:Botao.jsx;;texto:useEncomendas.js">
+  <p class="try-task">A árvore mostra só o primeiro nível: os filhos das pastas não aparecem. Faça o
+  componente <code>No</code> desenhar os filhos chamando a si mesmo — a árvore precisa ter nove itens e
+  mostrar <code>Botao.jsx</code> e <code>useEncomendas.js</code>.</p>
+  <pre class="jsx">const arvore = {
+  nome: "src",
+  tipo: "pasta",
+  filhos: [
+    {
+      nome: "components",
+      tipo: "pasta",
+      filhos: [
+        { nome: "Botao.jsx", tipo: "arquivo" },
+        { nome: "Cabecalho.jsx", tipo: "arquivo" }
+      ]
+    },
+    {
+      nome: "hooks",
+      tipo: "pasta",
+      filhos: [{ nome: "useEncomendas.js", tipo: "arquivo" }]
+    },
+    {
+      nome: "pages",
+      tipo: "pasta",
+      filhos: [{ nome: "Cardapio.jsx", tipo: "arquivo" }]
+    },
+    { nome: "App.jsx", tipo: "arquivo" }
+  ]
+};
+
+function No({ item }) {
+  return (
+    &lt;li className={item.tipo}&gt;
+      {item.nome}
+      {item.filhos &amp;&amp; (
+        &lt;ul&gt;
+          {item.filhos.map((filho) =&gt; (
+            &lt;li key={filho.nome}&gt;{filho.nome}&lt;/li&gt;
+          ))}
+        &lt;/ul&gt;
+      )}
+    &lt;/li&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;ul className="arvore"&gt;
+      &lt;No item={arvore} /&gt;
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul class="arvore"&gt;
+  &lt;li class="pasta"&gt;
+    src
+    &lt;ul&gt;
+      &lt;li&gt;components&lt;/li&gt;
+      &lt;li&gt;hooks&lt;/li&gt;
+      &lt;li&gt;pages&lt;/li&gt;
+      &lt;li&gt;App.jsx&lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">const arvore = {
+  nome: "src",
+  tipo: "pasta",
+  filhos: [
+    {
+      nome: "components",
+      tipo: "pasta",
+      filhos: [
+        { nome: "Botao.jsx", tipo: "arquivo" },
+        { nome: "Cabecalho.jsx", tipo: "arquivo" }
+      ]
+    },
+    {
+      nome: "hooks",
+      tipo: "pasta",
+      filhos: [{ nome: "useEncomendas.js", tipo: "arquivo" }]
+    },
+    {
+      nome: "pages",
+      tipo: "pasta",
+      filhos: [{ nome: "Cardapio.jsx", tipo: "arquivo" }]
+    },
+    { nome: "App.jsx", tipo: "arquivo" }
+  ]
+};
+
+function No({ item }) {
+  return (
+    &lt;li className={item.tipo}&gt;
+      {item.nome}
+      {item.filhos &amp;&amp; (
+        &lt;ul&gt;
+          {item.filhos.map((filho) =&gt; (
+            &lt;No key={filho.nome} item={filho} /&gt;
+          ))}
+        &lt;/ul&gt;
+      )}
+    &lt;/li&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;ul className="arvore"&gt;
+      &lt;No item={arvore} /&gt;
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p>O componente que se chama a si mesmo é a forma natural de desenhar uma árvore: cada nó sabe desenhar o
+seu nome e delega os filhos para outro nó igual a ele. A <code>key</code> continua sendo o nome, e a
+condição <code>item.filhos &amp;&amp; ...</code> evita o <code>ul</code> vazio nos arquivos. É o mesmo
+padrão que aparece em menu lateral, comentários com respostas e qualquer estrutura em níveis.</p>
+
+<p>Na prática, o que muda de <code>components</code> para <code>pages</code> é a responsabilidade. A
+página pode importar da pasta de componentes, mas o componente nunca importa da pasta de páginas — se
+importar, você criou um ciclo e o mapa perde o sentido. Essa direção única é a regra que mantém o projeto
+legível.</p>
+
+<h2>4. hooks e lib</h2>
+
+<p>Nem tudo é componente. A lógica que usa estado e efeito e é reaproveitada por mais de uma tela vira um
+<strong>hook</strong>, numa pasta com esse nome, e o arquivo começa com <code>use</code>:
+<code>useEncomendas.js</code>, <code>useCardapio.js</code>. O prefixo não é enfeite: é o que permite ao
+React (e ao lint) reconhecer que ali dentro existem hooks e aplicar as regras deles.</p>
+
+<pre class="file" data-file="src/hooks/useEncomendas.js">import { useEffect, useState } from "react";
+
+export function useEncomendas() {
+  const [encomendas, setEncomendas] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() =&gt; {
+    let ativo = true;
+
+    fetch("/api/encomendas")
+      .then((r) =&gt; r.json())
+      .then((dados) =&gt; {
+        if (ativo) {
+          setEncomendas(dados);
+          setCarregando(false);
+        }
+      });
+
+    return () =&gt; {
+      ativo = false;
+    };
+  }, []);
+
+  return { encomendas, carregando };
+}</pre>
+
+<p>O que não usa estado nem efeito é função pura e vai para <code>lib/</code> (ou <code>utils/</code>, o
+nome é escolha do time): formatar data, calcular total, validar telefone. São as peças mais fáceis de
+testar, porque recebem dados e devolvem dados, sem depender da tela. Uma regra prática: se a função não
+chama hook nenhum, ela não pertence a <code>hooks/</code>.</p>
+
+<p>Colocar essas funções em arquivos próprios tem um efeito colateral bom: você para de copiar a mesma
+conta em três telas. Quando o preço mudar de regra, muda num lugar só. E o teste, quando chegar, não
+precisa de navegador.</p>
+
+<h2>5. src/assets e public: dois lugares para imagens</h2>
+
+<p>Aqui está a confusão que quase todo mundo tem no começo: por que existem duas pastas para guardar
+arquivos? A resposta está no que acontece com eles no build. O que está em <code>src/assets</code> passa
+pelo processo: o Vite lê o arquivo, copia para a saída com um nome novo que inclui um hash do conteúdo e
+devolve a URL final para o seu import. O que está em <code>public</code> é copiado como está, com o mesmo
+nome, e fica acessível pela raiz do site.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>src/assets</code></th><th><code>public</code></th></tr>
+<tr><td>Como se usa</td><td><code>import pao from "./assets/pao.jpg"</code></td><td><code>src="/favicon.svg"</code></td></tr>
+<tr><td>Passa pelo build</td><td>sim: é processado e renomeado com hash</td><td>não: é copiado igual</td></tr>
+<tr><td>Nome final</td><td><code>pao-a1b2c3.jpg</code></td><td><code>favicon.svg</code></td></tr>
+<tr><td>Bom para</td><td>imagens que o código importa e usa em componentes</td><td>favicon, <code>robots.txt</code>, imagem de compartilhamento</td></tr>
+</table>
+</div>
+
+<p>O hash no nome existe por causa do cache do navegador: se o arquivo muda, o nome muda, e o navegador é
+obrigado a baixar de novo. Se o arquivo não muda, o nome fica igual e o cache continua valendo. Já o
+arquivo em <code>public</code> mantém o nome — ótimo para o que precisa de endereço fixo, como
+<code>/favicon.svg</code> e <code>/robots.txt</code>, e arriscado para imagem que muda com frequência,
+porque o navegador pode continuar mostrando a antiga.</p>
+
+<div class="tryreact" data-goal="conta:.build li=2;;conta:.publico li=2">
+  <p class="try-task">As duas listas estão repetindo os quatro arquivos. Separe pelo caminho: quem começa
+  com <code>public/</code> é copiado como está; quem começa com <code>src/assets/</code> passa pelo
+  build. Cada lista precisa ficar com dois itens.</p>
+  <pre class="jsx">const arquivos = [
+  "public/favicon.svg",
+  "src/assets/pao.jpg",
+  "public/robots.txt",
+  "src/assets/logo.svg"
+];
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;passa pelo build&lt;/h2&gt;
+      &lt;ul className="build"&gt;
+        {arquivos.map((a) =&gt; (
+          &lt;li key={a}&gt;{a}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+
+      &lt;h2&gt;copiado como está&lt;/h2&gt;
+      &lt;ul className="publico"&gt;
+        {arquivos.map((a) =&gt; (
+          &lt;li key={a}&gt;{a}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h2&gt;passa pelo build&lt;/h2&gt;
+  &lt;ul class="build"&gt;
+    &lt;li&gt;public/favicon.svg&lt;/li&gt;
+    &lt;li&gt;src/assets/pao.jpg&lt;/li&gt;
+    &lt;li&gt;public/robots.txt&lt;/li&gt;
+    &lt;li&gt;src/assets/logo.svg&lt;/li&gt;
+  &lt;/ul&gt;
+  &lt;h2&gt;copiado como está&lt;/h2&gt;
+  &lt;ul class="publico"&gt;
+    &lt;li&gt;public/favicon.svg&lt;/li&gt;
+    &lt;li&gt;src/assets/pao.jpg&lt;/li&gt;
+    &lt;li&gt;public/robots.txt&lt;/li&gt;
+    &lt;li&gt;src/assets/logo.svg&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const arquivos = [
+  "public/favicon.svg",
+  "src/assets/pao.jpg",
+  "public/robots.txt",
+  "src/assets/logo.svg"
+];
+
+function App() {
+  const doBuild = arquivos.filter((a) =&gt; a.startsWith("src/assets/"));
+  const doPublico = arquivos.filter((a) =&gt; a.startsWith("public/"));
+
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;passa pelo build&lt;/h2&gt;
+      &lt;ul className="build"&gt;
+        {doBuild.map((a) =&gt; (
+          &lt;li key={a}&gt;{a}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+
+      &lt;h2&gt;copiado como está&lt;/h2&gt;
+      &lt;ul className="publico"&gt;
+        {doPublico.map((a) =&gt; (
+          &lt;li key={a}&gt;{a}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Dois filtros, duas listas, e o mesmo array de origem — um padrão que você vai repetir muito. Note que a
+classificação é pelo caminho, e não pelo tipo do arquivo: o mesmo <code>.svg</code> pode estar nos dois
+lados, com comportamentos diferentes no build.</p>
+
+<h2>6. O atalho @ nos imports</h2>
+
+<p>Com pastas, vêm os caminhos relativos. Um componente em <code>src/pages/Cardapio.jsx</code> que
+importa o botão escreve <code>import Botao from "../components/Botao"</code>. Se amanhã esse arquivo mudar
+de pasta, o caminho quebra. Pior: quando o projeto tem quatro níveis, o import vira
+<code>"../../../components/Botao"</code> e ninguém sabe mais onde está.</p>
+
+<p>A solução é um <strong>alias</strong>: um apelido que aponta para uma pasta fixa. Você escreve
+<code>@/components/Botao</code> de qualquer lugar, e a ferramenta resolve para <code>src</code>. São duas
+configurações — uma para o Vite, que monta o site, e outra para o editor, que precisa entender o mesmo
+atalho para não marcar o import como erro.</p>
+
+<pre class="file" data-file="vite.config.js">import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "node:path";
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "src")
+    }
+  }
+});</pre>
+
+<p>O <code>path.resolve(__dirname, "src")</code> transforma o caminho relativo em absoluto, que é o que o
+Vite espera. Para o editor, o mesmo apelido vai num <code>jsconfig.json</code> na raiz — um arquivo só
+com os caminhos, que o VS Code lê:</p>
+
+<pre class="file" data-file="jsconfig.json">{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  }
+}</pre>
+
+<p>Vale a pena? Em projeto com poucas pastas, o relativo resolve. A partir do momento em que você escreve
+três <code>../</code> seguidos, o atalho se paga: o import fica igual em todo lugar, e mover arquivo deixa
+de quebrar caminho. O custo é essa configuração dupla e a surpresa de quem abre o projeto e não encontra
+<code>node_modules/@</code>.</p>
+
+<div class="tryreact" data-goal="texto:src/components/Botao;;texto:src/hooks/useEncomendas;;texto:./App.css">
+  <p class="try-task">A função <code>resolver</code> deveria trocar o prefixo <code>@/</code> por
+  <code>src/</code>, mas está devolvendo o caminho como veio. Corrija para os dois imports com
+  <code>@</code> aparecerem resolvidos — e o relativo <code>./App.css</code> continuar intacto.</p>
+  <pre class="jsx">const imports = [
+  "@/components/Botao",
+  "@/hooks/useEncomendas",
+  "./App.css"
+];
+
+function resolver(caminho) {
+  return caminho;
+}
+
+function App() {
+  return (
+    &lt;ul&gt;
+      {imports.map((i) =&gt; (
+        &lt;li key={i}&gt;
+          {i} → {resolver(i)}
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul&gt;
+  &lt;li&gt;@/components/Botao → @/components/Botao&lt;/li&gt;
+  &lt;li&gt;@/hooks/useEncomendas → @/hooks/useEncomendas&lt;/li&gt;
+  &lt;li&gt;./App.css → ./App.css&lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">const imports = [
+  "@/components/Botao",
+  "@/hooks/useEncomendas",
+  "./App.css"
+];
+
+function resolver(caminho) {
+  if (caminho.startsWith("@/")) {
+    return "src/" + caminho.slice(2);
+  }
+
+  return caminho;
+}
+
+function App() {
+  return (
+    &lt;ul&gt;
+      {imports.map((i) =&gt; (
+        &lt;li key={i}&gt;
+          {i} → {resolver(i)}
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p>O <code>slice(2)</code> corta os dois caracteres do prefixo, e o resto do caminho vem junto. Quem não
+começa com <code>@/</code> volta igual — é o caso do CSS relativo, que continua sendo relativo. Se você
+errar o apelido no projeto de verdade, o Vite responde com uma mensagem bem específica:</p>
+
+<pre class="term">Failed to resolve import "@/components/Botao" from "src/pages/Cardapio.jsx".
+Does the file exist?</pre>
+
+<p>Essa mensagem diz duas coisas úteis: qual import não resolveu e de qual arquivo ele veio. Com o alias
+configurado, ela costuma aparecer quando o caminho tem um erro de maiúscula ou quando a pasta
+<code>src</code> não é a que você pensou.</p>
+
+<h2>7. O index.js que reexporta</h2>
+
+<p>Existe um truque para encurtar imports: um arquivo <code>index.js</code> dentro da pasta que reexporta
+todos os irmãos. Aí <code>import { Botao, Cabecalho } from "@/components"</code> funciona, e você não
+precisa lembrar o nome do arquivo.</p>
+
+<pre class="file" data-file="src/components/index.js">export { Botao } from "./Botao";
+export { Cabecalho } from "./Cabecalho";
+export { CartaoDePao } from "./CartaoDePao";</pre>
+
+<p>O nome desse padrão é <strong>barrel</strong>. Ele tem um custo escondido: o arquivo
+<code>index.js</code> importa todos os componentes da pasta, então quem importa um acaba puxando a lista
+inteira para o grafo de dependências. No desenvolvimento isso quase não aparece; no build, o empacotador
+consegue descartar o que não é usado, mas nem sempre — e o resultado é um pacote maior do que precisava.
+Há também o risco de import circular.</p>
+
+<p>A recomendação prática: barrel é confortável em pastas pequenas e estáveis, e vira armadilha em pastas
+grandes. Se o time já usa, siga; se está começando, importe direto do arquivo — é mais explícito e o
+editor autocompleta de qualquer jeito. O que não vale é ter as duas formas convivendo sem regra.</p>
+
+<h2>8. Nomes, maiúsculas e o Linux que reprova</h2>
+
+<p>O sistema de arquivos do Windows e do macOS, por padrão, não diferencia maiúsculas de minúsculas:
+<code>Botao.jsx</code> e <code>botao.jsx</code> são o mesmo arquivo. O Linux do servidor diferencia. O
+resultado é um clássico: funciona na máquina da Ana e quebra no build, com a mensagem "Could not resolve
+... from ...". O culpado é um import escrito com minúscula.</p>
+
+<p>Por isso a convenção não é decoração: componente em <code>PascalCase</code> e arquivo com o mesmo nome
+do componente (<code>Botao.jsx</code> exporta <code>Botao</code>), hook começando com <code>use</code> e
+o resto em <code>camelCase</code>. O import tem de repetir o nome exato, letra por letra.</p>
+
+<pre class="term">$ npm run build
+
+vite v7.1.0 building for production...
+✓ 34 modules transformed.
+✗ Build failed in 812ms
+error during build:
+Could not resolve "../components/botao" from "src/pages/Cardapio.jsx"</pre>
+
+<p>A mensagem aponta o arquivo que pediu e o caminho que não foi encontrado — e o erro está na letra
+<code>b</code>. No Windows, o mesmo import abria a página sem reclamar; no Linux do build, o arquivo
+<code>botao.jsx</code> simplesmente não existe, porque o sistema diferencia maiúsculas. É o tipo de erro
+que só aparece no servidor, e é por isso que ele assusta: o código "funcionava".</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que é</th><th>Convenção</th><th>Exemplo</th></tr>
+<tr><td>componente</td><td>PascalCase, nome do arquivo igual ao do componente</td><td><code>CartaoDePao.jsx</code></td></tr>
+<tr><td>página</td><td>PascalCase, nome da tela</td><td><code>Cardapio.jsx</code></td></tr>
+<tr><td>hook</td><td>camelCase com prefixo <code>use</code></td><td><code>useEncomendas.js</code></td></tr>
+<tr><td>função utilitária</td><td>camelCase, verbo no nome</td><td><code>formatarData.js</code></td></tr>
+<tr><td>estilo</td><td>mesmo nome do componente</td><td><code>Botao.module.css</code></td></tr>
+<tr><td>teste</td><td>ao lado do arquivo testado</td><td><code>Botao.test.jsx</code></td></tr>
+</table>
+</div>
+
+<p>Teste ao lado do componente é outra escolha que vale explicar: manter <code>Botao.test.jsx</code> na
+mesma pasta de <code>Botao.jsx</code> faz o teste ser movido junto, renomeado junto e encontrado junto.
+Uma pasta <code>tests</code> espelhando <code>src</code> também funciona, e é preferida por quem gosta de
+ver a árvore de código limpa. Qualquer uma serve, desde que seja consistente.</p>
+
+<p>Um detalhe que se torna hábito: ao criar um componente, crie o arquivo com o nome já em PascalCase e
+importe-o imediatamente. O editor completa o caminho, e você nunca escreve o nome à mão — o que elimina
+99% dos erros de maiúscula.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o componente que importa a página</h3>
+<p>Para mostrar uma prévia do cardápio dentro do cabeçalho, a Ana importou
+<code>Cardapio.jsx</code> no <code>Cabecalho.jsx</code>. Funcionou até o cardápio importar o cabeçalho de
+volta: o Vite passou a avisar de import circular, e a página começou a renderizar pela metade. O caminho
+é sempre descer: página importa componente, componente não importa página.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a imagem que não atualiza</h3>
+<p>Ela trocou a foto do pão em <code>public/pao.jpg</code> e o navegador continuou mostrando a antiga. Como
+o arquivo em <code>public</code> mantém o nome, o cache não teve motivo para baixar de novo. A solução foi
+mover a foto para <code>src/assets</code>, onde o build gera um nome com hash — mudou o conteúdo, mudou o
+nome, mudou o cache.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: funciona no notebook, quebra no build</h3>
+<p>O import dizia <code>"../components/botao"</code>, com minúscula, e no Windows abria normalmente. No
+Linux da hospedagem, o build parou com "Could not resolve". O conserto foi renomear o import para
+<code>"../components/Botao"</code>. Para não repetir o susto, ela passou a criar o arquivo e o import pelo
+autocompletar do editor.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Qual é a diferença entre <code>pages</code> e <code>components</code>?</p>
+<label><input type="radio" name="q1"> páginas são arquivos maiores e componentes são menores</label>
+<label><input type="radio" name="q1"> página é a tela de uma rota; componente é peça reaproveitável</label>
+<label><input type="radio" name="q1"> componentes usam estado e páginas não</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que acontece com uma imagem em <code>src/assets</code> no build?</p>
+<label><input type="radio" name="q2"> é copiada com o mesmo nome para a raiz do site</label>
+<label><input type="radio" name="q2"> é ignorada, porque imagens não passam pelo build</label>
+<label><input type="radio" name="q2"> é processada e renomeada com um hash do conteúdo</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Por que o import com maiúscula errada funciona em casa e falha no servidor?</p>
+<label><input type="radio" name="q3"> porque o Linux diferencia maiúsculas e o Windows não</label>
+<label><input type="radio" name="q3"> porque o Vite renomeia arquivos no build</label>
+<label><input type="radio" name="q3"> porque o Node tem uma lista de nomes reservados</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o atalho do projeto</h2>
+<p>Complete a configuração do Vite para que <code>@</code> aponte para a pasta <code>src</code>:</p>
+<div class="ex-code">resolve: { alias: { "@": path.resolve(__dirname, "<input aria-label="resposta 1" data-answer="src" placeholder="...">") } }</div>
+<p class="ex-dica">Dica: é o nome da pasta onde fica o código — a mesma que aparece nos caminhos dos
+componentes. Sem aspas, o JavaScript procuraria uma variável com esse nome.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Estrutura é uma decisão sobre onde as coisas moram, e existem duas formas de agrupar: por tipo ou por
+assunto. Projetos pequenos e médios vivem bem por tipo — <code>components</code>, <code>pages</code>,
+<code>hooks</code>, <code>lib</code>, <code>styles</code> —, e a regra de ouro é a direção dos imports:
+página importa componente, componente nunca importa página.</p>
+
+<p>Imagens têm dois destinos: <code>src/assets</code> passa pelo build, ganha hash e é importada no
+código; <code>public</code> é copiado como está e é referenciado por URL. O atalho <code>@</code> substitui
+os <code>../</code> e exige configuração no Vite e no editor. Barrels encurtam imports e custam peso no
+pacote; use com parcimônia.</p>
+
+<p>E o detalhe que derruba build: nomes de arquivo seguem a convenção, e o import repete o nome exato. O
+Linux do servidor diferencia maiúsculas, o Windows da sua máquina não. Com o mapa arrumado, o projeto está
+pronto para receber os comandos do dia a dia — e é sobre eles, os scripts do <code>package.json</code>,
+que trata a próxima aula.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Duas formas de agrupar: por tipo ou por assunto. Escolha uma e mantenha.</li>
+<li>Página é tela; componente é peça. Página importa componente, nunca o contrário.</li>
+<li>Lógica com estado e efeito: <code>hooks/</code>, arquivo começando com <code>use</code>.</li>
+<li>Função pura: <code>lib/</code> (ou <code>utils/</code>), sem hook nenhum.</li>
+<li><code>src/assets</code> passa pelo build e ganha hash; <code>public</code> é copiado igual.</li>
+<li><code>@</code> é alias: configure em <code>vite.config.js</code> e no <code>jsconfig.json</code>.</li>
+<li>Barrel (<code>index.js</code>) encurta import e pode engordar o pacote.</li>
+<li>Componente em PascalCase; hook com <code>use</code>; import com o nome exato.</li>
+<li>Linux diferencia maiúsculas: <code>Botao.jsx</code> ≠ <code>botao.jsx</code>.</li>
+<li><code>node_modules</code>, <code>dist</code> e <code>.env.local</code> ficam fora do Git.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Layout com Rotas | Guia React</title>
+<meta name="description" content="Layout com rotas no React: por que o topo dentro de cada página remonta, como receber a página por children, layouts aninhados e o que um layout não deve fazer.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Layout com <span class="hl">Rotas</span></h1>
+<p class="intro">A Ana percebeu um detalhe no site: o cliente digita "sonho" na busca do topo, clica em
+"Cardápio" e o campo esvazia. O topo não sumiu — ele foi <strong>recriado</strong>, porque estava dentro
+de cada página. Nesta aula ela separa a moldura do site do conteúdo das rotas: o topo, o menu e o rodapé
+ficam montados uma vez só, e só a área do meio troca quando o caminho muda.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um layout em uma aplicação com rotas e por que ele existe.</li>
+  <li>Por que o topo dentro de cada página perde o estado a cada navegação.</li>
+  <li>Como receber a página por <code>children</code> e deixar o layout sem conhecer as rotas.</li>
+  <li>Como aninhar layouts para uma seção com sub-navegação própria.</li>
+  <li>O que um layout não deve fazer: buscar os dados da página, guardar o estado dela ou levar
+  <code>key</code> por caminho.</li>
+  <li>O que muda no desempenho quando a moldura fica montada.</li>
+  <li>Onde ficam as rotas quando o layout é só a moldura.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o campo de busca que esvazia</h2>
+
+<p>O site da Ana tem uma barra no topo com o nome da padaria e um campo de busca. Ele aparece na vitrine,
+no cardápio e no contato. Acontece que o campo está escrito dentro de cada uma das três páginas — a Ana
+copiou e colou, como fazia no tempo do HTML puro. Funciona, até o cliente digitar alguma coisa e navegar:
+o texto desaparece.</p>
+
+<p>Não é um bug do campo, e sim do lugar onde ele mora. Cada página tem o seu próprio campo, com o seu
+próprio estado. Quando o cliente troca de página, o React tira a página antiga da tela (desmonta) e monta
+a nova. O campo novo nasce vazio, porque nada do antigo sobreviveu. Na cabeça do cliente, é "o site
+esqueceu o que eu digitei".</p>
+
+<p>A solução é a mesma ideia que abriu o guia, aplicada um nível acima: em vez de repetir o topo em cada
+página, escreva <strong>um</strong> topo e coloque as páginas <em>dentro</em> dele. O topo passa a ser o
+que fica; o que muda é só a área do conteúdo. Esse arranjo tem nome: o <strong>layout</strong> (ou
+moldura, ou shell) da aplicação.</p>
+
+<p>E o ganho não é só o campo de busca. Um layout montado uma vez significa menos trabalho para o
+navegador a cada navegação, menos requisições se ele carrega algo, e um lugar óbvio para o que é comum a
+todas as páginas: cabeçalho, menu, rodapé, aviso de cookies.</p>
+
+<h2>2. O que é um layout, na prática</h2>
+
+<p>Um layout é um componente que desenha a moldura e reserva um espaço para o conteúdo. Ele não sabe qual
+página está ali: recebe o conteúdo pronto pela prop <code>children</code> e o coloca no lugar certo. Quem
+decide qual é o conteúdo é o componente de cima, o mesmo que guarda a rota atual. A ideia de compor telas
+com pedaços assim é a mesma de <a href="componentes-de-layout.html">componentes de layout</a>.</p>
+
+<dl class="anatomy">
+<dt>layout</dt>
+<dd>O componente que desenha o que é comum a várias rotas: topo, menu, rodapé, largura da página.</dd>
+<dt>children</dt>
+<dd>A prop que carrega o conteúdo passado entre as tags do componente. É o encaixe do layout.</dd>
+<dt>moldura</dt>
+<dd>Outro nome para o layout. Ajuda a lembrar: moldura fica, quadro troca.</dd>
+<dt>layout aninhado</dt>
+<dd>Um layout dentro do outro: a moldura do site e, dentro dela, a moldura de uma seção com a sua
+sub-navegação.</dd>
+<dt>remontar</dt>
+<dd>Tirar o componente da tela e criar de novo. O estado volta ao inicial e os efeitos rodam outra vez.</dd>
+</dl>
+
+<p>A distinção que resolve a aula inteira: <strong>renderizar de novo</strong> é barato e normal — o
+componente é chamado, compara o que mudou e segue; <strong>remontar</strong> é caro — o componente é
+destruído e recriado, com estado zerado e efeitos disparando de novo. Um layout bem colocado pode
+renderizar a cada navegação; o que não pode é remontar.</p>
+
+<p>Nos roteadores de verdade, esse arranjo costuma aparecer de duas formas: uma rota "pai" que desenha o
+layout e um <code>&lt;Outlet /&gt;</code> no lugar do conteúdo, ou o layout envolvendo as rotas filhas
+como <code>children</code>. As duas ideias são a mesma: a moldura fica acima da troca de páginas.</p>
+
+<h2>3. O topo dentro de cada página remonta</h2>
+
+<p>Na caixa, o topo mora dentro de <code>Vitrine</code> e dentro de <code>Cardapio</code>. Digite algo no
+campo e clique em <strong>Cardápio</strong>: o caminho muda, o conteúdo muda e o campo volta vazio. O
+painel mostra o valor do campo, então a perda fica visível.</p>
+
+<div class="tryreact" data-goal="digite:#busca=pão;;clique:#ir-paes;;attr:#busca|value=pão;;texto:pão de queijo no cardápio">
+  <p class="try-task">O <code>Topo</code> está repetido nas duas páginas e remonta a cada navegação. Suba o
+  <code>&lt;Topo /&gt;</code> para o <code>App</code>, acima da troca de páginas, e apague das páginas.
+  Depois digite <strong>pão</strong> no campo e clique em Cardápio.</p>
+  <pre class="jsx">function Topo() {
+  const [busca, setBusca] = useState("");
+  return (
+    &lt;header&gt;
+      &lt;p&gt;Padaria da Ana&lt;/p&gt;
+      &lt;input id="busca" value={busca} onChange={(e) =&gt; setBusca(e.target.value)} /&gt;
+    &lt;/header&gt;
+  );
+}
+
+function Vitrine() {
+  return (
+    &lt;div&gt;
+      &lt;Topo /&gt;
+      &lt;p&gt;pães quentinhos na vitrine&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function Cardapio() {
+  return (
+    &lt;div&gt;
+      &lt;Topo /&gt;
+      &lt;p&gt;pão de queijo no cardápio&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const [caminho, setCaminho] = useState("/");
+
+  return (
+    &lt;div&gt;
+      &lt;button id="ir-paes" onClick={() =&gt; setCaminho("/paes")}&gt;Cardápio&lt;/button&gt;
+      {caminho === "/" ? &lt;Vitrine /&gt; : &lt;Cardapio /&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="ir-paes"&gt;Cardápio&lt;/button&gt;
+  &lt;div&gt;
+    &lt;header&gt;
+      &lt;p&gt;Padaria da Ana&lt;/p&gt;
+      &lt;input id="busca" value=""&gt;
+    &lt;/header&gt;
+    &lt;p&gt;pães quentinhos na vitrine&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Topo() {
+  const [busca, setBusca] = useState("");
+  return (
+    &lt;header&gt;
+      &lt;p&gt;Padaria da Ana&lt;/p&gt;
+      &lt;input id="busca" value={busca} onChange={(e) =&gt; setBusca(e.target.value)} /&gt;
+    &lt;/header&gt;
+  );
+}
+
+function Vitrine() {
+  return &lt;p&gt;pães quentinhos na vitrine&lt;/p&gt;;
+}
+
+function Cardapio() {
+  return &lt;p&gt;pão de queijo no cardápio&lt;/p&gt;;
+}
+
+function App() {
+  const [caminho, setCaminho] = useState("/");
+
+  return (
+    &lt;div&gt;
+      &lt;Topo /&gt;
+      &lt;button id="ir-paes" onClick={() =&gt; setCaminho("/paes")}&gt;Cardápio&lt;/button&gt;
+      {caminho === "/" ? &lt;Vitrine /&gt; : &lt;Cardapio /&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel depois do clique mostra o que interessa: o campo vale <code>pão</code> e o cardápio está no
+lugar do conteúdo. O <code>Topo</code> não foi recriado, porque nada mudou na posição dele na árvore — o
+React só trocou o filho que veio depois do botão.</p>
+
+<p>A regra que se extrai daqui é curta: um componente perde o estado quando sai da tela. Se um estado
+precisa sobreviver à navegação, ele tem de morar acima da troca de páginas. Isso vale para o campo de
+busca do topo, para a aba aberta do menu, para o carrinho aberto — tudo o que deveria continuar igual
+enquanto o cliente navega.</p>
+
+<h2>4. A página como <code>children</code></h2>
+
+<p>Subir o topo resolve o campo de busca, mas não resolve o próximo problema: agora o
+<code>App</code> conhece o topo, a troca de páginas e os botões. Se a padaria crescer para dez páginas,
+esse componente vira um emaranhado. A solução é separar a moldura em um componente próprio, que recebe o
+conteúdo por <code>children</code>.</p>
+
+<p>O desenho fica assim: o <code>App</code> guarda o caminho, escolhe a página e monta a árvore
+<code>&lt;Layout&gt;&lt;Pagina /&gt;&lt;/Layout&gt;</code>. O <code>Layout</code> só sabe que precisa
+desenhar um cabeçalho, um <code>&lt;main&gt;</code> e um rodapé, e que o conteúdo vai dentro do
+<code>main</code>. Ele não importa nenhuma página e não conhece nenhum caminho.</p>
+
+<div class="tryreact" data-goal="clique:#ir-contato;;texto:fale com a Ana pelo balcão;;texto:Padaria da Ana">
+  <p class="try-task">O <code>Layout</code> conhece as rotas com uma lista de <code>if</code>, e a página de
+  contato ficou de fora: ela não aparece. Troque a prop <code>caminho</code> por <code>children</code> e
+  deixe o <code>App</code> escolher a página. Depois clique em Contato.</p>
+  <pre class="jsx">function Vitrine() {
+  return &lt;p&gt;pães quentinhos na vitrine&lt;/p&gt;;
+}
+
+function Cardapio() {
+  return &lt;p&gt;pão de queijo no cardápio&lt;/p&gt;;
+}
+
+function Contato() {
+  return &lt;p&gt;fale com a Ana pelo balcão&lt;/p&gt;;
+}
+
+function Layout({ caminho }) {
+  return (
+    &lt;div&gt;
+      &lt;header&gt;
+        &lt;p&gt;Padaria da Ana&lt;/p&gt;
+      &lt;/header&gt;
+      &lt;main&gt;
+        {caminho === "/" &amp;&amp; &lt;Vitrine /&gt;}
+        {caminho === "/paes" &amp;&amp; &lt;Cardapio /&gt;}
+      &lt;/main&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const [caminho, setCaminho] = useState("/");
+
+  return (
+    &lt;div&gt;
+      &lt;button id="ir-contato" onClick={() =&gt; setCaminho("/contato")}&gt;Contato&lt;/button&gt;
+      &lt;Layout caminho={caminho} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="ir-contato"&gt;Contato&lt;/button&gt;
+  &lt;div&gt;
+    &lt;header&gt;
+      &lt;p&gt;Padaria da Ana&lt;/p&gt;
+    &lt;/header&gt;
+    &lt;main&gt;
+      &lt;p&gt;pães quentinhos na vitrine&lt;/p&gt;
+    &lt;/main&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Vitrine() {
+  return &lt;p&gt;pães quentinhos na vitrine&lt;/p&gt;;
+}
+
+function Cardapio() {
+  return &lt;p&gt;pão de queijo no cardápio&lt;/p&gt;;
+}
+
+function Contato() {
+  return &lt;p&gt;fale com a Ana pelo balcão&lt;/p&gt;;
+}
+
+function Layout({ children }) {
+  return (
+    &lt;div&gt;
+      &lt;header&gt;
+        &lt;p&gt;Padaria da Ana&lt;/p&gt;
+      &lt;/header&gt;
+      &lt;main&gt;{children}&lt;/main&gt;
+    &lt;/div&gt;
+  );
+}
+
+const PAGINAS = { "/": Vitrine, "/paes": Cardapio, "/contato": Contato };
+
+function App() {
+  const [caminho, setCaminho] = useState("/");
+  const Pagina = PAGINAS[caminho] || Vitrine;
+
+  return (
+    &lt;div&gt;
+      &lt;button id="ir-contato" onClick={() =&gt; setCaminho("/contato")}&gt;Contato&lt;/button&gt;
+      &lt;Layout&gt;
+        &lt;Pagina /&gt;
+      &lt;/Layout&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel do código inicial mostra o <code>&lt;main&gt;</code> vazio depois do clique: o caminho é
+<code>/contato</code>, nenhuma das duas condições casou e o layout não tinha o que desenhar. Depois da
+missão, o mesmo clique mostra a frase do contato dentro do <code>main</code> — e, se amanhã a Ana criar a
+página de promoções, basta acrescentar uma linha no mapa de páginas. O <code>Layout</code> não muda.</p>
+
+<p>Essa é a vantagem prática do <code>children</code>: o layout não precisa crescer quando o site cresce.
+Quem conhece as rotas é um lugar só — o mapa <code>PAGINAS</code> —, e o layout é uma peça de
+apresentação, do mesmo tipo que você viu na aula de composição. Moldura e conteúdo evoluem separados.</p>
+
+<h2>5. Layouts aninhados</h2>
+
+<p>Quando uma seção tem páginas próprias, ela merece um layout próprio. As encomendas da Ana têm duas
+abas — novas e prontas — e um cabeçalho de seção com o total do dia. Esse cabeçalho pertence à seção, não
+ao site; e, como o topo, ele não pode remontar quando o cliente troca de aba.</p>
+
+<p>Na caixa, o <code>SubTopo</code> está dentro de cada aba e conta as montagens. O contador usa
+<code>useState</code> com uma função de inicialização, que roda só na primeira vez — é o jeito de contar
+montagens sem criar um laço. Clique em <strong>Prontas</strong> e veja o número subir para 2: o submold
+antigo saiu e outro nasceu.</p>
+
+<div class="tryreact" data-goal="clique:#ir-prontas;;texto:sub-topo montado 1 vez;;texto:encomendas prontas">
+  <p class="try-task">O <code>SubTopo</code> mora dentro de cada aba e remonta na troca. Crie
+  <code>SecaoEncomendas</code>, que desenha o <code>SubTopo</code> e recebe a aba por
+  <code>children</code>; no <code>App</code>, envolva a aba escolhida com ela. Depois clique em
+  Prontas.</p>
+  <pre class="jsx">let montagensSub = 0;
+
+function SubTopo() {
+  const [id] = useState(() =&gt; {
+    montagensSub = montagensSub + 1;
+    return montagensSub;
+  });
+  return &lt;p&gt;sub-topo montado {id} vez(es)&lt;/p&gt;;
+}
+
+function Novas() {
+  return (
+    &lt;div&gt;
+      &lt;SubTopo /&gt;
+      &lt;p&gt;encomendas novas&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function Prontas() {
+  return (
+    &lt;div&gt;
+      &lt;SubTopo /&gt;
+      &lt;p&gt;encomendas prontas&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const [aba, setAba] = useState("novas");
+
+  return (
+    &lt;div&gt;
+      &lt;button id="ir-prontas" onClick={() =&gt; setAba("prontas")}&gt;Prontas&lt;/button&gt;
+      {aba === "novas" ? &lt;Novas /&gt; : &lt;Prontas /&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="ir-prontas"&gt;Prontas&lt;/button&gt;
+  &lt;div&gt;
+    &lt;p&gt;sub-topo montado 1 vez(es)&lt;/p&gt;
+    &lt;p&gt;encomendas novas&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">let montagensSub = 0;
+
+function SubTopo() {
+  const [id] = useState(() =&gt; {
+    montagensSub = montagensSub + 1;
+    return montagensSub;
+  });
+  return &lt;p&gt;sub-topo montado {id} vez(es)&lt;/p&gt;;
+}
+
+function Novas() {
+  return &lt;p&gt;encomendas novas&lt;/p&gt;;
+}
+
+function Prontas() {
+  return &lt;p&gt;encomendas prontas&lt;/p&gt;;
+}
+
+function SecaoEncomendas({ children }) {
+  return (
+    &lt;section&gt;
+      &lt;SubTopo /&gt;
+      {children}
+    &lt;/section&gt;
+  );
+}
+
+function App() {
+  const [aba, setAba] = useState("novas");
+
+  return (
+    &lt;div&gt;
+      &lt;button id="ir-prontas" onClick={() =&gt; setAba("prontas")}&gt;Prontas&lt;/button&gt;
+      &lt;SecaoEncomendas&gt;
+        {aba === "novas" ? &lt;Novas /&gt; : &lt;Prontas /&gt;}
+      &lt;/SecaoEncomendas&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel do código inicial já mostra o problema sem clique: o <code>SubTopo</code> aparece com o
+número 1, porque é a primeira montagem. Depois do clique, o mesmo painel do código antigo mostraria 2. Na
+solução, o número fica em 1 e a frase "encomendas prontas" aparece — a seção inteira continuou no lugar,
+só a aba trocou.</p>
+
+<p>Repare na forma da solução: a seção recebe <code>children</code> e desenha o <code>SubTopo</code> antes
+deles. Se a padaria tiver uma terceira aba, nada muda; se a seção precisar de um botão "atualizar", ele
+mora ali e não é recriado a cada troca de aba. É o mesmo padrão do layout do site, um nível abaixo — e é
+por isso que esse arranjo é chamado de aninhado: um layout dentro do outro, cada um dono do seu pedaço.</p>
+
+<h2>6. O que o layout não deve fazer</h2>
+
+<p>O primeiro erro é guardar no layout um estado que pertence à página. A posição do scroll da lista, a
+aba selecionada dentro de um painel, o texto do formulário de contato: se estiver no layout, sobrevive à
+navegação e aparece na página errada depois. A pergunta é sempre "esse estado deve sobreviver a uma troca
+de página?" — se a resposta é não, ele mora na página.</p>
+
+<p>O segundo é buscar no layout os dados da página. Acontece quando o layout começa a crescer: ele busca
+os pães para mostrar a contagem no menu, busca os pedidos para o aviso, busca o perfil para o avatar. Cada
+navegação passa a disparar uma rodada de pedidos que nada tem a ver com o conteúdo que o cliente quer ver.
+Dados da moldura ficam na moldura; dados da página, na página.</p>
+
+<p>O terceiro é o <code>key</code>. Escrever <code>&lt;Layout key={caminho}&gt;</code> parece inofensivo e
+é a forma mais rápida de remontar a moldura inteira a cada navegação: mudar a <code>key</code> diz ao React
+"isto é outro componente". O campo de busca esvazia, o menu fecha, os efeitos rodam de novo. Se você
+precisa remontar de propósito — para zerar um formulário ao trocar de registro, por exemplo — use a
+<code>key</code> no componente certo, não na moldura.</p>
+
+<p>O quarto é deixar o layout decidir qual é a página. Enquanto ele tiver a lista de caminhos, cada página
+nova exige mexer em dois lugares. O layout desenha a moldura; quem escolhe o conteúdo é quem sabe qual é a
+rota — o componente que guarda o caminho.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sintoma</th><th>Causa provável</th><th>Conserto</th></tr>
+<tr><td>o campo do topo esvazia ao navegar</td><td>o estado mora dentro da página</td><td>subir o componente (ou o estado) para o layout</td></tr>
+<tr><td>página nova não aparece</td><td>o layout tem a lista de caminhos</td><td><code>children</code> + mapa de rotas fora do layout</td></tr>
+<tr><td>o menu fecha sozinho a cada clique</td><td><code>key={caminho}</code> no layout</td><td>tirar a <code>key</code> da moldura</td></tr>
+<tr><td>duas buscas iguais na aba Network</td><td>dado da página buscado no layout</td><td>mover a busca para a página</td></tr>
+</table>
+</div>
+
+<pre class="term">montou o topo (1)
+montou o topo (2)
+montou o topo (3)</pre>
+
+<p>O console acima é o que a Ana viu ao instrumentar o <code>Topo</code> com um contador de montagens
+enquanto ele estava dentro das páginas: um por navegação. Depois de subir o topo para o <code>App</code>,
+o mesmo console mostra uma linha só — e as navegações aparecem como outra coisa:</p>
+
+<pre class="term">montou o topo (1)
+navegou para /paes
+navegou para /contato</pre>
+
+<h2>7. O que muda no desempenho</h2>
+
+<p>Manter a moldura montada economiza trabalho em três frentes. A primeira é a criação de elementos: a
+cada navegação, o React deixa de criar e comparar a árvore do topo, do menu e do rodapé. A segunda são os
+efeitos: um layout com um efeito de "carregar o aviso do dia" não repete o pedido a cada clique. A
+terceira é a memória: cada remontagem cria objetos novos que o coletor de lixo vai ter de varrer.</p>
+
+<p>O ganho não é gigante em um site de quatro páginas — e vale dizer isso com honestidade. Em uma
+aplicação pequena, o motivo para separar o layout é o estado que precisa sobreviver e a organização do
+código, não os milissegundos. O desempenho passa a importar quando a moldura é pesada (um menu grande, um
+avatar com pedidos, um carrinho com contagem) ou quando a navegação é frequente.</p>
+
+<p>Há um custo do outro lado: um layout montado para sempre também guarda estado para sempre. Se ele
+mostra a hora do último pedido, essa hora envelhece enquanto o cliente navega. É por isso que a regra do
+"o que sobrevive" precisa ser pensada de propósito, e não por acidente.</p>
+
+<h2>8. Onde ficam as rotas</h2>
+
+<p>Com o layout separado, cada peça tem um lugar claro. As rotas ficam em um mapa ou uma lista, em um
+arquivo só; o componente que guarda o caminho escolhe a página; o layout desenha a moldura; a página
+desenha o conteúdo. Essa divisão é o que permite trocar o roteador de brinquedo por uma biblioteca sem
+reescrever a moldura.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Peça do site</th><th>Onde mora</th><th>Por quê</th></tr>
+<tr><td>topo, menu, rodapé</td><td>layout do site</td><td>iguais em todas as rotas; não podem remontar</td></tr>
+<tr><td>conteúdo da rota</td><td>página</td><td>é o que troca quando o caminho muda</td></tr>
+<tr><td>sub-navegação de uma seção</td><td>layout da seção</td><td>fica entre a rota e a página da seção</td></tr>
+<tr><td>mapa de caminhos</td><td>um arquivo de rotas</td><td>quem escolhe a página não é o layout</td></tr>
+<tr><td>estado do formulário</td><td>a página</td><td>não deve sobreviver à navegação</td></tr>
+</table>
+</div>
+
+<p>Em uma biblioteca de rotas, essa tabela continua valendo, com outros nomes: o layout vira uma rota pai
+com <code>&lt;Outlet /&gt;</code>, o mapa vira a lista de <code>&lt;Route&gt;</code>, e o layout aninhado
+vira uma rota filha com o seu próprio <code>&lt;Outlet /&gt;</code>. A pergunta "quem é o pai de quem" é a
+mesma que você respondeu nas caixas. E quando o caminho não casa com nenhuma rota, quem responde é a
+página de <a href="rota-404.html">404</a>, que fica fora da moldura ou dentro dela, conforme o desenho do
+site.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o menu lateral fecha a cada navegação</h3>
+<p>O menu mobile guarda aberto/fechado em um estado dentro de cada página. Ao navegar, o menu remonta
+fechado — e o cliente que estava navegando pelo menu tem de abrir de novo. Movendo o estado (ou o próprio
+menu) para o layout, ele continua aberto enquanto o cliente navega; fechar passa a ser uma ação dele, não
+um efeito colateral da navegação.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a página nova abre no meio do texto</h3>
+<p>Sem recarregar, o navegador não zera a rolagem: você clica no rodapé, muda de rota e a página nova
+aparece rolada para baixo. Com o layout fixo o problema fica mais visível, porque só o conteúdo troca. A
+saída é um efeito que rola para o topo quando o caminho muda — o layout é justamente o lugar onde esse
+efeito mora bem.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: duas buscas iguais a cada clique</h3>
+<p>O layout busca o perfil do cliente e a página busca os pedidos; ao navegar, o layout remonta e busca o
+perfil de novo, mesmo que nada tenha mudado. Se o perfil é da moldura, ele fica no layout e é buscado uma
+vez; se é da página, sai do layout. Duas buscas iguais na aba Network é o sintoma clássico de dado no
+lugar errado.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que o layout recebe no lugar do caminho?</p>
+<label><input type="radio" name="q1"> uma lista de rotas</label>
+<label><input type="radio" name="q1"> o conteúdo pela prop <code>children</code></label>
+<label><input type="radio" name="q1"> o objeto <code>location</code> do navegador</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que o campo de busca esvaziava ao navegar?</p>
+<label><input type="radio" name="q2"> porque o <code>onChange</code> estava errado</label>
+<label><input type="radio" name="q2"> porque o React apaga os campos ao trocar de rota</label>
+<label><input type="radio" name="q2"> porque o componente com o estado era remontado a cada navegação</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que <code>&lt;Layout key={caminho}&gt;</code> provoca?</p>
+<label><input type="radio" name="q3"> uma remontagem do layout a cada navegação</label>
+<label><input type="radio" name="q3"> um aviso no console</label>
+<label><input type="radio" name="q3"> nada: a <code>key</code> é ignorada em componentes</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o encaixe da moldura</h2>
+<p>Complete o layout para desenhar o conteúdo que o <code>App</code> passa entre as tags:</p>
+<div class="ex-code">function Layout({ <input aria-label="resposta 1" data-answer="children" placeholder="..."> }) { return &lt;main&gt;{children}&lt;/main&gt;; }</div>
+<p class="ex-dica">Dica: é a prop especial que carrega o que vai entre <code>&lt;Layout&gt;</code> e
+<code>&lt;/Layout&gt;</code>.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Layout é o componente que desenha o que é comum a várias rotas: topo, menu, rodapé. Ele fica acima da
+troca de páginas e recebe o conteúdo por <code>children</code>, então não precisa conhecer nenhum caminho.
+Assim o que é moldura não remonta quando o cliente navega — e o estado que precisa sobreviver (a busca do
+topo, o menu aberto) sobrevive de verdade.</p>
+
+<p>Dentro de uma seção com páginas próprias, o mesmo padrão se repete: um layout da seção, com a
+sub-navegação, envolvendo a sub-página. Cada nível cuida do seu pedaço, e o mapa de rotas fica em um lugar
+só — quem escolhe a página é quem guarda o caminho, nunca o layout.</p>
+
+<p>Evite guardar no layout o estado da página, buscar no layout os dados da página e, principalmente,
+colocar <code>key={caminho}</code> na moldura. O ganho de desempenho existe, mas o motivo principal é
+outro: com a moldura separada, cada peça do site tem um dono claro, e o cliente não perde o que estava
+fazendo só porque clicou em outro link.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Layout desenha a moldura; a página chega por <code>children</code>.</li>
+<li>Componente que sai da tela perde o estado: suba o estado que deve sobreviver.</li>
+<li>Remontar é caro; renderizar de novo é normal.</li>
+<li>O layout não conhece rotas: quem escolhe a página é quem guarda o caminho.</li>
+<li>Layout aninhado: a seção tem o seu próprio <code>children</code> e a sua sub-navegação.</li>
+<li>Estado da página não mora no layout.</li>
+<li><code>key={caminho}</code> no layout remonta a moldura a cada navegação.</li>
+<li>Dados da moldura na moldura; dados da página na página.</li>
+<li>Com a moldura fixa, a rolagem não zera sozinha: um efeito resolve.</li>
+<li>Em bibliotecas de rotas, o layout vira rota pai com <code>&lt;Outlet /&gt;</code>.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

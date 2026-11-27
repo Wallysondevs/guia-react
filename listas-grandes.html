@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Listas Grandes | Guia React</title>
+<meta name="description" content="Listas grandes no React sem travar: por que dois mil itens pesam no DOM, como desenhar só a janela visível, o trilho que mantém a rolagem honesta e quando nem vale otimizar.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Listas <span class="hl">Grandes</span></h1>
+<p class="intro">A Ana cadastrou o catálogo inteiro da padaria no site: dois mil pães, com nome, preço e
+código. A página que lista tudo ficou lenta de um jeito que ela nunca tinha visto — o navegador engasga,
+a digitação atrasa e o rolar parece travado. Nesta aula ela descobre que o problema não é o tamanho do
+array, é o tamanho da tela: o navegador não precisa conhecer dois mil pães, precisa conhecer os doze que
+cabem na janela. E aprende a desenhar só eles, sem perder a barra de rolagem.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que a lista pesada é a do DOM, não a do JavaScript.</li>
+  <li>O que é uma janela e por que ela resolve o problema de dois mil itens.</li>
+  <li>A desenhar só o pedaço visível, com um botão de “mais vinte”.</li>
+  <li>A mover a janela e a manter o trilho de rolagem no tamanho certo.</li>
+  <li>Por que altura fixa simplifica a conta e o que fazer quando as linhas variam.</li>
+  <li>As outras saídas — paginação, carregar mais, rolagem infinita — e quando nenhuma delas vale a pena.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o catálogo que trava a página</h2>
+
+<p>O cadastro da Ana tem dois mil pães. Ela montou a página do catálogo do jeito mais natural do mundo:
+guardou a lista em uma constante e passou um <code>map</code> nela. O código tem quatro linhas, o
+resultado é o esperado — e a página demora quase um segundo para aparecer. No notebook do balcão, que
+já tem cinco abas abertas, demora mais.</p>
+
+<p>O instinto dela foi culpar o JavaScript. Dois mil objetos não são problema para o JavaScript: o
+navegador percorre um array desse tamanho em poucos milissegundos, e a conta de trinta pães é a mesma de
+nunca. O problema está do outro lado do <code>map</code>: cada item vira um elemento no DOM, com tag,
+atributos, texto e um lugar no cálculo de layout. Dois mil elementos são dois mil lugares para o
+navegador medir, posicionar e pintar — e ele faz isso de novo quando qualquer coisa muda.</p>
+
+<p>O sintoma tem uma assinatura. A digitação atrasa, porque cada tecla pode redesenhar a lista inteira.
+O <code>F12</code>, na aba <em>Performance</em>, mostra um borrão roxo de “Recalculate Style” e “Layout”
+ocupando o tempo todo. E o inspetor de elementos demora a abrir, porque está imprimindo dois mil nós.
+Nada disso é culpa do React: uma página em HTML puro com duas mil linhas se comporta igual.</p>
+
+<p>A saída não é desenhar mais rápido, é desenhar menos. A tela tem espaço para doze linhas por vez; o
+resto é rolagem. Se o navegador só precisasse conhecer as doze que estão à vista, ele faria o mesmo
+trabalho de uma lista pequena, por maior que fosse o catálogo. Essa ideia tem nome —
+<strong>janela</strong> — e é a base de tudo o que se faz com listas grandes em React.</p>
+
+<h2>2. O que pesa: o array ou o DOM?</h2>
+
+<p>Antes de mexer no código, vale separar os dois custos, porque quase todo mundo confunde. O array de
+dois mil itens mora na memória: percorrer, filtrar e fatiar custa pouco e não toca na tela. O DOM é a
+árvore de elementos que o navegador mede e pinta: criar um elemento é barato, mas criar dois mil e
+depois recalcular o layout de todos é caro, e esse custo volta a cada atualização.</p>
+
+<dl class="anatomy">
+<dt>nó</dt>
+<dd>Um elemento no DOM. Cada item da lista é um nó — na verdade, dois: o <code>li</code> e o texto
+dentro dele.</dd>
+<dt>layout</dt>
+<dd>A conta que o navegador faz para saber onde cada caixa fica. Refazer com dois mil nós é o que
+engasga.</dd>
+<dt>janela</dt>
+<dd>O pedaço da lista que está visível. Desenhar a janela é desenhar poucos nós, mesmo com uma lista
+enorme.</dd>
+<dt>trilho</dt>
+<dd>Uma caixa do tamanho que a lista inteira teria. É ela que dá à barra de rolagem a proporção
+certa.</dd>
+<dt>virtualização</dt>
+<dd>O nome da técnica: uma janela que se move conforme a rolagem, mantendo o trilho fixo.</dd>
+</dl>
+
+<p>Com essas cinco palavras, a tabela do custo fica fácil de ler. Repare que a linha da janela tem
+custo constante: o número de nós não cresce com o catálogo, cresce com o tamanho da tela — que é o
+mesmo em um celular e em um monitor grande.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que o componente devolve</th><th>O que o navegador cria</th><th>Como o custo cresce</th></tr>
+<tr><td><code>itens.map(...)</code> com 2.000 itens</td><td>2.000 <code>li</code> e 2.000 nós de texto</td><td>com o catálogo inteiro</td></tr>
+<tr><td><code>itens.slice(0, 20).map(...)</code></td><td>20 <code>li</code></td><td>com o tamanho da janela</td></tr>
+<tr><td>janela + trilho</td><td>12 <code>li</code> e uma caixa vazia alta</td><td>com o tamanho da janela</td></tr>
+<tr><td>janela com <code>key={item.id}</code></td><td>os mesmos 12 <code>li</code>, reaproveitados</td><td>com o tamanho da janela</td></tr>
+</table>
+</div>
+
+<p>No console do navegador, com a lista inteira desenhada, a conferência é de duas linhas. A primeira
+conta os <code>li</code> no documento; a segunda mostra que o último deles existe de verdade, e não é
+promessa do array:</p>
+
+<pre class="term">document.querySelectorAll("li").length
+2000
+document.querySelectorAll("li")[1999].textContent
+'Pão número 2000'</pre>
+
+<p>Há uma consequência prática que vale dizer em voz alta: a janela não deixa a <em>busca</em> mais
+rápida. Filtrar dois mil itens continua sendo trabalho do JavaScript, e é barato. O que a janela resolve
+é o desenho. Quando as duas coisas pesam — filtrar e desenhar —, cada uma tem a sua ferramenta, e a
+divisão aparece nas seções seguintes.</p>
+
+<h2>3. Desenhar só o que cabe</h2>
+
+<p>A primeira caixa começa com a lista desligada, que é como a Ana deixou o site depois do susto: o
+cabeçalho conta quantos itens existem, o botão promete mostrar mais vinte, e o <code>ul</code> está
+vazio. A missão é desenhar os vinte primeiros — e só eles.</p>
+
+<div class="tryreact" data-goal="conta:li=20;;texto:mostrando 20 de 2000;;clique:button;;conta:li=40;;texto:mostrando 40 de 2000">
+  <p class="try-task">O <code>ul</code> está vazio porque a lista inteira travava a página. Desenhe
+  <code>itens.slice(0, quantos)</code> em vez de todos os itens, para o botão mostrar vinte e depois
+  quarenta linhas.</p>
+  <pre class="jsx">const itens = Array.from({ length: 2000 }, (_, i) =&gt; ({
+  id: i + 1,
+  nome: "Pão número " + (i + 1)
+}));
+
+function App() {
+  const [quantos, setQuantos] = useState(20);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{"mostrando " + quantos + " de " + itens.length}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setQuantos(quantos + 20)}&gt;mais 20&lt;/button&gt;
+      &lt;ul&gt;&lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;mostrando 20 de 2000&lt;/p&gt;
+  &lt;button&gt;mais 20&lt;/button&gt;
+  &lt;ul&gt;&lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const itens = Array.from({ length: 2000 }, (_, i) =&gt; ({
+  id: i + 1,
+  nome: "Pão número " + (i + 1)
+}));
+
+function App() {
+  const [quantos, setQuantos] = useState(20);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{"mostrando " + quantos + " de " + itens.length}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setQuantos(quantos + 20)}&gt;mais 20&lt;/button&gt;
+      &lt;ul&gt;
+        {itens.slice(0, quantos).map((item) =&gt; (
+          &lt;li key={item.id}&gt;{item.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois da solução, o painel mostra vinte <code>li</code> — e quarenta depois do clique. O texto do
+cabeçalho não mudou de lógica: o estado <code>quantos</code> sempre significou “quantos desenhar”, só
+faltava a lista obedecer. O <code>slice</code> é a peça nova, e ele é barato: devolve um array de vinte
+referências, não copia os dois mil objetos.</p>
+
+<p>Repare no <code>key={item.id}</code>. Ele já era necessário antes e continua sendo: ao passar de
+vinte para quarenta, os vinte primeiros <code>li</code> são reaproveitados em vez de recriados. Sem
+chave estável, o React remontaria os quarenta e você perderia o ganho justamente no momento em que a
+lista cresce. Chave é assunto de outra aula; aqui basta a regra: <strong>chave vem do dado, nunca do
+índice da janela</strong>.</p>
+
+<p>Para confirmar o ganho com número em vez de opinião, o console tem um cronômetro embutido:
+<code>console.time</code> abre a contagem e <code>console.timeEnd</code> imprime o total com o mesmo
+nome. Os seus números vão variar — o que importa é a diferença entre uma medição e outra, feita na mesma
+máquina.</p>
+
+<pre class="term">console.time("desenhar 2000 linhas")
+// o map com os dois mil itens
+console.timeEnd("desenhar 2000 linhas")
+desenhar 2000 linhas: 187.4 ms
+console.time("desenhar 20 linhas")
+console.timeEnd("desenhar 20 linhas")
+desenhar 20 linhas: 1.9 ms</pre>
+
+<p>Vale comparar com a lista inteira, que é o que a Ana tinha antes. O <code>map</code> sobre dois mil
+itens não é proibido: ele funciona. O que ele faz é entregar dois mil nós para o navegador medir e
+pintar, e repetir esse trabalho a cada tecla digitada em qualquer campo da mesma página. Em um catálogo
+que muda de preço, isso vira uma página que responde com atraso — e o cliente, no balcão, acha que o
+sistema caiu.</p>
+
+<h2>4. A janela que anda</h2>
+
+<p>Mostrar sempre os primeiros vinte resolve o catálogo de vinte. Para os dois mil, a janela precisa
+andar: o estado deixa de ser “quantos” e passa a ser “a partir de qual”. Aí a conta vira
+<code>itens.slice(inicio, inicio + 20)</code>, e dois botões movem o início de vinte em vinte.</p>
+
+<p>A diferença em relação à paginação é de intenção, não de código. Paginar é escolher uma página e
+saber em qual está; deslizar a janela é manter sempre o mesmo tamanho de tela enquanto o conteúdo passa
+por baixo. A conta é parecida — e é por isso que quem já escreveu paginação reconhece o
+<code>slice</code> na hora.</p>
+
+<div class="tryreact" data-goal="texto:de 1 a 20;;conta:li=20;;clique:button.proximos;;texto:de 21 a 40;;texto:Pão número 21;;clique:button.anteriores;;texto:de 1 a 20;;texto:Pão número 20">
+  <p class="try-task">A janela está presa no começo: os botões mudam o estado <code>inicio</code>, mas a
+  lista é sempre <code>slice(0, 20)</code>. Faça a janela usar <code>inicio</code> e travar nos
+  limites.</p>
+  <pre class="jsx">const itens = Array.from({ length: 2000 }, (_, i) =&gt; ({
+  id: i + 1,
+  nome: "Pão número " + (i + 1)
+}));
+
+function App() {
+  const [inicio, setInicio] = useState(0);
+  const janela = itens.slice(0, 20);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{"de " + (inicio + 1) + " a " + (inicio + 20)}&lt;/p&gt;
+      &lt;button className="anteriores" onClick={() =&gt; setInicio(inicio - 20)}&gt;anteriores&lt;/button&gt;
+      &lt;button className="proximos" onClick={() =&gt; setInicio(inicio + 20)}&gt;próximos&lt;/button&gt;
+      &lt;ul&gt;
+        {janela.map((item) =&gt; &lt;li key={item.id}&gt;{item.nome}&lt;/li&gt;)}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;de 1 a 20&lt;/p&gt;
+  &lt;button class="anteriores"&gt;anteriores&lt;/button&gt;
+  &lt;button class="proximos"&gt;próximos&lt;/button&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Pão número 1&lt;/li&gt;
+    &lt;li&gt;Pão número 2&lt;/li&gt;
+    &lt;li&gt;Pão número 3&lt;/li&gt;
+    &lt;li&gt;Pão número 4&lt;/li&gt;
+    &lt;li&gt;Pão número 5&lt;/li&gt;
+    &lt;li&gt;Pão número 6&lt;/li&gt;
+    &lt;li&gt;Pão número 7&lt;/li&gt;
+    &lt;li&gt;Pão número 8&lt;/li&gt;
+    &lt;li&gt;Pão número 9&lt;/li&gt;
+    &lt;li&gt;Pão número 10&lt;/li&gt;
+    &lt;li&gt;Pão número 11&lt;/li&gt;
+    &lt;li&gt;Pão número 12&lt;/li&gt;
+    &lt;li&gt;Pão número 13&lt;/li&gt;
+    &lt;li&gt;Pão número 14&lt;/li&gt;
+    &lt;li&gt;Pão número 15&lt;/li&gt;
+    &lt;li&gt;Pão número 16&lt;/li&gt;
+    &lt;li&gt;Pão número 17&lt;/li&gt;
+    &lt;li&gt;Pão número 18&lt;/li&gt;
+    &lt;li&gt;Pão número 19&lt;/li&gt;
+    &lt;li&gt;Pão número 20&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const itens = Array.from({ length: 2000 }, (_, i) =&gt; ({
+  id: i + 1,
+  nome: "Pão número " + (i + 1)
+}));
+
+function App() {
+  const [inicio, setInicio] = useState(0);
+  const janela = itens.slice(inicio, inicio + 20);
+
+  function mover(passo) {
+    const proximo = inicio + passo;
+    setInicio(Math.max(0, Math.min(proximo, itens.length - 20)));
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{"de " + (inicio + 1) + " a " + (inicio + 20)}&lt;/p&gt;
+      &lt;button className="anteriores" onClick={() =&gt; mover(-20)}&gt;anteriores&lt;/button&gt;
+      &lt;button className="proximos" onClick={() =&gt; mover(20)}&gt;próximos&lt;/button&gt;
+      &lt;ul&gt;
+        {janela.map((item) =&gt; &lt;li key={item.id}&gt;{item.nome}&lt;/li&gt;)}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O <code>Math.max(0, Math.min(proximo, itens.length - 20))</code> é a trava. Sem ela, o primeiro clique
+em “anteriores” deixa o início em <code>-20</code> e o <code>slice</code> devolve uma janela esquisita —
+vazia no começo, deslocada no fim. Travar o início entre zero e <code>total - tamanho</code> garante que
+a janela nunca saia da lista, e o texto “de 1 a 20” continua verdadeiro.</p>
+
+<p>Repare também que a conta da janela é feita na renderização, a partir do estado, sem efeito nenhum.
+É o padrão que você já viu: estado é o que muda por ação da pessoa; a fatia é o que se calcula dele. Se
+você guardasse a janela em outro estado, teria dois lugares dizendo qual pedaço mostrar, e mais cedo ou
+mais tarde eles discordariam.</p>
+
+<h2>5. O trilho: a rolagem honesta</h2>
+
+<p>Falta a parte que separa a janela de brinquedo da virtualização de verdade: a barra de rolagem. Com a
+janela de vinte, a barra mede vinte linhas, não duas mil — o visitante rola até o fim e acha que o
+catálogo acabou. A correção é um <strong>trilho</strong>: uma caixa vazia com a altura que a lista
+inteira teria, e a janela posicionada dentro dela, na altura certa.</p>
+
+<p>Com altura de linha fixa, a conta é uma divisão. A posição da rolagem dividida pela altura da linha
+dá o índice do primeiro item visível; o total de itens vezes a altura da linha dá a altura do trilho. É
+por isso que bibliotecas de virtualização pedem a altura da linha: sem ela, o navegador precisa medir
+cada item para saber onde posicionar o próximo, e o custo volta.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:a partir de 13;;css:div.trilho|height=64000px;;conta:li=12">
+  <p class="try-task">A caixa tem o trilho e a janela, mas o trilho está com a altura de doze linhas e a
+  janela não se move. Faça o trilho ter a altura da lista inteira
+  (<code>itens.length * ALTURA</code>) e a janela começar em <code>rolado / ALTURA</code>.</p>
+  <pre class="jsx">const itens = Array.from({ length: 2000 }, (_, i) =&gt; ({
+  id: i + 1,
+  nome: "Pão número " + (i + 1)
+}));
+const ALTURA = 32;
+const VISIVEIS = 12;
+
+function App() {
+  const [rolado, setRolado] = useState(0);
+  const inicio = 0;
+  const janela = itens.slice(inicio, inicio + VISIVEIS);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{"a partir de " + (inicio + 1)}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setRolado(rolado + VISIVEIS * ALTURA)}&gt;rolar uma tela&lt;/button&gt;
+      &lt;div className="janela" style={{ height: 384, overflowY: "auto", border: "1px solid #ccc" }}&gt;
+        &lt;div className="trilho" style={{ height: 384, position: "relative" }}&gt;
+          &lt;ul style={{ position: "absolute", top: 0, margin: 0, padding: 0, listStyle: "none" }}&gt;
+            {janela.map((item) =&gt; (
+              &lt;li key={item.id} style={{ height: ALTURA }}&gt;{item.nome}&lt;/li&gt;
+            ))}
+          &lt;/ul&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;a partir de 1&lt;/p&gt;
+  &lt;button&gt;rolar uma tela&lt;/button&gt;
+  &lt;div class="janela" style="height: 384px; overflow-y: auto; border: 1px solid rgb(204, 204, 204);"&gt;
+    &lt;div class="trilho" style="height: 384px; position: relative;"&gt;
+      &lt;ul style="position: absolute; top: 0px; margin: 0px; padding: 0px; list-style: none;"&gt;
+        &lt;li style="height: 32px;"&gt;Pão número 1&lt;/li&gt;
+        &lt;li style="height: 32px;"&gt;Pão número 2&lt;/li&gt;
+        &lt;li style="height: 32px;"&gt;Pão número 3&lt;/li&gt;
+        &lt;li style="height: 32px;"&gt;Pão número 4&lt;/li&gt;
+        &lt;li style="height: 32px;"&gt;Pão número 5&lt;/li&gt;
+        &lt;li style="height: 32px;"&gt;Pão número 6&lt;/li&gt;
+        &lt;li style="height: 32px;"&gt;Pão número 7&lt;/li&gt;
+        &lt;li style="height: 32px;"&gt;Pão número 8&lt;/li&gt;
+        &lt;li style="height: 32px;"&gt;Pão número 9&lt;/li&gt;
+        &lt;li style="height: 32px;"&gt;Pão número 10&lt;/li&gt;
+        &lt;li style="height: 32px;"&gt;Pão número 11&lt;/li&gt;
+        &lt;li style="height: 32px;"&gt;Pão número 12&lt;/li&gt;
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const itens = Array.from({ length: 2000 }, (_, i) =&gt; ({
+  id: i + 1,
+  nome: "Pão número " + (i + 1)
+}));
+const ALTURA = 32;
+const VISIVEIS = 12;
+
+function App() {
+  const [rolado, setRolado] = useState(0);
+  const inicio = Math.floor(rolado / ALTURA);
+  const janela = itens.slice(inicio, inicio + VISIVEIS);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{"a partir de " + (inicio + 1)}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setRolado(rolado + VISIVEIS * ALTURA)}&gt;rolar uma tela&lt;/button&gt;
+      &lt;div className="janela" style={{ height: 384, overflowY: "auto", border: "1px solid #ccc" }}&gt;
+        &lt;div className="trilho" style={{ height: itens.length * ALTURA, position: "relative" }}&gt;
+          &lt;ul style={{ position: "absolute", top: inicio * ALTURA, margin: 0, padding: 0, listStyle: "none" }}&gt;
+            {janela.map((item) =&gt; (
+              &lt;li key={item.id} style={{ height: ALTURA }}&gt;{item.nome}&lt;/li&gt;
+            ))}
+          &lt;/ul&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel confirma as duas contas: o trilho mede <code>64000px</code> — duas mil linhas de trinta e
+dois pixels — e a janela continua com doze <code>li</code>. Depois do clique, “a partir de 13”: a
+rolagem andou doze linhas, e a janela acompanhou. Em um site de verdade, quem alimenta o estado
+<code>rolado</code> é o evento de rolagem da caixa, e não um botão; a conta é a mesma.</p>
+
+<p>Duas armadilhas moram nesse trecho. A primeira: o <code>ul</code> posicionado em
+<code>top: inicio * ALTURA</code> precisa de um pai com <code>position: relative</code>, senão ele se
+posiciona em relação à página e a lista some para fora da caixa. A segunda: sem o trilho, a barra de
+rolagem mede só a janela, e o visitante não tem como chegar ao item mil — a lista parece curta e o
+catálogo, incompleto.</p>
+
+<h2>6. Altura fixa, altura variável</h2>
+
+<p>Toda a conta acima depende de uma coisa só: saber a altura de cada linha. Com
+<code>ALTURA = 32</code>, a posição do item mil é <code>999 * 32</code> e não há o que medir. Isso
+funciona quando as linhas são iguais — uma tabela, uma lista de nomes, um seletor. Deixa de funcionar
+quando uma linha tem duas linhas de texto e outra tem cinco.</p>
+
+<p>Com altura variável, o caminho é medir. O navegador oferece <code>getBoundingClientRect()</code>,
+que devolve a altura real de um elemento já desenhado, e o React oferece o
+<code>useLayoutEffect</code> para ler isso antes da pintura. A técnica de produção guarda a altura de
+cada item medida uma vez e estima as que ainda não foram vistas; é o que as bibliotecas fazem, e é
+trabalho de biblioteca, não de aula introdutória.</p>
+
+<p>Para o catálogo da Ana, a decisão foi mais simples: altura fixa, com o nome do pão em uma linha só e
+<code>text-overflow: ellipsis</code> para o caso de o nome ser comprido. Trocar uma técnica complicada
+por uma restrição de desenho é uma escolha legítima de engenharia, e quase sempre mais barata do que a
+medição.</p>
+
+<p>Há ainda o caso intermediário: altura fixa <em>por tipo</em> de linha — cabeçalhos de seção mais
+altos, itens mais baixos. A conta continua possível, com uma soma acumulada das alturas por grupo. Se
+você chegar nesse ponto, vale olhar uma biblioteca antes de escrever a sua: o problema já foi resolvido
+muitas vezes.</p>
+
+<h2>7. As outras saídas</h2>
+
+<p>Janela não é a única resposta, e nem sempre é a primeira. Se o catálogo tem oitenta itens, desenhe os
+oitenta: o navegador aguenta com folga e o código fica menor. A ordem de tentativa que costuma funcionar
+é esta: reduzir o que aparece, dividir em páginas, carregar sob demanda e, só então, virtualizar.</p>
+
+<p><strong>Paginação</strong> é a mais simples de entender e a que dá menos surpresa: mostra vinte,
+oferece “próxima”, e a pessoa sabe onde está. <strong>Carregar mais</strong> mantém o ritmo da leitura:
+a lista cresce quando alguém pede. <strong>Rolagem infinita</strong> é a mais confortável no celular e a
+mais difícil de acertar: sem um fim visível, o rodapé nunca chega, e quem usa leitor de tela perde a
+noção de onde está. <strong>Virtualização</strong> é a única que aguenta cem mil linhas, e a que cobra o
+preço de você cuidar da altura, da rolagem e do foco.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O sintoma</th><th>Causa provável</th><th>A saída</th></tr>
+<tr><td>a página demora a abrir com dois mil itens</td><td>todos os nós desenhados de uma vez</td><td>janela com <code>slice</code></td></tr>
+<tr><td>a barra de rolagem “acaba” cedo demais</td><td>falta o trilho com a altura total</td><td>caixa com <code>itens.length * ALTURA</code></td></tr>
+<tr><td>a linha pisca ao rolar a janela</td><td>chave pelo índice da janela</td><td><code>key={item.id}</code></td></tr>
+<tr><td>as linhas aparecem deslocadas</td><td>altura real diferente da usada na conta</td><td>altura fixa no CSS, ou medir com <code>getBoundingClientRect</code></td></tr>
+<tr><td>digitar no campo de busca trava</td><td>cada tecla redesenha a lista toda</td><td>janela menor e valor adiado</td></tr>
+</table>
+</div>
+
+<p>Sobre bibliotecas: <code>react-window</code> e <code>@tanstack/react-virtual</code> fazem exatamente
+o que você escreveu nesta aula, com medição de altura, rolagem e acessibilidade resolvidas. Elas entram
+no projeto quando a lista é parte central da tela e quando alguém já perdeu uma tarde com os detalhes.
+Para aprender o mecanismo, escrever a versão de trinta linhas vale muito: depois dela, a biblioteca
+deixa de ser caixa-preta.</p>
+
+<h2>8. Quando a lista muda embaixo dos pés</h2>
+
+<p>A janela tem um comportamento traiçoeiro quando a lista muda de tamanho. A Ana filtrou o catálogo por
+“integral” e a janela continuou no item 800 — que agora não existe, porque o filtro devolveu trinta
+itens. O resultado é uma tela vazia com o texto “de 801 a 820 de 30”. O conserto é uma linha: quando o
+filtro muda, o início volta para zero.</p>
+
+<pre class="file" data-file="App.jsx">const [inicio, setInicio] = useState(0);
+const filtrados = itens.filter((p) =&gt; p.nome.includes(busca));
+const seguro = Math.min(inicio, Math.max(0, filtrados.length - 20));
+const janela = filtrados.slice(seguro, seguro + 20);</pre>
+
+<p>Esse <code>seguro</code> é a versão em uma linha da trava da seção 4, aplicada ao total filtrado em
+vez do total fixo. Calcular na renderização resolve o caso sem efeito nenhum: mudou a busca, mudou o
+total, mudou o limite — e o <code>Math.min</code> cuida de não pedir o que não existe.</p>
+
+<p>O segundo comportamento traiçoeiro é a posição da rolagem. Se o catálogo é recarregado e a janela é
+recalculada para o topo, a caixa de rolagem continua onde estava e a pessoa vê a lista “pular”. Em uma
+lista virtualizada de verdade, isso exige guardar a posição e restaurá-la com
+<code>useLayoutEffect</code>; em uma janela com botões, é só lembrar de zerar o estado junto com o
+filtro.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a busca ficou lenta depois da janela</h3>
+<p>A Ana virtualizou a lista e a digitação continuou pesada. A janela resolveu o desenho, mas o filtro
+rodava sobre dois mil itens a cada tecla e o campo redesenhava a lista inteira. A correção foi separar
+as contas: filtrar na renderização (barato) e desenhar vinte. Quando nem isso basta, o valor adiado
+segura a digitação — o assunto da aula de <code>useDeferredValue</code>.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a lista de 60 itens que não precisava de janela</h3>
+<p>Ela aplicou a técnica em uma lista de sessenta produtos e ganhou três bugs: o foco se perdia ao
+rolar, o “Ctrl+F” do navegador não achava o que estava fora da janela e o leitor de tela lia “doze de
+sessenta”. Cinquenta ou sessenta linhas o navegador desenha sem suar. Janela é remédio para lista
+grande, e remédio sem doença é efeito colateral.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o trilho com a altura errada</h3>
+<p>Ela esqueceu de multiplicar pela altura e o trilho ficou com <code>2000px</code> em vez de
+<code>64000px</code>. A barra de rolagem passou a representar uma lista trinta vezes menor, e o item
+“mil” era impossível de alcançar: a rolagem chegava ao fim antes. O sintoma é sempre o mesmo — a barra
+acaba cedo —, e a causa é sempre a mesma conta: total de itens vezes altura da linha.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que deixa uma lista de 2.000 itens lenta?</p>
+<label><input type="radio" name="q1"> o tamanho do array em memória</label>
+<label><input type="radio" name="q1"> a quantidade de elementos que o navegador precisa medir e pintar</label>
+<label><input type="radio" name="q1"> o <code>map</code>, que é mais lento que o <code>for</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Para que serve o trilho?</p>
+<label><input type="radio" name="q2"> para deixar a lista mais bonita</label>
+<label><input type="radio" name="q2"> para carregar as imagens dos itens</label>
+<label><input type="radio" name="q2"> para a barra de rolagem representar a lista inteira, e não só a janela</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. A lista tem 60 itens e o site responde bem. O que fazer?</p>
+<label><input type="radio" name="q3"> desenhar os 60 e deixar a virtualização para quando precisar</label>
+<label><input type="radio" name="q3"> virtualizar desde já, para não precisar depois</label>
+<label><input type="radio" name="q3"> trocar a lista por uma tabela</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a janela e o trilho</h2>
+<p>Complete as duas contas. Na primeira, a janela começa no item que corresponde à rolagem; na segunda,
+o trilho reserva a altura da lista inteira (2.000 itens de 32 px):</p>
+<div class="ex-code">const inicio = Math.<input aria-label="resposta 1" data-answer="floor" placeholder="...">(rolado / ALTURA);
+&lt;div className="trilho" style={{ height: itens.length <input aria-label="resposta 2" data-answer="*|×" placeholder="..."> ALTURA }}&gt;</div>
+<p class="ex-dica">Dica: a primeira resposta é a função que arredonda para baixo — o item 7,9 é o item 7,
+não o 8. A segunda é o sinal da multiplicação, que transforma “2.000 itens” em “64.000 pixels”.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Lista grande pesa no DOM, não no array. Cada item desenhado é um nó que o navegador mede e pinta, e
+esse trabalho se repete a cada atualização da página. A janela corta o problema pela raiz: o componente
+desenha <code>itens.slice(inicio, inicio + tamanho)</code> e o número de nós passa a depender do tamanho
+da tela, não do tamanho do catálogo.</p>
+
+<p>Para a janela não mentir, o trilho precisa existir: uma caixa com a altura total —
+<code>itens.length * ALTURA</code> — e a janela posicionada dentro dela em
+<code>inicio * ALTURA</code>. Com altura fixa, a posição da rolagem dividida pela altura da linha dá o
+índice do primeiro item visível. Com altura variável, é preciso medir, e aí a conversa é com uma
+biblioteca.</p>
+
+<p>Antes de tudo isso, vale a pergunta mais barata: a lista precisa mesmo ser grande? Cinquenta itens se
+desenham direto. Paginação, carregar mais e rolagem infinita resolvem muitos catálogos com menos código
+e menos surpresa. E o resto é medir: a aula seguinte trata de descobrir onde o tempo está indo, em vez
+de adivinhar.</p>
+
+<p>Fica também o desenho mental que serve para qualquer otimização de tela: o navegador é bom em fazer
+pouca coisa muitas vezes e ruim em fazer muita coisa de uma vez. Mostrar doze linhas e trocá-las quando
+a pessoa rola é “pouca coisa muitas vezes”. Mostrar duas mil de uma vez é o contrário, e é por isso que
+a página engasga.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>O custo está nos nós desenhados; o array é barato de percorrer.</li>
+<li>Janela: desenhe só o pedaço visível com <code>slice(inicio, inicio + tamanho)</code>.</li>
+<li>Trilho: caixa com <code>itens.length * ALTURA</code> para a barra de rolagem ficar honesta.</li>
+<li>Janela posicionada em <code>inicio * ALTURA</code>, dentro de um pai <code>relative</code>.</li>
+<li><code>inicio = Math.floor(rolado / ALTURA)</code>; trave o início entre zero e <code>total - tamanho</code>.</li>
+<li>Chave sempre do dado: <code>key={item.id}</code>, nunca o índice da janela.</li>
+<li>Altura fixa simplifica; altura variável exige medição (ou biblioteca).</li>
+<li>Filtro que muda o total pede o início recalculado com <code>Math.min</code>.</li>
+<li>Poucas dezenas de itens: desenhe todas e não otimize.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

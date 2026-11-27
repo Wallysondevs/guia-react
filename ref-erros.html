@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mensagens de Erro | Guia React</title>
+<meta name="description" content="Consulta das mensagens de erro do React: JSX adjacente, tag não fechada, objeto inválido, hook inválido, laço de atualização e o roteiro para depurar cada uma.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Mensagens de <span class="hl">Erro</span></h1>
+<p class="intro">Erro em React quase nunca é “o React quebrou”: é uma mensagem que aponta um lugar e um
+motivo, e a maior parte delas tem três ou quatro causas conhecidas. A Ana aprendeu a ler as dela na ordem
+certa — primeiro onde a mensagem aparece, depois o que ela quer dizer, depois o conserto. Esta página é o
+catálogo: as mensagens que você mais vai ver, traduzidas, com o primeiro passo de cada uma.</p>
+
+<div class="note">
+<strong>Como usar esta página</strong>
+<ul>
+  <li>Comece pela seção 1 para saber <em>onde</em> procurar a mensagem; depois vá direto à seção do seu caso.</li>
+  <li>As mensagens de aviso (chave de lista, modo estrito) só aparecem em desenvolvimento — a seção 1 explica.</li>
+  <li>As duas caixas quebram de propósito: leia o painel e conserte. Ele mostra o erro de compilação completo.</li>
+  <li>O roteiro da seção 8 serve para qualquer mensagem, inclusive as que não estão aqui.</li>
+</ul>
+</div>
+
+<h2>1. Como ler uma mensagem</h2>
+
+<p>Antes do texto, o lugar. Um erro de <strong>compilação</strong> impede o componente de rodar e aparece no
+próprio painel da caixa, com a linha e um trecho de código. Um erro de <strong>execução</strong> acontece
+durante o desenho: a tela fica vazia ou congela e a mensagem vai para o console do navegador. E um
+<strong>aviso</strong> não impede nada: a página roda e o React só reclama de algo que vai dar problema
+depois.</p>
+
+<dl class="anatomy">
+<dt>erro de compilação</dt>
+<dd>O JSX não vira JavaScript: falta fechar uma tag, há dois elementos sem pai, falta uma chave. O painel
+mostra “não compilou” com a linha.</dd>
+<dt>erro de execução</dt>
+<dd>O componente rodou e lançou uma exceção: leitura de <code>undefined</code>, objeto desenhado, hook fora de
+lugar. A mensagem aparece no console.</dd>
+<dt>aviso</dt>
+<dd>O React reclama de algo que não quebra a tela agora: <code>key</code> faltando, atributo errado,
+dependência de efeito. A página continua.</dd>
+<dt>pilha</dt>
+<dd>A lista de chamadas que levou ao erro, com arquivo, linha e coluna. É o que diz <em>onde</em>, não
+<em>por quê</em>.</dd>
+<dt>componente</dt>
+<dd>O nome que aparece na pilha do React. É por ele que você acha o arquivo, mesmo quando a linha é de uma
+biblioteca.</dd>
+<dt>modo de desenvolvimento</dt>
+<dd>O React compilado sem minificação, que faz verificações extras e escreve mensagens longas e explicativas.
+As caixas deste guia rodam o build de produção.</dd>
+</dl>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Onde aparece</th><th>Exemplo de começo</th><th>Primeiro passo</th></tr>
+<tr><td>compilação</td><td>no painel da caixa, com linha</td><td>não compilou: …</td><td>ler a linha apontada e a de cima</td></tr>
+<tr><td>execução</td><td>console do navegador</td><td>Uncaught TypeError: …</td><td>abrir a pilha e achar o seu componente — <a href="depurando-no-navegador.html">Depurando no Navegador</a></td></tr>
+<tr><td>aviso</td><td>console, em desenvolvimento</td><td>Warning: …</td><td>consertar mesmo assim: é bug futuro — <a href="strict-mode.html">Strict Mode</a></td></tr>
+</table>
+</div>
+
+<p>Uma dica de leitura que economiza tempo: copie a mensagem sem os pedaços que mudam — o nome da variável, o
+número da linha, o texto do dado. O que sobra é a assinatura do problema, e ela é padronizada. “Cannot read
+properties of undefined” é sempre a mesma causa; o que muda é qual propriedade. Procurar pela frase inteira,
+com o nome do seu dado no meio, devolve resultados piores do que procurar pela parte fixa.</p>
+
+<p>Uma particularidade deste guia vale desde já: as caixas rodam a versão de produção do React, que não
+escreve os avisos de desenvolvimento. Por isso, nas caixas, você vê os erros de compilação e os erros de
+execução que acontecem antes do primeiro desenho — e não vê os avisos de <code>key</code> ou de modo estrito.
+No seu projeto, rodando <code>npm run dev</code>, todos aparecem. A seção 8 mostra como aproveitar os dois
+mundos.</p>
+
+<h2>2. JSX adjacente: o erro que o painel mostra</h2>
+
+<p>É o erro número um de quem começa. O componente devolve dois elementos lado a lado, sem um pai em volta. O
+JSX é traduzido para uma chamada que cria <strong>um</strong> elemento, e dois não cabem em um. A mensagem
+fala de “elementos JSX adjacentes” e sugere a saída: embrulhar em uma tag ou em um fragmento.</p>
+
+<div class="tryreact" data-goal="texto:Padaria da Ana;;conta:p=1">
+  <p class="try-task">O <code>App</code> devolve um título e um parágrafo soltos e não compila. Envolva os
+  dois em uma <code>&lt;div&gt;</code> (ou em <code>&lt;&gt;...&lt;/&gt;</code>) e rode.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+    &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+  );
+}</pre>
+  <pre class="out">
+Erro: não compilou: /App.jsx: Adjacent JSX elements must be wrapped in an enclosing tag. Did you want a JSX fragment &lt;&gt;...&lt;/&gt;? (4:4)
+
+  2 |   return (
+  3 |     &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+&gt; 4 |     &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    |     ^
+  5 |   );
+  6 | }
+</pre>
+  <pre class="solucao">function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra a mensagem inteira, com o arquivo, a linha, a coluna e um trecho com um acento circunflexo
+embaixo do ponto exato. Duas leituras úteis: a linha apontada é a do <em>segundo</em> elemento (o primeiro não
+tem culpa), e a sugestão entre parênteses já traz a correção. Quando a mensagem sugerir um fragmento, lembre
+que ele não cria nó no HTML — a aula <a href="fragment.html">O Fragment</a> compara as duas saídas.</p>
+
+<p>O erro também aparece quando alguém tenta devolver um comentário ou um texto solto ao lado de um elemento.
+Em JSX, comentário é <code>{/* … */}</code> e só existe dentro de um elemento; fora dele, o compilador
+vê dois filhos. O mesmo vale para texto: <code>return "Pão"</code> funciona, <code>return "Pão" &lt;p&gt;…&lt;/p&gt;</code>
+não.</p>
+
+<p>Se o componente devolve dois elementos de propósito e você não quer um <code>div</code> extra, o fragmento
+resolve. E se o erro acontecer dentro de um <code>map</code>, a causa é outra: ali cada item já é um elemento,
+e o problema costuma ser chave faltando ou <code>return</code> esquecido — a página
+<a href="ref-listas.html">Listas</a> cobre os dois.</p>
+
+<h2>3. Tag não fechada e o ponto e vírgula invisível</h2>
+
+<p>O segundo erro de sintaxe mais comum é a tag que ninguém fechou. A mensagem é
+<em>Unterminated JSX contents</em>, “conteúdo JSX não terminado”, e o detalhe importante: ela aponta a linha
+<strong>depois</strong> do problema, porque é ali que o compilador percebe que ainda estava dentro de uma
+tag.</p>
+
+<div class="tryreact" data-goal="texto:Padaria da Ana;;conta:h1=1">
+  <p class="try-task">O <code>&lt;h1&gt;</code> não foi fechado e a caixa não compila. Feche a tag e rode.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana
+      &lt;p&gt;Aberto das 6h&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+Erro: não compilou: /App.jsx: Unterminated JSX contents. (6:10)
+
+  4 |       &lt;h1&gt;Padaria da Ana
+  5 |       &lt;p&gt;Aberto das 6h&lt;/p&gt;
+&gt; 6 |     &lt;/div&gt;
+    |           ^
+  7 |   );
+  8 | }
+</pre>
+  <pre class="solucao">function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O método que resolve rápido: comece pela linha apontada e suba contando as tags abertas e fechadas. Em
+JSX, toda tag precisa fechar, inclusive as que no HTML não fecham — <code>&lt;br&gt;</code> se escreve
+<code>&lt;br /&gt;</code>, <code>&lt;img&gt;</code> se escreve <code>&lt;img /&gt;</code>, e
+<code>&lt;input&gt;</code> também.</p>
+
+<p>O terceiro erro de sintaxe é o mais traiçoeiro porque não parece sintaxe: o <code>return</code> com o JSX
+na linha de baixo. O JavaScript insere um ponto e vírgula invisível depois do <code>return</code>, a função
+devolve <code>undefined</code> e o React reclama que nada foi devolvido. O conserto é colocar o JSX na mesma
+linha do <code>return</code> ou abrir parênteses antes de quebrar. O sintoma não é uma mensagem de sintaxe: é
+uma tela vazia com “nothing was returned from render”.</p>
+
+<h2>4. Erros de JavaScript no meio do React</h2>
+
+<p>Boa parte das mensagens vermelhas não é do React: é JavaScript reclamando de um valor que não existia. O
+React só estava desenhando quando a conta estourou. As três mais comuns estão na tabela.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem</th><th>Causa comum</th><th>Conserto</th></tr>
+<tr><td>Cannot read properties of undefined (reading 'nome')</td><td>o objeto ainda não chegou (lista de pedidos vazia, prop não passada)</td><td>valor inicial seguro e condicional no JSX — <a href="carregando-e-erro.html">Carregando e Erro</a></td></tr>
+<tr><td>x is not a function</td><td>nome errado, import faltando ou prop com outro nome</td><td>conferir a origem do nome e o <code>import</code> — <a href="erros-comuns.html">Erros Comuns</a></td></tr>
+<tr><td>Unexpected token</td><td>vírgula, chave ou parêntese fora do lugar no JSX</td><td>ler a linha e a anterior; fechar o que abriu</td></tr>
+</table>
+</div>
+
+<p>A primeira merece um exemplo, porque acontece todo dia com dado vindo da rede. O componente desenha antes
+de a resposta chegar, e o valor é <code>undefined</code>. A leitura de uma propriedade de
+<code>undefined</code> derruba o desenho com a mensagem do console:</p>
+
+<pre class="term">Uncaught TypeError: Cannot read properties of undefined (reading 'nome')</pre>
+
+<p>O conserto não é <code>try</code>/<code>catch</code>: é desenhar só quando o dado existe — um
+<code>if</code> antes do acesso, um valor inicial (<code>[]</code> para lista, <code>""</code> para texto) ou
+o operador <code>?.</code> para leitura opcional. A aula
+<a href="carregando-e-erro.html">Carregando e Erro</a> mostra o caminho completo, e a
+<a href="erros-comuns.html">Erros Comuns</a> reúne mais mensagens dessa família.</p>
+
+<p>Há um erro de JavaScript que não gera exceção e por isso não tem mensagem: a conta que devolve
+<code>NaN</code>. Ela aparece na tela como “NaN” no meio do preço, e a causa é sempre a mesma — uma conversão
+que falhou, como <code>Number("12,50")</code> ou <code>undefined + 1</code>. Se você vir <code>NaN</code> em
+vez de uma mensagem, o caminho é o mesmo da seção 8: <code>console.log</code> nas parcelas da conta antes de
+olhar o código que desenha.</p>
+
+<p>Vale lembrar de uma armadilha de leitura: a linha que aparece na pilha costuma ser a do
+<code>return</code> do componente, não a do dado que faltou. O culpado está uma chamada acima — o pai que não
+passou a prop, o estado que começou vazio, a resposta que ainda não chegou.</p>
+
+<h2>5. Erros de hooks</h2>
+
+<p>Hooks têm mensagens próprias e todas falam de lugar ou de ordem. A primeira é a chamada fora do corpo de
+um componente — estado no topo do arquivo, hook dentro de um <code>onClick</code>, hook em função auxiliar
+comum:</p>
+
+<pre class="term">Uncaught Error: Invalid hook call. Hooks can only be called inside of the body of a function component.</pre>
+
+<p>“Chamada de hook inválida: hooks só podem ser chamados no corpo de um componente de função.” O conserto é
+mover a chamada para dentro do componente. Nas caixas deste guia, a mesma situação aparece com outra
+mensagem, porque a versão de produção é mais seca: <em>Cannot read properties of null (reading
+'useState')</em>.</p>
+
+<p>A segunda família é a ordem: <em>Rendered more hooks than during the previous render</em> (desenhou mais
+hooks que no desenho anterior) e <em>Rendered fewer hooks than expected</em> (menos hooks que o esperado).
+As duas querem dizer que um hook apareceu ou sumiu entre desenhos — <code>if</code>, laço ou
+<code>return</code> antecipado. A página <a href="regras-dos-hooks.html">As Regras dos Hooks</a> mostra cada
+caso quebrando na caixa.</p>
+
+<p>Uma terceira família de mensagens de hook não é sobre ordem, e sim sobre dependência: <em>React Hook
+useEffect has a missing dependency</em>. Ela aparece no ESLint e no console de desenvolvimento, e quer dizer
+que o efeito lê um valor que não está na lista — o valor pode estar desatualizado quando o efeito rodar. Não
+derruba a página; produz o bug mais chato do React, aquele que só aparece depois de três cliques. Aula:
+<a href="dependencias.html">As Dependências</a>.</p>
+
+<p>Antes de rodar, o ESLint avisa com uma mensagem diferente e mais fácil de entender:
+<em>React Hook “useState” is called conditionally</em>. Se você vir essa, não precisa nem abrir o navegador —
+o conserto é subir a chamada para o topo. Aula: <a href="hooks-proprios.html">Hooks Próprios</a> mostra o
+mesmo aviso dentro de um hook seu.</p>
+
+<h2>6. Lista e objeto</h2>
+
+<p>Duas mensagens dominam as listas. A primeira é aviso, não erro: falta <code>key</code> em um item. Ela não
+impede a tela e é fácil de ignorar — e cobra depois, como estado no item errado.</p>
+
+<pre class="term">Warning: Each child in a list should have a unique "key" prop.</pre>
+
+<p>A segunda é erro de verdade e confunde porque fala de “objeto” quando o assunto é lista: você desenhou o
+item inteiro em vez de um campo dele.</p>
+
+<pre class="term">Uncaught Error: Objects are not valid as a React child (found: object with keys {nome, preco}).</pre>
+
+<p>“Objetos não são filhos válidos do React.” O conserto é escolher o campo: <code>{pao.nome}</code> em vez
+de <code>{pao}</code>. Para inspecionar, <code>{JSON.stringify(pao)}</code> mostra o conteúdo como texto. A
+página <a href="ref-listas.html">Listas</a> junta as duas mensagens na tabela de erros comuns.</p>
+
+<p>Existe uma segunda mensagem de chave, menos conhecida e mais grave: <em>Encountered two children with the
+same key</em>. Ela aparece quando dois itens da mesma lista usam a mesma chave — um id repetido no dado, ou um
+índice somado a alguma coisa. O sintoma é o React reaproveitar o estado do primeiro no segundo, e o conserto é
+garantir unicidade no dado ou combinar campos (<code>id + "-" + tamanho</code>).</p>
+
+<p>Um terceiro caso, que não dá mensagem nenhuma e engana: desenhar uma função. O React não reclama de função
+como filho — ele simplesmente não mostra nada. Se a tela está vazia e o JSX está certo, confira se você não
+chamou a função duas vezes ou esqueceu de chamar: <code>{formatar}</code> desenha a função, e
+<code>{formatar()}</code> desenha o resultado.</p>
+
+<h2>7. Formulário e laço de atualização</h2>
+
+<p>No formulário, o erro clássico é o campo que não aceita digitação porque tem <code>value</code> e não tem
+<code>onChange</code>. Em desenvolvimento, o React avisa com todas as letras:</p>
+
+<pre class="term">Warning: You provided a `value` prop to a form field without an `onChange` handler. This will render a read-only field.</pre>
+
+<p>“Campo somente leitura.” O conserto é ligar o <code>onChange</code> ao estado — ou usar
+<code>defaultValue</code>, se a intenção era um campo não controlado. A página
+<a href="ref-formularios.html">Formulários</a> traz a tabela completa de campo por campo.</p>
+
+<p>O outro erro de formulário é o laço: <code>setEstado</code> chamado durante o desenho, sem evento no meio.
+O React corta depois de alguns ciclos e diz:</p>
+
+<pre class="term">Uncaught Error: Too many re-renders. React limits the number of renders to prevent an infinite loop.</pre>
+
+<p>“Desenhos demais.” A causa quase sempre é uma chamada de função no lugar de uma referência:
+<code>onClick={somar()}</code> roda <code>somar</code> no desenho e muda o estado, que desenha de novo. O
+conserto é passar a função sem chamar: <code>onClick={somar}</code> ou
+<code>onClick={() =&gt; somar()}</code>. O mesmo laço aparece com <code>useEffect</code> sem dependências
+corretas, com a mensagem <em>Maximum update depth exceeded</em> — vista na página
+<a href="ref-performance.html">Performance</a>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem</th><th>Onde está o problema</th><th>Conserto</th></tr>
+<tr><td>value sem onChange</td><td><code>&lt;input&gt;</code> controlado pela metade</td><td>ligar <code>onChange</code> ou usar <code>defaultValue</code> — <a href="ref-formularios.html">Formulários</a></td></tr>
+<tr><td>Too many re-renders</td><td>função chamada no desenho em vez de passada</td><td><code>onClick={somar}</code> — <a href="eventos-onclick.html">Eventos e onClick</a></td></tr>
+<tr><td>Maximum update depth exceeded</td><td>efeito que muda estado a cada desenho</td><td>dependências corretas — <a href="dependencias.html">As Dependências</a></td></tr>
+<tr><td>changing a controlled input to be uncontrolled</td><td><code>value</code> começa <code>undefined</code> e depois vira texto</td><td><code>value={texto ?? ""}</code></td></tr>
+</table>
+</div>
+
+<h2>8. Um roteiro para qualquer mensagem</h2>
+
+<p>Quando a mensagem não está neste catálogo, o caminho continua o mesmo. Quatro passos, na ordem, resolvem a
+maior parte dos casos sem chute.</p>
+
+<p><strong>Primeiro: separe compilação de execução.</strong> Se o painel (ou o terminal) diz “não compilou”,
+não há o que depurar em estado: é sintaxe, e a linha apontada e a anterior são o mapa. Se compilou e a tela
+está errada, o problema é de dado ou de fluxo.</p>
+
+<p><strong>Segundo: reduza até o osso.</strong> Apague o componente e devolva um parágrafo fixo. Apareceu? O
+problema está no que você apagou. Não apareceu? O problema está no nome do componente, no
+<code>return</code> ou em quem o chama. Reduzir acha o culpado mais rápido que reler quarenta linhas.</p>
+
+<p><strong>Terceiro: olhe o valor, não o código.</strong> Um <code>console.log</code> antes da linha que
+quebra mostra o que você achava que era uma coisa e é outra — lista vazia, prop com outro nome, número em
+texto. Nas caixas do guia, as linhas de <code>console.log</code> aparecem no painel prefixadas com
+<code>console:</code>; no projeto, é a aba Console.</p>
+
+<p>Um recurso que muda o jogo em produção: o <em>error boundary</em>, um componente que captura o erro dos
+filhos e desenha uma tela de desculpa em vez de deixar a página em branco. Ele não conserta nada, mas evita
+que um erro em um cartão derrube a loja inteira. A aula <a href="tratamento-de-erro.html">Tratamento de
+Erro</a> mostra o componente e o que ele não captura — erro dentro de evento e de promessa passa por
+fora.</p>
+
+<p><strong>Quarto: procure a mensagem exata.</strong> Copie a frase sem os valores que mudam (nomes de
+variável, números) e procure. Mensagem de erro de React é padronizada: a mesma frase tem sempre a mesma
+causa. A aula <a href="depurando-no-navegador.html">Depurando no Navegador</a> mostra onde ficam a pilha, o
+breakpoint e o valor de cada variável.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sintoma</th><th>Onde olhar primeiro</th><th>Primeiro passo</th></tr>
+<tr><td>tela vazia, sem erro visível</td><td>console do navegador e o painel da caixa</td><td>reduzir o componente a um parágrafo</td></tr>
+<tr><td>“não compilou”</td><td>linha apontada e a de cima</td><td>contar tags abertas e fechadas</td></tr>
+<tr><td>valor errado na tela</td><td>o estado e a prop, com <code>console.log</code></td><td>conferir o nome e o formato do dado</td></tr>
+<tr><td>tela congela depois de um clique</td><td>ordem dos hooks</td><td>procurar hook dentro de <code>if</code> — <a href="regras-dos-hooks.html">As Regras dos Hooks</a></td></tr>
+<tr><td>aviso no console em desenvolvimento</td><td>texto do aviso</td><td>consertar mesmo sem erro aparente</td></tr>
+</table>
+</div>
+
+<h2>Resumo</h2>
+
+<p>Primeiro o lugar: compilação aparece no painel e impede rodar; execução aparece no console e derruba o
+desenho; aviso aparece só em desenvolvimento e não impede nada. Depois o texto: JSX adjacente pede um pai,
+tag não fechada aponta a linha seguinte, objeto desenhado pede um campo, hook fora de ordem pede chamada fixa
+no topo.</p>
+
+<p>Os consertos são poucos e se repetem: embrulhar irmãos, fechar a tag, escolher o campo do objeto, ler o
+dado só quando ele existe, ligar <code>onChange</code> ao <code>value</code> e passar função em vez de
+chamá-la. E o roteiro vale para o resto: separar sintaxe de dado, reduzir, olhar o valor e procurar a
+mensagem exata.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>“Não compilou” é sintaxe: leia a linha apontada e a anterior.</li>
+<li>JSX adjacente: embrulhe em <code>div</code> ou em <code>&lt;&gt;...&lt;/&gt;</code>.</li>
+<li>“Unterminated JSX contents”: falta fechar uma tag logo acima.</li>
+<li>Objeto na tela: escolha o campo, ou <code>JSON.stringify</code> para inspecionar.</li>
+<li>“Invalid hook call”: hook fora do corpo do componente.</li>
+<li>“More/fewer hooks”: ordem mudou por <code>if</code>, laço ou <code>return</code> antecipado.</li>
+<li><code>value</code> sem <code>onChange</code> deixa o campo somente leitura.</li>
+<li>“Too many re-renders”: <code>onClick={somar()}</code> em vez de <code>onClick={somar}</code>.</li>
+<li>Avisos de <code>key</code> e de modo estrito são de desenvolvimento.</li>
+<li>Reduzir o componente a um parágrafo acha o culpado mais rápido que reler.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

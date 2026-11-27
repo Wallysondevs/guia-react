@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Suspense de Dados | Guia React</title>
+<meta name="description" content="Suspense de dados no React 19: a fronteira que mostra o fallback, o recurso que lança a promessa e por que o conteúdo aparece quando a leitura devolve valor.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Suspense de <span class="hl">Dados</span></h1>
+<p class="intro">A Ana já sabe mostrar “carregando” com três estados: um para o pedido em andamento, um
+para o erro e um para o resultado. Funciona, mas o mesmo bloco de <code>if</code> aparece em toda tela do
+site dela. Nesta aula ela conhece o <strong>Suspense</strong>: uma fronteira que diz “enquanto este pedaço
+não estiver pronto, mostre isto”, e um jeito de ler o dado que combina com ela. O painel das caixas vai
+mostrar o fallback sem susto — é ele que aparece antes de o valor chegar.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que o <code>Suspense</code> faz e o que ele não faz.</li>
+  <li>O que é uma fronteira e o que é o <code>fallback</code>.</li>
+  <li>Como um componente “suspende”: lançando a promessa em vez de devolver JSX.</li>
+  <li>Por que o resultado só aparece quando a leitura devolve valor.</li>
+  <li>Como colocar cada peça na sua própria fronteira.</li>
+  <li>O que faz o React desenhar de novo depois que o dado chega.</li>
+  <li>Quando Suspense é melhor do que os três estados, e quando não é.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o preço que chega depois</h2>
+
+<p>O preço do pão do dia muda toda manhã. O site da Ana pega esse preço de um serviço que ela mesma
+mantém, e a resposta leva alguns instantes. Até agora, ela resolveu isso do jeito que as aulas de
+<a href="buscando-dados.html">Buscando Dados</a> e <a href="carregando-e-erro.html">Carregando e Erro</a>
+ensinaram: um estado para o valor, um para o carregando, um para o erro, e um <code>if</code> no JSX
+escolhendo o que desenhar.</p>
+
+<p>O problema não é o resultado, é a repetição. Cada peça que busca alguma coisa repete os mesmos três
+estados e os mesmos três <code>if</code>. E quando uma tela tem quatro peças buscando ao mesmo tempo, o
+carregando de cada uma aparece em um lugar diferente, em um momento diferente, e a tela pisca em quatro
+lugares.</p>
+
+<p>O <code>Suspense</code> propõe outra divisão de trabalho. Em vez de cada componente decidir o que
+mostrar enquanto espera, ele simplesmente <em>para</em> — e quem está em volta decide o que aparece no
+lugar. O componente que lê o dado não sabe que existe um carregando; a fronteira não sabe que dado é
+aquele. Cada um cuida do seu pedaço.</p>
+
+<h2>2. A fronteira e o fallback</h2>
+
+<p>Três palavras resolvem o vocabulário. A <strong>fronteira</strong> é o componente
+<code>Suspense</code>: ele embrulha um pedaço da árvore. O <strong>fallback</strong> é o que ele desenha
+enquanto alguma coisa lá dentro está esperando. E <strong>suspender</strong> é o ato de um componente
+avisar “ainda não tenho o que desenhar”.</p>
+
+<dl class="anatomy">
+<dt>Suspense</dt>
+<dd>O componente de fronteira: <code>&lt;Suspense fallback={…}&gt;</code>. Ele não busca nada e não
+guarda dado.</dd>
+<dt>fallback</dt>
+<dd>O JSX que a fronteira mostra enquanto um filho está suspenso. Costuma ser um texto curto ou um
+esqueleto da tela.</dd>
+<dt>suspender</dt>
+<dd>Lançar uma promessa de dentro do render, em vez de devolver JSX. O React segura aquele pedaço e
+espera.</dd>
+<dt>recurso</dt>
+<dd>Um objeto com o valor já lido e a promessa do que ainda está vindo. É o cache que a leitura
+consulta.</dd>
+<dt>fronteira mais próxima</dt>
+<dd>Quando um componente suspende, quem mostra o fallback é o <code>Suspense</code> mais próximo acima
+dele.</dd>
+<dt>streaming</dt>
+<dd>O envio da página em pedaços, cada um assim que fica pronto. É o Suspense do lado do servidor;
+aqui o assunto é o lado do navegador.</dd>
+</dl>
+
+<p>Duas coisas que o Suspense <strong>não</strong> faz, e que confundem muita gente. Primeiro: ele não
+busca dados. Ele não tem endereço, não tem <code>fetch</code>, não sabe o que é preço. Ele só desenha o
+fallback enquanto um filho está suspenso. Segundo: ele não guarda o resultado. O dado mora no recurso, ou
+no estado de quem buscou; a fronteira só decide o que aparece na espera.</p>
+
+<p>Quem suspende é o componente que lê. E ele suspende de um jeito estranho à primeira vista: em vez de
+devolver JSX, ele <strong>lança uma promessa</strong>. O React reconhece esse lançamento, procura a
+fronteira mais próxima e mostra o fallback dela. Quando a promessa termina, o React tenta desenhar o
+componente de novo — e, se agora a leitura devolver valor, o conteúdo aparece.</p>
+
+<h2>3. A caixa: o fallback só sai quando a leitura devolve valor</h2>
+
+<p>Na caixa abaixo, o preço já chegou: o recurso está com <code>pronto: true</code> e o valor é 12. Mas o
+<code>lerPreco</code> sempre lança a promessa, sem olhar o recurso. Resultado: a fronteira mostra o
+fallback para sempre, mesmo com o dado na mão.</p>
+
+<div class="tryreact" data-goal="texto:Pão do dia: R$ 12,00">
+  <p class="try-task">O <code>lerPreco</code> esqueceu de devolver o valor quando o recurso está pronto.
+  Faça ele devolver <code>recurso.valor</code> nesse caso e clique em Rodar.</p>
+  <pre class="jsx">const recurso = { pronto: true, valor: 12 };
+
+function lerPreco() {
+  throw new Promise(function () {});
+}
+
+function Preco() {
+  const preco = lerPreco();
+  return &lt;p&gt;Pão do dia: R$ {preco},00&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;React.Suspense fallback={&lt;p&gt;Carregando o preço…&lt;/p&gt;}&gt;
+      &lt;Preco /&gt;
+    &lt;/React.Suspense&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;p&gt;Carregando o preço…&lt;/p&gt;
+</pre>
+  <pre class="solucao">const recurso = { pronto: true, valor: 12 };
+
+function lerPreco() {
+  if (recurso.pronto) return recurso.valor;
+  throw new Promise(function () {});
+}
+
+function Preco() {
+  const preco = lerPreco();
+  return &lt;p&gt;Pão do dia: R$ {preco},00&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;React.Suspense fallback={&lt;p&gt;Carregando o preço…&lt;/p&gt;}&gt;
+      &lt;Preco /&gt;
+    &lt;/React.Suspense&gt;
+  );
+}</pre>
+</div>
+
+<p>Repare no painel: ele mostra o fallback, e isso está certo — é o que a tela desenha enquanto a leitura
+não devolve valor. O erro é que a leitura nunca devolve. Com uma linha de <code>if</code>, o componente
+passa a devolver o preço, e o React troca o fallback pelo conteúdo.</p>
+
+<p>Guarde a forma da função, porque ela é o coração do assunto. A leitura tem três saídas possíveis:
+devolver o valor quando ele já está no recurso, lançar a promessa quando ainda não está, e devolver o
+valor quando a promessa termina. A primeira e a última são iguais — o valor está lá, então devolve. A do
+meio é a única que suspende.</p>
+
+<h2>4. De onde vem a promessa</h2>
+
+<p>Na caixa, a promessa nunca termina, para você ver o fallback parado. Num projeto de verdade, quem
+cria a promessa é o pedido, e quem guarda o estado é o recurso. O arquivo costuma ficar assim:</p>
+
+<pre class="file" data-file="src/precoDoDia.js">const recurso = { pronto: false, valor: null, promessa: null };
+
+export function carregarPreco() {
+  if (recurso.pronto) return recurso.valor;
+  if (!recurso.promessa) {
+    recurso.promessa = fetch("/api/preco-do-dia")
+      .then(function (resposta) { return resposta.json(); })
+      .then(function (dados) {
+        recurso.valor = dados.preco;
+        recurso.pronto = true;
+        return dados.preco;
+      });
+  }
+  throw recurso.promessa;
+}</pre>
+
+<p>A primeira chamada cria a promessa e lança. A segunda, depois que a promessa termina, encontra
+<code>pronto: true</code> e devolve o número. Repare que o <code>fetch</code> fica dentro do
+<code>if</code>: sem isso, cada desenho dispararia um pedido novo — o tropeço clássico de quem transforma
+busca em suspensão.</p>
+
+<p>No React 19 existe um atalho para a leitura: o hook <code>use</code>, que aceita uma promessa e
+devolve o valor dela, suspendendo enquanto ela não termina. Nas caixas deste guia ele não está no escopo,
+então o nome completo é <code>React.use</code>. O componente fica assim:</p>
+
+<pre class="file" data-file="src/Preco.jsx">function Preco() {
+  const dados = React.use(recurso.promessa);
+  return &lt;p&gt;Pão do dia: R$ {dados.preco},00&lt;/p&gt;;
+}</pre>
+
+<p>É mais curto, e é a forma que você vai encontrar em código novo. O que ele faz por dentro é
+exatamente o que a caixa mostra: guarda a promessa, lança enquanto está pendente e devolve o valor quando
+termina. Entender a versão longa primeiro é o que permite reconhecer o padrão quando ele aparece escondido
+dentro de uma biblioteca.</p>
+
+<h2>5. Uma fronteira por peça</h2>
+
+<p>Agora o detalhe que decide a qualidade da tela. Quando um componente suspende, ele derruba
+<strong>tudo</strong> que está dentro da mesma fronteira. Se o preço já chegou e o estoque não, e os dois
+estão na mesma fronteira, o visitante vê o fallback dos dois — perdendo a informação que já estava
+pronta.</p>
+
+<div class="tryreact" data-goal="texto:R$ 12,00;;conta:p=2;;texto:Carregando o estoque">
+  <p class="try-task">O preço já chegou, mas o estoque não, e os dois dividem a mesma fronteira: a tela
+  inteira espera. Ponha uma <code>&lt;React.Suspense&gt;</code> em volta de cada peça, com o fallback
+  certo para cada uma.</p>
+  <pre class="jsx">const preco = { pronto: true, valor: 12 };
+const estoque = { pronto: false, quantos: 0 };
+
+function Preco() {
+  if (!preco.pronto) throw new Promise(function () {});
+  return &lt;p className="preco"&gt;R$ {preco.valor},00&lt;/p&gt;;
+}
+
+function Estoque() {
+  if (!estoque.pronto) throw new Promise(function () {});
+  return &lt;p&gt;{estoque.quantos} unidades&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;React.Suspense fallback={&lt;p&gt;Carregando…&lt;/p&gt;}&gt;
+      &lt;Preco /&gt;
+      &lt;Estoque /&gt;
+    &lt;/React.Suspense&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;p&gt;Carregando…&lt;/p&gt;
+</pre>
+  <pre class="solucao">const preco = { pronto: true, valor: 12 };
+const estoque = { pronto: false, quantos: 0 };
+
+function Preco() {
+  if (!preco.pronto) throw new Promise(function () {});
+  return &lt;p className="preco"&gt;R$ {preco.valor},00&lt;/p&gt;;
+}
+
+function Estoque() {
+  if (!estoque.pronto) throw new Promise(function () {});
+  return &lt;p&gt;{estoque.quantos} unidades&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;React.Suspense fallback={&lt;p&gt;Carregando o preço…&lt;/p&gt;}&gt;
+        &lt;Preco /&gt;
+      &lt;/React.Suspense&gt;
+      &lt;React.Suspense fallback={&lt;p&gt;Carregando o estoque…&lt;/p&gt;}&gt;
+        &lt;Estoque /&gt;
+      &lt;/React.Suspense&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel agora mostra duas coisas ao mesmo tempo: o preço que chegou e o fallback do estoque. É
+exatamente o que a pessoa vê, e é muito melhor do que uma tela vazia esperando o pedaço mais lento. A
+regra prática: fronteira em volta do que aparece junto. Se duas informações chegam em momentos
+diferentes, elas não podem dividir a mesma espera.</p>
+
+<p>Há um detalhe a mais quando a peça pode trocar de dado: um <code>Suspense</code> guarda o estado
+da espera. Se o <code>Preco</code> passa a ler outro produto, a fronteira continua mostrando o conteúdo
+antigo até o novo chegar. Para começar do zero, dê uma <code>key</code> à fronteira com o identificador
+do dado — <code>key={produto.id}</code> — e o React trata aquilo como uma fronteira nova, com o fallback
+do começo.</p>
+
+<p>Existe um custo nisso. Muitas fronteiras pequenas produzem uma tela que “monta em pedaços”, com
+saltos de layout a cada fallback que some. A saída costuma ser combinar: uma fronteira por área da tela,
+e o fallback com o mesmo tamanho do conteúdo para o layout não pular. Suspense não é sobre ter uma
+fronteira por componente; é sobre ter a fronteira no lugar em que a espera faz sentido.</p>
+
+<h2>6. Quando o dado chega, alguém precisa desenhar de novo</h2>
+
+<p>O Suspense não fica vigiando o recurso. Ele mostra o fallback e espera por um novo desenho: o React
+tenta de novo quando a promessa que foi lançada termina. Se o valor aparece no recurso por outro caminho
+— uma resposta que já chegou, um cache preenchido por fora —, nada acontece até alguém pedir um novo
+desenho.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:R$ 12,00">
+  <p class="try-task">O botão preenche o recurso, mas a tela continua no fallback: falta um estado que
+  peça ao React para desenhar de novo. Acrescente <code>setVersao(versao + 1)</code> no fim do
+  <code>chegarPedido</code>.</p>
+  <pre class="jsx">const recurso = { pronto: false, valor: null };
+
+function lerPreco() {
+  if (recurso.pronto) return recurso.valor;
+  throw new Promise(function () {});
+}
+
+function Preco() {
+  const preco = lerPreco();
+  return &lt;p&gt;Pão do dia: R$ {preco},00&lt;/p&gt;;
+}
+
+function App() {
+  const [versao, setVersao] = useState(0);
+
+  function chegarPedido() {
+    recurso.pronto = true;
+    recurso.valor = 12;
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={chegarPedido}&gt;Chegou o preço&lt;/button&gt;
+      &lt;React.Suspense fallback={&lt;p&gt;Carregando o preço…&lt;/p&gt;}&gt;
+        &lt;Preco /&gt;
+      &lt;/React.Suspense&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Chegou o preço&lt;/button&gt;
+  &lt;p&gt;Carregando o preço…&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const recurso = { pronto: false, valor: null };
+
+function lerPreco() {
+  if (recurso.pronto) return recurso.valor;
+  throw new Promise(function () {});
+}
+
+function Preco() {
+  const preco = lerPreco();
+  return &lt;p&gt;Pão do dia: R$ {preco},00&lt;/p&gt;;
+}
+
+function App() {
+  const [versao, setVersao] = useState(0);
+
+  function chegarPedido() {
+    recurso.pronto = true;
+    recurso.valor = 12;
+    setVersao(versao + 1);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={chegarPedido}&gt;Chegou o preço&lt;/button&gt;
+      &lt;React.Suspense fallback={&lt;p&gt;Carregando o preço…&lt;/p&gt;}&gt;
+        &lt;Preco /&gt;
+      &lt;/React.Suspense&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois do clique, o React desenha de novo, o <code>lerPreco</code> encontra o valor e o fallback sai de
+cena. No projeto de verdade você não precisa desse botão: quem avisa é a promessa lançada, que o React
+observa. A caixa usa um botão só para você ver o mecanismo com os próprios olhos — sem promessa
+terminando, o único jeito de pedir outro desenho é mudar o estado.</p>
+
+<p>Vale reparar em um detalhe: a variável <code>versao</code> não aparece em lugar nenhum do JSX. Ela
+existe só para o React saber que algo mudou. É o mesmo truque de “atualizar a tela” que você já viu em
+outras aulas, e ele aparece em bibliotecas de dados o tempo todo: um contador interno que força o
+redesenho depois que o cache mudou.</p>
+
+<h2>7. Suspense ou os três estados?</h2>
+
+<p>As duas abordagens continuam válidas, e a escolha depende de onde a espera mora. Os três estados são
+locais: cada componente sabe que está esperando e desenha o próprio aviso. O Suspense é da árvore: quem
+está em volta decide a espera, e o componente que lê não precisa saber que existe um carregando.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pergunta</th><th>Três estados</th><th>Suspense</th></tr>
+<tr><td>quem decide o que aparece na espera?</td><td>o próprio componente</td><td>a fronteira acima dele</td></tr>
+<tr><td>onde fica o dado?</td><td>no <code>useState</code> do componente</td><td>no recurso, fora do componente</td></tr>
+<tr><td>quantos <code>if</code> a tela tem?</td><td>um por peça que busca</td><td>nenhum dentro da peça</td></tr>
+<tr><td>o que acontece se um pedido falhar?</td><td>o componente desenha o erro</td><td>precisa de um error boundary por perto</td></tr>
+<tr><td>quando é a escolha natural?</td><td>uma peça buscando sozinha</td><td>várias peças, cada uma com seu tempo</td></tr>
+</table>
+</div>
+
+<p>Um efeito colateral bom do recurso é que ele sobrevive à navegação. Se a Ana sai da tela de preços
+e volta, a segunda visita não espera nada: o valor já está no cache e a leitura devolve na hora. Com os
+três estados, o <code>useState</code> morre junto com o componente e o pedido recomeça. Esse é o tipo de
+ganho que aparece sem você pedir, só por guardar o dado no lugar certo.</p>
+
+<p>Repare na quarta linha, que costuma ser esquecida: Suspense não trata erro. Uma promessa que rejeita
+não vira “deu errado” na tela — ela precisa de um <em>error boundary</em>, um componente que captura o
+erro de um ramo da árvore. No React, isso ainda é uma classe com <code>componentDidCatch</code>, e é
+assunto para outra aula. Por enquanto, guarde a regra: fronteira para a espera, boundary para o erro.</p>
+
+<h2>8. As armadilhas</h2>
+
+<p>Quatro erros aparecem em quase toda primeira implementação. Nenhum deles dá mensagem clara — o sintoma
+é sempre uma tela que fica no fallback ou que pisca sem parar.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sintoma</th><th>Causa</th><th>Conserto</th></tr>
+<tr><td>o fallback nunca sai</td><td>a leitura sempre lança, mesmo com o valor pronto</td><td>devolver o valor quando o recurso estiver pronto</td></tr>
+<tr><td>a tela pisca sem parar</td><td>o <code>fetch</code> está fora do <code>if</code>: nova promessa a cada desenho</td><td>criar a promessa uma vez e guardar no recurso</td></tr>
+<tr><td>a peça pronta some junto</td><td>as duas peças dividem a mesma fronteira</td><td>uma fronteira por área da tela</td></tr>
+<tr><td>o erro derruba tudo</td><td>promessa rejeitada sem error boundary</td><td>envolver o ramo com um boundary</td></tr>
+</table>
+</div>
+
+<p>A segunda linha é a mais traiçoeira, porque o código parece certo. Se cada desenho cria uma promessa
+nova, o React lança, espera, tenta de novo, cria outra promessa e lança outra vez — para sempre. O
+sintoma é um fallback que pisca em ritmo de batida. A cura é o recurso lembrar da promessa:</p>
+
+<pre class="term">pedindo o preço…
+preço chegou: 12
+desenhando: R$ 12,00</pre>
+
+<p>Já a versão quebrada repete o pedido a cada desenho, e o console denuncia na hora:</p>
+
+<pre class="term">pedindo o preço…
+pedindo o preço…
+pedindo o preço…
+pedindo o preço…</pre>
+
+<p>Quatro linhas iguais em um segundo querem dizer que a promessa está sendo criada dentro do render, e
+não dentro do recurso. É o mesmo sintoma de uma tela que pisca: cada tentativa começa do zero.</p>
+
+<p>As três linhas de antes vêm de um recurso com um <code>console.log</code> na criação da promessa e outro no
+componente. Repare que “pedindo o preço” aparece uma vez só: a promessa foi criada na primeira leitura e
+reaproveitada nas seguintes. Se a sua aparecer repetida, o cache está sendo refeito a cada desenho.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o carrinho que esperava o frete</h3>
+<p>O carrinho da Ana mostrava os itens e o frete. Os itens vinham do estado, o frete de um serviço
+externo, e os dois estavam na mesma fronteira: enquanto o frete não chegava, o visitante não via nem os
+itens. Separar em duas fronteiras devolveu a lista na hora e deixou o frete com o seu próprio
+“calculando…”.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o preço que voltava ao carregando</h3>
+<p>Ela colocou o <code>fetch</code> dentro do componente, no corpo do render. Cada desenho criava uma
+promessa nova, o componente suspendia de novo e a tela piscava sem parar. A correção foi mover o pedido
+para o recurso, com a promessa guardada e a leitura devolvendo o valor assim que ele chega.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o erro que virou tela em branco</h3>
+<p>A promessa do estoque rejeitou porque o serviço estava fora do ar, e a tela ficou em branco: sem
+error boundary, um erro de render derruba o ramo inteiro. Ela aprendeu a diferença na prática — Suspense
+cuida da espera, o boundary cuida da falha, e os dois costumam andar juntos.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que o <code>Suspense</code> faz?</p>
+<label><input type="radio" name="q1"> busca os dados e guarda o resultado para os filhos</label>
+<label><input type="radio" name="q1"> mostra o <code>fallback</code> enquanto um filho está suspenso</label>
+<label><input type="radio" name="q1"> transforma a promessa em estado automaticamente</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Como um componente avisa que ainda não tem o que desenhar?</p>
+<label><input type="radio" name="q2"> devolve <code>null</code> em vez de JSX</label>
+<label><input type="radio" name="q2"> chama <code>setCarregando(true)</code></label>
+<label><input type="radio" name="q2"> lança a promessa de dentro do render</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que acontece quando um erro de render não tem error boundary?</p>
+<label><input type="radio" name="q3"> o ramo inteiro cai, e a tela pode ficar vazia</label>
+<label><input type="radio" name="q3"> o Suspense mostra o fallback para sempre</label>
+<label><input type="radio" name="q3"> o React tenta o pedido de novo sozinho</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a leitura que devolve o valor</h2>
+<p>Complete a função de leitura para ela não suspender quando o recurso já estiver pronto.</p>
+<div class="ex-code">function lerPreco() { if (recurso.pronto) return <input aria-label="resposta 1" data-answer="recurso.valor" placeholder="...">; throw recurso.promessa; }</div>
+<p class="ex-dica">Dica: é o campo onde a resposta já está guardada. Sem essa linha, o componente lança a
+promessa para sempre e o fallback nunca sai.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Suspense é uma fronteira, não uma busca. Ele embrulha um pedaço da árvore e mostra o
+<code>fallback</code> enquanto algum filho está suspenso. Quem suspende é o componente que lê o dado,
+lançando a promessa em vez de devolver JSX. Quando a promessa termina, o React tenta desenhar de novo; se
+a leitura agora devolve valor, o conteúdo entra no lugar do fallback.</p>
+
+<p>O dado mora no recurso, fora do componente: o valor já lido, a promessa em andamento e um jeito de
+saber qual dos dois usar. A leitura tem sempre a mesma forma — devolve se tem, lança se não tem. E a
+promessa é criada uma vez, dentro do <code>if</code>; criá-la a cada desenho é o que faz a tela piscar.</p>
+
+<p>O resto é posicionamento de fronteira: em volta do que aparece junto, não em volta de cada componente.
+Uma peça pronta não deve esperar pela peça lenta, e um erro não se resolve com fallback — se resolve com
+error boundary. Na próxima aula o assunto continua no React 19, agora do lado dos formulários: como o
+atributo <code>action</code> substitui o <code>onSubmit</code> em <a href="formularios-com-actions.html">Formulários
+com Actions</a>.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Suspense é fronteira: mostra o <code>fallback</code> enquanto um filho espera.</li>
+<li>Quem suspende lança a promessa no render; não devolve JSX.</li>
+<li>A leitura devolve o valor se ele já está no recurso; senão, lança.</li>
+<li>A promessa se cria uma vez, guardada no recurso.</li>
+<li>Cada área da tela merece a sua fronteira.</li>
+<li>O React redesenha quando a promessa lançada termina.</li>
+<li>Sem promessa terminando, só um novo desenho (estado) faz o valor aparecer.</li>
+<li>Erro não é espera: precisa de error boundary.</li>
+<li>Fallback do tamanho do conteúdo evita o salto de layout.</li>
+<li>Três estados para uma peça; Suspense quando várias esperam em tempos diferentes.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

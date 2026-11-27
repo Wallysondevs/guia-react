@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blog | Guia React</title>
+<meta name="description" content="Projeto de um blog em React, do esboço ao acabamento: os dados do post, a árvore de componentes, a lista, a busca, a leitura e a ordem de montagem.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Blog</span></h1>
+<p class="intro">A Ana escreve sobre pão há anos — em três cadernos, num bloco de notas e em dois papéis
+colados na parede da cozinha. Ela quer um blog de verdade: uma lista de posts, um campo de busca e uma
+página para ler cada receita inteira. Neste projeto você monta esse blog com ela, na ordem em que as
+coisas precisam ser feitas: os dados primeiro, os componentes depois, o estado no fim — e cada pedaço
+roda aqui na caixa, com o React de verdade.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como transformar uma ideia de tela em uma lista de dados antes de escrever componente.</li>
+  <li>Quais estados um blog precisa e onde cada um deve morar.</li>
+  <li>Como montar o cartão de um post com título, resumo, tag e data.</li>
+  <li>Como ligar um campo de busca à lista sem estragar os dados originais.</li>
+  <li>Como abrir um post guardando o <strong>id</strong>, e não o objeto inteiro.</li>
+  <li>A ordem de montagem que evita retrabalho: dado, lista, filtro, detalhe.</li>
+  <li>O que costuma quebrar num blog e como perceber pelo sintoma.</li>
+</ul>
+</div>
+
+<h2>1. A cena: as receitas espalhadas em três cadernos</h2>
+
+<p>A Ana tem sete textos prontos. Dois sobre fermentação, dois sobre fornos, três com receitas que ela
+vende no balcão. O problema não é escrever: é que ninguém acha nada. Quem quer a receita do pão de
+queijo pergunta no balcão; quem quer saber do forno novo nunca fica sabendo.</p>
+
+<p>Um blog resolve isso com três telas bem pequenas. A primeira é uma lista: todos os posts, do mais
+novo para o mais antigo, cada um com título, resumo, tag e data. A segunda é uma busca: a mesma lista,
+filtrada pelo que a pessoa digita. A terceira é a leitura: um post inteiro, aberto depois de um
+clique.</p>
+
+<p>É tentador começar pela tela mais bonita. Não faça isso. A ordem que funciona é a ordem dos dados:
+primeiro decidir o que é um post, depois desenhar a lista, depois o filtro, depois a leitura. Cada etapa
+usa a anterior, e nenhuma precisa ser desfeita. Nas próximas seções você vai montar exatamente nessa
+ordem.</p>
+
+<h2>2. O desenho antes do código: as três telas</h2>
+
+<p>Antes de escrever JSX, a Ana desenhou as três telas no papel. Esse passo parece perda de tempo e
+economiza horas: no papel ela descobre que a busca precisa do mesmo dado da lista, que a leitura precisa
+achar um post pelo id, e que a tag aparece nas três telas. Tudo isso vira uma decisão de dados, não de
+CSS.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tela</th><th>O que mostra</th><th>Que dado precisa</th></tr>
+<tr><td>Lista</td><td>todos os posts, do mais novo ao mais antigo</td><td>o array de posts, já ordenado</td></tr>
+<tr><td>Busca</td><td>os posts que casam com o texto digitado</td><td>o array + o texto da busca</td></tr>
+<tr><td>Leitura</td><td>um post inteiro, com o corpo</td><td>o array + o id do post aberto</td></tr>
+<tr><td>Filtro por tag</td><td>só os posts de uma tag</td><td>o array + a tag escolhida</td></tr>
+</table>
+</div>
+
+<p>Repare no que <em>não</em> aparece na tabela: nenhuma tela precisa de uma cópia própria da lista. As
+quatro leem o mesmo array e mudam só o que está em volta: uma ordenação, um texto, um id, uma tag. Essa
+é a decisão mais importante do projeto inteiro — e a que mais gente erra, guardando uma lista filtrada
+dentro do estado e ficando com duas verdades.</p>
+
+<p>O desenho também resolve uma dúvida de navegação: o blog é uma página só, que troca de conteúdo
+conforme o estado. Não há rota, não há endereço novo, não há recarregamento. Isso simplifica muito para
+quem está começando; quando o projeto crescer, a aula de <a href="rotas-com-estado.html">Rotas com
+Estado</a> mostra como transformar esses estados em endereços de verdade.</p>
+
+<h2>3. O post é um objeto: os dados do blog</h2>
+
+<p>Um post não é um título solto. Ele tem um identificador, um título, uma data, uma tag, um resumo
+curto que aparece na lista e um corpo longo que aparece na leitura. Cinco minutos escolhendo esses campos
+evitam um mês de remendo.</p>
+
+<dl class="anatomy">
+<dt>id</dt>
+<dd>O número que identifica o post. Não muda nunca e serve de key na lista e de critério para achar o
+post aberto.</dd>
+<dt>titulo</dt>
+<dd>O texto que aparece no cartão e no topo da leitura. Curto, direto, sem ponto final.</dd>
+<dt>tag</dt>
+<dd>A categoria do post: <code>receitas</code>, <code>bastidores</code>. É o que o filtro usa depois;
+por enquanto, é só um texto no cartão.</dd>
+<dt>resumo</dt>
+<dd>Uma frase que dá vontade de clicar. Aparece no cartão; nunca substitui o corpo.</dd>
+<dt>corpo</dt>
+<dd>O texto inteiro do post. Fica só na tela de leitura — se você desenhar o corpo na lista, a página
+vira um rolo.</dd>
+</dl>
+
+<p>Escreva os posts em um arquivo separado, <code>dados/posts.js</code>, exportando o array. Isso não é
+organização por gosto: é o que permite trocar o array fixo por dados vindos de uma API depois, sem tocar
+nos componentes. Enquanto são sete posts, o arquivo é uma constante; no dia em que forem setecentos,
+ele vira uma chamada de rede e nenhum componente muda.</p>
+
+<pre class="file" data-file="dados/posts.js">export const posts = [
+  {
+    id: 1,
+    titulo: "Pão de fermentação natural",
+    data: "12/03/2026",
+    tag: "receitas",
+    resumo: "Doze horas de espera e três ingredientes.",
+    corpo: "Misture a farinha e a água e deixe descansar por doze horas."
+  },
+  {
+    id: 2,
+    titulo: "Como escolher o forno da padaria",
+    data: "05/03/2026",
+    tag: "bastidores",
+    resumo: "O que a Ana aprendeu com dois fornos.",
+    corpo: "Dois fornos, duas contas de luz, uma decisão."
+  }
+];</pre>
+
+<p>Para conferir se o modelo está completo, um <code>console.log</code> com as chaves do primeiro post
+resolve — se falta um campo que a tela precisa, aparece aqui:</p>
+
+<pre class="file" data-file="teste.js">console.log("campos do post: " + Object.keys(posts[0]).join(", "));</pre>
+
+<pre class="term">console: campos do post: id, titulo, data, tag, resumo, corpo</pre>
+
+<p>Com o modelo na mão, o resto do projeto é decidir onde cada pedaço mora. Duas telas que leem o mesmo
+array não precisam de duas cópias; uma tela que muda com o clique precisa de um estado.</p>
+
+<h2>4. A árvore de componentes e onde mora cada estado</h2>
+
+<p>O blog inteiro cabe em quatro componentes. <code>App</code> guarda o estado e os dados;
+<code>ListaDePosts</code> recebe os posts já prontos para desenhar; <code>CartaoDePost</code> desenha um
+post; <code>Leitura</code> recebe um post e mostra o corpo. A busca é um <code>&lt;input&gt;</code>
+dentro do <code>App</code>, porque o valor dela muda a lista — e o estado que muda a lista mora acima
+dela.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Peça</th><th>Onde mora</th><th>Por quê</th></tr>
+<tr><td>os posts</td><td>arquivo de dados</td><td>é conteúdo, não muda durante a sessão</td></tr>
+<tr><td>o texto da busca</td><td>estado no <code>App</code></td><td>muda a cada letra e filtra a lista</td></tr>
+<tr><td>a tag escolhida</td><td>estado no <code>App</code></td><td>muda no clique e filtra a lista</td></tr>
+<tr><td>o post aberto</td><td>estado no <code>App</code></td><td>muda no clique e troca a tela de leitura</td></tr>
+<tr><td>a lista visível</td><td>derivada no desenho</td><td>é consequência dos três de cima</td></tr>
+</table>
+</div>
+
+<p>Três estados, uma derivada. É pouco para um app inteiro, e essa é a graça: quanto menos estado, menos
+coisa pode ficar fora de sincronia. Toda vez que você sentir vontade de criar um quarto
+<code>useState</code> para "a lista filtrada", releia a última linha da tabela — ela quase sempre resolve
+com uma <code>const</code>.</p>
+
+<p>A escolha de guardar o <strong>id</strong> do post aberto, e não o objeto, merece destaque. Se você
+guarda o objeto, o blog congela aquele post no momento do clique: quando o texto for editado, a leitura
+continua mostrando a versão velha. Guardando o id, você acha o post de novo a cada desenho e sempre vê a
+versão atual. É a mesma lição da aula de <a href="estado-derivado.html">Estado Derivado</a>, aplicada a
+uma tela de detalhe.</p>
+
+<h2>5. Primeiro pedaço: o cartão de post</h2>
+
+<p>Comece pelo que a pessoa vê primeiro. O cartão é um <code>&lt;li&gt;</code> com quatro informações:
+título, resumo, tag e data. Ele não busca nada, não decide nada — recebe um post por prop e desenha. Essa
+divisão deixa o componente testável e reaproveitável na lista, na busca e no filtro por tag.</p>
+
+<dl class="anatomy">
+<dt>título</dt>
+<dd>Um <code>h2</code> dentro do item da lista. É o que dá hierarquia à página e o que o leitor de tela
+anuncia primeiro.</dd>
+<dt>resumo</dt>
+<dd>Um parágrafo curto, com classe própria para o CSS limitar a duas linhas.</dd>
+<dt>tag</dt>
+<dd>Um <code>span</code> com classe <code>tag</code>. Vira botão de filtro depois; hoje é só rótulo.</dd>
+<dt>data</dt>
+<dd>Texto guardado no dado, no formato brasileiro. Simples e sem susto de fuso.</dd>
+<dt>key</dt>
+<dd>O <code>id</code> do post, no <code>&lt;CartaoDePost&gt;</code> que o <code>map</code> devolve.</dd>
+</dl>
+
+<div class="tryreact" data-goal="conta:li=3;;conta:.tag=3;;texto:Doze horas de espera">
+  <p class="try-task">A lista mostra só o título. Use o componente <code>CartaoDePost</code>, que já
+  existe, dentro do <code>map</code> — passando o post na prop e o id na key.</p>
+  <pre class="jsx">const posts = [
+  { id: 1, titulo: "Pão de fermentação natural", data: "12/03/2026", tag: "receitas", resumo: "Doze horas de espera e três ingredientes." },
+  { id: 2, titulo: "Como escolher o forno da padaria", data: "05/03/2026", tag: "bastidores", resumo: "O que a Ana aprendeu com dois fornos." },
+  { id: 3, titulo: "O pão de queijo que vende antes das 8h", data: "27/02/2026", tag: "receitas", resumo: "A receita que sai da forma às 6h30." }
+];
+
+function CartaoDePost({ post }) {
+  return (
+    &lt;li className="post"&gt;
+      &lt;h2&gt;{post.titulo}&lt;/h2&gt;
+      &lt;p className="resumo"&gt;{post.resumo}&lt;/p&gt;
+      &lt;p&gt;&lt;span className="tag"&gt;{post.tag}&lt;/span&gt; · {post.data}&lt;/p&gt;
+    &lt;/li&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;ul className="lista-de-posts"&gt;
+      {posts.map((p) =&gt; &lt;li key={p.id}&gt;{p.titulo}&lt;/li&gt;)}
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul class="lista-de-posts"&gt;
+  &lt;li&gt;Pão de fermentação natural&lt;/li&gt;
+  &lt;li&gt;Como escolher o forno da padaria&lt;/li&gt;
+  &lt;li&gt;O pão de queijo que vende antes das 8h&lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">const posts = [
+  { id: 1, titulo: "Pão de fermentação natural", data: "12/03/2026", tag: "receitas", resumo: "Doze horas de espera e três ingredientes." },
+  { id: 2, titulo: "Como escolher o forno da padaria", data: "05/03/2026", tag: "bastidores", resumo: "O que a Ana aprendeu com dois fornos." },
+  { id: 3, titulo: "O pão de queijo que vende antes das 8h", data: "27/02/2026", tag: "receitas", resumo: "A receita que sai da forma às 6h30." }
+];
+
+function CartaoDePost({ post }) {
+  return (
+    &lt;li className="post"&gt;
+      &lt;h2&gt;{post.titulo}&lt;/h2&gt;
+      &lt;p className="resumo"&gt;{post.resumo}&lt;/p&gt;
+      &lt;p&gt;&lt;span className="tag"&gt;{post.tag}&lt;/span&gt; · {post.data}&lt;/p&gt;
+    &lt;/li&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;ul className="lista-de-posts"&gt;
+      {posts.map((p) =&gt; &lt;CartaoDePost key={p.id} post={p} /&gt;)}
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra três <code>&lt;li class="post"&gt;</code>, cada um com título, resumo e a linha da tag
+com a data. Repare que a <code>key</code> foi para o <code>&lt;CartaoDePost&gt;</code>, e não para o
+<code>&lt;li&gt;</code> de dentro: quem percorre a lista é o <code>App</code>, então é ele que sabe qual é
+a identidade de cada linha. É a regra da aula de <a href="chaves-estaveis.html">Chaves Estáveis</a>,
+aplicada a um componente em vez de uma tag.</p>
+
+<p>Se você desenhar o corpo no cartão, a lista vira um rolo e ninguém acha nada. Resumo é resumo: uma
+frase, no máximo duas. O corpo tem a sua tela, e é o próximo pedaço.</p>
+
+<p>Duas decisões de acabamento cabem já aqui, no cartão. A primeira é a data: guarde em texto, no
+formato brasileiro. Parece preguiça e é prudência — uma data ISO como <code>2026-03-12</code> é lida como
+meia-noite em UTC, e no fuso de São Paulo isso é 21h do dia anterior, então a tela mostraria 11/03. Se um
+dia você guardar datas em ISO, converta com cuidado e teste no fuso certo.</p>
+
+<p>A segunda é o tempo de leitura, que avisa o tamanho do texto antes do clique. A conta é grosseira e
+honesta: duzentas palavras por minuto, arredondando para cima.</p>
+
+<pre class="file" data-file="util/texto.js">export function tempoDeLeitura(corpo) {
+  const palavras = corpo.split(" ").filter(Boolean).length;
+  return Math.ceil(palavras / 200) + " min de leitura";
+}
+
+console.log(tempoDeLeitura(posts[0].corpo));</pre>
+
+<p>Com um corpo de 412 palavras, o console mostra:</p>
+
+<pre class="term">console: 3 min de leitura</pre>
+
+<p>Repare no formato: isso não é componente nem estado, é uma função de texto que roda na hora de
+desenhar. O cartão chama <code>tempoDeLeitura(post.corpo)</code> e mostra o resultado ao lado da
+data.</p>
+
+<h2>6. Segundo pedaço: a busca que filtra sem estragar</h2>
+
+<p>Agora o campo que faz o blog ser útil. A busca é um estado de texto mais um <code>filter</code>
+derivado — nada de guardar a lista filtrada. A cada letra digitada, o estado muda, o
+<code>filter</code> roda e a lista desenha menos itens. O array original continua inteiro o tempo
+todo.</p>
+
+<div class="tryreact" data-goal="digite:input=queijo;;conta:li=1;;texto:O pão de queijo">
+  <p class="try-task">O campo não está ligado a nada e a lista mostra os três posts. Controle o campo
+  com <code>busca</code> e filtre os títulos por <code>includes</code>, sem diferenciar maiúsculas.
+  Depois digite <strong>queijo</strong>.</p>
+  <pre class="jsx">const posts = [
+  { id: 1, titulo: "Pão de fermentação natural" },
+  { id: 2, titulo: "Como escolher o forno da padaria" },
+  { id: 3, titulo: "O pão de queijo que vende antes das 8h" }
+];
+
+function App() {
+  const [busca, setBusca] = useState("");
+
+  return (
+    &lt;div&gt;
+      &lt;input placeholder="buscar no blog" /&gt;
+      &lt;ul&gt;
+        {posts.map((p) =&gt; &lt;li key={p.id}&gt;{p.titulo}&lt;/li&gt;)}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input placeholder="buscar no blog"&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Pão de fermentação natural&lt;/li&gt;
+    &lt;li&gt;Como escolher o forno da padaria&lt;/li&gt;
+    &lt;li&gt;O pão de queijo que vende antes das 8h&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const posts = [
+  { id: 1, titulo: "Pão de fermentação natural" },
+  { id: 2, titulo: "Como escolher o forno da padaria" },
+  { id: 3, titulo: "O pão de queijo que vende antes das 8h" }
+];
+
+function App() {
+  const [busca, setBusca] = useState("");
+  const visiveis = posts.filter((p) =&gt; p.titulo.toLowerCase().includes(busca.toLowerCase()));
+
+  return (
+    &lt;div&gt;
+      &lt;input
+        placeholder="buscar no blog"
+        value={busca}
+        onChange={(e) =&gt; setBusca(e.target.value)}
+      /&gt;
+      &lt;ul&gt;
+        {visiveis.map((p) =&gt; &lt;li key={p.id}&gt;{p.titulo}&lt;/li&gt;)}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois de digitar "queijo", o painel mostra um <code>&lt;li&gt;</code> só, com o <code>value</code> do
+campo atualizado. Três detalhes fazem a diferença. O primeiro é <code>value={busca}</code> junto com
+<code>onChange</code>: sem os dois, o campo é do navegador, não do React, e o valor some no próximo
+desenho. O segundo é <code>toLowerCase()</code> nos dois lados, para "Queijo" e "queijo" darem no mesmo.
+O terceiro é filtrar <em>antes</em> do <code>map</code>, como a aula de
+<a href="filtrar.html">Filtrar</a> explica.</p>
+
+<p>Um log simples mostra a conta que a tela está fazendo:</p>
+
+<pre class="file" data-file="App.jsx">const visiveis = posts.filter((p) =&gt; p.titulo.toLowerCase().includes(busca.toLowerCase()));
+console.log(visiveis.length + " de " + posts.length + " posts");</pre>
+
+<p>Digitando "queijo" em um blog de três posts, o console mostra:</p>
+
+<pre class="term">console: 1 de 3 posts</pre>
+
+<p>Se o número da esquerda nunca muda, o <code>filter</code> está no lugar errado — ou o campo não está
+controlado. Se muda e a lista não, você filtrou uma variável que o JSX não usa. Esse par de números é o
+teste mais rápido de uma busca.</p>
+
+<p>Falta um detalhe que custa uma linha: o campo precisa de um <code>label</code> de verdade, ligado por
+<code>htmlFor</code> e <code>id</code>. <em>Placeholder</em> não é rótulo — ele desaparece quando a pessoa
+digita e nem todo leitor de tela o anuncia.</p>
+
+<h2>7. Terceiro pedaço: abrir um post</h2>
+
+<p>Falta a leitura. O estado guarda o id do post aberto; o componente acha o post com
+<code>find</code>; a área de leitura mostra título e corpo. Antes do primeiro clique, a área mostra um
+convite — não um espaço vazio, que parece defeito.</p>
+
+<div class="tryreact" data-goal="clique:.abrir;;conta:.leitura h3=1;;texto:Misture a farinha">
+  <p class="try-task">O botão já guarda o id em <code>aberto</code> e o <code>find</code> já acha o
+  post, mas a área de leitura está vazia. Mostre o post aberto ali dentro — e um convite quando nada
+  estiver aberto.</p>
+  <pre class="jsx">const posts = [
+  { id: 1, titulo: "Pão de fermentação natural", corpo: "Misture a farinha e a água e deixe descansar por doze horas." },
+  { id: 2, titulo: "Como escolher o forno da padaria", corpo: "Dois fornos, duas contas de luz, uma decisão." }
+];
+
+function App() {
+  const [aberto, setAberto] = useState(null);
+  const post = posts.find((p) =&gt; p.id === aberto);
+
+  return (
+    &lt;div&gt;
+      &lt;ul&gt;
+        {posts.map((p) =&gt; (
+          &lt;li key={p.id}&gt;
+            &lt;button className="abrir" onClick={() =&gt; setAberto(p.id)}&gt;{p.titulo}&lt;/button&gt;
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+      &lt;div className="leitura"&gt;&lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;ul&gt;
+    &lt;li&gt;
+      &lt;button class="abrir"&gt;Pão de fermentação natural&lt;/button&gt;
+    &lt;/li&gt;
+    &lt;li&gt;
+      &lt;button class="abrir"&gt;Como escolher o forno da padaria&lt;/button&gt;
+    &lt;/li&gt;
+  &lt;/ul&gt;
+  &lt;div class="leitura"&gt;&lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const posts = [
+  { id: 1, titulo: "Pão de fermentação natural", corpo: "Misture a farinha e a água e deixe descansar por doze horas." },
+  { id: 2, titulo: "Como escolher o forno da padaria", corpo: "Dois fornos, duas contas de luz, uma decisão." }
+];
+
+function App() {
+  const [aberto, setAberto] = useState(null);
+  const post = posts.find((p) =&gt; p.id === aberto);
+
+  return (
+    &lt;div&gt;
+      &lt;ul&gt;
+        {posts.map((p) =&gt; (
+          &lt;li key={p.id}&gt;
+            &lt;button className="abrir" onClick={() =&gt; setAberto(p.id)}&gt;{p.titulo}&lt;/button&gt;
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+      &lt;div className="leitura"&gt;
+        {post ? (
+          &lt;article&gt;
+            &lt;h3&gt;{post.titulo}&lt;/h3&gt;
+            &lt;p&gt;{post.corpo}&lt;/p&gt;
+          &lt;/article&gt;
+        ) : (
+          &lt;p&gt;Escolha um post para ler&lt;/p&gt;
+        )}
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique no primeiro botão e a área de leitura ganha um <code>&lt;h3&gt;</code> com o título e o corpo.
+O ternário tem dois lados por um motivo: <code>post</code> é <code>undefined</code> enquanto ninguém
+clicou, e desenhar <code>post.titulo</code> nesse momento derrubaria o componente. É a mesma proteção da
+aula de <a href="renderizacao-condicional.html">Renderização Condicional</a>.</p>
+
+<p>Note também que o botão guarda <code>p.id</code>, não <code>p</code>. Parece detalhe e não é: o id é
+uma chave estável; o objeto é uma foto do momento. Guardando o id, qualquer mudança no post aparece na
+leitura sem você fazer nada. Guardando o objeto, a leitura fica congelada no dia do clique.</p>
+
+<p>Duas linhas de acessibilidade fecham a leitura. O botão que abre o post é um <code>button</code> de
+verdade, então o teclado já funciona de graça. E a área de leitura ganha
+<code>aria-live="polite"</code>, para o leitor de tela anunciar o texto novo quando ele troca sem
+recarregar a página — a aula de <a href="acessibilidade.html">Acessibilidade</a> explica o resto.</p>
+
+<h2>8. A ordem de montagem e o que quebra</h2>
+
+<p>Com os três pedaços prontos, a ordem de montagem do projeto fica óbvia — e ela é sempre a mesma em
+qualquer app de lista com detalhe. Vale escrever no papel antes de abrir o editor.</p>
+
+<pre class="file" data-file="src/">src/
+  dados/posts.js          os posts, sem React nenhum
+  App.jsx                 o estado e a lista
+  componentes/CartaoDePost.jsx
+  componentes/ListaDePosts.jsx
+  componentes/Leitura.jsx
+  componentes/Busca.jsx</pre>
+
+<p>Monte nesta ordem: dados, cartão, lista, busca, leitura. Cada passo tem uma tela que você consegue
+olhar. Se você começar pela leitura, vai precisar inventar um post para testar; se começar pela busca, vai
+filtrar uma lista que ainda não existe. A ordem certa é a que deixa a tela funcionando a cada passo.</p>
+
+<p>Falta um estado que o desenho previu e as caixas não precisaram: a tag escolhida. Ela entra por
+último, e a receita é a mesma da busca — um <code>useState</code> começando em <code>"todas"</code>, um
+botão por tag e mais uma condição no <code>filter</code>. Duas mudanças pequenas, nenhuma estrutura
+nova.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que quebra</th><th>Como aparece</th><th>Conserto</th></tr>
+<tr><td><code>key</code> com o índice da lista filtrada</td><td>a linha certa some e o estado vai para o vizinho</td><td><code>key={p.id}</code></td></tr>
+<tr><td>guardar o post aberto como objeto</td><td>a leitura mostra texto velho depois de editar</td><td>guarde o id e use <code>find</code></td></tr>
+<tr><td>filtrar os posts em vez de derivar</td><td>a busca não volta ao apagar o texto</td><td>derive <code>visiveis</code> no desenho</td></tr>
+<tr><td><code>input</code> sem <code>value</code> e <code>onChange</code></td><td>o texto digitado some no próximo desenho</td><td>campo controlado</td></tr>
+</table>
+</div>
+
+<div class="cenario">
+<h3>Cenário 1: a busca apaga quando abro um post</h3>
+<p>A Ana digitou "fermentação", abriu um post e o campo voltou vazio. Ela tinha desenhado a busca dentro
+de um bloco que só aparece na lista — e ao trocar para a leitura, o campo foi desmontado, levando o
+estado junto. O conserto é manter a busca acima da troca de tela, no <code>App</code>, para o estado
+sobreviver à navegação.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a leitura mostra a versão antiga do texto</h3>
+<p>Ela corrigiu um post no arquivo de dados e a tela de leitura continuou com o texto anterior. O estado
+guardava o objeto inteiro, capturado no clique. Guardando o id e fazendo <code>find</code> a cada
+desenho, a leitura passa a refletir o dado atual. Em app de verdade, é a diferença entre ver o pedido
+como ele está e vê-lo como estava.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o blog inteiro numa rolagem só</h3>
+<p>Ela desenhou o corpo do post dentro do cartão. Com dois posts ficou bonito; com sete, ninguém chegava
+ao segundo. O resumo existe para isso: o cartão dá vontade de clicar, a leitura entrega o texto. Quando
+a lista fica longa, a aula de <a href="paginacao.html">Paginação</a> mostra como fatiar sem mudar
+nada.</p>
+</div>
+
+<h2>9. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Qual é o primeiro passo do projeto?</p>
+<label><input type="radio" name="pb1"> desenhar o cartão bonito da lista</label>
+<label><input type="radio" name="pb1"> decidir os campos do post e escrever os dados</label>
+<label><input type="radio" name="pb1"> instalar uma biblioteca de rotas</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que o estado deve guardar para a tela de leitura?</p>
+<label><input type="radio" name="pb2"> o objeto do post inteiro</label>
+<label><input type="radio" name="pb2"> o texto do corpo já formatado</label>
+<label><input type="radio" name="pb2"> o id do post aberto</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. A busca some quando o leitor abre um post. Por quê?</p>
+<label><input type="radio" name="pb3"> o campo e o estado foram desmontados junto com a tela</label>
+<label><input type="radio" name="pb3"> o React apaga o <code>useState</code> a cada clique</label>
+<label><input type="radio" name="pb3"> o <code>filter</code> limpou o array original</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: achar o post aberto</h2>
+<p>Complete a linha que transforma o id guardado no estado no post que a leitura desenha. Depois
+responda: por que não guardar o objeto inteiro no lugar do id?</p>
+<div class="ex-code">const post = posts.<input aria-label="resposta 1" data-answer="find" placeholder="...">((p) =&gt; p.id === aberto);</div>
+<p class="ex-dica">Dica: é o método de array que devolve <strong>um</strong> item, o primeiro que passa
+no teste — ou <code>undefined</code> quando nenhum passa.</p>
+</div>
+
+<h2>10. Resumo</h2>
+
+<p>Um blog é uma lista, uma busca e uma leitura sobre o mesmo array de posts. O projeto começa pelos
+dados: id, título, data, tag, resumo e corpo. Depois vem o cartão, que recebe um post por prop; depois a
+lista, que percorre com <code>map</code> e key igual ao id; depois a busca, que é um estado de texto mais
+um <code>filter</code> derivado; por último a leitura, que guarda o id aberto e acha o post com
+<code>find</code>.</p>
+
+<p>Três estados resolvem o app inteiro — busca, tag e post aberto — e a lista visível é sempre conta,
+nunca estado. Guardar o id em vez do objeto mantém a leitura atualizada; guardar a lista filtrada cria
+uma segunda verdade que envelhece. E a ordem de montagem (dado, cartão, lista, busca, leitura) garante
+uma tela funcionando em cada passo, o que é a melhor forma de descobrir um erro cedo.</p>
+
+<p>O acabamento é curto e faz diferença: data guardada em texto no formato brasileiro, tempo de leitura
+calculado a partir do corpo, botão de verdade para abrir o post, área de leitura anunciada com
+<code>aria-live</code> e um <code>label</code> na busca. Nada disso é enfeite: é o que transforma uma
+lista de textos em um blog que as pessoas conseguem usar.</p>
+
+<p>Quando o blog crescer, os próximos passos já têm aula: paginar a lista, ordenar por data com
+<code>sort</code>, trocar o array fixo por dados de uma API com <code>useEffect</code> e transformar o
+post aberto em endereço com rotas. O desenho que você fez aqui continua o mesmo — muda só de onde os
+dados vêm.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Projeto começa pelos dados: os campos do post antes de qualquer componente.</li>
+<li>Um array de posts serve a todas as telas; nenhuma precisa de cópia própria.</li>
+<li>Cartão recebe um post por prop; a key é o id, no componente que o <code>map</code> devolve.</li>
+<li>Busca é estado de texto + <code>filter</code> derivado, com <code>toLowerCase</code> nos dois lados.</li>
+<li>Campo controlado precisa de <code>value</code> e <code>onChange</code> juntos.</li>
+<li>Guarde o id do post aberto; ache o post com <code>find</code> a cada desenho.</li>
+<li>Leitura sem post escolhido mostra um convite, não uma área vazia.</li>
+<li>Ordem de montagem: dados, cartão, lista, busca, leitura.</li>
+<li>Data em texto no formato brasileiro evita o deslocamento de fuso do ISO.</li>
+<li>Botão para abrir, <code>aria-live</code> na leitura e <code>label</code> na busca: acessibilidade barata.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

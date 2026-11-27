@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carrinho de Compras | Guia React</title>
+<meta name="description" content="Projeto de carrinho de compras em React: catálogo, itens com quantidade, somar o mesmo produto, subtotal, frete e total em reais e a mensagem do carrinho vazio.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Carrinho de <span class="hl">Compras</span></h1>
+<p class="intro">A padaria agora vende pelo site, e a Ana precisa resolver uma pergunta que parece simples:
+quando o cliente clica duas vezes em "Pão de queijo", o que acontece? Um item repetido na lista ou um item
+com quantidade 2? E o total, quem calcula? Neste projeto ela monta o carrinho do zero: o catálogo, a lista
+de itens com quantidade, as contas de subtotal, frete e total, o dinheiro formatado em reais e a mensagem
+do carrinho vazio. Cada caixa roda uma parte do app com o React de verdade.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como separar o catálogo (dado fixo) do carrinho (estado).</li>
+  <li>Como somar o mesmo produto em vez de repetir a linha.</li>
+  <li>Como aumentar a quantidade com <code>map</code> sem mutar o item.</li>
+  <li>Como calcular subtotal, frete e total no render.</li>
+  <li>Como formatar dinheiro em reais sem erro de arredondamento.</li>
+  <li>Como mostrar o carrinho vazio e limitar a quantidade.</li>
+  <li>Como remover um item com <code>filter</code>.</li>
+  <li>O que quebra quando o preço chega como texto.</li>
+</ul>
+</div>
+
+<h2>1. A cena e as decisões do carrinho</h2>
+
+<p>O carrinho tem duas listas, e confundi-las é o primeiro erro do projeto. A primeira é o
+<strong>catálogo</strong>: os produtos que a padaria vende, com preço fixo. A segunda é o
+<strong>carrinho</strong>: o que aquele cliente escolheu, com quantidade. O catálogo é dado de partida e
+não muda; o carrinho é estado e muda a cada clique.</p>
+
+<p>A segunda decisão é o que um item do carrinho guarda. Guardar o produto inteiro copiado é cômodo e
+perigoso: se o preço mudar no catálogo, o item fica com o preço velho. Guardar só o id obriga a buscar o
+produto a cada conta. Neste projeto o item guarda uma cópia mínima — id, título e preço — porque o preço
+do momento da compra é justamente o que interessa num carrinho.</p>
+
+<p>A terceira decisão é sobre dinheiro. Preço em reais com centavos é número decimal, e decimal em
+JavaScript tem fama ruim: <code>0.1 + 0.2</code> não dá exatamente <code>0.3</code>. Para um app de
+padaria, guardar reais e arredondar na hora de mostrar resolve. Para um sistema financeiro, o caminho é
+guardar centavos inteiros e dividir só na exibição.</p>
+
+<p>O escopo: catálogo, adicionar, aumentar, diminuir, remover, subtotal, frete e total. Fora: cupom,
+pagamento, estoque real. O frete é uma regra simples — grátis a partir de R$ 20, senão R$ 5 — e serve para
+mostrar que nem toda conta precisa de estado.</p>
+
+<h2>2. Os dados: produto e item</h2>
+
+<p>São dois formatos parecidos e com papéis diferentes. O produto é o que a loja oferece; o item é o que o
+cliente levou. O produto tem preço unitário; o item tem quantidade. Os dois têm id, e é o id que permite
+encontrar o mesmo produto nas duas listas.</p>
+
+<dl class="anatomy">
+<dt>produto</dt>
+<dd>O que está na vitrine: <code>{ id, titulo, preco }</code>. O preço é o valor unitário, em reais.</dd>
+<dt>item do carrinho</dt>
+<dd>O que o cliente escolheu: <code>{ id, titulo, preco, quantidade }</code>. O id é o mesmo do
+produto.</dd>
+<dt><code>quantidade</code></dt>
+<dd>Quantas unidades daquele produto. Começa em 1 e sobe com o botão de mais.</dd>
+<dt>subtotal</dt>
+<dd>A soma de <code>preco * quantidade</code> de todos os itens, antes do frete.</dd>
+<dt>total</dt>
+<dd>Subtotal mais o frete. É o número que o cliente paga e o que aparece em destaque.</dd>
+</dl>
+
+<p>Com os formatos definidos, os dados ficam legíveis:</p>
+
+<pre class="file" data-file="App.jsx">const produtos = [
+  { id: "pao-frances", titulo: "Pão francês", preco: 1.0 },
+  { id: "pao-queijo", titulo: "Pão de queijo", preco: 1.5 },
+  { id: "bolo-cenoura", titulo: "Bolo de cenoura", preco: 12.0 },
+  { id: "cafe", titulo: "Café coado", preco: 2.5 },
+];</pre>
+
+<p>Repare que o preço é número, não texto: <code>1.5</code>, e não <code>"1,50"</code>. Guardar texto
+obrigaria a converter em toda conta e abriria espaço para <code>"1,5" + "2"</code> virar
+<code>"1,52"</code>. A conversão para o formato brasileiro acontece só na hora de mostrar, com uma função
+pequena.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Decisão</th><th>Caminho fácil</th><th>O que custa depois</th></tr>
+<tr><td>preço como texto</td><td><code>"R$ 1,50"</code></td><td>toda conta precisa converter; a soma concatena</td></tr>
+<tr><td>copiar o produto inteiro no item</td><td><code>{ ...produto, quantidade: 1 }</code></td><td>o item carrega campos que não usa e pode ficar velho</td></tr>
+<tr><td>guardar o total no estado</td><td><code>const [total, setTotal]</code></td><td>é preciso atualizar em cada mudança de quantidade</td></tr>
+<tr><td>calcular o total no render</td><td><code>carrinho.reduce(...)</code></td><td>nada: é sempre a soma do carrinho atual</td></tr>
+</table>
+</div>
+
+<p>A última linha é a regra do projeto inteiro: o total não é um dado novo, é uma conta. Guardar o total
+num <code>useState</code> significa lembrar de recalculá-lo em adicionar, aumentar, diminuir e remover — e
+um dia esquecer. A conta feita no render nunca esquece.</p>
+
+<h2>3. O catálogo na tela</h2>
+
+<p>A vitrine é a parte fácil: um <code>map</code> sobre <code>produtos</code>, um cartão por produto, com
+título, preço formatado e o botão de adicionar. O botão ainda não faz nada nesta etapa — ele ganha a função
+no próximo passo. Separar as etapas é o que permite testar uma coisa de cada vez.</p>
+
+<div class="tryreact" data-goal="conta:.produto=4;;texto:R$ 12,00">
+  <p class="try-task">A vitrine mostra dois produtos escritos à mão. Gere um <code>div.produto</code> para
+  cada item de <code>produtos</code>, com <code>key</code>, título, preço em reais e o botão
+  <strong>Adicionar</strong>.</p>
+  <pre class="jsx">const produtos = [
+  { id: "pao-frances", titulo: "Pão francês", preco: 1.0 },
+  { id: "pao-queijo", titulo: "Pão de queijo", preco: 1.5 },
+  { id: "bolo-cenoura", titulo: "Bolo de cenoura", preco: 12.0 },
+  { id: "cafe", titulo: "Café coado", preco: 2.5 },
+];
+
+const reais = (valor) =&gt; "R$ " + valor.toFixed(2).replace(".", ",");
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Vitrine&lt;/h2&gt;
+      &lt;div className="produtos"&gt;
+        &lt;div className="produto"&gt;
+          &lt;p&gt;Pão francês&lt;/p&gt;
+          &lt;button&gt;Adicionar&lt;/button&gt;
+        &lt;/div&gt;
+        &lt;div className="produto"&gt;
+          &lt;p&gt;Pão de queijo&lt;/p&gt;
+          &lt;button&gt;Adicionar&lt;/button&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h2&gt;Vitrine&lt;/h2&gt;
+  &lt;div class="produtos"&gt;
+    &lt;div class="produto"&gt;
+      &lt;p&gt;Pão francês&lt;/p&gt;
+      &lt;button&gt;Adicionar&lt;/button&gt;
+    &lt;/div&gt;
+    &lt;div class="produto"&gt;
+      &lt;p&gt;Pão de queijo&lt;/p&gt;
+      &lt;button&gt;Adicionar&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const produtos = [
+  { id: "pao-frances", titulo: "Pão francês", preco: 1.0 },
+  { id: "pao-queijo", titulo: "Pão de queijo", preco: 1.5 },
+  { id: "bolo-cenoura", titulo: "Bolo de cenoura", preco: 12.0 },
+  { id: "cafe", titulo: "Café coado", preco: 2.5 },
+];
+
+const reais = (valor) =&gt; "R$ " + valor.toFixed(2).replace(".", ",");
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Vitrine&lt;/h2&gt;
+      &lt;div className="produtos"&gt;
+        {produtos.map((produto) =&gt; (
+          &lt;div key={produto.id} className="produto"&gt;
+            &lt;p&gt;{produto.titulo}&lt;/p&gt;
+            &lt;p&gt;{reais(produto.preco)}&lt;/p&gt;
+            &lt;button&gt;Adicionar&lt;/button&gt;
+          &lt;/div&gt;
+        ))}
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra quatro cartões com o preço já no formato brasileiro. A função <code>reais</code> faz
+duas coisas: <code>toFixed(2)</code> garante duas casas e <code>replace(".", ",")</code> troca o ponto pela
+vírgula. Sem o <code>toFixed</code>, o preço apareceria como <code>1</code> ou <code>1.5</code>; sem o
+<code>replace</code>, apareceria como <code>R$ 1.50</code> — que o cliente brasileiro lê errado.</p>
+
+<p>Note que a função está fora do componente. Ela não usa estado nem props, então não precisa ser recriada
+a cada desenho. O mesmo vale para <code>produtos</code>: é dado fixo, não estado. Só o carrinho vai mudar
+com o tempo.</p>
+
+<p>Para conferir os dados, um <code>console.log</code> mostra o catálogo e o tipo do preço:</p>
+
+<pre class="term">produtos.length: 4
+produtos[1].preco: 1.5
+typeof produtos[1].preco: number</pre>
+
+<p>Se o seu <code>typeof</code> der <code>string</code>, o preço veio com aspas em algum lugar — e a
+primeira conta vai concatenar em vez de somar. Vale conferir antes de seguir.</p>
+
+<h2>4. Adicionar o mesmo produto duas vezes</h2>
+
+<p>Aqui está a decisão que separa um carrinho de uma lista de compras: clicar duas vezes no mesmo produto
+não cria duas linhas, aumenta a quantidade da linha existente. O código precisa procurar o produto no
+carrinho antes de decidir entre somar e acrescentar.</p>
+
+<p>Na caixa abaixo, o <code>adicionar</code> sempre empilha um item novo. Clique duas vezes no segundo
+produto e veja duas linhas de "Pão de queijo". Conserte com <code>find</code> e <code>map</code>:</p>
+
+<div class="tryreact" data-goal="clique:.produto:nth-child(2) button;;clique:.produto:nth-child(2) button;;conta:li=1;;texto:2 × Pão de queijo">
+  <p class="try-task">Clicar duas vezes no mesmo produto cria duas linhas. Se o produto já estiver no
+  carrinho, aumente a <code>quantidade</code> com <code>map</code>; se não estiver, acrescente com
+  spread.</p>
+  <pre class="jsx">const produtos = [
+  { id: "pao-frances", titulo: "Pão francês", preco: 1.0 },
+  { id: "pao-queijo", titulo: "Pão de queijo", preco: 1.5 },
+  { id: "bolo-cenoura", titulo: "Bolo de cenoura", preco: 12.0 },
+  { id: "cafe", titulo: "Café coado", preco: 2.5 },
+];
+
+function App() {
+  const [carrinho, setCarrinho] = useState([]);
+
+  function adicionar(produto) {
+    setCarrinho([
+      ...carrinho,
+      {
+        id: produto.id,
+        titulo: produto.titulo,
+        preco: produto.preco,
+        quantidade: 1,
+      },
+    ]);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Vitrine&lt;/h2&gt;
+      &lt;div className="produtos"&gt;
+        {produtos.map((produto) =&gt; (
+          &lt;div key={produto.id} className="produto"&gt;
+            &lt;p&gt;{produto.titulo}&lt;/p&gt;
+            &lt;button onClick={() =&gt; adicionar(produto)}&gt;Adicionar&lt;/button&gt;
+          &lt;/div&gt;
+        ))}
+      &lt;/div&gt;
+      &lt;h3&gt;Carrinho&lt;/h3&gt;
+      &lt;ul&gt;
+        {carrinho.map((item) =&gt; (
+          &lt;li key={item.id}&gt;
+            {item.quantidade} × {item.titulo}
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h2&gt;Vitrine&lt;/h2&gt;
+  &lt;div class="produtos"&gt;
+    &lt;div class="produto"&gt;
+      &lt;p&gt;Pão francês&lt;/p&gt;
+      &lt;button&gt;Adicionar&lt;/button&gt;
+    &lt;/div&gt;
+    &lt;div class="produto"&gt;
+      &lt;p&gt;Pão de queijo&lt;/p&gt;
+      &lt;button&gt;Adicionar&lt;/button&gt;
+    &lt;/div&gt;
+    &lt;div class="produto"&gt;
+      &lt;p&gt;Bolo de cenoura&lt;/p&gt;
+      &lt;button&gt;Adicionar&lt;/button&gt;
+    &lt;/div&gt;
+    &lt;div class="produto"&gt;
+      &lt;p&gt;Café coado&lt;/p&gt;
+      &lt;button&gt;Adicionar&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+  &lt;h3&gt;Carrinho&lt;/h3&gt;
+  &lt;ul&gt;&lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const produtos = [
+  { id: "pao-frances", titulo: "Pão francês", preco: 1.0 },
+  { id: "pao-queijo", titulo: "Pão de queijo", preco: 1.5 },
+  { id: "bolo-cenoura", titulo: "Bolo de cenoura", preco: 12.0 },
+  { id: "cafe", titulo: "Café coado", preco: 2.5 },
+];
+
+function App() {
+  const [carrinho, setCarrinho] = useState([]);
+
+  function adicionar(produto) {
+    const existe = carrinho.find((item) =&gt; item.id === produto.id);
+    if (existe) {
+      setCarrinho(
+        carrinho.map((item) =&gt;
+          item.id === produto.id
+            ? { ...item, quantidade: item.quantidade + 1 }
+            : item
+        )
+      );
+    } else {
+      setCarrinho([
+        ...carrinho,
+        {
+          id: produto.id,
+          titulo: produto.titulo,
+          preco: produto.preco,
+          quantidade: 1,
+        },
+      ]);
+    }
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Vitrine&lt;/h2&gt;
+      &lt;div className="produtos"&gt;
+        {produtos.map((produto) =&gt; (
+          &lt;div key={produto.id} className="produto"&gt;
+            &lt;p&gt;{produto.titulo}&lt;/p&gt;
+            &lt;button onClick={() =&gt; adicionar(produto)}&gt;Adicionar&lt;/button&gt;
+          &lt;/div&gt;
+        ))}
+      &lt;/div&gt;
+      &lt;h3&gt;Carrinho&lt;/h3&gt;
+      &lt;ul&gt;
+        {carrinho.map((item) =&gt; (
+          &lt;li key={item.id}&gt;
+            {item.quantidade} × {item.titulo}
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois do conserto, dois cliques no "Pão de queijo" deixam <strong>uma</strong> linha, com
+<code>2 × Pão de queijo</code>. O <code>find</code> responde se o produto já está lá; o <code>map</code>
+devolve um carrinho novo, trocando só o item que combina. É a mesma receita do "concluir tarefa": procurar
+pelo id e devolver um objeto novo com o campo alterado.</p>
+
+<p>Três detalhes merecem atenção. O primeiro é que o <code>map</code> precisa devolver <code>item</code>
+sem alteração nos outros casos — esquecer o <code>: item</code> transforma todos os itens em
+<code>undefined</code>. O segundo é o spread no item que muda: sem ele, você perde título e preço. O
+terceiro é que o <code>else</code> é obrigatório: sem ele, o item novo seria acrescentado mesmo quando já
+existe.</p>
+
+<p>O console mostra o carrinho depois dos dois cliques, com um item só:</p>
+
+<pre class="term">carrinho.length: 1
+carrinho[0].quantidade: 2
+carrinho[0].preco: 1.5</pre>
+
+<p>Se o seu <code>carrinho.length</code> for 2, o <code>find</code> não achou o item — quase sempre porque
+o id comparado é do produto e o guardado é outro, ou porque a comparação usa <code>==</code> com tipos
+diferentes.</p>
+
+<h2>5. Aumentar, diminuir e remover</h2>
+
+<p>Dentro do carrinho, as três operações são variações da mesma ideia: encontrar o item pelo id e devolver
+um carrinho novo. Aumentar e diminuir trocam a quantidade; remover tira a linha. O erro clássico é mutar o
+item e entregar o mesmo array ao <code>set</code>.</p>
+
+<div class="tryreact" data-goal="clique:button.mais;;texto:2 × Pão francês;;texto:Total: R$ 2,00">
+  <p class="try-task">O botão de mais muda o objeto no lugar e a tela não atualiza. Troque por um
+  <code>map</code> que devolve <code>{ ...item, quantidade: item.quantidade + 1 }</code> para o item
+  clicado.</p>
+  <pre class="jsx">const reais = (valor) =&gt; "R$ " + valor.toFixed(2).replace(".", ",");
+
+function App() {
+  const [carrinho, setCarrinho] = useState([
+    { id: "pao-frances", titulo: "Pão francês", preco: 1.0, quantidade: 1 },
+  ]);
+
+  function aumentar(id) {
+    const item = carrinho.find((i) =&gt; i.id === id);
+    item.quantidade = item.quantidade + 1;
+    setCarrinho(carrinho);
+  }
+
+  const total = carrinho.reduce(
+    (soma, item) =&gt; soma + item.preco * item.quantidade,
+    0
+  );
+
+  return (
+    &lt;div&gt;
+      &lt;h3&gt;Carrinho&lt;/h3&gt;
+      &lt;ul&gt;
+        {carrinho.map((item) =&gt; (
+          &lt;li key={item.id}&gt;
+            {item.quantidade} × {item.titulo}
+            &lt;button className="mais" onClick={() =&gt; aumentar(item.id)}&gt;+&lt;/button&gt;
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+      &lt;p&gt;Total: {reais(total)}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h3&gt;Carrinho&lt;/h3&gt;
+  &lt;ul&gt;
+    &lt;li&gt;
+      1
+      ×
+      Pão francês
+      &lt;button class="mais"&gt;+&lt;/button&gt;
+    &lt;/li&gt;
+  &lt;/ul&gt;
+  &lt;p&gt;Total: R$ 1,00&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const reais = (valor) =&gt; "R$ " + valor.toFixed(2).replace(".", ",");
+
+function App() {
+  const [carrinho, setCarrinho] = useState([
+    { id: "pao-frances", titulo: "Pão francês", preco: 1.0, quantidade: 1 },
+  ]);
+
+  function aumentar(id) {
+    setCarrinho(
+      carrinho.map((item) =&gt;
+        item.id === id
+          ? { ...item, quantidade: item.quantidade + 1 }
+          : item
+      )
+    );
+  }
+
+  const total = carrinho.reduce(
+    (soma, item) =&gt; soma + item.preco * item.quantidade,
+    0
+  );
+
+  return (
+    &lt;div&gt;
+      &lt;h3&gt;Carrinho&lt;/h3&gt;
+      &lt;ul&gt;
+        {carrinho.map((item) =&gt; (
+          &lt;li key={item.id}&gt;
+            {item.quantidade} × {item.titulo}
+            &lt;button className="mais" onClick={() =&gt; aumentar(item.id)}&gt;+&lt;/button&gt;
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+      &lt;p&gt;Total: {reais(total)}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique no <strong>+</strong>: a linha passa a "2 × Pão francês" e o total para R$ 2,00. O total é
+<code>reduce</code> — ele percorre o carrinho somando <code>preco * quantidade</code>, começando em
+<code>0</code>. Como é uma conta feita no render, ela acompanha a quantidade sem nenhum
+<code>setTotal</code>.</p>
+
+<dl class="anatomy">
+<dt><code>adicionar</code></dt>
+<dd>Recebe o produto do catálogo. Decide entre somar a quantidade do item existente e acrescentar um item
+novo.</dd>
+<dt><code>aumentar</code></dt>
+<dd>Recebe o id do item. Devolve o carrinho com <code>quantidade + 1</code> no item certo.</dd>
+<dt><code>diminuir</code></dt>
+<dd>Recebe o id. Devolve <code>quantidade - 1</code> e remove o item que chegar a zero.</dd>
+<dt><code>remover</code></dt>
+<dd>Recebe o id. Devolve o carrinho sem aquele item, com <code>filter</code>.</dd>
+<dt><code>reais</code></dt>
+<dd>Recebe um número e devolve o texto formatado: <code>R$ 8,00</code>. Usada só na exibição.</dd>
+</dl>
+
+<p>Para diminuir, a diferença é o limite: a quantidade não pode ficar abaixo de 1. Quando chega em 1, o
+botão de menos deve remover o item, não mostrar "0 ×". Uma condição resolve:</p>
+
+<pre class="file" data-file="App.jsx">function diminuir(id) {
+  setCarrinho(
+    carrinho
+      .map((item) =&gt;
+        item.id === id
+          ? { ...item, quantidade: item.quantidade - 1 }
+          : item
+      )
+      .filter((item) =&gt; item.quantidade &gt; 0)
+  );
+}</pre>
+
+<p>O <code>map</code> diminui a quantidade e o <code>filter</code> tira quem chegou a zero. Repare que o
+<code>filter</code> vem depois, sobre o resultado do <code>map</code> — e não antes. Essa ordem importa: é
+o item já atualizado que precisa ser testado.</p>
+
+<p>Remover é só o <code>filter</code>, sem <code>map</code>:</p>
+
+<pre class="file" data-file="App.jsx">function remover(id) {
+  setCarrinho(carrinho.filter((item) =&gt; item.id !== id));
+}</pre>
+
+<p>As três funções têm a mesma forma: recebem um id, devolvem um carrinho novo, nunca tocam no array
+antigo. Quando você sentir que está repetindo código, é sinal de que dá para extrair uma função
+<code>atualizarQuantidade(id, delta)</code> — mas só depois de as três funcionarem.</p>
+
+<h2>6. Subtotal, frete e total</h2>
+
+<p>O carrinho tem três números e nenhum deles é estado. O subtotal soma os itens; o frete depende do
+subtotal; o total soma os dois. Todos são contas feitas no render, a partir do carrinho. A tabela mostra a
+regra de cada um:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Número</th><th>Como se calcula</th><th>Cuidado</th></tr>
+<tr><td>subtotal</td><td><code>reduce</code> de <code>preco * quantidade</code></td><td>começar em <code>0</code>, senão o primeiro item quebra a conta</td></tr>
+<tr><td>frete</td><td>R$ 5, ou R$ 0 a partir de R$ 20</td><td>carrinho vazio não cobra frete</td></tr>
+<tr><td>total</td><td>subtotal + frete</td><td>somar depois de arredondar, não antes</td></tr>
+<tr><td>exibição</td><td><code>reais(total)</code></td><td>formatar só na tela; guardar número</td></tr>
+</table>
+</div>
+
+<p>A regra do frete é uma expressão condicional simples e merece um cuidado: carrinho vazio não paga
+frete. Sem essa condição, o cliente abre o site e vê "Total: R$ 5,00" sem ter escolhido nada — um dos
+bugs mais constrangedores de loja pequena.</p>
+
+<pre class="file" data-file="App.jsx">const subtotal = carrinho.reduce(
+  (soma, item) =&gt; soma + item.preco * item.quantidade,
+  0
+);
+const frete = carrinho.length === 0 || subtotal &gt;= 20 ? 0 : 5;  // vazio ou acima de 20: grátis
+const total = subtotal + frete;</pre>
+
+<p>Quando o subtotal chega a R$ 20, o frete vira zero e o total é só o subtotal. O cliente vê "Frete:
+grátis" em vez de "Frete: R$ 0,00" — detalhe de redação que faz diferença na percepção. Uma condicional no
+texto resolve:</p>
+
+<pre class="file" data-file="App.jsx">&lt;p&gt;Frete: {frete === 0 ? "grátis" : reais(frete)}&lt;/p&gt;
+&lt;p&gt;Total: {reais(total)}&lt;/p&gt;</pre>
+
+<p>O console é o melhor lugar para conferir as contas antes de confiar na tela:</p>
+
+<pre class="term">subtotal: 1
+frete: 5
+total: 6
+reais(total): "R$ 6,00"</pre>
+
+<p>Se o total vier com muitas casas decimais — <code>7.999999999</code> —, é o tal do decimal binário. Não
+arredonde no meio da conta: arredonde só na exibição, com <code>toFixed(2)</code>, e o cliente vê o valor
+certo. Guardar centavos inteiros é a solução definitiva, para quando o app crescer.</p>
+
+<h2>7. Carrinho vazio, limites e o que remove</h2>
+
+<p>O carrinho vazio não é um erro: é o estado inicial e o estado depois de remover o último item. A tela
+precisa dizer o que fazer, não ficar em branco. E o texto muda conforme o motivo: na primeira visita,
+"Seu carrinho está vazio. Escolha um pão na vitrine."; depois de remover, a mesma frase serve, porque o
+carrinho realmente está vazio.</p>
+
+<p>Os limites são a outra metade do acabamento. Quantidade máxima por item evita pedidos de 300 pães por
+engano; quantidade mínima 1 evita linha com zero. O frete grátis é um limite de outra natureza — é uma
+regra de negócio que muda o total, não a lista. Todos os três são condições calculadas, não estados.</p>
+
+<pre class="file" data-file="App.jsx">const limite = 10;
+
+function aumentar(id) {
+  setCarrinho(
+    carrinho.map((item) =&gt;
+      item.id === id &amp;&amp; item.quantidade &lt; limite
+        ? { ...item, quantidade: item.quantidade + 1 }
+        : item
+    )
+  );
+}
+
+if (carrinho.length === 0) {
+  return &lt;p&gt;Seu carrinho está vazio. Escolha um pão na vitrine.&lt;/p&gt;;
+}</pre>
+
+<p>O <code>return</code> antecipado do vazio é uma escolha legível: quando não há carrinho, não há o que
+calcular. Cuidado apenas com a ordem dos hooks — todos os <code>useState</code> precisam vir antes de
+qualquer <code>return</code> condicional. Se você devolver cedo demais, o React reclama que a quantidade de
+hooks mudou entre um desenho e outro.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Regra</th><th>O que a tela faz</th></tr>
+<tr><td>carrinho sem itens</td><td><code>carrinho.length === 0</code></td><td>mostra a mensagem de vazio e não cobra frete</td></tr>
+<tr><td>menos no item de quantidade 1</td><td><code>quantidade &gt; 0</code> depois do <code>map</code></td><td>o item sai da lista</td></tr>
+<tr><td>mais no item de quantidade 10</td><td><code>quantidade &lt; limite</code></td><td>o botão não faz nada, e o número não sobe</td></tr>
+<tr><td>subtotal de R$ 20 ou mais</td><td><code>subtotal &gt;= 20</code></td><td>frete zero, exibido como "grátis"</td></tr>
+</table>
+</div>
+
+<p>Um detalhe de acessibilidade que vale desde já: o botão de aumentar deve dizer o que aumenta. Um
+<strong>+</strong> sozinho é lido como "mais" e não diz de qual produto. Um <code>aria-label</code> resolve
+sem mudar o visual: <code>aria-label={"Aumentar " + item.titulo}</code>. O mesmo vale para o botão de
+remover.</p>
+
+<h2>8. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o total fica um clique atrás</h3>
+<p>A Ana atualizava a quantidade com <code>item.quantidade += 1</code> e o total só mudava no clique
+seguinte. O array era o mesmo objeto, então o React não redesenhava; o segundo clique mudava o número de
+novo, e a tela mostrava o valor anterior. Com <code>map</code> e um objeto novo, cada clique desenha uma vez
+e o total acompanha.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o preço virou texto e o total concatenou</h3>
+<p>O preço chegou de um catálogo em JSON como <code>"1.50"</code>, e o <code>reduce</code> começou a colar
+textos: "01.501.50". O conserto foi converter na entrada — <code>Number(produto.preco)</code> — e manter
+número no estado. Se o valor vier do servidor como texto, converta uma vez, no lugar em que ele entra, e
+não em cada conta.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o carrinho cobra frete sem ter item</h3>
+<p>Ela calculou o frete só pela regra do valor e esqueceu o carrinho vazio: o subtotal era 0, então a
+condição do frete grátis falhava e o total aparecia como R$ 5,00 na primeira visita. A correção foi
+testar <code>carrinho.length === 0</code> antes da regra de valor. Regra de negócio precisa considerar o
+estado vazio, não só o número.</p>
+</div>
+
+<h2>9. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. O que acontece ao clicar duas vezes no mesmo produto?</p>
+<label><input type="radio" name="q1"> duas linhas iguais no carrinho</label>
+<label><input type="radio" name="q1"> o preço dobra no catálogo</label>
+<label><input type="radio" name="q1"> uma linha só, com <code>quantidade</code> 2</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">2. Onde deve morar o total do carrinho?</p>
+<label><input type="radio" name="q2"> num <code>useState</code> atualizado a cada clique</label>
+<label><input type="radio" name="q2"> numa conta feita no render, a partir do carrinho</label>
+<label><input type="radio" name="q2"> numa variável global, para durar entre telas</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Por que guardar o preço como número e formatar só na tela?</p>
+<label><input type="radio" name="q3"> porque conta com texto concatena e conta com número soma</label>
+<label><input type="radio" name="q3"> porque número ocupa menos espaço no estado</label>
+<label><input type="radio" name="q3"> porque o React não aceita texto em <code>useState</code></label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: somar o carrinho</h2>
+<p>Complete a conta que soma <code>preco * quantidade</code> de todos os itens. Escreva só o método do
+array:</p>
+<div class="ex-code">const subtotal = carrinho.<input aria-label="resposta 1" data-answer="reduce" placeholder="...">(&#10;  (soma, item) =&gt; soma + item.preco * item.quantidade,&#10;  0&#10;);</div>
+<p class="ex-dica">Dica: é o método que percorre a lista acumulando um valor só. O segundo argumento,
+<code>0</code>, é o valor inicial do acumulador. Com <code>map</code> você teria uma lista de subtotais, não
+um total.</p>
+</div>
+
+<h2>10. Resumo</h2>
+
+<p>O carrinho tem duas listas: o catálogo, que é dado fixo, e o carrinho, que é estado. Cada item guarda
+id, título, preço e quantidade — o preço como número, não como texto. Adicionar procura o produto com
+<code>find</code>: se existe, <code>map</code> aumenta a quantidade; se não, spread acrescenta o item novo.
+Aumentar, diminuir e remover devolvem sempre um carrinho novo.</p>
+
+<p>Subtotal, frete e total são contas feitas no render, com <code>reduce</code> e uma condicional. O
+formato brasileiro aparece só na exibição, com <code>toFixed(2)</code> e <code>replace</code>. O carrinho
+vazio tem mensagem própria, e a quantidade tem limite mínimo e máximo. Nenhum desses números precisa de
+<code>useState</code>.</p>
+
+<p>O projeto anterior, a <a href="projeto-galeria-de-fotos.html">galeria de fotos</a>, usa a mesma base
+de listas com filtro e um detalhe que abre — vale comparar. O próximo projeto usa a mesma base com um
+ingrediente novo: dados que chegam de uma "API" e
+mudam de status. O <a href="projeto-painel-de-pedidos.html">painel de pedidos</a> junta o carrinho, o
+status e o carregamento numa tela só. Se quiser revisar as contas com calma, a aula de
+<a href="estado-derivado.html">estado derivado</a> tem os mesmos exemplos isolados.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Catálogo é dado fixo; carrinho é estado.</li>
+<li>Item do carrinho: <code>{ id, titulo, preco, quantidade }</code>.</li>
+<li>Adicionar: <code>find</code> decide entre <code>map</code> e spread.</li>
+<li>Aumentar: <code>map</code> com <code>{ ...item, quantidade: item.quantidade + 1 }</code>.</li>
+<li>Remover: <code>filter</code> pelo id.</li>
+<li>Subtotal: <code>reduce</code> começando em <code>0</code>.</li>
+<li>Frete: condicional no subtotal e no carrinho vazio.</li>
+<li>Total: subtotal + frete, calculado no render.</li>
+<li>Dinheiro: número no estado, <code>reais()</code> na tela.</li>
+<li>Carrinho vazio merece mensagem e não cobra frete.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

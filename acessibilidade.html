@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acessibilidade | Guia React</title>
+<meta name="description" content="Acessibilidade no React: nome acessível, papel de cada elemento, foco e teclado, rótulos ligados aos campos e avisos anunciados por leitor de tela.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Acessibilidade</span></h1>
+<p class="intro">Uma cliente da padaria não usa mouse. Ela navega com Tab e Enter, e o leitor de tela
+anuncia cada coisa que aparece. No site da Ana, o botão de encomendar é uma <code>div</code> com
+<code>onClick</code>: para o leitor de tela, aquilo não é botão nenhum, e o Tab passa direto. Nesta aula
+ela aprende o que faz uma tela ser navegável por teclado e por leitor de tela — quase sempre com HTML
+comum, e não com atributos exóticos.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é nome acessível e por que ele decide se um elemento existe para o leitor de tela.</li>
+  <li>Como o papel de cada elemento vem do HTML, não do CSS.</li>
+  <li>Como descrever imagens e quando deixar a descrição vazia.</li>
+  <li>Por que uma <code>div</code> com <code>onClick</code> não é um botão.</li>
+  <li>Como ligar rótulo, dica e mensagem de erro a um campo.</li>
+  <li>Como anunciar mudanças sem roubar o foco com <code>role="status"</code>.</li>
+  <li>Um checklist que roda no console para conferir o básico.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a cliente que chega pelo teclado</h2>
+
+<p>A Ana ficou sabendo do problema pelo balcão. A cliente entrou no site, apertou Tab e o foco pulou do
+menu para um link do rodapé, sem parar em nenhum dos cartões. Apertou Enter no cartão e nada aconteceu.
+Pediu ajuda à sobrinha, que abriu o site no notebook e mostrou: o “botão” de encomendar era uma
+<code>div</code> com um <code>onClick</code> — invisível para o teclado e sem nome para o leitor de
+tela.</p>
+
+<p>O susto da Ana foi descobrir quanto custa um elemento errado. Aquela <code>div</code> não recebe
+foco, não responde a Enter nem a espaço, não é anunciada como botão e não tem estado de “apertado”. Para
+consertar, ela não precisou de biblioteca nem de atributo novo: precisou trocar <code>div</code> por
+<code>button</code>. O navegador entregou foco, teclado, papel e anúncio de graça.</p>
+
+<p>O curioso é que o site dela já tinha passado por um teste de acessibilidade de formulário: os
+campos tinham rótulo, as mensagens de erro apareciam no lugar certo. O que faltava era o que não é
+formulário — a navegação, as imagens, os cartões. A aula de
+<a href="formulario-acessivel.html">Formulário Acessível</a> cobre o campo por campo; esta aqui olha a
+tela inteira.</p>
+
+<p>Essa é a ideia que atravessa a aula inteira: acessibilidade em React é, na maior parte, escrever HTML
+direito. O React não inventa regras — ele desenha os elementos que você pediu. Quando você pede
+<code>div</code>, recebe uma <code>div</code>, com todas as limitações dela.</p>
+
+<h2>2. Nome, papel e foco</h2>
+
+<p>Três conceitos explicam quase todos os problemas que aparecem. O <strong>papel</strong> diz o que o
+elemento é: botão, link, campo, título. O <strong>nome acessível</strong> diz como ele se chama: é o texto
+que o leitor de tela fala. O <strong>foco</strong> diz por onde o teclado passa: sem foco, não há
+interação.</p>
+
+<dl class="anatomy">
+<dt>nome acessível</dt>
+<dd>O texto que o leitor de tela anuncia para um elemento. Vem do conteúdo, de um <code>label</code>, de
+um <code>alt</code> ou de um <code>aria-label</code>.</dd>
+<dt>papel</dt>
+<dd>O que o elemento é para a tecnologia assistiva. <code>button</code> tem papel de botão; uma
+<code>div</code> tem papel nenhum.</dd>
+<dt>foco</dt>
+<dd>O elemento que recebe o teclado naquele momento. Só elementos interativos entram na fila do
+Tab.</dd>
+<dt>leitor de tela</dt>
+<dd>O programa que fala a página em voz alta. Ele lê o nome e o papel, e ignora o que não tem
+nenhum dos dois.</dd>
+<dt>aria-live</dt>
+<dd>Uma região que o leitor de tela observa. Quando o texto muda, ele anuncia sem tirar o foco de onde a
+pessoa está.</dd>
+<dt>HTML semântico</dt>
+<dd>Usar o elemento que já significa aquilo: <code>button</code> para ação, <code>a</code> para
+navegação, <code>nav</code>, <code>main</code>, <code>header</code>.</dd>
+</dl>
+
+<p>O React ajuda em uma coisa e atrapalha em outra. Ajuda porque o JSX é praticamente HTML: o que você
+escreve é o que vai para a página. Atrapalha porque é fácil montar um componente com
+<code>div</code> e <code>onClick</code> e achar que aquilo é um botão — funciona no mouse, então parece
+certo. O teclado é o teste que revela a diferença.</p>
+
+<p>A primeira conferência é sempre a mesma: clique na página, aperte Tab e veja se o foco chega onde
+deveria. Se não chega, o elemento não é interativo para o teclado, por mais que o mouse funcione. Se
+chega mas o leitor de tela não fala nada, falta nome. São dois testes diferentes, e os dois precisam
+passar.</p>
+
+<h2>3. A caixa: a imagem precisa de descrição</h2>
+
+<p>Imagem é o caso mais simples e o mais esquecido. Na caixa abaixo, a foto do pão não tem descrição. A
+prévia não carrega a imagem — a caixa não tem arquivos —, então você vê exatamente o que aparece quando a
+foto falha: nada. Com o <code>alt</code>, aparece o texto; e é esse mesmo texto que o leitor de tela fala
+sempre.</p>
+
+<div class="tryreact" data-goal="attr:img|alt=Pão de queijo saindo do forno">
+  <p class="try-task">Descreva a foto para quem não vê: acrescente
+  <code>alt="Pão de queijo saindo do forno"</code> à imagem e clique em Rodar.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;figure&gt;
+      &lt;img src="pao.jpg" width="120" /&gt;
+      &lt;figcaption&gt;Pão de queijo&lt;/figcaption&gt;
+    &lt;/figure&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;figure&gt;
+  &lt;img width="120" src="pao.jpg"&gt;
+  &lt;figcaption&gt;Pão de queijo&lt;/figcaption&gt;
+&lt;/figure&gt;
+</pre>
+  <pre class="solucao">function App() {
+  return (
+    &lt;figure&gt;
+      &lt;img src="pao.jpg" width="120" alt="Pão de queijo saindo do forno" /&gt;
+      &lt;figcaption&gt;Pão de queijo&lt;/figcaption&gt;
+    &lt;/figure&gt;
+  );
+}</pre>
+</div>
+
+<p>Repare que a imagem já tinha uma legenda embaixo. Legenda e descrição não são a mesma coisa: a legenda
+é conteúdo visível para todo mundo; o <code>alt</code> é o substituto da imagem para quem não a vê. Em
+uma figura com legenda, o <code>alt</code> pode ser curto — “Pão de queijo” — porque o resto da
+informação está ali do lado. Em uma foto que carrega informação (um gráfico, um mapa), o
+<code>alt</code> precisa dizer o que a imagem mostra.</p>
+
+<p>E existe o caso opcional: imagem que é só enfeite. Aí o certo é <code>alt=""</code>, vazio. Isso diz
+ao leitor de tela “pule isto, não é conteúdo”. Esquecer o atributo é diferente de deixá-lo vazio:
+esquecer faz o leitor tentar anunciar o nome do arquivo, o que é pior do que não falar nada.</p>
+
+<h2>4. A caixa: uma div não é um botão</h2>
+
+<p>Agora o caso que a cliente encontrou. A caixa tem um “botão” feito de <code>div</code> com
+<code>onClick</code>. No mouse, funciona. No teclado, não existe: a <code>div</code> não entra na fila do
+Tab, e o clique do verificador nem encontra um <code>button</code> para apertar.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Encomendado">
+  <p class="try-task">Troque a <code>div</code> com <code>className="botao"</code> por um
+  <code>&lt;button&gt;</code> de verdade, mantendo o <code>onClick</code> e o texto. Depois clique em
+  Encomendar.</p>
+  <pre class="jsx">function App() {
+  const [encomendado, setEncomendado] = useState(false);
+  return (
+    &lt;div&gt;
+      &lt;div className="botao" onClick={function () { setEncomendado(true); }}&gt;Encomendar&lt;/div&gt;
+      &lt;p&gt;{encomendado ? "Encomendado" : "Nada ainda"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;div class="botao"&gt;Encomendar&lt;/div&gt;
+  &lt;p&gt;Nada ainda&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [encomendado, setEncomendado] = useState(false);
+  return (
+    &lt;div&gt;
+      &lt;button onClick={function () { setEncomendado(true); }}&gt;Encomendar&lt;/button&gt;
+      &lt;p&gt;{encomendado ? "Encomendado" : "Nada ainda"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra a diferença em uma linha: antes havia um <code>div</code> com classe, agora há um
+<code>button</code> com o texto dentro. Esse texto é o nome acessível — o leitor de tela anuncia
+“Encomendar, botão”. O <code>button</code> também responde a Enter e a espaço, recebe foco no Tab, mostra
+o contorno de foco e entra na lista de controles do formulário, se estiver dentro de um.</p>
+
+<p>Um cuidado com o estado desabilitado. Um <code>button</code> com <code>disabled</code> não recebe
+foco, então quem navega por teclado pode passar por ele sem saber que existe. Quando a ação está
+indisponível por um motivo que a pessoa precisa entender, prefira <code>aria-disabled="true"</code> com
+um clique que não faz nada, ou explique o motivo num texto ao lado. Desabilitar sem explicação é o
+equivalente visual de uma porta sem maçaneta.</p>
+
+<p>Se o desenho precisa ser outro — um cartão inteiro clicável, por exemplo —, a solução não é
+<code>div</code> com <code>onClick</code>: é <code>button</code> com CSS que o deixe com a cara do cartão.
+Nunca o contrário. Um <code>div</code> com <code>role="button"</code> e <code>tabIndex={0}</code> até
+funciona, mas você passa a ter de reimplementar Enter, espaço, foco e estados — e é quase certo que algum
+deles vai faltar. Use o elemento pronto.</p>
+
+<h2>5. A caixa: rótulo ligado e aviso anunciado</h2>
+
+<p>Campo de formulário tem dois nomes em jogo: o que está escrito ao lado e o que o leitor de tela
+associa ao campo. Um <code>label</code> solto, sem <code>for</code>, não associa nada: quem vê lê “Busca”
+e o campo; quem usa leitor de tela ouve só “campo de edição”, sem saber de quê.</p>
+
+<div class="tryreact" data-goal="attr:label|for=busca;;attr:input|id=busca;;attr:.aviso|role=status">
+  <p class="try-task">Ligue o rótulo ao campo com <code>htmlFor="busca"</code> e <code>id="busca"</code>,
+  e faça o aviso ser anunciado quando mudar, com <code>role="status"</code>.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;div&gt;
+      &lt;label&gt;Busca&lt;/label&gt;
+      &lt;input name="busca" /&gt;
+      &lt;p className="aviso"&gt;3 pães encontrados&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label&gt;Busca&lt;/label&gt;
+  &lt;input name="busca"&gt;
+  &lt;p class="aviso"&gt;3 pães encontrados&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="busca"&gt;Busca&lt;/label&gt;
+      &lt;input id="busca" name="busca" /&gt;
+      &lt;p className="aviso" role="status"&gt;3 pães encontrados&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O par <code>for</code> e <code>id</code> é a ligação: o rótulo aponta para o campo pelo identificador.
+Em JSX, porém, o atributo se escreve <code>htmlFor</code>, porque <code>for</code> é palavra reservada do
+JavaScript. O React traduz <code>htmlFor</code> para <code>for</code> no HTML — e é por isso que o painel
+mostra <code>for="busca"</code> depois de você escrever <code>htmlFor</code>. A aula de
+<a href="useId.html">O useId</a> mostra como gerar esse id sem repetir em cópias do mesmo campo.</p>
+
+<p>O <code>role="status"</code> é a segunda metade. Ele transforma o parágrafo numa região viva: quando o
+texto muda, o leitor de tela anuncia o novo conteúdo sem tirar o foco do campo onde a pessoa está
+digitando. É o que faz a busca avisar “3 pães encontrados” sem interromper a digitação. O
+<code>aria-live="polite"</code> faz o mesmo e é ainda mais explícito; o <code>role="status"</code> já
+implica <code>polite</code>.</p>
+
+<h2>6. O elemento certo para cada coisa</h2>
+
+<p>Metade da acessibilidade de uma tela é escolher o elemento certo. O navegador já sabe se comportar
+como botão, link, título e lista — desde que você peça. Esta tabela é a cola mais útil da aula.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que é</th><th>Elemento</th><th>O que vem de graça</th></tr>
+<tr><td>ação que muda a tela</td><td><code>button</code></td><td>foco, Enter, espaço, papel de botão</td></tr>
+<tr><td>navegação para outra página</td><td><code>a href</code></td><td>foco, Enter, “link” anunciado, menu de contexto</td></tr>
+<tr><td>título de seção</td><td><code>h2</code>, <code>h3</code></td><td>navegação por títulos no leitor de tela</td></tr>
+<tr><td>área principal</td><td><code>main</code></td><td>atalho para pular direto ao conteúdo</td></tr>
+<tr><td>grupo de links</td><td><code>nav</code></td><td>“navegação” anunciada, com nome pelo <code>aria-label</code></td></tr>
+<tr><td>imagem com conteúdo</td><td><code>img alt</code></td><td>descrição falada no lugar da imagem</td></tr>
+</table>
+</div>
+
+<p>Repare na primeira linha contra a segunda. Botão faz algo nesta página; link leva para outro endereço.
+Trocar os dois é um dos erros mais comuns: um <code>a</code> com <code>onClick</code> e
+<code>href="#"</code> parece botão, mas o leitor de tela anuncia “link” e a pessoa pode tentar abrir em
+outra aba. Se a ação não navega, é <code>button</code>.</p>
+
+<p>Já os títulos merecem um cuidado silencioso: use <code>h2</code> para as seções e <code>h3</code> para
+as subseções, sem pular de <code>h1</code> para <code>h4</code> só porque o <code>h4</code> é menor. O
+tamanho é CSS; a hierarquia é informação. Muita gente navega por títulos — no leitor de tela, é o
+equivalente a olhar o sumário de um livro.</p>
+
+<p>Outro comando útil lista os elementos que o Tab alcança, na ordem em que ele vai passar. É a
+melhor forma de descobrir um “botão” que não é botão — ele simplesmente não aparece na lista:</p>
+
+<pre class="file" data-file="console do navegador">document.querySelectorAll("a[href], button, input, select, textarea")
+  .forEach(function (el) { console.log(el.tagName + ": " + (el.textContent || el.name)); });</pre>
+
+<p>Na página da padaria, com o menu, o campo de busca e o botão de encomendar, o resultado é curto e
+revelador:</p>
+
+<pre class="term">A: Início
+A: Pães
+A: Contato
+INPUT: busca
+BUTTON: Encomendar</pre>
+
+<p>Cinco elementos, na ordem do documento. Se o cartão clicável não está nessa lista, ele não é alcançável
+pelo teclado — e não há CSS que resolva isso. A lista também mostra a ordem: se o Tab pula do rodapé para
+o topo, o problema está no HTML, não no CSS.</p>
+
+<h2>7. O que atrapalha</h2>
+
+<p>Existe um conjunto de boas intenções que piora a vida de quem usa tecnologia assistiva. Vale conhecer
+para não repetir.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que se vê no código</th><th>Por que atrapalha</th><th>O que fazer</th></tr>
+<tr><td><code>div</code> com <code>onClick</code></td><td>não recebe foco nem responde ao teclado</td><td><code>button</code></td></tr>
+<tr><td><code>aria-label</code> numa <code>div</code> sem papel</td><td>o leitor ignora o nome</td><td>usar o elemento certo, ou <code>role="img"</code></td></tr>
+<tr><td><code>placeholder</code> como único rótulo</td><td>some ao digitar e não é lido como nome</td><td><code>label</code> de verdade</td></tr>
+<tr><td><code>tabIndex="5"</code></td><td>quebra a ordem natural do Tab</td><td>deixar a ordem do HTML; usar <code>0</code> só quando precisar</td></tr>
+<tr><td>ícone “×” sem texto</td><td>o leitor fala “multiplicação” ou nada</td><td><code>aria-label="Fechar"</code> no botão</td></tr>
+<tr><td>erro só com cor vermelha</td><td>quem não distingue cor não vê o erro</td><td>texto e ícone além da cor</td></tr>
+</table>
+</div>
+
+<p>O <code>tabIndex</code> positivo é o mais tentador e o mais perigoso. Ele tira o elemento da ordem do
+documento e o coloca numa fila paralela, que ninguém consegue prever depois de algumas telas. A ordem
+natural do HTML — de cima para baixo, da esquerda para a direita — quase sempre é a ordem certa. Quando
+não é, o problema costuma estar no layout, não no <code>tabIndex</code>.</p>
+
+<p>Outro clássico é apagar o contorno de foco no CSS. Aquele anel azul em volta do botão é a única
+pista de onde o teclado está; removê-lo porque “fica feio” deixa a pessoa sem saber o que vai acontecer
+quando apertar Enter. Se o anel não combina com o desenho, troque por outro visível — nunca por
+<code>outline: none</code> sem substituto.</p>
+
+<p>Já o ícone sem nome é o caso mais frequente em componente. Um botão com “×” dentro tem nome acessível
+“×”, que o leitor fala como “multiplicação” ou “vezes”. O conserto é dar nome ao botão, não ao ícone:
+<code>&lt;button aria-label="Fechar"&gt;×&lt;/button&gt;</code>. O <code>aria-label</code> substitui o
+conteúdo como nome — e é por isso que ele não serve para decorar uma <code>div</code> qualquer.</p>
+
+<h2>8. Um checklist no console</h2>
+
+<p>Não é preciso esperar o teste com leitor de tela para achar o básico. Um trecho de JavaScript no
+console do navegador responde três perguntas rápidas: toda imagem tem descrição, todo campo tem rótulo,
+todo aviso é uma região viva.</p>
+
+<pre class="file" data-file="console do navegador">var semAlt = document.querySelectorAll("img:not([alt])").length;
+var semRotulo = document.querySelectorAll("input:not([id])").length;
+var avisos = document.querySelectorAll("[role=status]").length;
+console.log("imagens sem alt: " + semAlt);
+console.log("campos sem id: " + semRotulo);
+console.log("regiões de aviso: " + avisos);</pre>
+
+<p>Rodando na página já consertada, o resultado é este:</p>
+
+<pre class="term">imagens sem alt: 0
+campos sem id: 0
+regiões de aviso: 1</pre>
+
+<p>Não é um teste completo — uma imagem com <code>alt="imagem"</code> passa e continua inútil. Mas é um
+filtro barato que pega o que costuma escapar, e roda em qualquer página, inclusive nas que você não
+escreveu. O complemento é o teste manual: Tab do começo ao fim, Enter em cada botão, e um leitor de tela
+de verdade se você tiver acesso. Cinco minutos de Tab encontram mais problemas do que uma hora de
+leitura de código.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o cartão que só abria no mouse</h3>
+<p>O cartão de pão inteiro era clicável, feito de <code>div</code> com <code>onClick</code>. A cliente
+que navega por teclado não conseguia abrir nenhum. A correção foi colocar um <code>button</code> dentro do
+cartão, com o nome do pão no texto, e deixar o cartão como moldura. Quem usa mouse continua clicando no
+botão; quem usa teclado encontra o foco.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o aviso que ninguém ouvia</h3>
+<p>A busca mostrava “nenhum pão encontrado” num parágrafo comum. Quem enxerga via a mensagem; quem usa
+leitor de tela continuava ouvindo o campo vazio, sem saber que a busca tinha terminado. O
+<code>role="status"</code> resolveu na hora, e a mensagem passou a ser anunciada sem tirar o foco do
+campo.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o ícone que virava “multiplicação”</h3>
+<p>O botão de fechar o carrinho tinha só um “×” dentro. O leitor de tela anunciava “multiplicação,
+botão”. O conserto foi <code>aria-label="Fechar o carrinho"</code>, e o texto do rótulo passou a dizer o
+que acontece — não só o desenho. Nome acessível bom é nome que explica a ação.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Qual elemento usar para uma ação que muda a tela?</p>
+<label><input type="radio" name="q1"> <code>a</code> com <code>href="#"</code></label>
+<label><input type="radio" name="q1"> <code>button</code></label>
+<label><input type="radio" name="q1"> <code>div</code> com <code>onClick</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que fazer com uma imagem que é só enfeite?</p>
+<label><input type="radio" name="q2"> deixar sem <code>alt</code></label>
+<label><input type="radio" name="q2"> escrever <code>alt="imagem"</code></label>
+<label><input type="radio" name="q2"> usar <code>alt=""</code>, vazio</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Para que serve o <code>role="status"</code> num aviso?</p>
+<label><input type="radio" name="q3"> para o leitor de tela anunciar a mudança sem tirar o foco</label>
+<label><input type="radio" name="q3"> para o aviso aparecer em vermelho</label>
+<label><input type="radio" name="q3"> para o botão ficar desabilitado durante o envio</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: dê nome ao botão de fechar</h2>
+<p>O botão mostra só um “×” e o leitor de tela não sabe o que ele faz. Complete o atributo que dá nome à
+ação.</p>
+<div class="ex-code">&lt;button <input aria-label="resposta 1" data-answer="aria-label=&quot;Fechar&quot;|aria-label='Fechar'" placeholder="...">&gt;×&lt;/button&gt;</div>
+<p class="ex-dica">Dica: é o atributo que substitui o conteúdo como nome acessível. O valor deve dizer a
+ação — “Fechar” — e não o desenho.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Acessibilidade começa no elemento certo. <code>button</code> para ação, <code>a</code> para navegação,
+<code>label</code> ligado ao campo por <code>htmlFor</code> e <code>id</code>, <code>img</code> com
+<code>alt</code> descrevendo o que importa, títulos em hierarquia. O navegador entrega foco, teclado e
+papel de graça; a <code>div</code> não entrega nada.</p>
+
+<p>O nome acessível é o que o leitor de tela fala. Ele vem do texto do elemento, do <code>label</code>,
+do <code>alt</code> ou de um <code>aria-label</code> — que só funciona quando o elemento tem papel. E
+regiões vivas, como <code>role="status"</code>, avisam mudanças sem roubar o foco de quem está
+digitando.</p>
+
+<p>Para conferir, dois testes: Tab até o fim, apertando Enter em tudo; e o checklist de três linhas no
+console. O primeiro encontra o que não recebe foco, o segundo encontra o que não tem nome. Na próxima
+aula o assunto é o outro lado da qualidade: os erros que se repetem em todo projeto React e como
+reconhecê-los rápido, em <a href="erros-comuns.html">Erros Comuns</a>.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Papel vem do HTML; <code>div</code> com <code>onClick</code> não é botão.</li>
+<li>Nome acessível: texto do elemento, <code>label</code>, <code>alt</code> ou <code>aria-label</code>.</li>
+<li>Imagem com conteúdo: <code>alt</code> descritivo. Enfeite: <code>alt=""</code>.</li>
+<li><code>label</code> + <code>htmlFor</code> + <code>id</code> ligam rótulo e campo.</li>
+<li>Em JSX, o atributo é <code>htmlFor</code>; o HTML final mostra <code>for</code>.</li>
+<li><code>role="status"</code> anuncia mudanças sem tirar o foco.</li>
+<li>Botão de ícone precisa de <code>aria-label</code> com a ação.</li>
+<li>Não use <code>tabIndex</code> positivo: quebra a ordem natural.</li>
+<li>Placeholder não substitui rótulo.</li>
+<li>Teste com Tab e com o checklist no console antes de dizer que está pronto.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

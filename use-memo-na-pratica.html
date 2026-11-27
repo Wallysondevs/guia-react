@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>useMemo na Prática | Guia React</title>
+<meta name="description" content="useMemo na prática: memoizar uma conta derivada, dar identidade estável para um filho memoizado e para um elemento JSX, medir antes de otimizar e o custo de exagerar.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>useMemo na <span class="hl">Prática</span></h1>
+<p class="intro">O catálogo da Ana tem quatrocentos pães, e a tela de resumo conta quantos são doces e
+quantos são salgados. A conta é barata uma vez; o problema é que ela roda em <em>todo</em> desenho — até
+quando a Ana só troca a cor do aviso. Nesta aula ela usa o <code>useMemo</code> nos três casos que aparecem
+de verdade em um projeto: a conta derivada, a identidade que um filho memoizado precisa e o elemento JSX
+que não pode ser recriado.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como decidir se vale memoizar — e como medir antes de decidir.</li>
+  <li>Guardar o resultado de uma conta derivada que roda em todo desenho.</li>
+  <li>Dar identidade estável para um array que alimenta um componente memoizado.</li>
+  <li>Memoizar um elemento JSX para manter a referência entre desenhos.</li>
+  <li>Onde a identidade importa: dependência de efeito, prop de <code>memo</code>, <code>value</code> de
+  contexto.</li>
+  <li>O custo do <code>useMemo</code>: comparação, memória e código mais difícil de ler.</li>
+  <li>Quem guarda o quê: <code>useMemo</code>, <code>useCallback</code> e <code>memo</code>.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a conta que roda em todo desenho</h2>
+
+<p>A página de resumo da padaria mostra dois números: quantos pães doces e quantos salgados existem no
+catálogo. O catálogo vem de uma planilha e tem quatrocentas linhas. A conta é simples — um
+<code>filter</code> para cada tipo — e leva alguns milissegundos. Uma vez só, ninguém nota.</p>
+
+<p>O problema é que a função roda a cada desenho do componente. A Ana troca o texto do aviso, a conta roda.
+Ela abre o menu, a conta roda. Ela digita no campo de busca, a conta roda em cada tecla. Como o resultado é
+sempre o mesmo enquanto o catálogo não muda, esse trabalho é desperdício — e, em uma tela com mais de uma
+conta dessas, é a diferença entre uma digitação fluida e uma travada.</p>
+
+<p>O <a href="useMemo.html"><code>useMemo</code></a> resolve exatamente isso: ele guarda o resultado de um
+cálculo entre desenhos e só
+refaz o cálculo quando uma das dependências muda. A forma é
+<code>useMemo(() =&gt; conta(), [dependencias])</code>. Se as dependências forem as mesmas do desenho
+anterior, o React devolve o valor guardado sem chamar a função.</p>
+
+<p>A pergunta certa, antes de qualquer código, é se vale a pena. Memoizar tem custo e complica a leitura;
+um cálculo de dois números não precisa. O critério prático: o cálculo é caro, ou o resultado é usado em um
+lugar que depende de identidade — um filho memoizado, uma dependência de efeito, um valor de contexto.</p>
+
+<h2>2. Medir antes de memoizar</h2>
+
+<p>A Ana mediu antes. Colocou um <code>performance.now()</code> antes e depois da conta e imprimiu a
+diferença. É o jeito mais simples de responder "isso é caro?" sem chutar. O número que ela viu no notebook,
+com o catálogo de quatrocentas linhas, foi este:</p>
+
+<pre class="term">agrupar: 9.4 ms
+agrupar: 9.1 ms
+agrupar: 9.6 ms</pre>
+
+<p>Nove milissegundos por desenho é bastante quando o desenho acontece a cada tecla. Se a conta levasse
+0,2 ms, a resposta seria outra: provavelmente não valeria memoizar, porque comparar dependências e guardar
+o resultado também custa. O React DevTools tem uma aba Profiler que mostra o tempo de cada componente em
+cada desenho; é a ferramenta mais direta para achar o culpado antes de mexer no código.</p>
+
+<dl class="anatomy">
+<dt>conta derivada</dt>
+<dd>Um valor que pode ser calculado a partir de outros: o resumo a partir do catálogo, o total a partir
+dos itens.</dd>
+<dt><code>useMemo</code></dt>
+<dd>O gancho que guarda o resultado de uma função entre desenhos e a refaz só quando as dependências
+mudam.</dd>
+<dt>dependências</dt>
+<dd>O array que decide quando refazer a conta. Vale a mesma regra do efeito: lista tudo o que a função
+lê.</dd>
+<dt>identidade</dt>
+<dd>A referência do valor. Dois arrays com o mesmo conteúdo são identidades diferentes.</dd>
+<dt>perfil</dt>
+<dd>A medição. Sem ela, memoizar é chute; com ela, é decisão.</dd>
+</dl>
+
+<p>E há um detalhe de honestidade que vale desde já: o <code>useMemo</code> é uma dica, não uma garantia.
+A documentação diz que o React pode descartar o valor guardado em situações de pressão de memória. Nenhuma
+regra do seu site pode depender de "essa conta rodou uma vez só"; o que você pode esperar é que ela rode
+menos.</p>
+
+<h2>3. Guardando a conta derivada</h2>
+
+<p>Na caixa, o resumo é calculado no corpo do componente e conta quantas vezes a conta rodou, em uma
+variável de módulo. Clique em <strong>Trocar aviso</strong>: o aviso é só um texto e, mesmo assim, o
+contador sobe. A missão é envolver a conta em <code>useMemo</code> com o array vazio, porque o catálogo é
+uma constante de módulo e não muda.</p>
+
+<div class="tryreact" data-goal="clique:#trocar;;texto:agrupamentos: 1">
+  <p class="try-task">O resumo do catálogo é recalculado a cada desenho. Envolva a chamada de
+  <code>agrupar(CATALOGO)</code> em um <code>useMemo</code> com dependências <code>[]</code> e faça o
+  contador continuar em 1 depois do clique.</p>
+  <pre class="jsx">const CATALOGO = Array.from({ length: 400 }, (_, i) =&gt; ({
+  nome: "pão " + (i + 1),
+  tipo: i % 3 === 0 ? "doce" : "salgado",
+}));
+
+let agrupamentos = 0;
+function agrupar(itens) {
+  agrupamentos = agrupamentos + 1;
+  return {
+    doces: itens.filter((p) =&gt; p.tipo === "doce").length,
+    salgados: itens.filter((p) =&gt; p.tipo === "salgado").length,
+  };
+}
+
+function App() {
+  const [aviso, setAviso] = useState("Padaria aberta");
+  const resumo = agrupar(CATALOGO);
+
+  return (
+    &lt;div&gt;
+      &lt;button id="trocar" onClick={() =&gt; setAviso("Forno quente até as 10h")}&gt;
+        Trocar aviso
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;p&gt;doces: {resumo.doces}&lt;/p&gt;
+      &lt;p&gt;salgados: {resumo.salgados}&lt;/p&gt;
+      &lt;p&gt;agrupamentos: {agrupamentos}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="trocar"&gt;Trocar aviso&lt;/button&gt;
+  &lt;p&gt;Padaria aberta&lt;/p&gt;
+  &lt;p&gt;doces: 134&lt;/p&gt;
+  &lt;p&gt;salgados: 266&lt;/p&gt;
+  &lt;p&gt;agrupamentos: 1&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const CATALOGO = Array.from({ length: 400 }, (_, i) =&gt; ({
+  nome: "pão " + (i + 1),
+  tipo: i % 3 === 0 ? "doce" : "salgado",
+}));
+
+let agrupamentos = 0;
+function agrupar(itens) {
+  agrupamentos = agrupamentos + 1;
+  return {
+    doces: itens.filter((p) =&gt; p.tipo === "doce").length,
+    salgados: itens.filter((p) =&gt; p.tipo === "salgado").length,
+  };
+}
+
+function App() {
+  const [aviso, setAviso] = useState("Padaria aberta");
+  const resumo = useMemo(() =&gt; agrupar(CATALOGO), []);
+
+  return (
+    &lt;div&gt;
+      &lt;button id="trocar" onClick={() =&gt; setAviso("Forno quente até as 10h")}&gt;
+        Trocar aviso
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;p&gt;doces: {resumo.doces}&lt;/p&gt;
+      &lt;p&gt;salgados: {resumo.salgados}&lt;/p&gt;
+      &lt;p&gt;agrupamentos: {agrupamentos}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel do código inicial termina com <code>agrupamentos: 1</code>, que é a montagem. Depois do clique,
+o código antigo mostra 2 e a solução continua em 1. Os números de doces e salgados são os mesmos nos dois
+casos — a diferença está só em quando a conta acontece.</p>
+
+<p>Repare no <code>[]</code>. Ele diz "não dependo de nada que mude". Se o catálogo viesse de uma prop ou
+de um estado de busca, ele entraria no array, e é aí que mora o erro clássico: esquecer uma dependência e
+mostrar o resumo de ontem. A regra é a mesma do <code>useEffect</code>: liste tudo o que a função lê —
+nada a mais (que faria refazer à toa) e nada a menos (que faria guardar valor velho).</p>
+
+<h2>4. Identidade para um filho memoizado</h2>
+
+<p>O segundo uso é o que mais aparece em código de verdade, e ele não tem a ver com tempo de cálculo: tem a
+ver com referência. O <a href="memo.html"><code>memo</code></a> compara props por identidade, então um
+array filtrado no corpo do
+pai é sempre "novo" — e o filho desenha mesmo recebendo o mesmo conteúdo.</p>
+
+<p>Na caixa, o componente <code>Doces</code> está embrulhado com <code>memo</code> e recebe os doces
+filtrados. Como o <code>filter</code> acontece no corpo do <code>App</code>, cada desenho do pai entrega um
+array novo e o <code>memo</code> libera o desenho do filho. A conta é barata; o problema é a identidade.</p>
+
+<div class="tryreact" data-goal="clique:#trocar;;texto:doces desenhados: 1">
+  <p class="try-task">O filho está com <code>memo</code>, mas recebe um array novo a cada desenho. Envolva o
+  <code>filter</code> em um <code>useMemo</code> com dependências <code>[]</code> e faça o número continuar
+  em 1 depois do clique.</p>
+  <pre class="jsx">const PAES = [
+  { nome: "sonho", tipo: "doce" },
+  { nome: "pão francês", tipo: "salgado" },
+  { nome: "pão de queijo", tipo: "salgado" },
+];
+
+let desenhos = 0;
+const Doces = memo(function Doces({ itens }) {
+  desenhos = desenhos + 1;
+  return &lt;p&gt;doces desenhados: {desenhos} ({itens.length} pão(es))&lt;/p&gt;;
+});
+
+function App() {
+  const [aviso, setAviso] = useState("Padaria aberta");
+  const doces = PAES.filter((p) =&gt; p.tipo === "doce");
+
+  return (
+    &lt;div&gt;
+      &lt;button id="trocar" onClick={() =&gt; setAviso("Forno quente até as 10h")}&gt;
+        Trocar aviso
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;Doces itens={doces} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="trocar"&gt;Trocar aviso&lt;/button&gt;
+  &lt;p&gt;Padaria aberta&lt;/p&gt;
+  &lt;p&gt;doces desenhados: 1 ( 1 pão(es))&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const PAES = [
+  { nome: "sonho", tipo: "doce" },
+  { nome: "pão francês", tipo: "salgado" },
+  { nome: "pão de queijo", tipo: "salgado" },
+];
+
+let desenhos = 0;
+const Doces = memo(function Doces({ itens }) {
+  desenhos = desenhos + 1;
+  return &lt;p&gt;doces desenhados: {desenhos} ({itens.length} pão(es))&lt;/p&gt;;
+});
+
+function App() {
+  const [aviso, setAviso] = useState("Padaria aberta");
+  const doces = useMemo(() =&gt; PAES.filter((p) =&gt; p.tipo === "doce"), []);
+
+  return (
+    &lt;div&gt;
+      &lt;button id="trocar" onClick={() =&gt; setAviso("Forno quente até as 10h")}&gt;
+        Trocar aviso
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;Doces itens={doces} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O <code>useMemo</code> aqui não economiza o <code>filter</code> de três itens — isso seria irrelevante.
+Ele existe para que a referência do array seja a mesma entre desenhos, e o <code>memo</code> do filho possa
+concluir "nada mudou". É a dupla que funciona: um estabiliza a referência, o outro compara.</p>
+
+<p>Quando o array depende de um filtro escolhido pela pessoa, o padrão é o mesmo, com o filtro no array de
+dependências: <code>useMemo(() =&gt; filtrar(filtro), [filtro])</code>. Aí a referência muda só quando o
+filtro muda — que é exatamente quando o filho precisa desenhar.</p>
+
+<h2>5. O elemento JSX memoizado</h2>
+
+<p>O terceiro caso é o mais surpreendente e o mais útil para quem tem um layout com <code>children</code>.
+Quando você escreve <code>&lt;Moldura&gt;&lt;p&gt;oi&lt;/p&gt;&lt;/Moldura&gt;</code>, aquele
+<code>&lt;p&gt;oi&lt;/p&gt;</code> é um objeto criado no desenho do pai. Para o <code>memo</code> da
+moldura, é uma prop nova toda vez — e o desenho dela não é pulado.</p>
+
+<p>A saída é tratar o elemento como qualquer outro valor: guardá-lo em um <code>useMemo</code>. Se as
+dependências não mudarem, a referência é a mesma, e o <code>memo</code> da moldura funciona. É a mesma
+ideia da seção anterior, com JSX no lugar do array.</p>
+
+<div class="tryreact" data-goal="clique:#trocar;;texto:moldura desenhada: 1">
+  <p class="try-task">A <code>Moldura</code> tem <code>memo</code>, mas o <code>&lt;p&gt;</code> passado
+  como filho é recriado a cada desenho. Guarde o conteúdo em um <code>useMemo</code> com
+  <code>[]</code> e faça o número continuar em 1 depois do clique.</p>
+  <pre class="jsx">let desenhos = 0;
+const Moldura = memo(function Moldura({ children }) {
+  desenhos = desenhos + 1;
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Padaria da Ana&lt;/h2&gt;
+      {children}
+      &lt;p&gt;moldura desenhada: {desenhos}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+});
+
+function App() {
+  const [aviso, setAviso] = useState("Padaria aberta");
+
+  return (
+    &lt;div&gt;
+      &lt;button id="trocar" onClick={() =&gt; setAviso("Forno quente até as 10h")}&gt;
+        Trocar aviso
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;Moldura&gt;
+        &lt;p&gt;Pães de hoje: 2&lt;/p&gt;
+      &lt;/Moldura&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="trocar"&gt;Trocar aviso&lt;/button&gt;
+  &lt;p&gt;Padaria aberta&lt;/p&gt;
+  &lt;div&gt;
+    &lt;h2&gt;Padaria da Ana&lt;/h2&gt;
+    &lt;p&gt;Pães de hoje: 2&lt;/p&gt;
+    &lt;p&gt;moldura desenhada: 1&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">let desenhos = 0;
+const Moldura = memo(function Moldura({ children }) {
+  desenhos = desenhos + 1;
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Padaria da Ana&lt;/h2&gt;
+      {children}
+      &lt;p&gt;moldura desenhada: {desenhos}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+});
+
+function App() {
+  const [aviso, setAviso] = useState("Padaria aberta");
+  const dentro = useMemo(() =&gt; &lt;p&gt;Pães de hoje: 2&lt;/p&gt;, []);
+
+  return (
+    &lt;div&gt;
+      &lt;button id="trocar" onClick={() =&gt; setAviso("Forno quente até as 10h")}&gt;
+        Trocar aviso
+      &lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;Moldura&gt;{dentro}&lt;/Moldura&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois do clique, o código antigo mostra <code>moldura desenhada: 2</code> e a solução continua em 1. E
+note o que o <code>useMemo</code> guardou: não um número, mas um elemento — o resultado do JSX, que é um
+objeto como outro qualquer.</p>
+
+<p>Esse padrão tem nome na comunidade: "elemento como prop" ou "slot". Ele é útil quando o conteúdo é caro
+ou quando a moldura tem animações e não pode redesenhar. Também é a explicação de metade dos casos em que
+"o <code>memo</code> não funciona": quase sempre há um elemento sendo recriado no meio.</p>
+
+<h2>6. Onde a identidade importa</h2>
+
+<p>Os três casos acima têm a mesma raiz: alguém compara referências. Vale conhecer os quatro lugares em
+que isso aparece, porque o conserto é sempre o mesmo — <code>useMemo</code> para valores,
+<code>useCallback</code> para funções — e o sintoma muda de lugar.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde a identidade conta</th><th>O que acontece com referência nova</th><th>Ferramenta</th></tr>
+<tr><td>prop de componente com <code>memo</code></td><td>o filho desenha sem necessidade</td><td><code>useMemo</code></td></tr>
+<tr><td>dependência de <code>useEffect</code></td><td>o efeito roda em todo desenho</td><td><code>useMemo</code></td></tr>
+<tr><td><code>value</code> de um contexto</td><td>todo consumidor desenha de novo</td><td><code>useMemo</code></td></tr>
+<tr><td>dependência de outro <code>useMemo</code></td><td>a conta de cima refaz à toa</td><td><code>useMemo</code></td></tr>
+</table>
+</div>
+
+<p>O caso do efeito merece um exemplo, porque é o que mais surpreende. Um efeito que busca dados com
+<code>[filtro]</code>, onde <code>filtro</code> é um array montado no corpo do componente, roda a cada
+desenho — e a aba Network mostra uma busca por tecla digitada em qualquer outro campo da tela:</p>
+
+<pre class="term">buscando doces...
+buscando doces...
+buscando doces...</pre>
+
+<p>Com o array estabilizado por <code>useMemo</code>, o efeito roda quando o filtro muda de verdade. E, se
+a dependência fosse um objeto com duas propriedades, valeria memoizar o objeto inteiro ou listar as
+propriedades soltas — o segundo jeito costuma ser mais simples de ler e de acertar.</p>
+
+<p>Nos contextos, o padrão tem nome próprio: <code>value</code> memoizado. Um provider que recebe
+<code>value={{ cliente, entrar }}</code> cria um objeto novo a cada desenho do provider, e todos os
+consumidores desenham junto. Com <code>useMemo</code>, o valor só muda quando o cliente ou a função mudam —
+e aí a função também precisa de <code>useCallback</code>, ou a corrente se rompe no elo seguinte.</p>
+
+<h2>7. O custo de memoizar</h2>
+
+<p>O primeiro custo é a comparação. O <code>useMemo</code> guarda o valor e o array de dependências do
+desenho anterior e compara item por item. Para duas dependências primitivas, é barato. Para um array de dez
+itens, é uma comparação de dez — sempre menor que refazer a conta, se a conta for caras, e sempre maior se
+não for.</p>
+
+<p>O segundo é a memória: o valor guardado fica vivo enquanto o componente estiver montado. Guardar uma
+lista de quatrocentas linhas para economizar um <code>filter</code> pode ser um mau negócio; guardar a
+contagem de doces, um número, é barato. O que você guarda importa tanto quanto guardar.</p>
+
+<p>O terceiro custo é o mais subestimado: a leitura. Cada <code>useMemo</code> é uma pergunta nova para
+quem lê — "por que isso está memoizado?" — e um lugar novo onde a dependência pode estar errada. Em código
+de time, um <code>useMemo</code> sem motivo aparente vira discussão em revisão. O comentário curto
+("identidade estável para o <code>Doces</code>") paga o preço.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Vale memoizar?</th><th>Por quê</th></tr>
+<tr><td>somar dois números do estado</td><td>não</td><td>mais barato que comparar dependências</td></tr>
+<tr><td>filtrar e ordenar 400 itens</td><td>sim, se medido</td><td>dezenas de milissegundos por desenho</td></tr>
+<tr><td>array que alimenta um filho com <code>memo</code></td><td>sim</td><td>a referência é o que o filho compara</td></tr>
+<tr><td>objeto <code>value</code> de contexto</td><td>sim</td><td>evita redesenhar todos os consumidores</td></tr>
+<tr><td>elemento JSX passado como prop</td><td>às vezes</td><td>útil com moldura memoizada e conteúdo caro</td></tr>
+</table>
+</div>
+
+<h2>8. Quem guarda o quê</h2>
+
+<p>Os três nomes parecidos confundem, e a diferença é simples quando se olha para o que cada um guarda. O
+<code>memo</code> guarda o resultado do desenho de um <strong>componente</strong>. O <code>useMemo</code>
+guarda um <strong>valor</strong> calculado no corpo. O <code>useCallback</code> guarda uma
+<strong>função</strong> — é o <code>useMemo</code> de uma função, sem a camada de chamada.</p>
+
+<pre class="file" data-file="App.jsx">const total = useMemo(() =&gt; precos.reduce(somar, 0), [precos]);
+const aoSomar = useCallback((item) =&gt; setItens((l) =&gt; [...l, item]), []);
+const Item = memo(function Item({ item, aoSomar }) { /* ... */ });</pre>
+
+<p>Nesse trecho os três trabalham juntos: <code>memo</code> evita desenhar o item, <code>useCallback</code>
+mantém a função estável para o <code>memo</code> funcionar e <code>useMemo</code> guarda o total. Se um dos
+três faltar, o elo se rompe — e o sintoma é sempre "continua desenhando".</p>
+
+<p>Uma nota sobre o futuro, porque ela muda o conselho: com o React Compiler ligado no projeto, boa parte
+desses <code>useMemo</code> vira automático. Ele não vem ligado por padrão no React 19, e a documentação
+recomenda tratar a memoização manual como exceção. Enquanto o projeto não usa o compilador, medir e
+memoizar o que dói continua sendo o caminho.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o resumo ficou com o valor de ontem</h3>
+<p>A Ana memoizou a conta com <code>[]</code>, mas o catálogo vinha de uma busca que mudava. O resumo
+congelou no primeiro resultado. O conserto é listar a dependência que a conta lê. O aviso do ESLint
+(<code>react-hooks/exhaustive-deps</code>) aponta exatamente isso, e ele aparece no editor antes de o bug
+chegar na tela.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a lista de cards pesada e o <code>useMemo</code> que não resolveu</h3>
+<p>Memoizar o array filtrado resolveu a identidade, e a digitação continuou pesada: o problema era o
+número de cards desenhados, não a referência. A solução foi memoizar cada card, e depois limitar quantos
+aparecem. É o lembrete de que <code>useMemo</code> é uma ferramenta entre várias — e que a medição diz qual
+usar.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: <code>useMemo</code> em tudo desde o primeiro dia</h3>
+<p>Um projeto com <code>useMemo</code> em cada variável fica mais difícil de ler e não fica mais rápido:
+as contas que importam continuam lá. O hábito saudável é escrever direto, medir no Profiler e memoizar só
+o que aparece na medição — ou o que precisa de identidade estável por contrato, como a prop de um filho
+memoizado.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que o <code>useMemo</code> devolve?</p>
+<label><input type="radio" name="q1"> a função embrulhada, pronta para chamar</label>
+<label><input type="radio" name="q1"> o resultado da função, guardado entre desenhos enquanto as dependências não mudam</label>
+<label><input type="radio" name="q1"> uma Promise com o resultado</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que um array filtrado no corpo do pai derruba o <code>memo</code> do filho?</p>
+<label><input type="radio" name="q2"> porque o filtro muda o conteúdo do array</label>
+<label><input type="radio" name="q2"> porque o <code>memo</code> não aceita arrays</label>
+<label><input type="radio" name="q2"> porque cada desenho cria um array novo, com outra referência</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Qual é o primeiro passo antes de memoizar?</p>
+<label><input type="radio" name="q3"> medir o custo com o Profiler ou com <code>performance.now()</code></label>
+<label><input type="radio" name="q3"> memoizar todas as contas por precaução</label>
+<label><input type="radio" name="q3"> trocar o <code>useMemo</code> por <code>useEffect</code></label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a conta e a dependência</h2>
+<p>Complete o <code>useMemo</code> que refaz a lista ordenada só quando a busca muda:</p>
+<div class="ex-code">const lista = useMemo(() =&gt; ordenar(filtrar(busca)), [<input aria-label="resposta 1" data-answer="busca" placeholder="...">]);</div>
+<p class="ex-dica">Dica: é o único valor que a função lê além das constantes de módulo.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O <code>useMemo</code> guarda o resultado de um cálculo entre desenhos e refaz o cálculo só quando uma
+dependência muda. Ele serve para três coisas na prática: economizar uma conta derivada caras, dar identidade
+estável a um valor que outro lugar compara (o <code>memo</code> de um filho, a dependência de um efeito, o
+<code>value</code> de um contexto) e guardar um elemento JSX para uma moldura memoizada.</p>
+
+<p>O array de dependências segue a mesma regra do efeito: tudo o que a função lê, nada a mais e nada a
+menos. O custo existe — comparação, memória e legibilidade —, então a ordem é sempre escrever claro, medir
+e memoizar o que dói. Números que vêm do <code>performance.now()</code> ou do Profiler decidem melhor do
+que a intuição.</p>
+
+<p>E, se o objeto guardado for uma função, a ferramenta é o <code>useCallback</code>: a mesma ideia, com o
+foco em manter a referência estável para quem compara. É o assunto da próxima aula, onde a corrente de
+dependências aparece inteira.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>useMemo(() =&gt; conta(), [deps])</code> guarda o resultado, não a função.</li>
+<li>As dependências listam o que a conta lê; <code>[]</code> só quando não lê nada que mude.</li>
+<li>Serve para conta caras, para identidade estável e para elemento JSX.</li>
+<li>Identidade importa em: prop de <code>memo</code>, dependência de efeito, <code>value</code> de contexto.</li>
+<li>Array filtrado no corpo do pai é sempre novo — e derruba o <code>memo</code> do filho.</li>
+<li>Elemento JSX também é valor: dá para guardar em <code>useMemo</code>.</li>
+<li>Medir antes: Profiler ou <code>performance.now()</code>.</li>
+<li>Memoizar não é garantia: o React pode descartar o valor guardado.</li>
+<li>Para funções, o nome é <code>useCallback</code>.</li>
+<li>O React Compiler memoiza sozinho — e não vem ligado por padrão.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

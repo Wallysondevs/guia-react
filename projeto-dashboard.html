@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard | Guia React</title>
+<meta name="description" content="Projeto de um dashboard em React: os totais com reduce, a busca simulada com carregando, o filtro de período, a tabela de pedidos e o que costuma quebrar.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Dashboard</span></h1>
+<p class="intro">Todo fim de dia a Ana faz a mesma conta no caderno: soma os pedidos, divide pelo número
+de clientes, compara com ontem e anota o pão que mais saiu. Ela quer o painel — o <em>dashboard</em> — que
+faz isso sozinho. Neste projeto você monta o painel do dia com ela: os números derivados da lista, a busca
+que simula a rede, o filtro de período, a tabela de pedidos e o que fazer quando não há nada para
+mostrar.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como transformar uma lista de pedidos em quatro números de painel, sem guardar cada um.</li>
+  <li>O que é derivado e o que precisa mesmo de <code>useState</code> num painel.</li>
+  <li>Como simular a busca de dados com <code>Promise</code> e <code>setTimeout</code>, e o que a tela
+  mostra enquanto espera.</li>
+  <li>Como filtrar por período sem estragar a lista original.</li>
+  <li>Como montar a tabela de pedidos com cabeçalho de verdade e alinhamento de número.</li>
+  <li>O que fazer quando o período não tem nenhum pedido.</li>
+  <li>Os três bugs clássicos de painel: divisão por zero, carregando que não desliga e total que não
+  acompanha o filtro.</li>
+</ul>
+</div>
+
+<h2>1. A cena: as contas do dia no caderno</h2>
+
+<p>O caderno da Ana tem uma página por dia. No topo, três números: quantos pedidos, quanto entrou e quanto
+deu cada pedido em média. Embaixo, a lista do que saiu. Ela preenche à mão, com a calculadora do celular, e
+confere duas vezes porque já errou uma vírgula e passou um dia achando que tinha vendido o dobro.</p>
+
+<p>Um painel resolve isso com uma regra simples: os números não são digitados, são <strong>calculados</strong>
+da lista. Lista mudou, número muda. E como a lista já existe no sistema, não há o que digitar — há o que
+derivar. Essa é a ideia inteira do projeto, e o resto é consequência dela.</p>
+
+<p>O painel tem duas partes. Em cima, quatro cartões: pedidos do dia, faturamento, ticket médio e o pão
+mais vendido. Embaixo, a tabela dos pedidos, com cliente e valor. Uma barra de período escolhe entre
+hoje, semana e mês — e é ela que decide quais pedidos entram em tudo, inclusive nos totais.</p>
+
+<p>Três estados, mais uma porção de contas. É menos do que parece: a maior parte do painel é
+<code>filter</code>, <code>reduce</code> e formatação. O trabalho de verdade está em decidir onde cada
+número nasce — e em não guardar o que dá para calcular.</p>
+
+<h2>2. O desenho do painel: números em cima, tabela embaixo</h2>
+
+<p>Antes do código, a tabela dos cartões. Cada cartão é uma conta diferente sobre a mesma lista, e escrever
+a conta antes de escrever o componente evita a maior armadilha do painel: calcular uma coisa e mostrar
+outra.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Cartão</th><th>A conta</th><th>O que precisa da lista</th></tr>
+<tr><td>Pedidos</td><td>quantos são</td><td><code>lista.length</code></td></tr>
+<tr><td>Faturamento</td><td>soma dos totais</td><td><code>reduce</code> somando <code>total</code></td></tr>
+<tr><td>Ticket médio</td><td>faturamento dividido pelos pedidos</td><td>as duas contas acima</td></tr>
+<tr><td>Mais vendido</td><td>o item que aparece em mais pedidos</td><td>contagem por item</td></tr>
+</table>
+</div>
+
+<p>Repare que nenhuma linha da tabela diz "guardar". Nenhum dos quatro números merece um
+<code>useState</code>: todos são contas feitas a partir da lista, no momento de desenhar. Guardar um deles
+cria o problema clássico — a lista muda, o número guardado não, e o painel passa a mentir com cara de
+certo.</p>
+
+<p>O desenho também decide a ordem na tela: número grande em cima, detalhe embaixo. Quem abre o painel
+quer a resposta antes da planilha. E o período fica visível, no topo, porque ele muda o significado de
+todos os números — "R$ 148" hoje e "R$ 148" no mês contam histórias diferentes.</p>
+
+<p>Sobre o "mais vendido": ele é o único que exige uma conta um pouco maior, porque precisa contar
+ocorrências. Se o painel for simples, deixe-o de fora da primeira versão — os três primeiros cartões já
+contam a história, e o quarto pode esperar a segunda.</p>
+
+<h2>3. Os dados, os estados e as contas</h2>
+
+<p>O painel lê uma lista de pedidos com quatro campos: <code>id</code>, <code>cliente</code>,
+<code>total</code> e <code>periodo</code>. O <code>periodo</code> é o que o filtro usa; na vida real seria
+uma data, e o filtro compararia datas. Aqui ele é um texto — <code>"hoje"</code>, <code>"semana"</code> —
+para o projeto caber em uma aula sem falar de fuso horário.</p>
+
+<dl class="anatomy">
+<dt>pedidos</dt>
+<dd>A lista que vem da API. No painel de verdade, chega de fora e muda com o tempo; aqui, chega de uma
+função que simula a rede.</dd>
+<dt>periodo</dt>
+<dd>A escolha do usuário: <code>"hoje"</code>, <code>"semana"</code> ou <code>"mes"</code>. É estado,
+porque muda no clique e decide o que entra em todas as contas.</dd>
+<dt>carregando</dt>
+<dd>Um booleano que diz se a resposta ainda não chegou. É estado, porque muda no tempo da rede.</dd>
+<dt>derivado</dt>
+<dd>O que se calcula a partir do estado: a lista visível, o faturamento, o ticket médio. Muda sozinho
+quando a entrada muda.</dd>
+<dt>vazio</dt>
+<dd>A lista visível com zero itens. Não é erro e não é carregando: é um resultado legítimo do filtro.</dd>
+</dl>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Informação</th><th>Onde mora</th><th>Por quê</th></tr>
+<tr><td>a lista de pedidos</td><td>estado que recebe a resposta</td><td>começa vazia e chega depois</td></tr>
+<tr><td>o período escolhido</td><td><code>useState</code></td><td>muda no clique e filtra tudo</td></tr>
+<tr><td>carregando</td><td><code>useState</code></td><td>muda no tempo da resposta</td></tr>
+<tr><td>faturamento e ticket</td><td>contas no desenho</td><td>consequência da lista visível</td></tr>
+<tr><td>a tabela de pedidos</td><td>a própria lista visível</td><td>não há dado novo, só outro desenho</td></tr>
+</table>
+</div>
+
+<p>Para conferir o mapa do estado em uma linha, um log com os três números resolve:</p>
+
+<pre class="file" data-file="App.jsx">const faturamento = pedidos.reduce((soma, p) =&gt; soma + p.total, 0);
+const ticket = faturamento / pedidos.length;
+
+console.log(
+  pedidos.length + " pedidos | faturamento: " + faturamento +
+  " | ticket: " + ticket.toFixed(2)
+);</pre>
+
+<p>Com seis pedidos somando 148, o console mostra:</p>
+
+<pre class="term">console: 6 pedidos | faturamento: 148 | ticket: 24.67</pre>
+
+<p>Repare no <code>24.67</code>: o JavaScript usa ponto para decimal, e quem mostra em reais é a função de
+formatação, não a conta. Guardar número e formatar na hora é o padrão; formatar antes de guardar é o
+caminho para não conseguir mais somar.</p>
+
+<h2>4. Primeira peça: os números derivados</h2>
+
+<p>Comece pelos números que resumem o dia. O <code>reduce</code> percorre a lista e acumula a soma; o
+ticket médio é a soma dividida pela quantidade. Nenhum dos dois é estado: são calculados a cada
+desenho, com a lista que estiver ali naquele momento.</p>
+
+<div class="tryreact" data-goal="texto:R$ 148,00;;texto:R$ 24,67">
+  <p class="try-task">Os dois cartões estão com zero fixo no código. Calcule o faturamento com
+  <code>reduce</code> e o ticket médio dividindo pelo número de pedidos.</p>
+  <pre class="jsx">const pedidos = [
+  { id: 1, cliente: "Ana", total: 24.5 },
+  { id: 2, cliente: "Beto", total: 32 },
+  { id: 3, cliente: "Cida", total: 18.5 },
+  { id: 4, cliente: "Duda", total: 27 },
+  { id: 5, cliente: "Eva", total: 21 },
+  { id: 6, cliente: "Fabi", total: 25 }
+];
+
+const reais = (v) =&gt; "R$ " + v.toFixed(2).replace(".", ",");
+
+function App() {
+  const faturamento = 0;
+  const ticket = 0;
+
+  return (
+    &lt;section className="cartoes"&gt;
+      &lt;p className="faturamento"&gt;{reais(faturamento)}&lt;/p&gt;
+      &lt;p className="ticket"&gt;{reais(ticket)}&lt;/p&gt;
+    &lt;/section&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;section class="cartoes"&gt;
+  &lt;p class="faturamento"&gt;R$ 0,00&lt;/p&gt;
+  &lt;p class="ticket"&gt;R$ 0,00&lt;/p&gt;
+&lt;/section&gt;
+</pre>
+  <pre class="solucao">const pedidos = [
+  { id: 1, cliente: "Ana", total: 24.5 },
+  { id: 2, cliente: "Beto", total: 32 },
+  { id: 3, cliente: "Cida", total: 18.5 },
+  { id: 4, cliente: "Duda", total: 27 },
+  { id: 5, cliente: "Eva", total: 21 },
+  { id: 6, cliente: "Fabi", total: 25 }
+];
+
+const reais = (v) =&gt; "R$ " + v.toFixed(2).replace(".", ",");
+
+function App() {
+  const faturamento = pedidos.reduce((soma, p) =&gt; soma + p.total, 0);
+  const ticket = faturamento / pedidos.length;
+
+  return (
+    &lt;section className="cartoes"&gt;
+      &lt;p className="faturamento"&gt;{reais(faturamento)}&lt;/p&gt;
+      &lt;p className="ticket"&gt;{reais(ticket)}&lt;/p&gt;
+    &lt;/section&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra <code>R$ 148,00</code> e <code>R$ 24,67</code>. A função <code>reais</code> é o
+truque de formatação: <code>toFixed(2)</code> garante duas casas e <code>replace(".", ",")</code> troca o
+ponto decimal pela vírgula brasileira. Sem ela, o cartão mostraria <code>24.666666666666668</code> — e
+ninguém confia num painel desses.</p>
+
+<p>Mantenha a função fora do componente, no topo do arquivo. Ela não usa nada do componente e não muda:
+recriar a cada desenho é desperdício e ruído de leitura. O mesmo vale para a lista de pedidos, que vira
+uma constante do módulo até o dia em que vier da API.</p>
+
+<p>O <code>reduce</code> merece um aviso: o zero no fim é obrigatório. Sem ele, a soma começa pelo primeiro
+objeto e vira uma concatenação estranha — o clássico <code>[object Object]</code> no lugar do número. Com
+o zero, a conta é numérica desde o primeiro passo.</p>
+
+<h2>5. Segunda peça: buscar os dados e o carregando</h2>
+
+<p>No app de verdade, a lista chega de uma API. Aqui não há rede no quadro, então a busca é simulada com
+uma <code>Promise</code> e um <code>setTimeout</code>: a função devolve a lista depois de um tempinho, e o
+código que chama espera. É o mesmo formato da aula de
+<a href="estados-de-carregamento.html">Estados de Carregamento</a>, só que sem internet nenhuma.</p>
+
+<div class="tryreact" data-goal="texto:6 pedidos;;conta:.carregando=0">
+  <p class="try-task">O componente nunca chama <code>buscarPedidos</code>: o painel fica em "Carregando..."
+  e zero pedidos. Busque dentro do <code>useEffect</code>, guarde a lista e desligue o carregando.</p>
+  <pre class="jsx">const pedidosDaApi = [
+  { id: 1, cliente: "Ana", total: 24.5 },
+  { id: 2, cliente: "Beto", total: 32 },
+  { id: 3, cliente: "Cida", total: 18.5 },
+  { id: 4, cliente: "Duda", total: 27 },
+  { id: 5, cliente: "Eva", total: 21 },
+  { id: 6, cliente: "Fabi", total: 25 }
+];
+
+function buscarPedidos() {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok(pedidosDaApi), 0));
+}
+
+function App() {
+  const [pedidos, setPedidos] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() =&gt; {
+    console.log("carregando pedidos");
+  }, []);
+
+  return (
+    &lt;section className="painel"&gt;
+      {carregando ? &lt;p className="carregando"&gt;Carregando...&lt;/p&gt; : null}
+      &lt;p className="total"&gt;{pedidos.length} pedidos&lt;/p&gt;
+    &lt;/section&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;section class="painel"&gt;
+  &lt;p class="carregando"&gt;Carregando...&lt;/p&gt;
+  &lt;p class="total"&gt;0 pedidos&lt;/p&gt;
+&lt;/section&gt;
+console: carregando pedidos
+</pre>
+  <pre class="solucao">const pedidosDaApi = [
+  { id: 1, cliente: "Ana", total: 24.5 },
+  { id: 2, cliente: "Beto", total: 32 },
+  { id: 3, cliente: "Cida", total: 18.5 },
+  { id: 4, cliente: "Duda", total: 27 },
+  { id: 5, cliente: "Eva", total: 21 },
+  { id: 6, cliente: "Fabi", total: 25 }
+];
+
+function buscarPedidos() {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok(pedidosDaApi), 0));
+}
+
+function App() {
+  const [pedidos, setPedidos] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() =&gt; {
+    console.log("carregando pedidos");
+    buscarPedidos().then((lista) =&gt; {
+      console.log("chegaram " + lista.length + " pedidos");
+      setPedidos(lista);
+      setCarregando(false);
+    });
+  }, []);
+
+  return (
+    &lt;section className="painel"&gt;
+      {carregando ? &lt;p className="carregando"&gt;Carregando...&lt;/p&gt; : null}
+      &lt;p className="total"&gt;{pedidos.length} pedidos&lt;/p&gt;
+    &lt;/section&gt;
+  );
+}</pre>
+</div>
+
+<p>Com a busca ligada, o painel mostra <code>6 pedidos</code> e nenhum "Carregando..." — a resposta
+chegou e o estado foi desligado. No console aparecem as duas linhas, na ordem:</p>
+
+<pre class="term">console: carregando pedidos
+console: chegaram 6 pedidos</pre>
+
+<p>O painel das caixas mostra o estado <em>depois</em> da resposta, porque a espera aqui é de zero
+milissegundo. Num app de verdade, com oitocentos milissegundos de rede, o "Carregando..." fica visível
+nesse meio-tempo — e é ele que evita a tela em branco que parece defeito.</p>
+
+<p>O <code>useEffect</code> com array de dependências vazio roda uma vez, na montagem. É o lugar certo
+para a primeira busca: se você chamar <code>buscarPedidos()</code> direto no corpo do componente, a função
+roda a cada desenho e dispara uma busca por render — um laço de pedidos. O array vazio é a promessa de
+"isto roda uma vez só".</p>
+
+<p>E o <code>then</code> precisa desligar o carregando <strong>também no erro</strong>. Um
+<code>catch</code> que mostra a mensagem e chama <code>setCarregando(false)</code> evita o painel preso em
+"Carregando..." para sempre, que é o segundo bug mais comum de painel — o primeiro é a divisão por
+zero.</p>
+
+<h2>6. Terceira peça: o período e o vazio</h2>
+
+<p>O filtro de período é o que faz o painel conversar. Ele é um estado de texto e um
+<code>filter</code> derivado; os totais, a tabela e a contagem usam a mesma lista filtrada. Quando o
+período não tem nenhum pedido, a tabela some e entra uma frase — não um espaço em branco que parece
+erro.</p>
+
+<div class="tryreact" data-goal="clique:#mes;;conta:.vazio=1;;texto:Nenhum pedido no período;;conta:tbody tr=0">
+  <p class="try-task">Clique em Mês: o período não tem pedido e a tabela fica vazia, sem explicação.
+  Mostre <strong>Nenhum pedido no período</strong> quando a lista visível estiver vazia.</p>
+  <pre class="jsx">const pedidos = [
+  { id: 1, cliente: "Ana", total: 24.5, periodo: "hoje" },
+  { id: 2, cliente: "Beto", total: 32, periodo: "hoje" },
+  { id: 3, cliente: "Cida", total: 18.5, periodo: "hoje" },
+  { id: 4, cliente: "Duda", total: 27, periodo: "hoje" },
+  { id: 5, cliente: "Eva", total: 21, periodo: "semana" },
+  { id: 6, cliente: "Fabi", total: 25, periodo: "semana" }
+];
+
+function App() {
+  const [periodo, setPeriodo] = useState("hoje");
+  const visiveis = pedidos.filter((p) =&gt; p.periodo === periodo);
+
+  return (
+    &lt;section&gt;
+      &lt;button id="hoje" onClick={() =&gt; setPeriodo("hoje")}&gt;Hoje&lt;/button&gt;
+      &lt;button id="semana" onClick={() =&gt; setPeriodo("semana")}&gt;Semana&lt;/button&gt;
+      &lt;button id="mes" onClick={() =&gt; setPeriodo("mes")}&gt;Mês&lt;/button&gt;
+      &lt;table&gt;
+        &lt;tbody&gt;
+          {visiveis.map((p) =&gt; (
+            &lt;tr key={p.id}&gt;&lt;td&gt;{p.cliente}&lt;/td&gt;&lt;td&gt;{p.total}&lt;/td&gt;&lt;/tr&gt;
+          ))}
+        &lt;/tbody&gt;
+      &lt;/table&gt;
+    &lt;/section&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;section&gt;
+  &lt;button id="hoje"&gt;Hoje&lt;/button&gt;
+  &lt;button id="semana"&gt;Semana&lt;/button&gt;
+  &lt;button id="mes"&gt;Mês&lt;/button&gt;
+  &lt;table&gt;
+    &lt;tbody&gt;
+      &lt;tr&gt;
+        &lt;td&gt;Ana&lt;/td&gt;
+        &lt;td&gt;24.5&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+        &lt;td&gt;Beto&lt;/td&gt;
+        &lt;td&gt;32&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+        &lt;td&gt;Cida&lt;/td&gt;
+        &lt;td&gt;18.5&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+        &lt;td&gt;Duda&lt;/td&gt;
+        &lt;td&gt;27&lt;/td&gt;
+      &lt;/tr&gt;
+    &lt;/tbody&gt;
+  &lt;/table&gt;
+&lt;/section&gt;
+</pre>
+  <pre class="solucao">const pedidos = [
+  { id: 1, cliente: "Ana", total: 24.5, periodo: "hoje" },
+  { id: 2, cliente: "Beto", total: 32, periodo: "hoje" },
+  { id: 3, cliente: "Cida", total: 18.5, periodo: "hoje" },
+  { id: 4, cliente: "Duda", total: 27, periodo: "hoje" },
+  { id: 5, cliente: "Eva", total: 21, periodo: "semana" },
+  { id: 6, cliente: "Fabi", total: 25, periodo: "semana" }
+];
+
+function App() {
+  const [periodo, setPeriodo] = useState("hoje");
+  const visiveis = pedidos.filter((p) =&gt; p.periodo === periodo);
+
+  return (
+    &lt;section&gt;
+      &lt;button id="hoje" onClick={() =&gt; setPeriodo("hoje")}&gt;Hoje&lt;/button&gt;
+      &lt;button id="semana" onClick={() =&gt; setPeriodo("semana")}&gt;Semana&lt;/button&gt;
+      &lt;button id="mes" onClick={() =&gt; setPeriodo("mes")}&gt;Mês&lt;/button&gt;
+      {visiveis.length === 0 ? (
+        &lt;p className="vazio"&gt;Nenhum pedido no período&lt;/p&gt;
+      ) : (
+        &lt;table&gt;
+          &lt;tbody&gt;
+            {visiveis.map((p) =&gt; (
+              &lt;tr key={p.id}&gt;&lt;td&gt;{p.cliente}&lt;/td&gt;&lt;td&gt;{p.total}&lt;/td&gt;&lt;/tr&gt;
+            ))}
+          &lt;/tbody&gt;
+        &lt;/table&gt;
+      )}
+    &lt;/section&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em Mês e o painel troca a tabela pela frase. Repare que a condição é
+<code>visiveis.length === 0</code>, e não <code>pedidos.length</code>: o vazio é do período escolhido, não
+da base. Confundir os dois é o erro que faz o painel dizer "nenhum pedido" com seis pedidos carregados na
+memória.</p>
+
+<p>Para conferir de onde vem o vazio, conte os pedidos por período antes de desenhar qualquer coisa:</p>
+
+<pre class="file" data-file="teste.js">const contar = (p) =&gt; pedidos.filter((x) =&gt; x.periodo === p).length;
+console.log("hoje: " + contar("hoje") + " | semana: " + contar("semana") + " | mes: " + contar("mes"));</pre>
+
+<pre class="term">console: hoje: 4 | semana: 2 | mes: 0</pre>
+
+<p>O zero do mês é o que o painel precisa saber mostrar. Sem essa conta, alguém ia "consertar" o filtro
+achando que ele estava quebrado — quando o filtro está certíssimo e o período é que está vazio.</p>
+
+<p>O estado do período merece um cuidado de projeto: quando ele muda, os totais mudam junto, porque todos
+derivam da lista visível. Se você calcular o faturamento sobre <code>pedidos</code> e a tabela sobre
+<code>visiveis</code>, o painel mostra um total que não corresponde às linhas de baixo — e o erro é
+silencioso, porque os dois números existem.</p>
+
+<h2>7. A tabela do painel: cabeçalho, alinhamento e a linha que falta</h2>
+
+<p>O painel de verdade tem uma tabela, e tabela tem regras próprias. Cabeçalho em <code>thead</code>,
+linhas em <code>tbody</code>, cada coluna com um <code>th</code> que tem <code>scope="col"</code> e um
+<code>caption</code> que diz o que a tabela mostra — mesmo que ninguém veja o caption, o leitor de tela
+lê. A aula de <a href="tabela-de-dados.html">Tabela de Dados</a> destrincha cada peça.</p>
+
+<dl class="anatomy">
+<dt>caption</dt>
+<dd>O título da tabela, dentro de <code>&lt;table&gt;</code> e antes do cabeçalho. É o que identifica a
+tabela para quem usa leitor de tela.</dd>
+<dt>thead e tbody</dt>
+<dd>O cabeçalho e o corpo. Separar os dois permite estilizar a linha de títulos sem tocar nos dados.</dd>
+<dt>th com scope</dt>
+<dd><code>&lt;th scope="col"&gt;</code> diz que a célula é título da coluna. Negrito não é cabeçalho;
+<code>th</code> é.</dd>
+<dt>alinhamento</dt>
+<dd>Número à direita, texto à esquerda. Um <code>className</code> por coluna resolve, e a leitura fica
+muito mais rápida.</dd>
+<dt>key da linha</dt>
+<dd>O <code>id</code> do pedido, no <code>&lt;tr&gt;</code> que o <code>map</code> devolve — nunca o
+índice, porque a lista muda com o filtro.</dd>
+</dl>
+
+<pre class="file" data-file="componentes/TabelaDePedidos.jsx">function TabelaDePedidos({ pedidos }) {
+  return (
+    &lt;table className="tabela"&gt;
+      &lt;caption&gt;Pedidos do período&lt;/caption&gt;
+      &lt;thead&gt;
+        &lt;tr&gt;
+          &lt;th scope="col"&gt;Cliente&lt;/th&gt;
+          &lt;th scope="col" className="numero"&gt;Total&lt;/th&gt;
+        &lt;/tr&gt;
+      &lt;/thead&gt;
+      &lt;tbody&gt;
+        {pedidos.map((p) =&gt; (
+          &lt;tr key={p.id}&gt;
+            &lt;td&gt;{p.cliente}&lt;/td&gt;
+            &lt;td className="numero"&gt;{reais(p.total)}&lt;/td&gt;
+          &lt;/tr&gt;
+        ))}
+      &lt;/tbody&gt;
+    &lt;/table&gt;
+  );
+}</pre>
+
+<p>Se a tabela ficar vazia, o <code>thead</code> sozinho é pior do que a frase de vazio: a pessoa vê uma
+tabela com títulos e nenhuma linha, e não sabe se os dados não existem ou se ainda estão chegando. Por
+isso o vazio substitui a tabela inteira, e não só o <code>tbody</code>.</p>
+
+<p>Quando os dados chegam da API, eles vêm fora de ordem. A ordenação também é derivada: copie antes de
+ordenar, porque <code>sort</code> mexe no array original — <code>[...visiveis].sort((a, b) =&gt; b.total -
+a.total)</code>. A aula de <a href="ordenar.html">Ordenar</a> mostra o comparador e o desempate.</p>
+
+<h2>8. O que quebra e a ordem de montagem</h2>
+
+<p>Painel tem quatro bugs clássicos, e os quatro aparecem como "o número está errado" — quase sempre sem
+erro no console. A tabela abaixo é o mapa.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que quebra</th><th>Como aparece</th><th>Conserto</th></tr>
+<tr><td>dividir por zero</td><td>ticket médio <code>Infinity</code> ou <code>NaN</code></td><td><code>pedidos.length || 1</code> no divisor</td></tr>
+<tr><td>esquecer de desligar o carregando</td><td>"Carregando..." eterno, mesmo com erro</td><td><code>setCarregando(false)</code> no sucesso e no erro</td></tr>
+<tr><td>calcular sobre a lista completa</td><td>o total não acompanha o filtro</td><td>derive tudo da lista visível</td></tr>
+<tr><td>guardar o total em estado</td><td>o número fica velho quando a lista muda</td><td>calcule no desenho</td></tr>
+</table>
+</div>
+
+<p>A ordem de montagem é a das peças: primeiro os dados e as contas, depois os cartões, depois a busca com
+o carregando, depois o filtro de período, por último a tabela. Cada passo tem uma tela que você consegue
+conferir — e conferir número é fácil: some na mão, compare com o painel, veja se bate.</p>
+
+<pre class="file" data-file="src/">src/
+  dados/pedidos.js         a lista (ou a função que simula a API)
+  util/reais.js            a formatação de dinheiro
+  App.jsx                  estados, filtro e contas
+  componentes/Cartao.jsx
+  componentes/TabelaDePedidos.jsx
+  componentes/Periodo.jsx</pre>
+
+<div class="cenario">
+<h3>Cenário 1: o ticket médio virou Infinity</h3>
+<p>Num domingo sem pedidos, o cartão mostrou <code>R$ Infinity</code>. O divisor era
+<code>pedidos.length</code>, que valia zero. O conserto é uma linha:
+<code>faturamento / (pedidos.length || 1)</code>, que devolve zero em vez de infinito. A regra vale para
+qualquer média: divisor zero pede tratamento explícito, não sorte.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o painel ficou carregando para sempre</h3>
+<p>A API respondeu com erro, o <code>catch</code> mostrou a mensagem e ninguém desligou o
+<code>carregando</code>. O painel ficou com o texto "Carregando..." e a mensagem de erro ao mesmo tempo.
+O conserto é desligar o carregando nos dois caminhos — sucesso e falha — e mostrar um só dos dois
+avisos.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o total não batia com a tabela</h3>
+<p>O faturamento era calculado sobre a lista inteira, e a tabela mostrava só o período. No filtro
+"hoje", o cartão dizia R$ 148 e as linhas somavam R$ 102. O conserto é o mesmo desta aula: uma única
+lista visível, e tudo — cartões, contagem, tabela — derivado dela.</p>
+</div>
+
+<h2>9. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. De onde saem o faturamento e o ticket médio?</p>
+<label><input type="radio" name="pd1"> de dois <code>useState</code> atualizados no envio</label>
+<label><input type="radio" name="pd1"> de contas sobre a lista visível, no desenho</label>
+<label><input type="radio" name="pd1"> do <code>localStorage</code>, gravados uma vez por dia</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Quando o <code>useEffect</code> da busca roda?</p>
+<label><input type="radio" name="pd2"> a cada desenho do componente</label>
+<label><input type="radio" name="pd2"> só quando o período muda</label>
+<label><input type="radio" name="pd2"> uma vez, na montagem, com array de dependências vazio</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O período escolhido não tem pedidos. O que mostrar?</p>
+<label><input type="radio" name="pd3"> uma frase de vazio no lugar da tabela</label>
+<label><input type="radio" name="pd3"> a tabela com o cabeçalho e nenhuma linha</label>
+<label><input type="radio" name="pd3"> "Carregando..." até aparecer algum pedido</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a soma dos pedidos</h2>
+<p>Complete a conta que transforma a lista de pedidos no faturamento. Depois responda: por que esse número
+não deve ficar em <code>useState</code>?</p>
+<div class="ex-code">const faturamento = pedidos.<input aria-label="resposta 1" data-answer="reduce" placeholder="...">((soma, p) =&gt; soma + p.total, 0);</div>
+<p class="ex-dica">Dica: é o método de array que reduz a lista a um valor só, recebendo o acumulador e o
+item — e o zero no fim é o valor inicial.</p>
+</div>
+
+<h2>10. Resumo</h2>
+
+<p>Um painel é uma lista e quatro contas. O estado guarda o que muda de fora para dentro — a lista que
+chega da API, o período escolhido e o carregando. Todo o resto é derivado: a lista visível é um
+<code>filter</code>, o faturamento é um <code>reduce</code>, o ticket médio é uma divisão. Guardar
+qualquer um desses números cria uma segunda verdade que envelhece no primeiro clique.</p>
+
+<p>A busca é simulada com <code>Promise</code> e <code>setTimeout</code>, dentro de um
+<code>useEffect</code> de dependências vazias, e desliga o carregando tanto no sucesso quanto no erro. O
+filtro de período é um estado de texto e alimenta tudo — cartões, contagem e tabela. Quando o período não
+tem pedido, a tabela dá lugar a uma frase; vazio não é erro nem carregando.</p>
+
+<p>Os três bugs clássicos são divisão por zero, carregando que não desliga e total calculado sobre a lista
+errada. Todos os três aparecem como número estranho na tela, sem erro no console — o que reforça a rotina
+de conferir as contas na mão antes de suspeitar do React.</p>
+
+<p>Quando o projeto crescer, os próximos passos já têm aula: trocar a simulação por <code>fetch</code>,
+cachear a resposta, ordenar pelo cabeçalho da tabela, paginar os pedidos e formatar valores com
+<code>Intl.NumberFormat</code>. O desenho desta aula continua o mesmo — muda só de onde vêm os dados e
+quantos deles chegam.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Painel é lista + contas: número não se digita, se calcula.</li>
+<li>Estado só para o que vem de fora: lista, período, carregando.</li>
+<li><code>reduce((soma, p) =&gt; soma + p.total, 0)</code>: o zero é obrigatório.</li>
+<li>Formate na hora de desenhar: <code>toFixed(2)</code> e vírgula no lugar do ponto.</li>
+<li>Ticket médio com divisor protegido: <code>pedidos.length || 1</code>.</li>
+<li>Busca no <code>useEffect</code> com <code>[]</code>, nunca no corpo do componente.</li>
+<li>Desligue o carregando no sucesso e no erro.</li>
+<li>Um filtro, uma lista visível: tudo deriva dela.</li>
+<li>Vazio do período substitui a tabela inteira, com frase própria.</li>
+<li>Tabela com <code>caption</code>, <code>thead</code>, <code>th scope="col"</code> e key igual ao id.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O useActionState | Guia React</title>
+<meta name="description" content="O useActionState do React 19: estado que volta da ação, pendente de graça, validação sem estados paralelos e o resultado anterior que continua na tela durante o envio.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O <span class="hl">useActionState</span></h1>
+<p class="intro">O formulário de encomenda da Ana já usa uma ação, mas o resultado ficou espalhado: um
+estado para a mensagem, outro para o erro, outro para o “enviando”. No React 19 existe um hook que
+devolve os três de uma vez, com uma diferença importante — é a ação que decide o novo estado, devolvendo
+o valor. Nesta aula a Ana troca três estados por um e aprende a ler o pendente sem contar clique.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que o <code>useActionState</code> devolve: estado, ação e pendente.</li>
+  <li>A nova assinatura da ação: <code>(estadoAnterior, dados) =&gt; novoEstado</code>.</li>
+  <li>Como validar e devolver o erro sem criar estados paralelos.</li>
+  <li>Como usar o pendente para desabilitar o botão e trocar o rótulo.</li>
+  <li>Por que o resultado anterior continua na tela durante o envio.</li>
+  <li>Quando um <code>useState</code> comum já resolve e o hook é exagero.</li>
+  <li>As armadilhas: formulário que se limpa no erro, valor inicial instável, ação que lança.</li>
+</ul>
+</div>
+
+<h2>1. A cena: três estados para um formulário</h2>
+
+<p>A encomenda da Ana já usa <code>action</code>, então o envio está resolvido. O que sobrou foi o
+depois: mostrar “encomenda registrada” quando dá certo, “informe o nome” quando falta o nome, e
+“enviando…” enquanto a resposta não chega. Para isso ela tem três <code>useState</code> — mensagem,
+erro e pendente — e três lugares onde eles podem ficar desalinhados.</p>
+
+<p>O desalinhamento aparece na prática. O envio falha, ela esquece de limpar a mensagem de sucesso e a
+tela mostra as duas coisas ao mesmo tempo. Ela desabilita o botão no lugar errado e a pessoa fica sem
+poder reenviar. Ela atualiza o erro dentro de uma função assíncrona e o erro aparece depois que o
+formulário já foi limpo.</p>
+
+<p>O <code>useActionState</code> existe para juntar esse trio. Ele recebe a ação e um valor inicial, e
+devolve três coisas em uma linha: o <strong>estado</strong> que a ação produziu, a <strong>ação</strong>
+já embrulhada para usar no formulário e o <strong>pendente</strong> do envio. É o mesmo padrão de
+<code>useState</code>, com uma diferença de dono: quem escreve o estado é a ação, não você.</p>
+
+<p>Essa inversão é o coração do hook. Em vez de a ação chamar <code>setMensagem</code> e
+<code>setErro</code>, ela <strong>devolve</strong> o novo estado. O React guarda esse retorno e o entrega
+na próxima renderização. A ação fica uma função pura de dados — recebe o estado anterior e os campos,
+devolve o próximo estado —, o que a torna fácil de testar e de mover para o servidor depois.</p>
+
+<h2>2. O que o hook devolve</h2>
+
+<p>A chamada tem a forma <code>const [estado, acao, pendente] = React.useActionState(funcao, inicial)</code>.
+O primeiro elemento é o estado atual; o segundo, uma ação pronta para o <code>action</code> do formulário
+ou um <code>formAction</code> de botão; o terceiro, um booleano que fica verdadeiro do envio até a
+resposta.</p>
+
+<dl class="anatomy">
+<dt>estado</dt>
+<dd>O que a última execução da ação devolveu. Começa com o valor inicial e só muda quando a ação
+termina.</dd>
+<dt>ação</dt>
+<dd>A função embrulhada pelo hook. Vai no <code>action</code> do formulário ou no
+<code>formAction</code> de um botão.</dd>
+<dt>pendente</dt>
+<dd><code>true</code> enquanto a ação roda. É o que desabilita o botão e troca o rótulo.</dd>
+<dt>estado anterior</dt>
+<dd>O primeiro argumento da sua função: o estado da última execução. Serve para somar, manter mensagem
+antiga ou contar tentativas.</dd>
+<dt>valor inicial</dt>
+<dd>O estado antes do primeiro envio. Precisa ter a mesma forma do que a ação devolve.</dd>
+</dl>
+
+<p>A tabela compara o que a Ana tinha com o que passa a ter. Note que não é “menos controle”: é o mesmo
+controle, com um dono só para o estado do formulário.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Com <code>useState</code></th><th>Com <code>useActionState</code></th><th>Quem decide</th></tr>
+<tr><td><code>const [erro, setErro] = useState("")</code></td><td>um campo do estado que a ação devolve</td><td>a ação</td></tr>
+<tr><td><code>const [ok, setOk] = useState("")</code></td><td>outro campo do mesmo estado</td><td>a ação</td></tr>
+<tr><td><code>const [enviando, setEnviando] = useState(false)</code></td><td>o terceiro item do hook</td><td>o React</td></tr>
+<tr><td><code>setEnviando(true)</code> antes do await</td><td>nada</td><td>o React marca sozinho</td></tr>
+<tr><td><code>setEnviando(false)</code> no fim e no catch</td><td>nada</td><td>o React desmarca sozinho</td></tr>
+</table>
+</div>
+
+<p>Um detalhe do motor deste guia: o <code>useActionState</code> não está no escopo das caixas, então o
+código escreve <code>React.useActionState</code>. No seu projeto, a primeira linha do arquivo importa o
+hook — <code>import { useActionState } from "react"</code> — e você chama pelo nome. É o mesmo hook, com
+o endereço completo.</p>
+
+<p>E vale saber o que ele era antes: no React 18 o mesmo hook se chamava <code>useFormState</code> e
+vinha do <code>react-dom</code>. Se você encontrar esse nome em código ou tutorial, é o mesmo
+comportamento com outro endereço. O React 19 renomeou para deixar claro que ele serve a qualquer ação,
+não só a formulário.</p>
+
+<h2>3. Validar e devolver o erro</h2>
+
+<p>O primeiro uso é a validação. A ação olha os campos, decide se dá para seguir e devolve um objeto com
+o que a tela precisa: uma mensagem de erro, ou uma de sucesso. A tela não pergunta “deu certo?”; ela
+desenha o que o estado diz.</p>
+
+<p>A caixa começa com a ação que não valida nada. Enviar o formulário vazio registra uma encomenda sem
+nome — e o pior é que ninguém percebe até o pão chegar sem dono. A missão é trocar o estado paralelo pelo
+retorno da ação.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Informe o nome do cliente;;digite:input=Maria;;clique:button;;texto:Encomenda de Maria registrada">
+  <p class="try-task">A ação registra encomenda até com o nome vazio. Use
+  <code>React.useActionState</code> para o estado voltar da ação: sem nome, ela devolve
+  <code>Informe o nome do cliente</code>; com nome, <code>Encomenda de Maria registrada</code>.</p>
+  <pre class="jsx">function App() {
+  const [recado, setRecado] = useState("nada ainda");
+
+  async function enviar(dados) {
+    const nome = String(dados.get("nome") || "").trim();
+    setRecado("Encomenda de " + nome + " registrada");
+  }
+
+  return (
+    &lt;form action={enviar}&gt;
+      &lt;input name="nome" /&gt;
+      &lt;button type="submit"&gt;Encomendar&lt;/button&gt;
+      &lt;p&gt;{recado}&lt;/p&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;form action="javascript:throw new Error('A React form was unexpectedly submitted. If you called form.submit() manually, consider using form.requestSubmit() instead. If you\'re trying to use event.stopPropagation() in a submit event handler, consider also calling event.preventDefault().')"&gt;
+  &lt;input name="nome"&gt;
+  &lt;button type="submit"&gt;Encomendar&lt;/button&gt;
+  &lt;p&gt;nada ainda&lt;/p&gt;
+&lt;/form&gt;
+</pre>
+  <pre class="solucao">const inicial = { erro: "", mensagem: "" };
+
+function App() {
+  const [estado, acao] = React.useActionState(async (anterior, dados) =&gt; {
+    const nome = String(dados.get("nome") || "").trim();
+    if (!nome) {
+      return { erro: "Informe o nome do cliente", mensagem: anterior.mensagem };
+    }
+    return { erro: "", mensagem: "Encomenda de " + nome + " registrada" };
+  }, inicial);
+
+  return (
+    &lt;form&gt;
+      &lt;input name="nome" /&gt;
+      &lt;button formAction={acao}&gt;Encomendar&lt;/button&gt;
+      &lt;p&gt;{estado.erro || estado.mensagem || "nada ainda"}&lt;/p&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+</div>
+
+<p>Na solução, o botão vazio mostra o erro e o botão com “Maria” mostra a confirmação — e o
+<code>useState</code> do recado desapareceu. O estado agora é um objeto com dois campos, e a tela escolhe
+o que mostrar com um <code>||</code>: erro primeiro, mensagem depois, texto padrão se não houver
+nenhum.</p>
+
+<p>Repare na assinatura <code>(anterior, dados)</code>. O primeiro argumento é o estado da execução
+anterior — foi dele que a solução copiou <code>anterior.mensagem</code> para não apagar a confirmação
+antiga ao mostrar um erro novo. O segundo é o <code>FormData</code>, o mesmo da aula de ações. A ordem
+importa: dados primeiro, estado depois, e o erro é silencioso (o hook devolve
+<code>undefined</code> no lugar do estado).</p>
+
+<p>Há um detalhe que confunde na primeira leitura: o estado é um objeto novo a cada execução, e o React
+compara por identidade. Se a ação devolver o mesmo objeto de antes, o React entende que nada mudou e não
+redesenha. Isso é bom para desempenho e péssimo quando você tenta “forçar” uma atualização devolvendo o
+estado anterior sem mudar nada — a tela fica como está, e você acha que a ação não rodou.</p>
+
+<h2>4. O pendente, de graça</h2>
+
+<p>O segundo item que o hook entrega é o pendente. Ele fica verdadeiro do envio até a ação terminar —
+não até o próximo desenho, não até a promessa resolver sozinha. É exatamente o intervalo em que o botão
+precisa estar desligado e o rótulo precisa dizer “enviando…”.</p>
+
+<p>A caixa usa um servidor controlado por você: a encomenda fica pendurada até o botão “servidor
+responde”. Assim dá para ver o estado pendente sem correr contra o relógio — e, quando o servidor
+responde, o estado volta e o botão reabre.</p>
+
+<div class="tryreact" data-goal="digite:input=Maria;;clique:button;;conta:button[disabled]=1;;texto:Enviando…;;clique:#responder;;texto:Encomenda de Maria registrada;;conta:button[disabled]=0">
+  <p class="try-task">O botão pode ser clicado várias vezes durante o envio. Pegue o terceiro item do
+  <code>React.useActionState</code> e use para desabilitar o botão e trocar o texto para
+  <code>Enviando…</code> enquanto a ação roda.</p>
+  <pre class="jsx">let responder = null;
+
+function gravar(nome) {
+  return new Promise((ok) =&gt; {
+    responder = () =&gt; ok({ erro: "", mensagem: "Encomenda de " + nome + " registrada" });
+  });
+}
+
+const inicial = { erro: "", mensagem: "" };
+
+function App() {
+  const [estado, acao] = React.useActionState(async (anterior, dados) =&gt; {
+    const nome = String(dados.get("nome") || "").trim();
+    if (!nome) return { erro: "Informe o nome do cliente", mensagem: "" };
+    return await gravar(nome);
+  }, inicial);
+
+  return (
+    &lt;form&gt;
+      &lt;input name="nome" /&gt;
+      &lt;button formAction={acao}&gt;Encomendar&lt;/button&gt;
+      &lt;button type="button" id="responder" onClick={() =&gt; responder &amp;&amp; responder()}&gt;
+        servidor responde
+      &lt;/button&gt;
+      &lt;p&gt;{estado.erro || estado.mensagem || "nada ainda"}&lt;/p&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;form&gt;
+  &lt;input name="nome"&gt;
+  &lt;button formaction="javascript:throw new Error('A React form was unexpectedly submitted. If you called form.submit() manually, consider using form.requestSubmit() instead. If you\'re trying to use event.stopPropagation() in a submit event handler, consider also calling event.preventDefault().')"&gt;Encomendar&lt;/button&gt;
+  &lt;button type="button" id="responder"&gt;servidor responde&lt;/button&gt;
+  &lt;p&gt;nada ainda&lt;/p&gt;
+&lt;/form&gt;
+</pre>
+  <pre class="solucao">let responder = null;
+
+function gravar(nome) {
+  return new Promise((ok) =&gt; {
+    responder = () =&gt; ok({ erro: "", mensagem: "Encomenda de " + nome + " registrada" });
+  });
+}
+
+const inicial = { erro: "", mensagem: "" };
+
+function App() {
+  const [estado, acao, pendente] = React.useActionState(async (anterior, dados) =&gt; {
+    const nome = String(dados.get("nome") || "").trim();
+    if (!nome) return { erro: "Informe o nome do cliente", mensagem: "" };
+    return await gravar(nome);
+  }, inicial);
+
+  return (
+    &lt;form&gt;
+      &lt;input name="nome" /&gt;
+      &lt;button formAction={acao} disabled={pendente}&gt;
+        {pendente ? "Enviando…" : "Encomendar"}
+      &lt;/button&gt;
+      &lt;button type="button" id="responder" onClick={() =&gt; responder &amp;&amp; responder()}&gt;
+        servidor responde
+      &lt;/button&gt;
+      &lt;p&gt;{estado.erro || estado.mensagem || "nada ainda"}&lt;/p&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois do clique em “Encomendar”, o painel mostra o botão com <code>disabled</code> e o texto
+“Enviando…”. Ao clicar em “servidor responde”, o estado volta com a confirmação e o botão reabre. Nenhuma
+linha marca o pendente como verdadeiro ou falso: o React faz isso a partir da promessa que a ação
+devolveu.</p>
+
+<pre class="term">clique em "Encomendar"
+  pendente: true
+  botão: disabled
+
+resposta do servidor
+  estado: {"erro":"","mensagem":"Encomenda de Maria registrada"}
+  pendente: false
+  botão: habilitado</pre>
+
+<p>Duas consequências práticas. A primeira: a ação precisa ser <code>async</code> e precisa
+<strong>esperar</strong> o que é lento. Se ela dispara o pedido e retorna antes, o pendente cai cedo
+demais. A segunda: o pendente é do formulário, não da tela — se você tem dois formulários com dois
+hooks, cada um tem o seu. Se você quer um só status para o formulário inteiro, o
+<code>useFormStatus</code> da aula anterior é a alternativa.</p>
+
+<h2>5. O estado anterior: a lista que cresce</h2>
+
+<p>O primeiro argumento da ação não é enfeite. Ele é o único jeito de <strong>acumular</strong>: cada
+execução recebe o estado que a anterior devolveu, então a ação pode somar em vez de substituir. Sem ele,
+a única coisa que a tela pode mostrar é o resultado do último envio.</p>
+
+<p>A Ana quer o histórico das encomendas da sessão — não para guardar em banco, mas para conferir o que
+já foi registrado sem sair da página. O código da caixa faz o contrário: a cada envio ele troca a lista
+inteira pela encomenda nova, então a lista cresce até um item. A missão é acumular.</p>
+
+<div class="tryreact" data-goal="digite:input=Maria;;clique:button;;clique:#responder;;digite:input=Joana;;clique:button;;clique:#responder;;conta:li=2">
+  <p class="try-task">Cada envio substitui o histórico pela encomenda nova. Com
+  <code>React.useActionState</code>, use o estado anterior para construir um array novo:
+  <code>[...anterior.lista, texto]</code>. Depois de duas encomendas, a lista precisa ter dois itens.</p>
+  <pre class="jsx">let responder = null;
+
+function gravar(nome) {
+  return new Promise((ok) =&gt; {
+    responder = () =&gt; ok("Encomenda de " + nome + " registrada");
+  });
+}
+
+function App() {
+  const [lista, setLista] = useState([]);
+
+  async function enviar(dados) {
+    const nome = String(dados.get("nome") || "").trim();
+    if (!nome) return;
+    const texto = await gravar(nome);
+    setLista([texto]);
+  }
+
+  return (
+    &lt;form action={enviar}&gt;
+      &lt;input name="nome" /&gt;
+      &lt;button type="submit"&gt;Encomendar&lt;/button&gt;
+      &lt;button type="button" id="responder" onClick={() =&gt; responder &amp;&amp; responder()}&gt;
+        servidor responde
+      &lt;/button&gt;
+      &lt;ul&gt;
+        {lista.map((texto, i) =&gt; (
+          &lt;li key={i}&gt;{texto}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;form action="javascript:throw new Error('A React form was unexpectedly submitted. If you called form.submit() manually, consider using form.requestSubmit() instead. If you\'re trying to use event.stopPropagation() in a submit event handler, consider also calling event.preventDefault().')"&gt;
+  &lt;input name="nome"&gt;
+  &lt;button type="submit"&gt;Encomendar&lt;/button&gt;
+  &lt;button type="button" id="responder"&gt;servidor responde&lt;/button&gt;
+  &lt;ul&gt;&lt;/ul&gt;
+&lt;/form&gt;
+</pre>
+  <pre class="solucao">let responder = null;
+
+function gravar(nome) {
+  return new Promise((ok) =&gt; {
+    responder = () =&gt; ok("Encomenda de " + nome + " registrada");
+  });
+}
+
+const inicial = { erro: "", lista: [] };
+
+function App() {
+  const [estado, acao] = React.useActionState(async (anterior, dados) =&gt; {
+    const nome = String(dados.get("nome") || "").trim();
+    if (!nome) return { ...anterior, erro: "Informe o nome do cliente" };
+    const texto = await gravar(nome);
+    return { erro: "", lista: [...anterior.lista, texto] };
+  }, inicial);
+
+  return (
+    &lt;form&gt;
+      &lt;input name="nome" /&gt;
+      &lt;button formAction={acao}&gt;Encomendar&lt;/button&gt;
+      &lt;button type="button" id="responder" onClick={() =&gt; responder &amp;&amp; responder()}&gt;
+        servidor responde
+      &lt;/button&gt;
+      &lt;p&gt;{estado.erro}&lt;/p&gt;
+      &lt;ul&gt;
+        {estado.lista.map((texto, i) =&gt; (
+          &lt;li key={i}&gt;{texto}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+</div>
+
+<p>Duas encomendas, dois itens na lista. O segredo está em três palavras: <code>...anterior.lista</code>.
+O espalhamento copia os itens que já estavam lá e o texto novo entra no fim, formando um array novo. O
+array antigo continua intacto — e é isso que o React precisa para perceber a mudança.</p>
+
+<p>Comparar por identidade é o que faz o React redesenhar. Um array novo, mesmo com o mesmo conteúdo, é
+um valor diferente aos olhos dele. Um array <em>mutado</em> — com <code>push</code> — é o mesmo objeto, e
+o React conclui que nada mudou. Se a lista não atualizar na tela depois de um envio, procure um
+<code>push</code>; troque por espalhamento e o problema desaparece.</p>
+
+<p>O mesmo raciocínio vale para qualquer acumulação: um total de fiado, um contador de tentativas, uma
+mensagem que junta avisos. O estado anterior é a memória da ação — e o hook entrega essa memória de
+graça, sem que você precise guardá-la em um <code>useRef</code> ou em uma variável de módulo.</p>
+
+<h2>6. Durante o envio, o resultado anterior fica na tela</h2>
+
+<p>Tem um comportamento do hook que parece mágica e é só consequência do lugar onde a ação roda: o
+estado só muda quando a ação <em>termina</em>. Enquanto a promessa está aberta, a tela continua mostrando
+o resultado anterior — a confirmação do pedido passado, o erro da tentativa passada. Nada de tela em
+branco no meio do envio.</p>
+
+<p>O motivo é que a ação de formulário roda dentro de uma transição, como você viu na aula de
+<code>useTransition</code>. O React segura o desenho novo até a transição terminar, e só então pinta o
+resultado. As atualizações de estado feitas no meio do caminho são aplicadas juntas, no fim — não uma a
+uma, conforme cada <code>await</code> resolve.</p>
+
+<p>Isso explica também um comportamento que surpreende quem vem de código imperativo: limpar o estado no
+começo da ação não produz tela vazia. O <code>setRecado("")</code> fica guardado junto com o resto e é
+aplicado quando a transição fecha. Ele não “pisca” — ele simplesmente deixa o estado novo errado, porque
+apagou o que devia estar sendo mostrado.</p>
+
+<p>A consequência prática: você não precisa se proteger contra a tela vazia. Precisa decidir o que a
+pessoa deve ver <em>durante</em> a espera. Se o resultado anterior ainda faz sentido, deixe-o ali e use o
+pendente no botão para sinalizar “enviando de novo…”. Se não faz, é sinal de que o estado guarda
+informação demais e a tela deveria mostrar menos.</p>
+
+<p>E, quando a ação termina com erro, o erro substitui o resultado anterior — porque agora existe um
+estado novo de verdade. É por isso que um formulário bem feito alterna entre “registrada com sucesso” e
+“informe o nome” sem acumular as duas mensagens: existe um campo só, e a ação decide o valor dele a cada
+envio.</p>
+
+<h2>7. Quando o hook é exagero</h2>
+
+<p>Nem todo formulário precisa dele. Se a ação só precisa avisar que deu certo e a tela mostra um texto
+fixo, um <code>useState</code> com o recado resolve — e é mais fácil de ler. O
+<code>useActionState</code> ganha quando o resultado é <strong>dado</strong>: erro de validação por
+campo, mensagem que vem do servidor, número de protocolo, lista de horários disponíveis.</p>
+
+<p>Outra comparação útil: o <code>useFormStatus</code> responde “está enviando?” e nada mais; o
+<code>useActionState</code> responde “está enviando? e o que voltou?”. Se você só precisa desabilitar o
+botão, o primeiro é menor. Se você precisa mostrar o que o servidor disse, o segundo evita o estado
+paralelo.</p>
+
+<p>Uma regra de bolso: se você escreveria três <code>useState</code> para o resultado de um envio, use o
+hook. Se escreveria um, comece com o <code>useState</code> e migre quando o segundo aparecer. Migrar é
+mecânico — mover os campos para um objeto e devolver esse objeto da ação.</p>
+
+<h2>8. As armadilhas</h2>
+
+<p>Quatro problemas aparecem sempre, e todos têm a ver com o ciclo do formulário, não com o hook em si.
+A tabela resume; os parágrafos explicam os dois mais caros.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O sintoma</th><th>A causa</th><th>O conserto</th></tr>
+<tr><td>o texto digitado some depois de um erro de validação</td><td>o React limpa o formulário quando a ação termina, mesmo devolvendo erro</td><td>devolver o valor no estado e usar <code>defaultValue</code>, ou validar no cliente antes de enviar</td></tr>
+<tr><td>a tela mostra o estado errado na primeira renderização</td><td>valor inicial sem a mesma forma do que a ação devolve</td><td>um objeto inicial com todos os campos</td></tr>
+<tr><td>o pendente nunca fica verdadeiro</td><td>a ação não é <code>async</code> ou não espera nada</td><td>marcar como <code>async</code> e <code>await</code> no pedido</td></tr>
+<tr><td>a página quebra ao enviar</td><td>a ação lançou uma exceção em vez de devolver estado</td><td>tratar dentro da ação e devolver <code>{ erro }</code></td></tr>
+<tr><td>o botão continua habilitado durante o envio</td><td><code>disabled</code> no lugar errado, ou o pendente de outro formulário</td><td>usar o terceiro item do hook no botão que envia</td></tr>
+</table>
+</div>
+
+<p>O primeiro é o mais surpreendente. O React limpa os campos não controlados depois que a ação termina —
+<em>qualquer</em> ação, inclusive a que devolveu erro. Se a validação falha e você quer que a pessoa
+corrija o que digitou, o campo não pode ter sido limpo. A saída é devolver o valor dentro do estado e
+usar <code>defaultValue</code> no campo, ou validar no cliente antes de enviar e só chamar a ação quando
+os dados estiverem completos.</p>
+
+<pre class="term">Uncaught Error: Falha ao gravar a encomenda
+    at enviar (app/encomenda/acao.jsx:14:11)</pre>
+
+<p>O quarto é o que derruba a página. Ação que lança exceção não devolve estado: o React considera o
+envio falho, mostra o erro no console e não atualiza a tela. Em produção, isso vira a tela de erro do
+framework. Trate dentro da ação — <code>try</code>/<code>catch</code> e devolver <code>{ erro: ... }</code>
+— e a mensagem chega na tela como qualquer outro estado.</p>
+
+<p>Vale ainda um cuidado com o valor inicial: ele precisa ser estável. Um objeto literal criado no
+<code>useActionState</code> é recriado a cada renderização e, embora o React só use o primeiro, ler o
+código fica confuso. Declare o inicial fora do componente, como nas caixas desta aula.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a validação que apagava o nome</h3>
+<p>A Ana validou o nome dentro da ação e devolveu o erro. O campo se limpou no mesmo instante, e a
+cliente, que tinha digitado “Maria Aparecida”, viu o formulário vazio com a mensagem “informe o nome”.
+O conserto foi devolver também o nome no estado e usá-lo em <code>defaultValue</code> — assim o campo
+reabre preenchido, com o erro embaixo.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o pendente que nunca aparecia</h3>
+<p>Ela tirou o <code>await</code> da ação “para ficar mais rápido”, e o pendente passou a cair no mesmo
+instante. Sem espera, não há intervalo — e o botão nunca fica desabilitado de verdade. A ação precisa
+esperar o que é lento; a velocidade vem de a resposta ser rápida, não de o código fingir que ela já
+chegou.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o estado que sobreviveu à troca de formulário</h3>
+<p>Ela usou o mesmo hook para a encomenda e para o cadastro de pão, e a mensagem de um apareceu no outro.
+Cada formulário precisa do seu <code>useActionState</code>: o estado é local ao componente que chamou o
+hook. Se dois formulários precisam do mesmo resultado, o estado sobe para o pai e desce por prop.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que o <code>useActionState</code> devolve?</p>
+<label><input type="radio" name="q1"> só o estado que a ação produziu</label>
+<label><input type="radio" name="q1"> estado, ação e pendente</label>
+<label><input type="radio" name="q1"> o <code>FormData</code> e o evento de envio</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Qual é a assinatura da função passada ao hook?</p>
+<label><input type="radio" name="q2"> <code>(dados) =&gt; estado</code></label>
+<label><input type="radio" name="q2"> <code>(evento, dados) =&gt; estado</code></label>
+<label><input type="radio" name="q2"> <code>(estadoAnterior, dados) =&gt; novoEstado</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que acontece com a mensagem anterior durante um novo envio?</p>
+<label><input type="radio" name="q3"> continua na tela até a ação terminar</label>
+<label><input type="radio" name="q3"> some assim que o envio começa</label>
+<label><input type="radio" name="q3"> é substituída por “carregando” automaticamente</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o hook e a assinatura</h2>
+<p>Complete as duas linhas. Na primeira, o nome do hook do React 19; na segunda, o primeiro argumento da
+função que ele recebe:</p>
+<div class="ex-code">const [estado, acao, pendente] = React.<input aria-label="resposta 1" data-answer="useActionState" placeholder="...">(
+  async (<input aria-label="resposta 2" data-answer="anterior|estadoAnterior" placeholder="...">, dados) =&gt; {
+    return { erro: "", mensagem: "ok" };
+  },
+  { erro: "", mensagem: "" }
+);</div>
+<p class="ex-dica">Dica: a primeira é o nome do hook — o mesmo que aparece no título da aula. A segunda é
+o estado da execução passada, que serve para preservar uma mensagem antiga ou somar tentativas; o
+segundo argumento é o <code>FormData</code> com os campos.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O <code>useActionState</code> devolve três coisas em uma linha: o estado que a ação produziu, a ação
+pronta para o formulário e o pendente do envio. A ação muda de assinatura — recebe o estado anterior e o
+<code>FormData</code>, devolve o novo estado — e deixa de chamar <code>set</code> para qualquer coisa. Um
+estado só, com os campos que a tela precisa: erro, mensagem, tentativas.</p>
+
+<p>O pendente vem junto e dispensa o <code>setEnviando(true/false)</code>: ele é verdadeiro do envio até a
+promessa resolver, e é a base do botão desabilitado com “enviando…”. E o estado só troca quando a ação
+termina, o que mantém o resultado anterior na tela durante a espera — em vez de piscar em branco.</p>
+
+<p>As armadilhas vêm do ciclo do formulário: o React limpa os campos não controlados ao fim de qualquer
+ação, inclusive a que devolveu erro; ação que lança exceção não devolve estado; ação sem
+<code>await</code> não tem pendente. Trate dentro da ação, devolva objeto com a mesma forma do inicial e
+declare o inicial fora do componente.</p>
+
+<p>Falta a última peça do trio do React 19: mostrar o resultado <em>antes</em> de ele existir. É o
+<code>useOptimistic</code>, que pinta o item novo na lista enquanto o servidor decide — e desfaz sozinho
+quando a resposta é “não”.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>React.useActionState(acao, inicial)</code> devolve <code>[estado, acao, pendente]</code>.</li>
+<li>A ação recebe <code>(estadoAnterior, dados)</code> e devolve o novo estado.</li>
+<li><code>pendente</code> é verdadeiro do envio até a promessa resolver.</li>
+<li>O estado só muda quando a ação termina: o resultado anterior fica na tela.</li>
+<li>Valor inicial com a mesma forma do retorno, declarado fora do componente.</li>
+<li><code>disabled={pendente}</code> e rótulo <code>{pendente ? "Enviando…" : "Encomendar"}</code>.</li>
+<li>O React limpa os campos não controlados ao fim da ação, mesmo com erro.</li>
+<li>Ação que lança não devolve estado: trate e devolva <code>{ erro }</code>.</li>
+<li>Um hook por formulário; estado compartilhado sobe para o pai.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

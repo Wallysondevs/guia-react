@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estado | Guia React</title>
+<meta name="description" content="Consulta rápida de estado no React 19: useState, o par valor e setter, atualização imutável de objetos e arrays, estado derivado, lote e erros comuns.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Estado</span></h1>
+<p class="intro">Estado é a memória de um componente: o valor que sobrevive entre um desenho e outro e que,
+quando muda, manda o React desenhar de novo. Esta página é a consulta rápida do assunto — o par valor e
+setter, por que nunca se altera o valor na mão, como atualizar objeto e array sem mutar, o que é estado
+derivado, como o lote junta várias mudanças e onde o estado deve morar. A Ana começou com um contador de
+pães e chegou a um painel com carrinho, pedido e filtro; o que ela consulta antes de criar mais um
+<code>useState</code> está aqui.</p>
+
+<div class="note">
+<strong>Como usar esta página</strong>
+<ul>
+  <li>Cada seção responde a uma dúvida que aparece no meio do código; as tabelas são o resumo.</li>
+  <li>As caixas rodam React 19 de verdade: edite, clique em Rodar e leia o painel.</li>
+  <li>Quando a dúvida for "onde guardo isso?", comece pela tabela da seção 1.</li>
+</ul>
+</div>
+
+<h2>1. O que é estado</h2>
+
+<p>Estado é o dado que o componente guarda entre renders. Uma variável comum não serve: ela nasce de novo
+a cada chamada da função e volta ao valor inicial. O <code>useState</code> pede ao React que guarde o valor
+em um lugar que sobrevive — e devolve o valor atual junto com a função que o substitui.</p>
+
+<pre class="file" data-file="Contador.jsx">function Contador() {
+  const [paes, setPaes] = useState(0);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;pães: {paes}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setPaes(paes + 1)}&gt;Somar um&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>O estado é <strong>do componente, por instância</strong>. Dois <code>&lt;Contador /&gt;</code> na mesma
+tela têm contadores separados: cada um guarda o seu. E o estado morre quando o componente sai da tela —
+por isso recarregar a página zera tudo, e por isso existe <code>localStorage</code> quando o valor precisa
+durar mais.</p>
+
+<p>Nem todo dado precisa de estado. Texto, número e booleano que a tela mostra e a pessoa altera, sim.
+Valor calculado a partir de outros, não. Valor que só controla bastidor — id de timer, elemento do DOM —,
+não. A tabela abaixo é o filtro inicial.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O dado</th><th>Estado?</th><th>Onde guardar</th><th>Aula</th></tr>
+<tr><td>o que a pessoa digita ou escolhe</td><td>sim</td><td><code>useState</code></td><td><a href="entrada-controlada.html">Entrada Controlada</a></td></tr>
+<tr><td>total, contagem, lista filtrada</td><td>não</td><td>conta no render</td><td><a href="estado-derivado.html">Estado Derivado</a></td></tr>
+<tr><td>id de timer, elemento do DOM, "já enviei"</td><td>não</td><td><code>useRef</code></td><td><a href="useRef.html">O useRef</a></td></tr>
+<tr><td>vários campos que mudam juntos</td><td>sim, um objeto</td><td><code>useState</code> ou <code>useReducer</code></td><td><a href="useReducer.html">O useReducer</a></td></tr>
+<tr><td>o mesmo dado em vários componentes distantes</td><td>sim, no ancestral</td><td>elevar ou contexto</td><td><a href="elevando-estado.html">Elevando o Estado</a></td></tr>
+</table>
+</div>
+
+<p>Uma pergunta resolve a maior parte: "se eu recarregar o componente, esse valor pode voltar ao início?"
+Se pode e ele aparece na tela, é estado. Se pode e ele não aparece, é ref ou variável. Se não pode, o
+lugar é o servidor ou o <code>localStorage</code>.</p>
+
+<h2>2. O par valor e setter</h2>
+
+<p><code>useState</code> devolve um array de dois itens: o valor de agora e a função que pede a troca. Por
+convenção, o segundo se chama <code>set</code> mais o nome do primeiro — <code>paes</code> e
+<code>setPaes</code>. O valor é somente leitura: atribuir <code>paes = 3</code> não muda a tela e ainda
+quebra o código, porque <code>paes</code> é uma constante.</p>
+
+<p>Chamar o setter não muda a variável do render atual. Ele agenda um novo render com o valor novo; o
+render que está rodando continua vendo o valor antigo até terminar. Isso explica por que um
+<code>console.log</code> logo depois do setter mostra o valor velho — e por que a tela, no fim, mostra o
+novo.</p>
+
+<dl class="anatomy">
+<dt>estado</dt>
+<dd>O valor que o React guarda entre renders: <code>const [valor, setValor] = useState(inicial)</code>.</dd>
+<dt>setter</dt>
+<dd>A função que agenda a troca. Recebe o valor novo ou uma função que calcula a partir do atual.</dd>
+<dt>render</dt>
+<dd>A chamada da função do componente para produzir o JSX. Acontece de novo quando o estado muda.</dd>
+<dt>retrato</dt>
+<dd>O valor do estado durante um render. Ele não muda no meio do render, mesmo depois do setter.</dd>
+<dt>updater</dt>
+<dd>A forma de função no setter: <code>setValor((v) =&gt; v + 1)</code>, que recebe o valor atual.</dd>
+</dl>
+
+<p>O valor inicial só é usado na montagem — mas a expressão entre parênteses é avaliada em todo render, e o
+resultado é descartado depois do primeiro. Se ela for caro de produzir — ler o <code>localStorage</code>,
+por exemplo —, passe uma função: <code>useState(() =&gt; lerDoStorage())</code>. Aí a leitura acontece uma
+vez só, na montagem, e não em cada desenho.</p>
+
+<p>O valor pode ser de qualquer tipo: texto, número, booleano, objeto, array, <code>null</code>. O que ele
+não pode é ser confundido com uma variável comum. Uma variável declarada no corpo da função é recriada a
+cada render; mudá-la não avisa ninguém e a tela não acompanha. O teste é prático: se o valor precisa
+sobreviver ao próximo desenho, é estado; se ele é recalculado sempre, é variável local.</p>
+
+<h2>3. Atualizar: valor novo ou função</h2>
+
+<p>O setter aceita duas formas. Com um valor, ele substitui o estado por aquele valor. Com uma função, ele
+recebe o valor atual e devolve o próximo. A diferença aparece quando você chama o setter mais de uma vez
+no mesmo evento, ou quando a atualização depende do que já estava lá.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>Quando usar</th><th>Aula</th></tr>
+<tr><td>valor direto</td><td><code>setPaes(3)</code></td><td>quando o novo valor não depende do antigo</td><td><a href="useState.html">O useState</a></td></tr>
+<tr><td>função</td><td><code>setPaes((p) =&gt; p + 1)</code></td><td>quando soma, remove ou atualiza a partir do atual</td><td><a href="atualizar-estado.html">Atualizar o Estado</a></td></tr>
+<tr><td>várias chamadas</td><td><code>setPaes((p) =&gt; p + 1)</code> duas vezes</td><td>quando o mesmo evento muda o valor duas vezes</td><td><a href="batching.html">Atualizações em Lote</a></td></tr>
+</table>
+</div>
+
+<p>O erro clássico é somar dois com <code>setPaes(paes + 1)</code> duas vezes. As duas chamadas leem o
+mesmo <code>paes</code> do render, calculam o mesmo resultado e o estado termina com um a mais, não dois.
+Com a forma de função, cada chamada recebe o resultado da anterior e a conta fecha.</p>
+
+<div class="tryreact" data-goal="clique:#somar;;texto:total: 2">
+  <p class="try-task">O botão "Somar dois" soma 1, porque as duas chamadas leem o mesmo total. Troque por
+  <code>setTotal((t) =&gt; t + 1)</code> nas duas e clique: o painel tem de mostrar
+  <strong>total: 2</strong>.</p>
+  <pre class="jsx">function App() {
+  const [total, setTotal] = useState(0);
+
+  function somar() {
+    setTotal(total + 1);
+    setTotal(total + 1);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;total: {total}&lt;/p&gt;
+      &lt;button id="somar" onClick={somar}&gt;Somar dois&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;total: 0&lt;/p&gt;
+  &lt;button id="somar"&gt;Somar dois&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [total, setTotal] = useState(0);
+
+  function somar() {
+    setTotal((t) =&gt; t + 1);
+    setTotal((t) =&gt; t + 1);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;total: {total}&lt;/p&gt;
+      &lt;button id="somar" onClick={somar}&gt;Somar dois&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No painel do código inicial, um clique leva o total a 1. Na solução, leva a 2. Repare que o React fez
+um render só nos dois casos: as duas chamadas entram na mesma fila e são aplicadas em ordem. Com valor
+direto, a segunda sobrescreve a primeira; com função, a segunda parte do resultado da primeira.</p>
+
+<h2>4. Objeto e array: substituir, não mutar</h2>
+
+<p>O React decide se redesenha comparando o estado novo com o antigo por identidade. Um objeto ou array
+mutado é o mesmo objeto — então o React conclui que nada mudou e não desenha. A regra é sempre substituir
+por um valor novo, montado a partir do antigo.</p>
+
+<pre class="file" data-file="Carrinho.jsx">// objeto: copia e sobrescreve
+setPedido({ ...pedido, pago: true });
+
+// array: copia e acrescenta
+setItens([...itens, "rosca"]);
+
+// array: filtra (já devolve novo)
+setItens(itens.filter((i) =&gt; i !== "rosca"));
+
+// array: atualiza um item
+setItens(itens.map((i) =&gt; (i.id === id ? { ...i, pronto: true } : i)));</pre>
+
+<p>Objeto dentro de objeto pede cópia em cada nível que muda —
+<code>{ ...pedido, cliente: { ...pedido.cliente, nome } }</code> —, porque o spread é raso. Array de
+objetos pede <code>map</code> para trocar um item e <code>filter</code> para remover. O que nunca entra é
+<code>push</code>, <code>splice</code>, <code>sort</code> no array original ou atribuição em
+<code>estado.campo</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Objetivo</th><th>Errado (muta)</th><th>Certo (novo valor)</th><th>Aula</th></tr>
+<tr><td>trocar um campo</td><td><code>pedido.pago = true</code></td><td><code>{ ...pedido, pago: true }</code></td><td><a href="estado-com-objeto.html">Estado com Objeto</a></td></tr>
+<tr><td>acrescentar item</td><td><code>itens.push(novo)</code></td><td><code>[...itens, novo]</code></td><td><a href="estado-com-array.html">Estado com Array</a></td></tr>
+<tr><td>remover item</td><td><code>itens.splice(i, 1)</code></td><td><code>itens.filter((x) =&gt; x !== alvo)</code></td><td><a href="estado-com-array.html">Estado com Array</a></td></tr>
+<tr><td>alterar um item</td><td><code>itens[i].pronto = true</code></td><td><code>itens.map((x) =&gt; ...)</code></td><td><a href="estado-com-array.html">Estado com Array</a></td></tr>
+<tr><td>ordenar</td><td><code>lista.sort()</code></td><td><code>[...lista].sort()</code></td><td><a href="ordenar.html">Ordenar</a></td></tr>
+</table>
+</div>
+
+<div class="tryreact" data-goal="clique:#add;;texto:itens: pão francês, rosca">
+  <p class="try-task">O <code>push</code> altera o array e devolve o mesmo objeto, então a tela não muda.
+  Troque por <code>setItens([...itens, "rosca"])</code> e clique em Adicionar rosca.</p>
+  <pre class="jsx">function App() {
+  const [itens, setItens] = useState(["pão francês"]);
+
+  function adicionar() {
+    itens.push("rosca");
+    setItens(itens);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;itens: {itens.join(", ")}&lt;/p&gt;
+      &lt;button id="add" onClick={adicionar}&gt;Adicionar rosca&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;itens: pão francês&lt;/p&gt;
+  &lt;button id="add"&gt;Adicionar rosca&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [itens, setItens] = useState(["pão francês"]);
+
+  function adicionar() {
+    setItens([...itens, "rosca"]);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;itens: {itens.join(", ")}&lt;/p&gt;
+      &lt;button id="add" onClick={adicionar}&gt;Adicionar rosca&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No inicial, o clique não muda o painel: o array foi alterado por dentro, mas é o mesmo objeto e o React
+não vê motivo para desenhar. Pior, o estado guardado agora está diferente da tela — o próximo render, por
+qualquer outro motivo, mostra a rosca. Na solução, o array novo aparece na hora.</p>
+
+<h2>5. Estado derivado: não guarde o que dá para calcular</h2>
+
+<p>Se o valor sai de outro estado ou das props, ele não precisa de <code>useState</code>: calcule no
+render. Total de um pedido, lista filtrada, quantidade de itens selecionados, mensagem de erro — todos são
+contas feitas na hora do desenho, e o resultado fica sempre em dia, sem sincronização manual.</p>
+
+<pre class="file" data-file="Carrinho.jsx">function Carrinho() {
+  const [preco, setPreco] = useState(2.5);
+  const [quantidade, setQuantidade] = useState(1);
+
+  const total = preco * quantidade;              // derivado
+  const vazio = quantidade === 0;                // derivado
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;total: R$ {total.toFixed(2)}&lt;/p&gt;
+      {vazio &amp;&amp; &lt;p&gt;Escolha pelo menos um pão&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Guardar o derivado em estado cria duas fontes de verdade. Um dia o preço muda e o total não; no outro, o
+total muda e o preço não. O sintoma é sempre o mesmo: um número certo e outro errado na mesma tela. Se a
+conta é cara, o problema é de desempenho, não de estado — e a resposta é <code>useMemo</code>, não um
+segundo <code>useState</code>.</p>
+
+<p>O caso mais traiçoeiro é copiar props para o estado. <code>const [nome, setNome] = useState(props.nome)</code>
+guarda o valor da primeira renderização e ignora as mudanças do pai. Se o valor vem de fora e precisa
+acompanhar, use a prop direto; se precisa de uma cópia independente e editável, o nome deve dizer isso —
+<code>rascunho</code>, <code>nomeEditado</code> — e a sincronização precisa ser consciente.</p>
+
+<p>Listas filtradas e ordenadas são o exemplo mais comum de derivado. Guardar <code>filtrados</code> no
+estado obriga a atualizar a lista em dois lugares — quando o termo muda e quando o dado muda —, e é
+questão de tempo até um dos dois esquecer. Calculando no render, o filtro acompanha os dois de graça:</p>
+
+<pre class="file" data-file="Busca.jsx">function Busca() {
+  const [termo, setTermo] = useState("");
+  const [paes, setPaes] = useState(PAES);
+
+  const encontrados = paes.filter((p) =&gt;
+    p.nome.toLowerCase().includes(termo.toLowerCase())
+  );
+
+  return (
+    &lt;div&gt;
+      &lt;input value={termo} onChange={(e) =&gt; setTermo(e.target.value)} /&gt;
+      &lt;p&gt;{encontrados.length} encontrados&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Validação segue a mesma regra. As regras — nome preenchido, telefone com dígitos, e-mail com arroba —
+são contas feitas no render a partir do que a pessoa digitou. O único estado extra é "já tentou enviar?",
+que decide se a mensagem aparece. Guardar cada erro em um <code>useState</code> separado é o caminho mais
+curto para a mensagem de erro ficar na tela de um campo que já foi corrigido.</p>
+
+<h2>6. Lote, ordem e o momento do render</h2>
+
+<p>O React junta as atualizações feitas no mesmo evento e faz um render só. É o <em>batching</em>: dois
+setters em um clique produzem um desenho, não dois. As atualizações são aplicadas na ordem em que foram
+enfileiradas, e o render seguinte vê o resultado de todas.</p>
+
+<p>Um <code>console.log</code> ajuda a ver o momento. O log do corpo do componente roda uma vez por
+render; o log dentro do handler roda antes, com o valor do render atual.</p>
+
+<pre class="term">total no render: 0
+total no render: 2</pre>
+
+<p>O primeiro render mostra 0. O clique enfileira duas somas, o React aplica as duas e faz um render com
+2. Não existe um render intermediário com 1 — e é por isso que a tela não pisca. Se você precisa do valor
+novo imediatamente para outra conta, calcule antes: <code>const proximo = total + 2</code>.</p>
+
+<p>No React 19 o lote é automático em todo lugar: clique, <code>setTimeout</code>, resposta de
+<code>fetch</code> e promessa. Antes, só eventos do React eram agrupados; hoje, três setters dentro de um
+<code>then</code> também produzem um render só. Isso é bom para desempenho e indiferente para a lógica —
+desde que cada atualização use a forma de função quando depende da anterior.</p>
+
+<p>Uma consequência prática: não leia o estado logo depois do setter esperando o valor novo. Ele só
+existe no próximo render. E não chame setter durante o render — o React agenda um novo render, que chama
+o render de novo, que chama o setter, e o processo não termina.</p>
+
+<pre class="file" data-file="Contador.jsx">function somar() {
+  setTotal(total + 1);
+  console.log(total);        // ainda o valor deste render
+  console.log(total + 1);    // o valor que vai aparecer no próximo
+}</pre>
+
+<p>Se você precisa do novo valor para outra conta no mesmo handler, calcule-o numa variável e use a
+variável. Se precisa do valor dentro da próxima atualização, use a forma de função. O que não funciona é
+ler o estado de novo logo depois do setter: a variável do render não muda.</p>
+
+<h2>7. Onde o estado mora</h2>
+
+<p>Todo estado tem um dono: o componente que chama o <code>useState</code>. Quem precisa do valor recebe
+por prop; quem precisa mudar recebe a função. Se dois irmãos precisam do mesmo dado, o dono sobe para o
+ancestral comum — é o "elevar o estado".</p>
+
+<p>O estado local é o padrão e deve continuar sendo. Ele é simples de ler, de mover e de apagar. O estado
+elevado entra quando dois componentes precisam concordar sobre o mesmo valor. O contexto entra quando o
+valor precisa chegar a muitos lugares distantes sem passar por todo mundo — tema, idioma, usuário logado.
+Nenhum dos dois é "mais moderno": são ferramentas para distâncias diferentes.</p>
+
+<pre class="file" data-file="Pedido.jsx">function Pedido() {
+  const [itens, setItens] = useState([]);   // dono é Pedido
+
+  return (
+    &lt;div&gt;
+      &lt;Lista itens={itens} aoAdicionar={setItens} /&gt;
+      &lt;Resumo itens={itens} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Repare que <code>setItens</code> desce como prop. É legítimo e comum: o filho não sabe como o array é
+montado, só pede a troca. Se a regra de troca ficar complicada — adicionar, remover, limpar, aplicar
+desconto —, o par vira um <code>useReducer</code>, e o filho passa a receber <code>dispatch</code>, que é
+estável.</p>
+
+<p>O exemplo clássico de elevar é o campo de busca com a lista ao lado. Se o campo e a lista são irmãos,
+nenhum dos dois pode guardar o termo sozinho: quem guarda é o pai, que passa o termo para um e a função de
+troca para o outro. O pai fica um pouco maior e os dois ficam simples — melhor do que duplicar o estado e
+sincronizar na mão.</p>
+
+<pre class="file" data-file="Busca.jsx">function Busca() {
+  const [termo, setTermo] = useState("");   // dono: o pai
+
+  return (
+    &lt;div&gt;
+      &lt;Campo termo={termo} aoMudar={setTermo} /&gt;
+      &lt;Resultados termo={termo} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Há ainda uma decisão que não é de estado: o que pode ser recalculado. Antes de criar mais um
+<code>useState</code>, pergunte se o valor não é só uma conta com o que você já tem. A maior parte dos
+"estados demais" nasce de uma conta que ninguém quis fazer no render.</p>
+
+<h2>8. Erros comuns</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que aconteceu</th><th>Sintoma</th><th>Conserto</th><th>Aula</th></tr>
+<tr><td>mutar objeto ou array</td><td>a tela não muda; o valor aparece depois, por acidente</td><td>spread, <code>map</code>, <code>filter</code></td><td><a href="estado-com-array.html">Estado com Array</a></td></tr>
+<tr><td>setter no corpo do render</td><td>laço infinito; o React interrompe com erro</td><td>mover para evento ou efeito</td><td><a href="quando-nao-usar-efeito.html">Quando Não Usar Efeito</a></td></tr>
+<tr><td>duas somas com valor direto</td><td>o total sobe 1 em vez de 2</td><td>forma de função no setter</td><td><a href="atualizar-estado.html">Atualizar o Estado</a></td></tr>
+<tr><td>copiar prop para estado</td><td>o valor para de acompanhar o pai</td><td>usar a prop ou sincronizar de propósito</td><td><a href="estado-derivado.html">Estado Derivado</a></td></tr>
+<tr><td>guardar total ou filtro em estado</td><td>uma hora fica dessincronizado</td><td>calcular no render</td><td><a href="estado-derivado.html">Estado Derivado</a></td></tr>
+<tr><td>lixo no estado (timer, DOM)</td><td>renders à toa e valores estranhos</td><td><code>useRef</code></td><td><a href="useRef.html">O useRef</a></td></tr>
+</table>
+</div>
+
+<p>O laço infinito tem uma mensagem própria, que aparece no console do navegador e no painel:</p>
+
+<pre class="term">Maximum update depth exceeded.</pre>
+
+<p>A leitura: um componente está pedindo atualização dentro do próprio render, ou um efeito está mudando
+um estado que ele mesmo observa. A primeira coisa a fazer é procurar <code>setAlgo</code> fora de
+handler e de efeito. A segunda é conferir o array de dependências do efeito — um objeto recriado a cada
+render faz o efeito rodar sempre.</p>
+
+<p>Já a mutação não gera erro nenhum, e é por isso que ela é pior. Se a tela mostra um valor e o console
+mostra outro, desconfie de estado mutado antes de desconfiar do React. O teste é simples: o objeto novo é
+diferente do antigo? Se a resposta for não, o React não tem como saber que algo mudou.</p>
+
+<h2>Resumo</h2>
+
+<p><code>useState</code> guarda um valor entre renders e devolve o par valor e setter. O valor é
+somente leitura e constante durante o render; o setter agenda um novo render. Para atualizações que
+dependem do valor atual — somar, remover, trocar um campo de objeto —, use a forma de função:
+<code>setValor((v) =&gt; ...)</code>.</p>
+
+<p>Objeto e array se substituem, nunca se mutam: spread para copiar, <code>map</code> e
+<code>filter</code> para transformar. O valor que sai de outro estado ou de props é derivado e se calcula
+no render, não em um segundo <code>useState</code>. O React junta as atualizações do mesmo evento em um
+render e aplica na ordem.</p>
+
+<p>O estado mora no componente que precisa dele; irmãos pedem para o ancestral comum, e o contexto entra
+para distâncias grandes. Antes de criar mais um estado, pergunte: esse valor pode ser calculado? Ele
+aparece na tela? Ele precisa sobreviver ao render? As três respostas dizem se o lugar é estado, ref ou
+variável.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>const [valor, setValor] = useState(inicial)</code>; o setter agenda um render.</li>
+<li>O valor é constante no render: o log depois do setter mostra o antigo.</li>
+<li>Use <code>setValor((v) =&gt; v + 1)</code> quando a conta depende do atual.</li>
+<li>Objeto e array: copie e sobrescreva; nunca <code>push</code> nem atribuição direta.</li>
+<li>Estado novo igual ao antigo não redesenha — é o que a mutação provoca.</li>
+<li>Total, filtro e validação são derivados: calcule no render.</li>
+<li>Prop copiada para estado para de acompanhar o pai.</li>
+<li>Vários setters no mesmo evento: um render, aplicado em ordem.</li>
+<li>O dono do estado é quem chama o <code>useState</code>; os outros recebem prop.</li>
+<li>Antes de mais um <code>useState</code>, pergunte se o valor não é conta.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eventos | Guia React</title>
+<meta name="description" content="Consulta rápida de eventos no React 19: onClick com função, o objeto do evento, onChange e onSubmit, propagação, teclado e os erros mais comuns.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Eventos</span></h1>
+<p class="intro">Evento é o que acontece com a página: o clique, a tecla, o envio do formulário. No React,
+você não chama <code>addEventListener</code> para cada elemento — escreve uma prop com o nome do evento e
+entrega uma função. Esta página é a consulta rápida: quais eventos existem, o que chega no objeto do
+evento, como ligar campo e estado com <code>onChange</code>, como segurar o formulário com
+<code>onSubmit</code> e quais erros aparecem no caminho. A Ana liga botões desde a primeira aula; aqui
+está o resumo que ela consulta quando um clique não faz o que devia.</p>
+
+<div class="note">
+<strong>Como usar esta página</strong>
+<ul>
+  <li>A tabela da seção 4 é a lista de eventos para consultar; as outras explicam o mecanismo.</li>
+  <li>As caixas rodam React 19: edite, clique em Rodar e leia o painel.</li>
+  <li>Se o clique não faz nada, comece pela seção 2; se o campo não atualiza, pela seção 5.</li>
+</ul>
+</div>
+
+<h2>1. O que é um evento no React</h2>
+
+<p>Evento é um acontecimento do navegador: o ponteiro clicou, a tecla desceu, o formulário foi enviado, o
+campo ganhou foco. O React escuta esses acontecimentos na raiz da aplicação e os entrega ao componente
+certo, na forma de uma prop. Escrever <code>onClick={salvar}</code> é dizer "quando o clique acontecer
+neste elemento, chame esta função".</p>
+
+<p>O nome da prop é o nome do evento em camelCase: <code>onClick</code>, <code>onChange</code>,
+<code>onSubmit</code>, <code>onKeyDown</code>. O valor é sempre uma função. Não há string com código,
+como no HTML antigo (<code>onclick="salvar()"</code>) — e essa é a primeira coisa que muda para quem vem
+do HTML.</p>
+
+<pre class="file" data-file="Botao.jsx">function Botao() {
+  function avisar() {
+    console.log("clicou");
+  }
+
+  return &lt;button onClick={avisar}&gt;Avisar&lt;/button&gt;;
+}</pre>
+
+<p>Por baixo, o React usa um único listener na raiz e descobre qual componente deve receber cada evento.
+Isso economiza memória em listas grandes e faz os eventos funcionarem igual em qualquer navegador. O
+objeto que chega na sua função não é o evento nativo: é um <code>SyntheticEvent</code>, uma casca com a
+mesma interface — <code>target</code>, <code>preventDefault</code>, <code>stopPropagation</code> — e com
+os campos do evento original quando você precisa deles.</p>
+
+<p>Na prática, você trata o evento como o do navegador. As diferenças aparecem em detalhes: os nomes são
+camelCase, o handler é uma função de verdade e o objeto que chega é a casca do React, não o evento nativo.
+Nada disso muda o dia a dia; muda a leitura das mensagens de erro.</p>
+
+<dl class="anatomy">
+<dt>evento</dt>
+<dd>O acontecimento que o navegador avisa: clique, tecla, envio, foco. No React, vira o nome de uma
+prop.</dd>
+<dt>handler</dt>
+<dd>A função que você entrega ao evento: <code>onClick={salvar}</code>. Também chamada de
+manipulador.</dd>
+<dt>SyntheticEvent</dt>
+<dd>A casca que o React entrega no lugar do evento nativo, com a mesma interface e comportamento igual em
+qualquer navegador.</dd>
+<dt>propagação</dt>
+<dd>A subida do evento pela árvore: do elemento clicado até os pais. <code>stopPropagation</code>
+interrompe.</dd>
+<dt>alvo</dt>
+<dd>O elemento que disparou o evento (<code>e.target</code>), que pode não ser o dono do handler
+(<code>e.currentTarget</code>).</dd>
+</dl>
+
+<h2>2. O handler é uma função, não uma chamada</h2>
+
+<p>A confusão número um é a diferença entre passar a função e chamar a função. <code>onClick={salvar}</code>
+passa a referência: o React guarda e chama no clique. <code>onClick={salvar()}</code> chama na hora do
+render e passa o retorno — que quase sempre é <code>undefined</code>.</p>
+
+<pre class="file" data-file="Botao.jsx">// certo: a função é chamada no clique
+&lt;button onClick={salvar}&gt;Salvar&lt;/button&gt;
+
+// errado: a função roda no render e o clique fica sem handler
+&lt;button onClick={salvar()}&gt;Salvar&lt;/button&gt;
+
+// certo: uma função nova que chama com argumento
+&lt;button onClick={() =&gt; salvar("pão de queijo")}&gt;Salvar&lt;/button&gt;</pre>
+
+<p>O sintoma do erro depende do que a função faz. Se ela só registra no console, a mensagem aparece antes
+de qualquer clique — uma vez por render. Se ela muda estado, o React entra em laço: render chama a função,
+a função muda o estado, o estado pede outro render. Se ela devolve algo, o React reclama que esperava uma
+função.</p>
+
+<p>Uma convenção de nome ajuda a não cair nisso: handler é verbo no infinitivo (<code>salvar</code>,
+<code>remover</code>, <code>abrir</code>) ou <code>handle</code> mais o evento (<code>handleClique</code>).
+Quando a função vira prop, o prefixo <code>ao</code> deixa claro o momento: <code>aoSalvar</code>. Quem lê
+<code>onClick={aoSalvar}</code> entende que a chamada acontece no clique, não ali.</p>
+
+<p>Uma mesma função pode servir a vários botões. Se o comportamento é o mesmo, não há problema em repetir
+<code>onClick={fechar}</code> em três lugares; se muda por item, a função intermediária com argumento é o
+caminho. O que não vale é criar uma função nova em cada render dentro de um componente que compara props
+sem necessidade — e mesmo isso só importa quando há <code>memo</code> no meio.</p>
+
+<p>Quando precisa de argumento, use a função intermediária. Ela é criada a cada render, o que é normal e
+não custa nada na maioria dos casos; só vira problema quando atravessa um componente embrulhado em
+<code>memo</code>, e aí a resposta é <code>useCallback</code>. O importante é que a chamada esteja dentro
+do corpo da função, não no valor da prop.</p>
+
+<h2>3. O objeto do evento</h2>
+
+<p>O primeiro parâmetro do handler é o evento. Dele saem as informações do que aconteceu: quem foi o alvo,
+qual o valor do campo, qual tecla foi pressionada, se o padrão do navegador deve continuar. Os campos mais
+usados estão na tabela.</p>
+
+<pre class="file" data-file="Campo.jsx">function Campo() {
+  function mudou(e) {
+    console.log(e.type);          // "change"
+    console.log(e.target.value);  // o texto digitado
+  }
+
+  return &lt;input onChange={mudou} /&gt;;
+}</pre>
+
+<p>No painel e no console, o registro sai assim:</p>
+
+<pre class="term">change Maria</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No evento</th><th>O que é</th><th>Exemplo</th><th>Aula</th></tr>
+<tr><td><code>e.target</code></td><td>o elemento que disparou o evento</td><td><code>e.target.value</code></td><td><a href="entrada-controlada.html">Entrada Controlada</a></td></tr>
+<tr><td><code>e.currentTarget</code></td><td>o elemento que tem o handler</td><td>útil quando há filhos dentro</td><td><a href="eventos-onclick.html">Eventos e onClick</a></td></tr>
+<tr><td><code>e.target.value</code></td><td>o texto do campo</td><td><code>"Maria"</code></td><td><a href="input-controlado.html">Input Controlado</a></td></tr>
+<tr><td><code>e.target.checked</code></td><td>o estado de uma caixa</td><td><code>true</code> ou <code>false</code></td><td><a href="checkbox.html">Checkbox</a></td></tr>
+<tr><td><code>e.key</code></td><td>a tecla pressionada</td><td><code>"Enter"</code>, <code>"Escape"</code></td><td><a href="textarea.html">Textarea</a></td></tr>
+<tr><td><code>e.preventDefault()</code></td><td>cancela o padrão do navegador</td><td>impede o envio do formulário</td><td><a href="envio-de-formulario.html">Envio de Formulário</a></td></tr>
+<tr><td><code>e.stopPropagation()</code></td><td>para o evento de subir para o pai</td><td>fechar um menu sem fechar o painel</td><td><a href="eventos-onclick.html">Eventos e onClick</a></td></tr>
+</table>
+</div>
+
+<p>Duas confusões comuns. <code>e.target</code> é quem disparou; <code>e.currentTarget</code> é quem tem o
+handler — num botão com um ícone dentro, clicar no ícone dá <code>target</code> diferente de
+<code>currentTarget</code>. E <code>value</code> é sempre texto: mesmo em <code>type="number"</code>, o
+que chega é string, e converter é trabalho seu (<code>Number(e.target.value)</code>), com cuidado para o
+caso vazio.</p>
+
+<p>O React antigo reaproveitava o objeto do evento e o limpava depois do handler; desde o React 17 isso
+acabou. Hoje dá para guardar <code>e.target</code> e ler depois, sem o clássico
+<code>e.persist()</code>. Se você encontrar esse método em código antigo, é herança daquela época.</p>
+
+<p>Um hábito do HTML que não funciona no React: <code>return false</code> para cancelar o padrão. Aqui,
+quem cancela é <code>e.preventDefault()</code>, e o retorno do handler é ignorado. O mesmo vale para
+<code>onclick="return false"</code> em atributo — no React, o valor precisa ser função, e função não
+recebe string de código.</p>
+
+<h2>4. Os eventos que você vai usar</h2>
+
+<p>Existem dezenas, mas um punhado cobre quase tudo em formulário e painel. A tabela abaixo é a lista de
+consulta: o nome da prop, quando dispara e o uso típico.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Prop</th><th>Quando dispara</th><th>Uso típico</th><th>Aula</th></tr>
+<tr><td><code>onClick</code></td><td>clique do mouse ou toque</td><td>botão, cartão clicável</td><td><a href="eventos-onclick.html">Eventos e onClick</a></td></tr>
+<tr><td><code>onChange</code></td><td>o valor do campo muda</td><td>ligar campo ao estado</td><td><a href="entrada-controlada.html">Entrada Controlada</a></td></tr>
+<tr><td><code>onSubmit</code></td><td>o formulário é enviado</td><td>enviar pedido sem recarregar</td><td><a href="envio-de-formulario.html">Envio de Formulário</a></td></tr>
+<tr><td><code>onKeyDown</code></td><td>uma tecla desce</td><td>Enter para buscar, Escape para fechar</td><td><a href="textarea.html">Textarea</a></td></tr>
+<tr><td><code>onFocus</code> / <code>onBlur</code></td><td>o campo ganha ou perde o foco</td><td>validar ao sair, mostrar dica</td><td><a href="validacao.html">Validação</a></td></tr>
+<tr><td><code>onDoubleClick</code></td><td>dois cliques rápidos</td><td>editar um item da lista</td><td><a href="eventos-onclick.html">Eventos e onClick</a></td></tr>
+<tr><td><code>onMouseEnter</code> / <code>onMouseLeave</code></td><td>o ponteiro entra ou sai</td><td>destacar no hover (prefira CSS)</td><td><a href="eventos-onclick.html">Eventos e onClick</a></td></tr>
+</table>
+</div>
+
+<p>Para campo de texto, <code>onChange</code> no React dispara a cada tecla — é o evento
+<code>input</code> do navegador, não o <code>change</code> que só dispara ao sair do campo. Isso é
+proposital: o estado acompanha a digitação, e o valor na tela nunca fica atrasado. Para caixa de seleção,
+o mesmo <code>onChange</code> serve, lendo <code>e.target.checked</code>.</p>
+
+<p>Eventos de ponteiro que mudam só a aparência — <code>onMouseEnter</code>, <code>onMouseLeave</code> —
+costumam ser melhor resolvidos com CSS (<code>:hover</code>), porque não precisam passar pelo estado. Use
+JavaScript quando a mudança precisa de dado, não de estilo.</p>
+
+<p>Select e textarea usam o mesmo <code>onChange</code> do input: no select, <code>e.target.value</code> é
+o valor da opção escolhida; no textarea, é o texto inteiro, com as quebras de linha. Não existe
+<code>onInput</code> separado no uso normal — o <code>onChange</code> do React já cobre a digitação e a
+escolha, e é por isso que um único hábito serve para todos os campos do formulário.</p>
+
+<h2>5. Formulários: onChange e onSubmit</h2>
+
+<p>Campo controlado é o par <code>value</code> e <code>onChange</code>: o valor vem do estado, a mudança
+vai para o estado. Sem os dois, o campo fica travado e o React avisa. A leitura do texto está sempre em
+<code>e.target.value</code>; a leitura da marcação, em <code>e.target.checked</code>.</p>
+
+<pre class="file" data-file="Campo.jsx">function Campo() {
+  const [nome, setNome] = useState("");
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;p&gt;Olá, {nome}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>O formulário inteiro tem um evento só: <code>onSubmit</code>. Ele dispara no clique de um botão
+<code>type="submit"</code> ou no Enter dentro de um campo. A primeira linha do handler precisa ser
+<code>e.preventDefault()</code>, senão o navegador envia e recarrega a página, levando o estado junto. O
+botão que não envia leva <code>type="button"</code>, porque dentro de um form o padrão é
+<code>submit</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Peça</th><th>Para que serve</th><th>Sem ela</th><th>Aula</th></tr>
+<tr><td><code>value={nome}</code></td><td>o campo mostra o estado</td><td>o campo fica independente do estado</td><td><a href="input-controlado.html">Input Controlado</a></td></tr>
+<tr><td><code>onChange</code></td><td>o estado recebe a digitação</td><td>o campo fica travado</td><td><a href="entrada-controlada.html">Entrada Controlada</a></td></tr>
+<tr><td><code>onSubmit</code></td><td>junta o envio num lugar só</td><td>o navegador navega e recarrega</td><td><a href="envio-de-formulario.html">Envio de Formulário</a></td></tr>
+<tr><td><code>e.preventDefault()</code></td><td>cancela a navegação</td><td>a página pisca e o estado se perde</td><td><a href="envio-de-formulario.html">Envio de Formulário</a></td></tr>
+<tr><td><code>type="button"</code></td><td>botão que não envia</td><td>o botão "Cancelar" envia o formulário</td><td><a href="envio-de-formulario.html">Envio de Formulário</a></td></tr>
+</table>
+</div>
+
+<div class="tryreact" data-goal="digite:#nome=Maria;;texto:Olá, Maria">
+  <p class="try-task">O <code>onChange</code> guarda o nome do render em vez do texto digitado, então o
+  campo não muda. Use <code>e.target.value</code>: digite "Maria" e confira a saudação.</p>
+  <pre class="jsx">function App() {
+  const [nome, setNome] = useState("Ana");
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(nome)}
+      /&gt;
+      &lt;p&gt;Olá, {nome}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="nome"&gt;Nome&lt;/label&gt;
+  &lt;input id="nome" value="Ana"&gt;
+  &lt;p&gt;Olá, Ana&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nome, setNome] = useState("Ana");
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;p&gt;Olá, {nome}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No inicial, digitar não muda nada: o handler grava o mesmo nome do render e o estado não sai do lugar.
+Na solução, cada tecla atualiza o estado e a saudação acompanha. O <code>value</code> é o que fecha o
+ciclo: sem ele, o campo mudaria sozinho e o estado ficaria desatualizado — o problema inverso.</p>
+
+<p>Enter dentro de um campo de texto também envia o formulário: é o comportamento nativo, chamado de
+submissão implícita. Por isso o handler de envio precisa estar no <code>form</code>, e não no
+<code>onClick</code> do botão — assim os dois caminhos passam pelo mesmo lugar. Se você quer Enter para
+outra coisa (buscar enquanto digita, por exemplo), o evento é <code>onKeyDown</code> no campo, e o
+<code>preventDefault</code> impede o envio.</p>
+
+<h2>6. Propagação, teclado e acessibilidade</h2>
+
+<p>Eventos sobem na árvore. Um clique num botão dentro de um cartão dispara o handler do botão e depois o
+do cartão. Quando você não quer o segundo, chame <code>e.stopPropagation()</code> no primeiro. Quando quer
+cancelar o comportamento do navegador — o envio do form, o link que navega —, chame
+<code>e.preventDefault()</code>. São coisas diferentes: uma para a subida, outra para o padrão.</p>
+
+<pre class="file" data-file="Cartao.jsx">function Cartao({ children }) {
+  function clicou() {
+    console.log("cartão");
+  }
+
+  return &lt;div onClick={clicou}&gt;{children}&lt;/div&gt;;
+}
+
+// dentro do cartão, um botão que não deve abrir o cartão
+&lt;button
+  onClick={(e) =&gt; {
+    e.stopPropagation();
+    remover(id);
+  }}
+&gt;
+  Remover
+&lt;/button&gt;</pre>
+
+<p>Teclado é o outro lado. <code>onKeyDown</code> recebe <code>e.key</code>, com nomes como
+<code>"Enter"</code>, <code>"Escape"</code> e <code>"ArrowUp"</code>. Use quando o atalho faz sentido:
+Enter para confirmar uma busca, Escape para fechar um painel. Não use para recriar o que o elemento já faz
+— um <code>button</code> responde a Enter e a Espaço sozinho.</p>
+
+<p>Isso vale como regra maior: clique em <code>div</code> funciona com mouse e falha com teclado, porque a
+div não recebe foco nem responde a Enter. Botão é <code>button</code>. O mesmo vale para o
+<code>label</code>, que já transfere o clique para o campo, e para o <code>form</code>, que já trata o
+Enter. Usar o elemento certo economiza evento e código.</p>
+
+<p><code>onFocus</code> e <code>onBlur</code> servem para validar no momento certo. O primeiro dispara
+quando o campo ganha o cursor; o segundo, quando perde. A dupla é útil para mostrar a dica ao entrar e a
+mensagem de erro ao sair, sem incomodar quem ainda está digitando a primeira letra. O <code>blur</code>
+também acontece quando a pessoa clica em outro lugar — inclusive no botão de enviar —, então a validação
+ao sair precisa ser rápida e não pode bloquear o clique.</p>
+
+<p>Foco é um estado do navegador, não do React: quem guarda "este campo está em foco" é o DOM, e o
+<code>:focus-visible</code> do CSS resolve a maioria dos casos de estilo. Use o evento quando precisar de
+dado — contar tentativas, buscar sugestões ao entrar — e deixe a aparência com o CSS.</p>
+
+<h2>7. Passar argumentos e manter a identidade</h2>
+
+<p>Para mandar um dado junto com o clique, a função intermediária resolve:
+<code>onClick={() =&gt; remover(id)}</code>. Outra opção é ler o dado do próprio elemento com
+<code>data-*</code> — <code>data-id={id}</code> e <code>e.currentTarget.dataset.id</code> —, mas isso
+devolve string e esconde a intenção; prefira o argumento.</p>
+
+<div class="tryreact" data-goal="clique:#queijo;;texto:pedido: pão de queijo">
+  <p class="try-task">O botão chama <code>pedir()</code> sem argumento e a tela mostra
+  <code>undefined</code>. Passe o nome do pão com uma função intermediária:
+  <code>onClick={() =&gt; pedir("pão de queijo")}</code>.</p>
+  <pre class="jsx">function App() {
+  const [pedido, setPedido] = useState("");
+
+  function pedir(nome) {
+    setPedido(nome);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button id="queijo" onClick={() =&gt; pedir()}&gt;
+        Pedir pão de queijo
+      &lt;/button&gt;
+      &lt;p&gt;pedido: {pedido}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="queijo"&gt;Pedir pão de queijo&lt;/button&gt;
+  &lt;p&gt;pedido:&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [pedido, setPedido] = useState("");
+
+  function pedir(nome) {
+    setPedido(nome);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button id="queijo" onClick={() =&gt; pedir("pão de queijo")}&gt;
+        Pedir pão de queijo
+      &lt;/button&gt;
+      &lt;p&gt;pedido: {pedido}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Repare que <code>pedir()</code> sem argumento grava <code>undefined</code>, e o painel mostra o campo
+vazio depois dos dois-pontos. A função intermediária é nova a cada render — irrelevante aqui, porque ela
+não é prop de um filho em <code>memo</code>. Quando for, o assunto é <code>useCallback</code>, e o
+cuidado é o mesmo: a função precisa ver os valores do render em que foi criada.</p>
+
+<p>Em lista, cada item cria a sua função: <code>{itens.map((i) =&gt; &lt;li key={i.id}&gt;&lt;button
+onClick={() =&gt; remover(i.id)}&gt;X&lt;/button&gt;&lt;/li&gt;)}</code>. A <code>key</code> identifica a
+linha; o argumento identifica o dado. Um não substitui o outro.</p>
+
+<p>Em handler assíncrono, leia o que precisa do evento antes do primeiro <code>await</code>. O objeto do
+evento continua válido — o React não o limpa mais —, mas <code>e.target</code> aponta para o elemento do
+momento, e o valor pode ter mudado enquanto a resposta não chegava. Guarde
+<code>const nome = e.target.value</code> e use a variável depois; é mais previsível e mais fácil de
+testar.</p>
+
+<h2>8. Erros comuns</h2>
+
+<p>Quando um clique não faz nada, a ordem de investigação é sempre a mesma: o handler é uma função? O
+elemento certo recebeu o evento? Algum pai está interceptando? Um <code>console.log("clicou")</code>
+dentro do handler responde à primeira pergunta em segundos; se ele aparece no console, o problema está no
+que a função faz, não no evento.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você escreveu</th><th>O que acontece</th><th>Conserto</th><th>Aula</th></tr>
+<tr><td><code>onClick={salvar()}</code></td><td>a função roda no render; o clique fica sem handler</td><td><code>onClick={salvar}</code></td><td><a href="eventos-onclick.html">Eventos e onClick</a></td></tr>
+<tr><td><code>onClick="salvar()"</code></td><td>o React avisa que esperava uma função</td><td>chaves com a referência</td><td><a href="eventos-onclick.html">Eventos e onClick</a></td></tr>
+<tr><td><code>onChange</code> sem <code>value</code></td><td>o campo aceita texto, mas o estado não manda</td><td>fechar o par <code>value</code> + <code>onChange</code></td><td><a href="entrada-controlada.html">Entrada Controlada</a></td></tr>
+<tr><td><code>onSubmit</code> sem <code>preventDefault</code></td><td>a página recarrega e o estado some</td><td>primeira linha do handler</td><td><a href="envio-de-formulario.html">Envio de Formulário</a></td></tr>
+<tr><td>clique em <code>div</code></td><td>funciona com mouse, falha com teclado</td><td>usar <code>button</code></td><td><a href="formulario-acessivel.html">Formulário Acessível</a></td></tr>
+<tr><td><code>e.target.value</code> em checkbox</td><td>vem <code>"on"</code>, não o marcado</td><td><code>e.target.checked</code></td><td><a href="checkbox.html">Checkbox</a></td></tr>
+</table>
+</div>
+
+<p>O erro da string tem mensagem específica no console de desenvolvimento:</p>
+
+<pre class="term">Warning: Expected `onClick` listener to be a function, instead got a value of `string` type.</pre>
+
+<p>A leitura: o valor entre aspas é texto, e o React não executa texto. Em produção o aviso não aparece —
+o handler simplesmente não roda e o botão fica morto. É o tipo de erro que passa no teste de quem só olha
+a tela e falha no primeiro clique de verdade.</p>
+
+<p>Os outros erros desta tabela não geram mensagem nenhuma: campo travado, formulário que recarrega, div
+que não responde ao teclado. Por isso vale a conferência rápida antes de entregar: todo handler é uma
+função? Todo campo controlado tem <code>value</code> e <code>onChange</code>? Todo form tem
+<code>onSubmit</code> com <code>preventDefault</code>? Todo clique que precisa de teclado usa
+<code>button</code>?</p>
+
+<h2>Resumo</h2>
+
+<p>Evento no React é prop em camelCase com uma função como valor: <code>onClick</code>,
+<code>onChange</code>, <code>onSubmit</code>. Passe a referência (<code>onClick={salvar}</code>) ou uma
+função intermediária quando precisar de argumento (<code>onClick={() =&gt; salvar(id)}</code>); nunca
+chame a função no valor da prop.</p>
+
+<p>O handler recebe um <code>SyntheticEvent</code> com <code>target</code>, <code>value</code>,
+<code>checked</code>, <code>key</code>, <code>preventDefault</code> e <code>stopPropagation</code>. Campo
+controlado é <code>value</code> mais <code>onChange</code> lendo <code>e.target.value</code>; formulário é
+<code>onSubmit</code> com <code>preventDefault</code> na primeira linha e botão de envio com
+<code>type="submit"</code>.</p>
+
+<p>Eventos sobem na árvore; <code>stopPropagation</code> para a subida e <code>preventDefault</code>
+cancela o padrão. Teclado e clique funcionam de graça nos elementos certos — <code>button</code>,
+<code>label</code>, <code>form</code> —, e é aí que a maior parte dos problemas de acessibilidade se
+resolve antes de virar código.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Eventos são props em camelCase com uma função como valor.</li>
+<li><code>onClick={salvar}</code> passa a função; <code>salvar()</code> chama na hora.</li>
+<li>Para argumento, use <code>onClick={() =&gt; salvar(id)}</code>.</li>
+<li><code>e.target.value</code> é texto, mesmo em <code>type="number"</code>.</li>
+<li>Checkbox e rádio leem <code>e.target.checked</code>.</li>
+<li><code>preventDefault</code> cancela o padrão; <code>stopPropagation</code> para a subida.</li>
+<li><code>onChange</code> no React dispara a cada tecla.</li>
+<li><code>onSubmit</code> precisa de <code>preventDefault</code> na primeira linha.</li>
+<li>Dentro de um form, botão sem <code>type</code> envia.</li>
+<li>Clique em <code>div</code> não funciona no teclado: use <code>button</code>.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

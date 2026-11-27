@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel de Pedidos | Guia React</title>
+<meta name="description" content="Projeto de um painel de pedidos em React: carga simulada com Promise, carregando e erro, filtro por status, contagens derivadas e o botão que avança cada pedido na fila.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Painel de <span class="hl">Pedidos</span></h1>
+<p class="intro">Na cozinha da padaria, a Ana precisa de uma tela que mostre os pedidos do site na ordem em
+que chegam: os novos, os que estão sendo preparados e os que já saíram. Ela quer filtrar por status, ver
+quantos pedidos há em cada etapa e avançar cada um com um clique — sem recarregar a página e sem perder o
+que já foi feito. Neste projeto ela monta o painel do zero: os dados que chegam de uma "API" simulada, os
+estados de carregando e erro, a lista com filtro, as contagens e o botão que empurra o pedido para a
+próxima etapa.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como modelar um pedido com id, cliente, itens, total e status.</li>
+  <li>Como simular a rede com <code>Promise</code> e <code>setTimeout</code>.</li>
+  <li>Como mostrar carregando e erro sem confundir com vazio.</li>
+  <li>Como filtrar por status sem estragar a lista.</li>
+  <li>Como avançar o status com <code>map</code> e um objeto novo.</li>
+  <li>Como derivar contagens e faturamento do estado.</li>
+  <li>Como ordenar sem mutar o array.</li>
+  <li>O que quebra quando o carregando não desliga.</li>
+</ul>
+</div>
+
+<h2>1. A cena e o escopo do painel</h2>
+
+<p>O painel é a tela de quem trabalha na cozinha, não a de quem compra. Ele mostra os pedidos que chegaram,
+com o cliente, o que foi pedido, o total e o horário. Cada pedido tem um status: <strong>novo</strong>,
+<strong>preparando</strong> ou <strong>entregue</strong>. A Ana quer ver a fila inteira, filtrar por etapa e
+avançar um pedido com um clique.</p>
+
+<p>Duas decisões de projeto aparecem antes do código. A primeira: o status é um texto curto e fixo, não um
+número. <code>"novo"</code> é legível, fácil de comparar e não precisa de legenda. A segunda: a lista de
+pedidos vem de fora, não nasce no componente. Num app de verdade, ela chega de um servidor; aqui, de uma
+promessa que resolve depois de um instante.</p>
+
+<p>O que fica de fora: login, edição de itens, cancelamento, impressão. O painel é para acompanhar, e o
+escopo é esse. Cada recurso a mais é uma chance de não terminar — e o valor deste projeto está em ver a
+tela reagir a dados que chegam e a cliques que mudam o status.</p>
+
+<p>A ordem de montagem também é uma decisão: primeiro os dados e a carga, depois a lista, depois o filtro,
+depois o botão de avançar. Quem começa pelo botão descobre tarde que o pedido não tem status, e volta duas
+etapas. Construir na ordem dos dados economiza retrabalho.</p>
+
+<h2>2. Os dados: o pedido e o status</h2>
+
+<p>Um pedido é um objeto com seis campos. O id identifica; o cliente dá o nome; os itens dizem o que
+preparar; o total é o valor a cobrar; o status é a etapa. O horário serve para ordenar a fila, e é o campo
+que a cozinha mais olha depois do status.</p>
+
+<dl class="anatomy">
+<dt>pedido</dt>
+<dd>Um objeto com os dados de uma linha do painel:
+<code>{ id, cliente, itens, total, status, horario }</code>.</dd>
+<dt><code>status</code></dt>
+<dd>Um dos três textos: <code>"novo"</code>, <code>"preparando"</code>, <code>"entregue"</code>. É o que
+o filtro compara e o botão avança.</dd>
+<dt><code>itens</code></dt>
+<dd>Um resumo legível do pedido: "2 pães e 1 café". Num app completo, seria uma lista de produtos com
+quantidade.</dd>
+<dt><code>total</code></dt>
+<dd>O valor do pedido, em número. Formatação só na tela, como no carrinho.</dd>
+<dt><code>horario</code></dt>
+<dd>O texto "07:10" que ordena a fila. Aqui é dado de mentira; num app real, viria do servidor em formato
+de data.</dd>
+</dl>
+
+<p>Com a forma definida, os pedidos iniciais ficam assim:</p>
+
+<pre class="file" data-file="App.jsx">const pedidosDaApi = [
+  { id: 101, cliente: "Marta", itens: "2 pães e 1 café", total: 4.5, status: "novo", horario: "07:10" },
+  { id: 102, cliente: "João", itens: "1 bolo de cenoura", total: 12, status: "novo", horario: "07:25" },
+  { id: 103, cliente: "Clara", itens: "6 pães de queijo", total: 9, status: "preparando", horario: "07:40" },
+  { id: 104, cliente: "Rita", itens: "3 pães franceses", total: 3, status: "entregue", horario: "08:05" },
+];</pre>
+
+<p>O status é o campo que mais aparece no código, então vale definir as transições antes de escrever a
+tela. A tabela é a regra do negócio, e o botão de avançar é só a implementação dela:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Status</th><th>O que significa na cozinha</th><th>O que o botão faz</th></tr>
+<tr><td><code>novo</code></td><td>chegou e ninguém começou</td><td>vira <code>preparando</code></td></tr>
+<tr><td><code>preparando</code></td><td>está no forno ou sendo montado</td><td>vira <code>entregue</code></td></tr>
+<tr><td><code>entregue</code></td><td>saiu para o cliente</td><td>não muda mais</td></tr>
+<tr><td>qualquer outro texto</td><td>dado corrompido</td><td>não muda: o mapa não encontra o próximo</td></tr>
+</table>
+</div>
+
+<p>A última linha é defesa contra dado ruim. Um status desconhecido não deve quebrar a tela nem virar
+<code>undefined</code>: o mapa de transições devolve o próprio status quando não encontra o próximo. É uma
+linha de código que evita um erro estranho no meio do expediente.</p>
+
+<h2>3. A carga simulada</h2>
+
+<p>Não há rede no quadro onde as caixas rodam, então a API é simulada com uma promessa que resolve depois
+de um tempo. A estrutura é exatamente a de um <code>fetch</code>: uma função que devolve promessa, um
+estado para a lista, um para o carregando e um para o erro.</p>
+
+<p>Na caixa abaixo, a carga funciona mas o carregando nunca desliga: a tela fica em "Carregando pedidos…"
+para sempre, mesmo com os dados já no estado. Esse é o bug mais comum de quem começa com promessa.
+Conserte desligando o carregando no <code>finally</code>:</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:3 pedidos">
+  <p class="try-task">A lista chega, mas a tela continua em "Carregando pedidos…". Desligue
+  <code>carregando</code> quando a promessa terminar — no <code>.then</code>, no
+  <code>.catch</code> ou, melhor, no <code>.finally</code>.</p>
+  <pre class="jsx">const pedidosDaApi = [
+  { id: 101, cliente: "Marta", status: "novo" },
+  { id: 102, cliente: "João", status: "novo" },
+  { id: 103, cliente: "Clara", status: "preparando" },
+];
+
+function buscarPedidos() {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok(pedidosDaApi), 50));
+}
+
+function App() {
+  const [pedidos, setPedidos] = useState([]);
+  const [carregando, setCarregando] = useState(false);
+
+  function carregar() {
+    setCarregando(true);
+    buscarPedidos().then((lista) =&gt; {
+      setPedidos(lista);
+    });
+  }
+
+  if (carregando) return &lt;p&gt;Carregando pedidos…&lt;/p&gt;;
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={carregar}&gt;Carregar pedidos&lt;/button&gt;
+      &lt;p&gt;{pedidos.length} pedidos&lt;/p&gt;
+      &lt;ul&gt;
+        {pedidos.map((pedido) =&gt; (
+          &lt;li key={pedido.id}&gt;{pedido.cliente}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Carregar pedidos&lt;/button&gt;
+  &lt;p&gt;0 pedidos&lt;/p&gt;
+  &lt;ul&gt;&lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const pedidosDaApi = [
+  { id: 101, cliente: "Marta", status: "novo" },
+  { id: 102, cliente: "João", status: "novo" },
+  { id: 103, cliente: "Clara", status: "preparando" },
+];
+
+function buscarPedidos() {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok(pedidosDaApi), 50));
+}
+
+function App() {
+  const [pedidos, setPedidos] = useState([]);
+  const [carregando, setCarregando] = useState(false);
+
+  function carregar() {
+    setCarregando(true);
+    buscarPedidos()
+      .then((lista) =&gt; {
+        setPedidos(lista);
+      })
+      .finally(() =&gt; {
+        setCarregando(false);
+      });
+  }
+
+  if (carregando) return &lt;p&gt;Carregando pedidos…&lt;/p&gt;;
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={carregar}&gt;Carregar pedidos&lt;/button&gt;
+      &lt;p&gt;{pedidos.length} pedidos&lt;/p&gt;
+      &lt;ul&gt;
+        {pedidos.map((pedido) =&gt; (
+          &lt;li key={pedido.id}&gt;{pedido.cliente}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em Carregar pedidos: a tela mostra o carregando por um instante e depois a lista com três nomes.
+O <code>finally</code> roda nos dois caminhos, sucesso e falha, e é por isso que ele é o lugar certo para
+desligar o carregando. Se você desligar só no <code>then</code>, um erro deixa a tela presa para
+sempre.</p>
+
+<p>O console mostra a ordem em que os estados mudam durante a carga:</p>
+
+<pre class="term">carregando: true
+pedidos: 0
+pedidos: 3
+carregando: false</pre>
+
+<p>Num app de verdade, a função muda pouco:</p>
+
+<pre class="file" data-file="App.jsx">function buscarPedidos() {
+  return fetch("https://loja.test/api/pedidos").then((resposta) =&gt; {
+    if (!resposta.ok) throw new Error("falha na rede");
+    return resposta.json();
+  });
+}
+
+function carregar() {
+  setCarregando(true);
+  setErro(null);
+  buscarPedidos()
+    .then((lista) =&gt; setPedidos(lista))
+    .catch(() =&gt; setErro("Não foi possível carregar os pedidos"))
+    .finally(() =&gt; setCarregando(false));
+}</pre>
+
+<p>O <code>catch</code> é o que separa erro de vazio — a aula de
+<a href="carregando-e-erro.html">carregando e erro</a> mostra a mesma tela com <code>fetch</code> de
+verdade. Com ele, a tela pode mostrar "Não foi possível
+carregar" e um botão "Tentar de novo" que chama <code>carregar</code> outra vez. Sem ele, a promessa
+rejeitada some no console e a tela fica em "Carregando" para sempre — o mesmo sintoma do bug que você
+acabou de consertar, com outra causa.</p>
+
+<p>Ordem das condições na tela: carregando primeiro, erro depois, vazio depois, lista por último. Cada uma
+responde a uma pergunta diferente, e misturá-las produz mensagens erradas — "Nenhum pedido" enquanto os
+dados ainda vêm, por exemplo.</p>
+
+<h2>4. A lista e o filtro por status</h2>
+
+<p>Com os pedidos no estado, a lista é um <code>map</code> com uma <code>key</code> por id. O filtro é um
+estado separado que guarda o status escolhido — incluindo <code>"todos"</code> — e uma conta que decide quem
+aparece. A regra de ouro é a mesma da galeria: filtrar não altera o array original.</p>
+
+<p>Na caixa abaixo, os botões mudam o filtro e a lista ignora: os quatro pedidos aparecem sempre. Faça a
+conta de <code>visiveis</code> e use essa lista no <code>map</code>:</p>
+
+<div class="tryreact" data-goal="clique:button[data-status=preparando];;conta:.pedido=1;;texto:Clara">
+  <p class="try-task">Os botões mudam <code>filtro</code>, mas a lista mostra sempre todos. Calcule
+  <code>visiveis</code> a partir do filtro (deixe passar quando for "todos") e desenhe os cartões com
+  essa lista.</p>
+  <pre class="jsx">const pedidosDaApi = [
+  { id: 101, cliente: "Marta", itens: "2 pães e 1 café", total: 4.5, status: "novo", horario: "07:10" },
+  { id: 102, cliente: "João", itens: "1 bolo de cenoura", total: 12, status: "novo", horario: "07:25" },
+  { id: 103, cliente: "Clara", itens: "6 pães de queijo", total: 9, status: "preparando", horario: "07:40" },
+  { id: 104, cliente: "Rita", itens: "3 pães franceses", total: 3, status: "entregue", horario: "08:05" },
+];
+
+function App() {
+  const [pedidos, setPedidos] = useState(pedidosDaApi);
+  const [filtro, setFiltro] = useState("todos");
+  const visiveis = pedidos;
+  return (
+    &lt;div&gt;
+      &lt;div className="filtros"&gt;
+        &lt;button data-status="todos" onClick={() =&gt; setFiltro("todos")}&gt;Todos&lt;/button&gt;
+        &lt;button data-status="novo" onClick={() =&gt; setFiltro("novo")}&gt;Novos&lt;/button&gt;
+        &lt;button data-status="preparando" onClick={() =&gt; setFiltro("preparando")}&gt;Preparando&lt;/button&gt;
+        &lt;button data-status="entregue" onClick={() =&gt; setFiltro("entregue")}&gt;Entregues&lt;/button&gt;
+      &lt;/div&gt;
+      &lt;ul&gt;
+        {visiveis.map((pedido) =&gt; (
+          &lt;li key={pedido.id} className="pedido" data-status={pedido.status}&gt;
+            &lt;strong&gt;{pedido.cliente}&lt;/strong&gt; — {pedido.itens}
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;div class="filtros"&gt;
+    &lt;button data-status="todos"&gt;Todos&lt;/button&gt;
+    &lt;button data-status="novo"&gt;Novos&lt;/button&gt;
+    &lt;button data-status="preparando"&gt;Preparando&lt;/button&gt;
+    &lt;button data-status="entregue"&gt;Entregues&lt;/button&gt;
+  &lt;/div&gt;
+  &lt;ul&gt;
+    &lt;li class="pedido" data-status="novo"&gt;&lt;strong&gt;Marta&lt;/strong&gt; — 2 pães e 1 café&lt;/li&gt;
+    &lt;li class="pedido" data-status="novo"&gt;&lt;strong&gt;João&lt;/strong&gt; — 1 bolo de cenoura&lt;/li&gt;
+    &lt;li class="pedido" data-status="preparando"&gt;&lt;strong&gt;Clara&lt;/strong&gt; — 6 pães de queijo&lt;/li&gt;
+    &lt;li class="pedido" data-status="entregue"&gt;&lt;strong&gt;Rita&lt;/strong&gt; — 3 pães franceses&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const pedidosDaApi = [
+  { id: 101, cliente: "Marta", itens: "2 pães e 1 café", total: 4.5, status: "novo", horario: "07:10" },
+  { id: 102, cliente: "João", itens: "1 bolo de cenoura", total: 12, status: "novo", horario: "07:25" },
+  { id: 103, cliente: "Clara", itens: "6 pães de queijo", total: 9, status: "preparando", horario: "07:40" },
+  { id: 104, cliente: "Rita", itens: "3 pães franceses", total: 3, status: "entregue", horario: "08:05" },
+];
+
+function App() {
+  const [pedidos, setPedidos] = useState(pedidosDaApi);
+  const [filtro, setFiltro] = useState("todos");
+  const visiveis =
+    filtro === "todos" ? pedidos : pedidos.filter((pedido) =&gt; pedido.status === filtro);
+  return (
+    &lt;div&gt;
+      &lt;div className="filtros"&gt;
+        &lt;button data-status="todos" onClick={() =&gt; setFiltro("todos")}&gt;Todos&lt;/button&gt;
+        &lt;button data-status="novo" onClick={() =&gt; setFiltro("novo")}&gt;Novos&lt;/button&gt;
+        &lt;button data-status="preparando" onClick={() =&gt; setFiltro("preparando")}&gt;Preparando&lt;/button&gt;
+        &lt;button data-status="entregue" onClick={() =&gt; setFiltro("entregue")}&gt;Entregues&lt;/button&gt;
+      &lt;/div&gt;
+      &lt;ul&gt;
+        {visiveis.map((pedido) =&gt; (
+          &lt;li key={pedido.id} className="pedido" data-status={pedido.status}&gt;
+            &lt;strong&gt;{pedido.cliente}&lt;/strong&gt; — {pedido.itens}
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em "Preparando" e sobra um cartão, o da Clara. Clique em "Novos" e aparecem dois. O filtro não
+mexe no array: <code>pedidos</code> continua com quatro, e é por isso que voltar para "Todos" traz todo
+mundo de volta.</p>
+
+<p>O atributo <code>data-status</code> no <code>li</code> não é enfeite: ele deixa o status visível no HTML
+e permite estilizar cada etapa com CSS, além de servir de seletor para teste. É um detalhe pequeno que
+ajuda quando o painel cresce.</p>
+
+<p>O vazio do filtro tem mensagem própria: "Nenhum pedido preparando agora." Quando não há nenhum pedido
+na lista inteira — primeira carga sem dados —, a mensagem é outra: "Nenhum pedido ainda." Duas condições,
+dois textos; o mesmo cuidado da galeria.</p>
+
+<h2>5. Avançar o status</h2>
+
+<p>Avançar é trocar um pedido por outro com o status seguinte. O mapa de transições diz qual é o próximo, e
+o <code>map</code> devolve a lista com o pedido trocado. O erro clássico é o mesmo de sempre: mudar o campo
+no objeto e entregar o mesmo array ao <code>set</code>.</p>
+
+<p>Na caixa abaixo, clicar em Avançar não muda a contagem de "preparando". Conserte trocando a mutação por
+um <code>map</code> com objeto novo:</p>
+
+<div class="tryreact" data-goal="clique:.pedido button.avancar;;texto:preparando: 2;;conta:.pedido[data-status=preparando]=2">
+  <p class="try-task">O <code>avancar</code> muda o objeto no lugar e a tela não atualiza. Use
+  <code>map</code> para devolver <code>{ ...pedido, status: novoStatus }</code> no pedido clicado e a lista
+  nova em <code>setPedidos</code>.</p>
+  <pre class="jsx">const pedidosDaApi = [
+  { id: 101, cliente: "Marta", status: "novo" },
+  { id: 102, cliente: "João", status: "novo" },
+  { id: 103, cliente: "Clara", status: "preparando" },
+];
+
+const proximo = { novo: "preparando", preparando: "entregue" };
+
+function App() {
+  const [pedidos, setPedidos] = useState(pedidosDaApi);
+
+  function avancar(id) {
+    const pedido = pedidos.find((p) =&gt; p.id === id);
+    pedido.status = proximo[pedido.status] || pedido.status;
+    setPedidos(pedidos);
+  }
+
+  const preparando = pedidos.filter((p) =&gt; p.status === "preparando").length;
+
+  return (
+    &lt;div&gt;
+      &lt;p className="resumo"&gt;
+        novos: {pedidos.filter((p) =&gt; p.status === "novo").length} · preparando: {preparando}
+      &lt;/p&gt;
+      &lt;ul&gt;
+        {pedidos.map((pedido) =&gt; (
+          &lt;li key={pedido.id} className="pedido" data-status={pedido.status}&gt;
+            &lt;strong&gt;{pedido.cliente}&lt;/strong&gt;
+            &lt;button className="avancar" onClick={() =&gt; avancar(pedido.id)}&gt;
+              Avançar
+            &lt;/button&gt;
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p class="resumo"&gt;novos: 2 · preparando: 1&lt;/p&gt;
+  &lt;ul&gt;
+    &lt;li class="pedido" data-status="novo"&gt;
+      &lt;strong&gt;Marta&lt;/strong&gt;
+      &lt;button class="avancar"&gt;Avançar&lt;/button&gt;
+    &lt;/li&gt;
+    &lt;li class="pedido" data-status="novo"&gt;
+      &lt;strong&gt;João&lt;/strong&gt;
+      &lt;button class="avancar"&gt;Avançar&lt;/button&gt;
+    &lt;/li&gt;
+    &lt;li class="pedido" data-status="preparando"&gt;
+      &lt;strong&gt;Clara&lt;/strong&gt;
+      &lt;button class="avancar"&gt;Avançar&lt;/button&gt;
+    &lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const pedidosDaApi = [
+  { id: 101, cliente: "Marta", status: "novo" },
+  { id: 102, cliente: "João", status: "novo" },
+  { id: 103, cliente: "Clara", status: "preparando" },
+];
+
+const proximo = { novo: "preparando", preparando: "entregue" };
+
+function App() {
+  const [pedidos, setPedidos] = useState(pedidosDaApi);
+
+  function avancar(id) {
+    setPedidos(
+      pedidos.map((pedido) =&gt;
+        pedido.id === id
+          ? { ...pedido, status: proximo[pedido.status] || pedido.status }
+          : pedido
+      )
+    );
+  }
+
+  const preparando = pedidos.filter((p) =&gt; p.status === "preparando").length;
+
+  return (
+    &lt;div&gt;
+      &lt;p className="resumo"&gt;
+        novos: {pedidos.filter((p) =&gt; p.status === "novo").length} · preparando: {preparando}
+      &lt;/p&gt;
+      &lt;ul&gt;
+        {pedidos.map((pedido) =&gt; (
+          &lt;li key={pedido.id} className="pedido" data-status={pedido.status}&gt;
+            &lt;strong&gt;{pedido.cliente}&lt;/strong&gt;
+            &lt;button className="avancar" onClick={() =&gt; avancar(pedido.id)}&gt;
+              Avançar
+            &lt;/button&gt;
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em Avançar na Marta: o status dela vira <code>preparando</code>, a contagem do topo vai para
+"preparando: 2" e o <code>data-status</code> do cartão muda. O resumo é derivado do array — não há um
+segundo estado para manter em sincronia.</p>
+
+<dl class="anatomy">
+<dt><code>avancar</code></dt>
+<dd>Recebe o id do pedido. Devolve a lista com aquele pedido no status seguinte.</dd>
+<dt><code>proximo</code></dt>
+<dd>O mapa de transições: <code>{ novo: "preparando", preparando: "entregue" }</code>. Quem não está no
+mapa fica como está.</dd>
+<dt><code>data-status</code></dt>
+<dd>Atributo do <code>li</code> com o status atual. Aparece no HTML gerado e serve de seletor para CSS e
+para teste.</dd>
+<dt>resumo</dt>
+<dd>A linha com as contagens por status. É uma conta feita no render, não estado.</dd>
+<dt>status final</dt>
+<dd><code>"entregue"</code> não tem próximo: o botão continua na tela, mas não muda mais nada.</dd>
+</dl>
+
+<p>Uma decisão de interface que vale a pena: quando o status é final, o botão pode ficar desabilitado ou
+sumir. Um botão que não faz nada é pior que um botão ausente — a pessoa clica, nada acontece, e ela acha
+que o sistema travou. Se o pedido está entregue, mostre "Entregue" no lugar do botão.</p>
+
+<p>O console confirma a transição e as contagens:</p>
+
+<pre class="term">pedido.status: "preparando"
+preparando: 2
+novos: 1</pre>
+
+<h2>6. As contagens e os números do topo</h2>
+
+<p>O painel tem quatro números que a Ana olha de longe: quantos pedidos novos, quantos preparando, quantos
+entregues e quanto já entrou de dinheiro. Nenhum deles é estado. Todos saem do mesmo array, com
+<code>filter</code> e <code>reduce</code>.</p>
+
+<pre class="file" data-file="App.jsx">const novos = pedidos.filter((p) =&gt; p.status === "novo").length;
+const preparando = pedidos.filter((p) =&gt; p.status === "preparando").length;
+const entregues = pedidos.filter((p) =&gt; p.status === "entregue").length;
+const faturamento = pedidos
+  .filter((p) =&gt; p.status === "entregue")
+  .reduce((soma, p) =&gt; soma + p.total, 0);</pre>
+
+<p>O faturamento conta só o que foi entregue. Se contasse tudo, o número incluiria pedidos que ainda podem
+ser cancelados — e a Ana tomaria decisão com dado errado. Regra de negócio também é uma decisão de
+código.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Número</th><th>De onde sai</th><th>Quando muda</th></tr>
+<tr><td>novos</td><td><code>filter(status === "novo").length</code></td><td>ao carregar e ao avançar</td></tr>
+<tr><td>preparando</td><td><code>filter(status === "preparando").length</code></td><td>ao avançar</td></tr>
+<tr><td>entregues</td><td><code>filter(status === "entregue").length</code></td><td>ao avançar</td></tr>
+<tr><td>faturamento</td><td><code>reduce</code> sobre os entregues</td><td>ao avançar</td></tr>
+</table>
+</div>
+
+<p>Quatro <code>filter</code> sobre quatro itens é barato. Com mil pedidos, valeria uma passada só,
+contando tudo num objeto. Não otimize antes de doer: a legibilidade de quatro linhas separadas vale mais
+que a economia de três passadas enquanto a lista é pequena.</p>
+
+<p>O console confirma as contas com a lista atual:</p>
+
+<pre class="term">novos: 2
+preparando: 1
+entregues: 1
+faturamento: 3</pre>
+
+<p>Se você quiser mostrar os números no topo com rótulo, a formatação é a mesma do carrinho:
+<code>reais(faturamento)</code>. E cuidado com o plural: "1 novos" é feio. Uma função pequena resolve —
+<code>{novos} novo{novos === 1 ? "" : "s"}</code> —, e a Ana agradece.</p>
+
+<h2>7. Ordenar e o que quebra no painel</h2>
+
+<p>A fila da cozinha tem uma ordem natural: o pedido mais antigo primeiro. O <code>sort</code> resolve, mas
+com dois cuidados. O primeiro é que ele muda o array no lugar; numa lista do estado, isso é mutação
+disfarçada. O segundo é que, sem comparador, ele ordena como texto.</p>
+
+<pre class="file" data-file="App.jsx">const emOrdem = [...pedidos].sort((a, b) =&gt;
+  a.horario.localeCompare(b.horario)
+);</pre>
+
+<p>O spread cria uma lista nova antes de ordenar; o <code>localeCompare</code> compara os horários como
+texto, o que funciona para "07:10" e "08:05". Se a lista já vem ordenada do servidor, você não precisa de
+nada disso — e essa é a solução mais comum em produção.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sintoma</th><th>Causa provável</th><th>Conserto</th></tr>
+<tr><td>a tela fica em "Carregando" para sempre</td><td>o carregando não desliga no <code>finally</code></td><td>desligar nos dois caminhos</td></tr>
+<tr><td>o botão Avançar não muda nada</td><td>mutação do pedido com o mesmo array no <code>set</code></td><td><code>map</code> com <code>{ ...pedido, status }</code></td></tr>
+<tr><td>a lista embaralha ao filtrar</td><td><code>sort</code> aplicado direto no estado</td><td>copiar com <code>[...pedidos]</code> antes</td></tr>
+<tr><td>o status vira <code>undefined</code></td><td>mapa de transições sem o status atual</td><td><code>|| pedido.status</code> como reserva</td></tr>
+<tr><td>"Nenhum pedido" enquanto carrega</td><td>condição de vazio antes de carregando</td><td>carregando, erro, vazio, lista</td></tr>
+</table>
+</div>
+
+<p>A quarta linha é sutil. Ao avançar um pedido já entregue, <code>proximo["entregue"]</code> é
+<code>undefined</code>, e sem a reserva o status do pedido seria apagado. Com
+<code>|| pedido.status</code>, ele continua entregue. A reserva custa quatro palavras e evita um bug de
+dado.</p>
+
+<p>Uma última armadilha: <code>key</code> com índice. Ao filtrar, os pedidos visíveis mudam de posição, e o
+React reaproveitaria cartões errados — o status de um aparecendo no outro. O id é estável e resolve. O
+mesmo vale para a <code>key</code> do resumo por status, se você renderizar uma lista de contadores.</p>
+
+<h2>8. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o painel abre vazio e a Ana acha que perdeu os pedidos</h3>
+<p>A tela mostrava "Nenhum pedido ainda" no primeiro segundo, antes de a promessa resolver. O estado
+inicial da lista é vazio — isso não quer dizer que não há pedidos, quer dizer que a resposta ainda não
+chegou. Com a condição de carregando na frente, a mensagem de vazio só aparece depois da resposta. Ordem
+de condição muda o significado da tela.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: dois cliques rápidos no Avançar pulam uma etapa</h3>
+<p>A Ana clicou duas vezes no mesmo pedido e ele foi de "novo" para "entregue" sem passar por
+"preparando". Cada clique lê o estado do render atual; dois cliques antes do próximo desenho podem aplicar
+a mesma transição duas vezes. A cura é calcular o próximo status dentro do <code>set</code>, com função
+atualizadora: <code>setPedidos((atual) =&gt; ...)</code>. O assunto tem aula própria, mas o sintoma vale
+reconhecer.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o faturamento conta pedido que ainda está no forno</h3>
+<p>Ela somou todos os totais e o número do dia ficou maior que o caixa. Pedido preparando ainda pode ser
+cancelado e não é dinheiro no bolso. O filtro por <code>"entregue"</code> antes do <code>reduce</code>
+resolve. Número de painel é decisão de negócio tanto quanto código: some o que já aconteceu, não o que
+pode acontecer.</p>
+</div>
+
+<h2>9. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Onde o carregando deve ser desligado?</p>
+<label><input type="radio" name="q1"> no começo da função, antes da promessa</label>
+<label><input type="radio" name="q1"> no <code>finally</code>, que roda no sucesso e no erro</label>
+<label><input type="radio" name="q1"> no <code>render</code>, logo depois do <code>return</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Como o filtro por status deve funcionar?</p>
+<label><input type="radio" name="q2"> removendo do estado os pedidos de outros status</label>
+<label><input type="radio" name="q2"> guardando a lista filtrada num segundo <code>useState</code></label>
+<label><input type="radio" name="q2"> calculando uma lista visível com <code>filter</code>, sem mexer no estado</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Por que o <code>sort</code> pede uma cópia da lista?</p>
+<label><input type="radio" name="q3"> porque ele ordena no lugar e mutaria o array do estado</label>
+<label><input type="radio" name="q3"> porque o React não aceita listas ordenadas</label>
+<label><input type="radio" name="q3"> porque <code>localeCompare</code> só funciona em cópias</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o próximo status</h2>
+<p>Complete a linha que devolve o status seguinte, com reserva para quem já está no fim. Escreva só o
+método do objeto que guarda as transições (o trecho entre colchetes):</p>
+<div class="ex-code">const novoStatus = proximo[<input aria-label="resposta 1" data-answer="pedido.status" placeholder="...">] || pedido.status;</div>
+<p class="ex-dica">Dica: é a chave do mapa, ou seja, o status atual do pedido. Sem a reserva
+<code>|| pedido.status</code>, um pedido já entregue ficaria com status <code>undefined</code>.</p>
+</div>
+
+<h2>10. Resumo</h2>
+
+<p>O painel começa pelos dados: cada pedido tem id, cliente, itens, total, status e horário. A lista chega
+por uma promessa simulada com <code>setTimeout</code>, e a tela tem três estados de carga — carregando,
+erro e pronto — mais o vazio, com mensagem própria. O <code>finally</code> desliga o carregando nos dois
+caminhos.</p>
+
+<p>O filtro é estado; a lista visível é conta. Avançar o status é <code>map</code> com um objeto novo, e o
+mapa de transições com <code>|| pedido.status</code> protege contra status desconhecido. As contagens e o
+faturamento saem de <code>filter</code> e <code>reduce</code> no render, e a ordenação pede uma cópia antes
+do <code>sort</code>.</p>
+
+<p>Com isso, os quatro projetos do nível estão de pé: <a href="projeto-lista-de-tarefas.html">lista de
+tarefas</a>, <a href="projeto-galeria-de-fotos.html">galeria</a>,
+<a href="projeto-carrinho.html">carrinho</a> e painel. Todos
+usam o mesmo esqueleto — estado, handler, conta, lista e vazio — com um ingrediente diferente em cada um.
+O próximo passo é juntar os pedaços num app com rotas e dados vindos de uma API de verdade, no nível 3.
+Se quiser revisar a parte de rede, a aula de <a href="fetch.html">fetch</a> mostra a mesma promessa com
+resposta real, e a de <a href="ordenar.html">ordenar</a> detalha o comparador.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Pedido: <code>{ id, cliente, itens, total, status, horario }</code>; status é texto curto.</li>
+<li><code>Promise</code> + <code>setTimeout</code> simulam a rede; <code>fetch</code> é o mesmo desenho.</li>
+<li>Carregando desliga no <code>finally</code>; erro tem <code>catch</code> e botão de tentar de novo.</li>
+<li>Ordem da tela: carregando, erro, vazio, lista.</li>
+<li>Filtro é estado; lista visível é <code>filter</code> no render.</li>
+<li>Avançar é <code>map</code> com <code>{ ...pedido, status: proximo[status] }</code>.</li>
+<li>Contagens e faturamento são contas, não <code>useState</code>.</li>
+<li><code>sort</code> muta: copie com <code>[...pedidos]</code> antes.</li>
+<li><code>data-status</code> no cartão ajuda o CSS e o teste.</li>
+<li>Status final merece botão desabilitado ou ausente.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

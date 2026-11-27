@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Server Components | Guia React</title>
+<meta name="description" content="Server Components no React 19: o componente que roda no servidor, a fronteira do use client, o que atravessa por prop e o que fica obrigatoriamente no cliente.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Server <span class="hl">Components</span></h1>
+<p class="intro">A Ana descobriu que a página do catálogo manda dois mil pães para o navegador do cliente
+só para desenhar uma lista que ele nem pode alterar. O trabalho todo — buscar, ordenar, montar o HTML —
+acontece no aparelho de quem visita, e o servidor fica parado olhando. Nesta aula ela conhece o outro
+tipo de componente do React 19: aquele que roda no <strong>servidor</strong>, manda a tela pronta e nunca
+chega como JavaScript. As três caixas rodam aqui, no navegador, e simulam a fronteira para você ver o
+que passa e o que não passa por ela.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um Server Component e por que ele não pesa no navegador.</li>
+  <li>Por que no servidor não existe “carregando”: os dados chegam prontos.</li>
+  <li>A fronteira do <code>"use client"</code> e o que ela separa.</li>
+  <li>O que atravessa por prop e o que nunca atravessa.</li>
+  <li>Por que estado e evento ficam sempre do lado do cliente.</li>
+  <li>Como um componente de servidor entra em um de cliente pelo <code>children</code>.</li>
+  <li>Quando vale usar — e por que isso pede um framework, não só o Vite.</li>
+</ul>
+</div>
+
+<h2>1. A cena: dois mil pães viajando até o cliente</h2>
+
+<p>O catálogo da Ana tem dois mil itens. A página busca a lista, ordena por preço e desenha. Tudo isso
+acontece no navegador de quem visita: o JavaScript desce pela rede, roda, pede os dados, espera a
+resposta, mostra “carregando…” e só então pinta as linhas. No celular do balcão, entre o pedido e a
+primeira linha, passam-se quase dois segundos.</p>
+
+<p>O desconforto da Ana não é com o React, é com o lugar. A lista é igual para todo mundo, não tem
+interação nenhuma e não muda enquanto a pessoa olha. Fazê-la no aparelho do cliente é repetir o mesmo
+trabalho em cada visita, gastar a bateria de cada visitante e ainda mandar os dois mil itens pela
+rede — sendo que a única coisa que a pessoa precisa receber é o HTML pronto.</p>
+
+<p>É isso que o React 19 chama de <strong>Server Component</strong>: um componente que roda no servidor.
+Ele busca no banco, monta a lista, calcula o total e devolve o resultado já em JSX. O React transforma
+esse resultado em HTML e manda para o navegador. O código desse componente não vai junto: o cliente
+recebe a tela, não a receita.</p>
+
+<p>A consequência mais visível é o tamanho do que desce. Um componente de cliente precisa do React, dos
+seus hooks e do seu código para funcionar; um de servidor não deixa nada disso no navegador. Em um site
+grande, isso é a diferença entre mandar 800 KB de JavaScript e mandar 80 — com a página aparecendo antes
+de qualquer script rodar.</p>
+
+<h2>2. Dois tipos de componente, uma fronteira</h2>
+
+<p>Até aqui, todo componente que você escreveu era de cliente: rodava no navegador, podia ter estado,
+podia responder a clique. O Server Component é o outro lado. Ele não tem estado, não tem efeito, não
+escuta evento e não conhece <code>window</code>, porque quando ele roda não existe navegador — existe um
+servidor, com acesso ao banco e ao disco.</p>
+
+<dl class="anatomy">
+<dt>Server Component</dt>
+<dd>Componente que roda no servidor e não é enviado ao navegador como JavaScript. Pode ser
+<code>async</code> e buscar dados direto.</dd>
+<dt>Client Component</dt>
+<dd>Componente que roda no navegador, com estado, efeitos e eventos. É marcado com
+<code>"use client"</code>.</dd>
+<dt>fronteira</dt>
+<dd>O ponto onde um componente de servidor desenha um de cliente. Tudo o que cruza passa por props.</dd>
+<dt>serializável</dt>
+<dd>O que consegue virar dados e ser reconstruído do outro lado: texto, número, lista, objeto simples,
+elemento React.</dd>
+<dt>hidratação</dt>
+<dd>O trabalho de o React assumir um HTML já pronto no navegador e ligar os eventos. Só acontece nos
+componentes de cliente.</dd>
+</dl>
+
+<p>A tabela abaixo é o resumo que vale colar no monitor. Repare que a maior parte das linhas é sobre o
+que <strong>não</strong> existe do lado do servidor — e é aí que mora quase todo erro de quem chega
+achando que é só “mover o componente para cima”.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th> </th><th>Server Component</th><th>Client Component</th></tr>
+<tr><td>onde roda</td><td>no servidor, a cada pedido</td><td>no navegador</td></tr>
+<tr><td><code>useState</code>, <code>useEffect</code></td><td>não</td><td>sim</td></tr>
+<tr><td><code>onClick</code> e outros eventos</td><td>não</td><td>sim</td></tr>
+<tr><td><code>async</code> e <code>await</code> no componente</td><td>sim</td><td>não</td></tr>
+<tr><td>acesso a banco, arquivo, segredo</td><td>sim</td><td>não</td></tr>
+<tr><td>JavaScript enviado ao navegador</td><td>nenhum</td><td>o componente inteiro</td></tr>
+</table>
+</div>
+
+<p>Vale dizer o óbvio: você não escolhe “usar Server Components” como escolhe um hook. Quem tem
+componente de servidor é a aplicação, não a linha de código — e para isso a aplicação precisa de um
+servidor que saiba renderizar React. É o caso dos frameworks com App Router (Next.js, Waku, React Router
+com servidor). Um projeto criado com Vite puro, como o do Nível 3, é uma aplicação de cliente: os
+componentes todos rodam no navegador, e é assim que deve ser.</p>
+
+<h2>3. No servidor, os dados chegam prontos</h2>
+
+<p>Esta é a diferença que mais muda o código do dia a dia. No cliente, buscar dados é sempre uma
+coreografia: um estado para o resultado, um para o “carregando”, um efeito que dispara a busca e um
+desenho condicional que troca o aviso pela lista. No servidor, o componente espera os dados com
+<code>await</code> e devolve a lista — o “carregando” não existe, porque ninguém está esperando um
+desenho que já vai chegar pronto.</p>
+
+<p>A caixa a seguir mostra os dois lados. O código inicial é a versão de cliente, com efeito e aviso de
+carregando; a solução é o mesmo componente recebendo os pães por prop, como faria um componente de
+servidor que buscou os dados antes de desenhar. Repare que a solução não tem estado nem efeito nenhum.</p>
+
+<div class="tryreact" data-goal="conta:li=3;;texto:Pão francês;;texto:carregando: não">
+  <p class="try-task">A lista passa por “carregando…” porque busca no efeito. Apague o estado e o efeito
+  e receba os pães por prop: o componente deve desenhar as três linhas direto, sem passar pelo
+  aviso.</p>
+  <pre class="jsx">const paes = [
+  { id: 1, nome: "Pão francês", preco: 12 },
+  { id: 2, nome: "Pão de queijo", preco: 8 },
+  { id: 3, nome: "Croissant", preco: 14 }
+];
+
+function ListaDePaes() {
+  const [carregando, setCarregando] = useState(true);
+  const [itens, setItens] = useState([]);
+
+  useEffect(() =&gt; {
+    setTimeout(() =&gt; {
+      setItens(paes);
+      setCarregando(false);
+    }, 400);
+  }, []);
+
+  if (carregando) return &lt;p&gt;carregando: sim&lt;/p&gt;;
+
+  return (
+    &lt;ul&gt;
+      {itens.map((p) =&gt; &lt;li key={p.id}&gt;{p.nome}&lt;/li&gt;)}
+    &lt;/ul&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Catálogo&lt;/h1&gt;
+      &lt;ListaDePaes /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Catálogo&lt;/h1&gt;
+  &lt;p&gt;carregando: sim&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const paes = [
+  { id: 1, nome: "Pão francês", preco: 12 },
+  { id: 2, nome: "Pão de queijo", preco: 8 },
+  { id: 3, nome: "Croissant", preco: 14 }
+];
+
+function ListaDePaes({ paes }) {
+  return (
+    &lt;ul&gt;
+      {paes.map((p) =&gt; &lt;li key={p.id}&gt;{p.nome}&lt;/li&gt;)}
+    &lt;/ul&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Catálogo&lt;/h1&gt;
+      &lt;p&gt;carregando: não&lt;/p&gt;
+      &lt;ListaDePaes paes={paes} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Na solução, o componente é uma função de quatro linhas que devolve uma lista. Não há
+<code>useState</code>, não há <code>useEffect</code>, não há <code>if (carregando)</code>. Isso é o
+desenho de um componente de servidor: ele recebe os dados já resolvidos e devolve a tela. No projeto de
+verdade, esses dados viriam de um <code>await</code> na primeira linha, e o componente seria
+<code>async</code>.</p>
+
+<pre class="file" data-file="app/catalogo/page.jsx">export default async function Catalogo() {
+  const paes = await buscarPaesNoBanco();   // roda no servidor, antes de desenhar
+
+  return (
+    &lt;main&gt;
+      &lt;h1&gt;Catálogo&lt;/h1&gt;
+      &lt;ListaDePaes paes={paes} /&gt;
+    &lt;/main&gt;
+  );
+}</pre>
+
+<p>Repare no que a função acima não tem: estado, efeito, try/catch de carregamento, nada disso. O
+<code>await</code> roda no servidor, e o que desce para o navegador é o resultado. Se a consulta falhar,
+quem trata é o servidor — o cliente recebe uma página de erro, não um “carregando” eterno.</p>
+
+<h2>4. A fronteira do use client</h2>
+
+<p>Um componente de servidor não consegue fazer tudo, e é aí que entra a marcação
+<code>"use client"</code>. Ela fica na primeira linha de um arquivo e diz ao framework: “daqui para baixo,
+tudo é componente de cliente”. Tudo o que esse arquivo importar também vira cliente, mesmo que não tenha
+a marcação — a fronteira é o arquivo, não a função.</p>
+
+<p>A regra de ouro é descer a marcação o mais fundo possível. Se a página inteira é
+<code>"use client"</code>, você perdeu o benefício: o servidor volta a ser um repassador de dados e o
+navegador recebe todo o código. O desenho bom é a página de servidor com pequenos bolsões de cliente:
+o botão que compra, o campo que filtra, o menu que abre.</p>
+
+<pre class="file" data-file="app/catalogo/botao-pedir.jsx">"use client";
+
+import { useState } from "react";
+
+export default function BotaoPedir({ nome }) {
+  const [pedidos, setPedidos] = useState(0);
+
+  return (
+    &lt;button onClick={() =&gt; setPedidos(pedidos + 1)}&gt;
+      pedir {nome} ({pedidos})
+    &lt;/button&gt;
+  );
+}</pre>
+
+<p>E o arquivo do servidor usa esse botão como se fosse uma tag comum, passando só o que ele precisa
+saber. O componente de servidor não sabe que existe estado do outro lado; ele entrega um nome, e o
+cliente cuida do resto. É a mesma ideia de props que você já conhece, com uma diferença importante: o que
+atravessa não pode ser qualquer coisa.</p>
+
+<h2>5. O que atravessa a fronteira</h2>
+
+<p>Aqui está o erro que mais aparece em quem está começando. Props que passam de um componente de
+servidor para um de cliente precisam ser <strong>serializáveis</strong>: precisam virar dados, viajar e
+ser reconstruídas do outro lado. Texto vai, número vai, lista vai, objeto simples vai. Função não vai —
+porque não existe um jeito de mandar “um pedaço de código” para o navegador sem mandar o código.</p>
+
+<p>No console, o teste é rápido: transforme o objeto em texto e veja o que sobra. A função some sem
+aviso, e o objeto volta sem ela.</p>
+
+<pre class="term">JSON.stringify({ nome: "Pão", preco: 12, formatar: (n) =&gt; n })
+'{"nome":"Pão","preco":12}'</pre>
+
+<p>A caixa a seguir simula a viagem com <code>JSON.stringify</code> e <code>JSON.parse</code>, que é o
+transporte mais rígido que existe. A simulação é proposital: o transporte real do React aceita mais
+coisas, mas o que ele nunca aceita é função. Se o dado sobrevive ao JSON, sobrevive à fronteira; se
+desaparece ali, também desapareceria no projeto de verdade.</p>
+
+<div class="tryreact" data-goal="texto:R$ 12,00;;conta:.cartao=1">
+  <p class="try-task">O cartão recebe uma função <code>formatarPreco</code>, e função não atravessa a
+  fronteira: o preço fica “indisponível”. Tire a função e passe o preço já formatado em
+  <code>precoTexto</code>, mantendo a chamada de <code>atravessa</code>.</p>
+  <pre class="jsx">function atravessa(props) {
+  // simula a fronteira: só o que é serializável chega do outro lado
+  return JSON.parse(JSON.stringify(props));
+}
+
+function Cartao({ dados }) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{dados.nome}&lt;/h2&gt;
+      &lt;p&gt;{dados.formatarPreco ? dados.formatarPreco(dados.preco) : "preço indisponível"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const dados = {
+    nome: "Pão francês",
+    preco: 12,
+    formatarPreco: (valor) =&gt; "R$ " + valor + ",00"
+  };
+
+  return &lt;Cartao dados={atravessa(dados)} /&gt;;
+}</pre>
+  <pre class="out">
+&lt;div class="cartao"&gt;
+  &lt;h2&gt;Pão francês&lt;/h2&gt;
+  &lt;p&gt;preço indisponível&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function atravessa(props) {
+  // simula a fronteira: só o que é serializável chega do outro lado
+  return JSON.parse(JSON.stringify(props));
+}
+
+function Cartao({ dados }) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{dados.nome}&lt;/h2&gt;
+      &lt;p&gt;{dados.precoTexto}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const dados = {
+    nome: "Pão francês",
+    preco: 12,
+    precoTexto: "R$ 12,00"
+  };
+
+  return &lt;Cartao dados={atravessa(dados)} /&gt;;
+}</pre>
+</div>
+
+<p>Na versão inicial, o painel mostra “preço indisponível”. A função existia no objeto, mas não sobreviveu
+à viagem: do outro lado, <code>dados.formatarPreco</code> é <code>undefined</code>. O conserto não é
+mandar a função “de outro jeito” — é mandar o dado pronto, que é o que a formatação produzia de qualquer
+forma.</p>
+
+<p>No projeto de verdade, esse caso nem chega a desenhar: o React para com um erro dizendo que funções
+não podem ser passadas de um componente de servidor para um de cliente. A exceção é a função marcada com
+<code>"use server"</code> — as Server Actions, que têm uma aula própria nesta sequência e são a forma
+oficial de mandar “algo que faz” para o outro lado.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você passa</th><th>Atravessa?</th><th>O que fazer</th></tr>
+<tr><td>texto, número, booleano</td><td>sim</td><td>nada</td></tr>
+<tr><td>lista e objeto simples</td><td>sim</td><td>nada</td></tr>
+<tr><td>elemento React (<code>children</code>)</td><td>sim</td><td>é assim que se compõe entre fronteiras</td></tr>
+<tr><td>função comum</td><td>não</td><td>formatar no servidor, ou marcar com <code>"use server"</code></td></tr>
+<tr><td>instância de classe com métodos</td><td>não</td><td>mandar os campos e reconstruir no cliente</td></tr>
+</table>
+</div>
+
+<h2>6. Estado e evento ficam do lado do cliente</h2>
+
+<p>A terceira consequência é a que mais muda a arquitetura. Componente de servidor não tem estado nem
+evento: ele é desenhado uma vez, no servidor, e o resultado é enviado como HTML. Um clique não muda nada
+nele, porque não há nada rodando do outro lado para reagir. Quem guarda o “quantos pedidos” e responde ao
+clique é o componente de cliente.</p>
+
+<p>Por isso o padrão que aparece em todo app com Server Components é este: o componente de servidor
+busca os dados e desenha a estrutura; o componente de cliente, pequeno, fica com o estado e recebe uma
+função por prop para avisar o que aconteceu. Quem “manda” no dado continua sendo o cliente, mas só no
+pedacinho que precisa.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:pedidos no painel: 1;;conta:button=1">
+  <p class="try-task">O cartão guarda o próprio contador, e o painel nunca sabe de nada — estado dentro
+  de componente de servidor não existe. Tire o estado do cartão, receba <code>aoPedir</code> por prop e
+  guarde a lista de pedidos no <code>App</code>.</p>
+  <pre class="jsx">function Cartao({ nome, preco }) {
+  const [pedidos, setPedidos] = useState(0);
+
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{nome}&lt;/h2&gt;
+      &lt;p&gt;{"R$ " + preco + ",00"}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setPedidos(pedidos + 1)}&gt;pedir&lt;/button&gt;
+      &lt;p&gt;{"neste cartão: " + pedidos}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;p&gt;pedidos no painel: 0&lt;/p&gt;
+      &lt;Cartao nome="Pão francês" preco={12} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;pedidos no painel: 0&lt;/p&gt;
+  &lt;div class="cartao"&gt;
+    &lt;h2&gt;Pão francês&lt;/h2&gt;
+    &lt;p&gt;R$ 12,00&lt;/p&gt;
+    &lt;button&gt;pedir&lt;/button&gt;
+    &lt;p&gt;neste cartão: 0&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Cartao({ nome, preco, aoPedir }) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{nome}&lt;/h2&gt;
+      &lt;p&gt;{"R$ " + preco + ",00"}&lt;/p&gt;
+      &lt;button onClick={() =&gt; aoPedir(nome)}&gt;pedir&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const [pedidos, setPedidos] = useState([]);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{"pedidos no painel: " + pedidos.length}&lt;/p&gt;
+      &lt;Cartao nome="Pão francês" preco={12} aoPedir={(nome) =&gt; setPedidos([...pedidos, nome])} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No código inicial, clicar aumenta “neste cartão”, e “pedidos no painel” fica em zero para sempre: o
+estado mora dentro do cartão e ninguém de fora o enxerga. Na solução, o cartão ficou sem estado — só
+desenha e chama —, e o número aparece no painel. Esse formato é o que atravessa a fronteira sem
+problema: dados descem por prop, eventos sobem por função.</p>
+
+<p>Repare que a solução passa uma função (o <code>aoPedir</code>) do <code>App</code> para o
+<code>Cartao</code>. Isso é permitido porque os dois são componentes de cliente, no mesmo lado da
+fronteira. A regra da seção 5 vale para o que cruza de servidor para cliente — e é por isso que o cartão
+“de servidor” precisa ficar sem estado: ele não tem como receber comportamento, só dados.</p>
+
+<h2>7. O que o servidor não pode fazer</h2>
+
+<p>Vale uma lista do que não existe do lado do servidor, porque cada item é uma tentativa que quebra a
+página com uma mensagem diferente. <strong>Hooks</strong>: nada de <code>useState</code>,
+<code>useEffect</code>, <code>useContext</code> — o servidor não tem estado de componente nem ciclo de
+vida. <strong>Eventos</strong>: <code>onClick</code>, <code>onChange</code> são ignorados, porque não há
+navegador para clicar. <strong>APIs do navegador</strong>: <code>window</code>,
+<code>document</code>, <code>localStorage</code> não existem ali. <strong>Efeitos</strong>: timer,
+assinatura, qualquer coisa que dependa de tempo de vida da tela.</p>
+
+<p>O que existe do lado do servidor: acesso ao banco, a arquivos, a variáveis de ambiente com segredo,
+a cabeçalhos da requisição, a cookies. É uma troca justa — o servidor ganha poderes que o cliente nunca
+teria e perde tudo o que é interativo. Quem tenta fazer um formulário inteiro no servidor descobre isso
+no primeiro <code>onChange</code>.</p>
+
+<p>Quando o componente de servidor toca em algo do navegador, o erro aparece no terminal do servidor,
+não no console do cliente — e a mensagem é direta sobre o que faltou:</p>
+
+<pre class="term">ReferenceError: window is not defined
+    at Tema (app/tema.jsx:3:15)</pre>
+
+<p>Há um caso que costuma confundir: gerar um número aleatório ou a data de hoje no componente de
+servidor. Funciona, mas o valor fica congelado no HTML enviado — e se o mesmo HTML for reaproveitado em
+cache, dois visitantes veem o mesmo “agora”. O cliente, ao hidratar, pode calcular outra coisa, e a tela
+pisca ou diverge. Quando o valor depende do momento ou do aparelho, o lugar dele é o cliente.</p>
+
+<h2>8. Composição: o servidor dentro do cliente</h2>
+
+<p>Falta a peça que faz o desenho fechar: um componente de cliente não consegue importar um de servidor,
+mas consegue <strong>receber</strong> um pelo <code>children</code>. Você já sabe que
+<code>children</code> é o conteúdo entre as tags; aqui ele é o que permite montar um painel interativo
+que envolve conteúdo estático vindo do servidor.</p>
+
+<pre class="file" data-file="app/catalogo/page.jsx">import Abas from "./abas";                  // cliente: tem estado
+import ListaDePaes from "./lista-de-paes";  // servidor: só desenha
+
+export default async function Catalogo() {
+  const paes = await buscarPaesNoBanco();
+
+  return (
+    &lt;Abas&gt;
+      &lt;ListaDePaes paes={paes} /&gt;
+    &lt;/Abas&gt;
+  );
+}</pre>
+
+<p>O componente <code>Abas</code> é de cliente: ele guarda qual aba está aberta e desenha o botão. Não
+sabe o que está dentro; só decide quando mostrar. A lista continua sendo de servidor — o código dela
+nunca desce para o navegador, mesmo estando dentro de um componente de cliente. Essa é a composição que
+resolve o caso “preciso de interação em volta de conteúdo que não deveria pesar”.</p>
+
+<p>É o mesmo raciocínio do <code>children</code> que você aprendeu no Nível 1, com uma consequência nova:
+o React não precisa mover o conteúdo entre lados, porque o conteúdo já foi resolvido no servidor. O
+cliente recebe um elemento pronto, com um espaço para ele. Por isso a regra “passe como
+<code>children</code>, não importe” é tão repetida na documentação de Server Components.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a página inteira marcada como cliente</h3>
+<p>A Ana pôs <code>"use client"</code> no topo do arquivo da página para poder usar um botão. O botão
+funcionou e o ganho desapareceu: o arquivo da página importa a lista, e a marcação transformou lista,
+cabeçalho e rodapé em cliente. A correção foi mover a marcação para o arquivo do botão — três linhas de
+cliente em uma página que continua sendo de servidor.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a função que sumiu no caminho</h3>
+<p>Ela passou <code>formatarPreco</code> por prop para o cartão e recebeu “indisponível” na tela. Função
+não atravessa a fronteira sem <code>"use server"</code>. O conserto foi formatar no servidor e mandar o
+texto pronto — o que também deixou o cartão mais simples. Quando o dado é o que importa, mande o dado;
+comportamento só quando ele precisa acontecer no cliente.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o localStorage que não existe no servidor</h3>
+<p>Ela copiou o componente de tema, que lia <code>localStorage</code>, para a página de servidor, e o
+build quebrou com “localStorage is not defined”. Não é limitação do React: no servidor não há
+armazenamento do navegador. O tema virou um componente de cliente, e a página de servidor passou a
+receber só o nome do tema escolhido.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. O que um Server Component manda para o navegador?</p>
+<label><input type="radio" name="q1"> o componente inteiro, para rodar lá</label>
+<label><input type="radio" name="q1"> apenas o estado, e o resto fica no servidor</label>
+<label><input type="radio" name="q1"> o HTML do resultado, sem o código do componente</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. Onde fica a marcação <code>"use client"</code>?</p>
+<label><input type="radio" name="q2"> na primeira linha do arquivo, e vale para tudo o que ele importa</label>
+<label><input type="radio" name="q2"> dentro de cada componente que usa estado</label>
+<label><input type="radio" name="q2"> no <code>package.json</code>, junto das dependências</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. O cartão de servidor precisa responder a um clique. O que fazer?</p>
+<label><input type="radio" name="q3"> usar <code>useState</code> dentro dele mesmo</label>
+<label><input type="radio" name="q3"> deixar o clique em um componente de cliente que recebe os dados por prop</label>
+<label><input type="radio" name="q3"> passar o <code>onClick</code> como prop de texto</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a fronteira</h2>
+<p>Complete as duas linhas. Na primeira, a marcação que transforma um arquivo em componente de cliente;
+na segunda, o tipo de valor que nunca atravessa a fronteira por prop:</p>
+<div class="ex-code">"use <input aria-label="resposta 1" data-answer="client" placeholder="...">";
+
+// o que não atravessa: <input aria-label="resposta 2" data-answer="função|funcao|function" placeholder="..."></div>
+<p class="ex-dica">Dica: a primeira resposta é a palavra que vem depois de <code>use</code>, em inglês,
+minúscula. A segunda é o tipo de valor que representa comportamento — o que o servidor não consegue
+enviar para o navegador sem mandar código junto.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Server Component é o componente que roda no servidor e não é enviado ao navegador. Ele pode ser
+<code>async</code>, busca no banco, lê arquivo e nunca usa hook nem evento. O cliente recebe o HTML
+pronto — e o ganho aparece no tamanho do JavaScript e na hora em que a página fica visível. No servidor
+não existe “carregando”: os dados chegam resolvidos antes do desenho.</p>
+
+<p>A fronteira é o arquivo marcado com <code>"use client"</code>, que transforma em cliente tudo o que
+ele importa. Desça essa marcação até o menor componente possível. O que cruza de servidor para cliente
+precisa ser serializável: texto, número, lista, objeto simples e elemento React passam; função e
+instância de classe não, a não ser que a função seja uma Server Action.</p>
+
+<p>Estado e evento ficam do lado do cliente, sempre. O padrão é o de sempre: dados descem por prop,
+eventos sobem por função — só que agora cada lado tem o seu papel. E a composição resolvida com
+<code>children</code> permite pôr um componente de servidor dentro de um de cliente sem trazer código
+junto.</p>
+
+<p>Por fim, o aviso prático: aplicação com Server Components é aplicação com servidor renderizando
+React. O projeto de Vite do Nível 3 é de cliente, e isso não é uma falha — é um tipo diferente de
+projeto. Saber a diferença evita passar a tarde procurando um <code>"use client"</code> que aquele
+projeto não tem.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Server Component roda no servidor e não manda código para o navegador.</li>
+<li>Pode ser <code>async</code>; não tem <code>useState</code>, <code>useEffect</code> nem
+<code>onClick</code>.</li>
+<li>No servidor os dados chegam prontos: sem estado de “carregando”.</li>
+<li><code>"use client"</code> na primeira linha do arquivo marca a fronteira para tudo o que ele importa.</li>
+<li>Props entre servidor e cliente precisam ser serializáveis; função não passa.</li>
+<li><code>"use server"</code> é a exceção que permite mandar comportamento (Server Actions).</li>
+<li>Estado e eventos moram no cliente; dados descem, eventos sobem.</li>
+<li>Cliente não importa servidor, mas recebe servidor por <code>children</code>.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

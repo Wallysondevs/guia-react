@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Formulário em Etapas | Guia React</title>
+<meta name="description" content="Projeto de um formulário em etapas no React: o objeto de dados, a etapa como estado, a validação que segura o avanço, a revisão e o envio simulado.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Formulário em <span class="hl">Etapas</span></h1>
+<p class="intro">A Ana recebe encomenda de bolo pelo balcão, no guardanapo: nome, sabor, tamanho e o dia
+da retirada — quando alguém lembra de anotar o telefone. Ela quer um formulário que pergunte uma coisa de
+cada vez, que não deixe avançar com campo vazio e que mostre tudo antes de enviar. Neste projeto você
+monta esse formulário com ela: um objeto para os dados, uma etapa como estado, uma validação que segura o
+botão e um envio que espera a resposta.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que os campos de todas as etapas ficam em um objeto só, e não um <code>useState</code> por
+  etapa.</li>
+  <li>Como a etapa vira estado e como ela decide qual pedaço do formulário aparece.</li>
+  <li>Como validar em cada avanço, em vez de esperar o envio.</li>
+  <li>Onde a mensagem de erro deve aparecer e como anunciá-la para quem não vê.</li>
+  <li>Como montar a tela de revisão a partir dos dados, sem digitar tudo de novo.</li>
+  <li>Como simular a rede com <code>Promise</code> e por que o botão desliga enquanto envia.</li>
+  <li>O que costuma quebrar num formulário em etapas e como perceber pelo sintoma.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o pedido de aniversário no guardanapo</h2>
+
+<p>Na sexta-feira, a Ana recebeu quatro pedidos de bolo. Dois chegaram completos; um chegou sem telefone;
+um chegou com o sabor escrito "a combinar". Ela perdeu vinte minutos ligando para clientes e mais dez
+decidindo o que fazer com o bolo "a combinar". O problema não é o bolo: é o formulário — ou a falta
+dele.</p>
+
+<p>Um formulário de uma tela só, com oito campos, tem dois defeitos previsíveis. O primeiro é que ele
+parece um muro: a pessoa desiste no meio. O segundo é que o erro aparece no fim, quando ela já digitou
+tudo e não lembra mais o que esqueceu. Quebrar em etapas resolve os dois: duas ou três perguntas por vez e
+um botão que só deixa seguir quando a etapa está completa.</p>
+
+<p>O desenho que a Ana escolheu tem três etapas. A primeira pergunta quem encomenda: nome e telefone. A
+segunda pergunta o bolo: sabor, tamanho e o dia da retirada. A terceira não pergunta nada — mostra tudo o
+que foi digitado, para ela conferir antes de enviar. É pouco, é comum e é exatamente o tipo de tela que
+todo app de verdade tem.</p>
+
+<p>Como sempre neste guia, a ordem importa. Primeiro os dados e a etapa; depois o que aparece em cada
+etapa; depois a validação; depois a revisão; por último o envio. Cada caixa daqui roda um pedaço que
+funciona sozinho, e você pode montar na ordem em que elas aparecem.</p>
+
+<h2>2. O desenho: três etapas, um formulário só</h2>
+
+<p>Antes de escrever componente, vale escrever a tabela das etapas. Ela responde três perguntas de uma
+vez: quantas etapas existem, o que cada uma pergunta e quais campos pertencem a cada uma. Se um campo
+aparece em duas etapas, o desenho está errado — ele pertence a uma só.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Etapa</th><th>Pergunta que responde</th><th>Campos</th></tr>
+<tr><td>1</td><td>quem está encomendando</td><td>nome, telefone</td></tr>
+<tr><td>2</td><td>qual bolo e para quando</td><td>sabor, tamanho, retirada</td></tr>
+<tr><td>3</td><td>está tudo certo?</td><td>nenhum: só o resumo e o botão Enviar</td></tr>
+</table>
+</div>
+
+<p>Repare no que a tabela <em>não</em> diz: ela não fala em três formulários, nem em três componentes com
+estado próprio. É um formulário só, com três pedaços visíveis um de cada vez. Essa decisão é a que separa
+um formulário em etapas de três formulários que se conhecem mal — e é a origem de quase todo bug deste
+projeto.</p>
+
+<p>Há uma consequência prática: o botão "Voltar" precisa funcionar sem perder nada. Se cada etapa
+guardasse os seus próprios campos, voltar desmontaria a etapa e o texto digitado iria junto. Com os dados
+acima das etapas, voltar é só trocar um número — o que está preenchido continua preenchido.</p>
+
+<p>Também vale decidir o que acontece no fim. Depois do envio, o formulário sai de cena e dá lugar a uma
+confirmação com o protocolo. Não é uma quarta etapa; é outro estado da mesma tela. Essa distinção
+simplifica o código: a etapa vai de 1 a 3, e o "enviado" é um segundo estado, independente.</p>
+
+<h2>3. Um objeto e uma etapa: onde mora o quê</h2>
+
+<p>O estado do projeto tem quatro peças, e cada uma tem um trabalho. Os campos ficam em um objeto
+<code>dados</code>; a etapa atual fica em <code>etapa</code>; o "está enviando" e o protocolo ficam em
+estados próprios, porque mudam em outro ritmo. As mensagens de erro, essas não precisam de estado: são
+contas feitas no desenho.</p>
+
+<dl class="anatomy">
+<dt>dados</dt>
+<dd>O objeto com todos os campos, de todas as etapas: <code>{ nome, telefone, sabor, tamanho, retirada }</code>.
+É o que vai ser enviado no fim, então nasce junto e cresce junto.</dd>
+<dt>etapa</dt>
+<dd>Um número de 1 a 3. Decide qual pedaço do formulário aparece e em que passo a barra de progresso
+está.</dd>
+<dt>revisão</dt>
+<dd>A terceira tela, montada a partir de <code>dados</code>. Não guarda nada: lê o objeto e desenha o
+resumo.</dd>
+<dt>enviando</dt>
+<dd>Um booleano que fica verdadeiro enquanto a resposta não chega. Serve para desligar o botão e mostrar
+"Enviando...".</dd>
+<dt>protocolo</dt>
+<dd>O número que o servidor devolve depois do envio. Quando ele existe, a tela vira a confirmação.</dd>
+</dl>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Informação</th><th>Onde mora</th><th>Por quê</th></tr>
+<tr><td>os campos preenchidos</td><td><code>dados</code>, no <code>App</code></td><td>mudam juntos e viajam juntos no envio</td></tr>
+<tr><td>a etapa atual</td><td><code>etapa</code>, no <code>App</code></td><td>muda no clique e decide o que aparece</td></tr>
+<tr><td>a mensagem de erro</td><td>conta feita no desenho</td><td>é consequência dos campos, não uma verdade à parte</td></tr>
+<tr><td>enviando e protocolo</td><td>estados no <code>App</code></td><td>mudam no ritmo da rede, não no ritmo da digitação</td></tr>
+</table>
+</div>
+
+<p>Um objeto para todos os campos não é preciosismo: é o formato que o envio espera. Se cada campo fosse
+um <code>useState</code> solto, na hora de enviar você montaria o objeto de qualquer jeito — e esqueceria
+um campo. Do jeito que está, o objeto do estado <em>é</em> o corpo do pedido.</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const [etapa, setEtapa] = useState(1);
+  const [dados, setDados] = useState({
+    nome: "",
+    telefone: "",
+    sabor: "",
+    tamanho: "médio",
+    retirada: ""
+  });
+  const [enviando, setEnviando] = useState(false);
+  const [protocolo, setProtocolo] = useState(null);
+
+  console.log(
+    "etapa: " + etapa +
+    " | nome: " + (dados.nome || "(vazio)") +
+    " | sabor: " + (dados.sabor || "(vazio)")
+  );</pre>
+
+<p>Na primeira montagem, com o formulário ainda em branco, o console mostra:</p>
+
+<pre class="term">console: etapa: 1 | nome: (vazio) | sabor: (vazio)</pre>
+
+<p>Esse log é o mapa do estado. Quando um campo parece "não estar salvando", imprima este trio antes de
+mexer no JSX: se o valor aparece no console, o problema está no desenho; se não aparece, o problema está
+no <code>onChange</code> do campo.</p>
+
+<h2>4. A etapa como estado</h2>
+
+<p>Com os dados guardados, falta decidir o que aparece. A primeira versão de quase todo mundo desenha as
+três etapas e esconde duas com CSS — e o formulário fica com três campos de nome na mesma tela. A versão
+certa desenha <strong>uma</strong> etapa por vez, escolhida pelo número guardado no estado.</p>
+
+<div class="tryreact" data-goal="clique:#proximo;;conta:section=1;;texto:Sabor do bolo">
+  <p class="try-task">O progresso já muda para "Etapa 2 de 3", mas as duas seções aparecem sempre. Mostre
+  só a seção da etapa atual — depois do clique, apenas a etapa 2 na tela.</p>
+  <pre class="jsx">function App() {
+  const [etapa, setEtapa] = useState(1);
+  const [dados, setDados] = useState({ nome: "", sabor: "" });
+
+  return (
+    &lt;div&gt;
+      &lt;p className="progresso"&gt;Etapa {etapa} de 3&lt;/p&gt;
+
+      &lt;section className="etapa-1"&gt;
+        &lt;label htmlFor="nome"&gt;Seu nome&lt;/label&gt;
+        &lt;input id="nome" value={dados.nome} onChange={(e) =&gt; setDados({ ...dados, nome: e.target.value })} /&gt;
+      &lt;/section&gt;
+
+      &lt;section className="etapa-2"&gt;
+        &lt;label htmlFor="sabor"&gt;Sabor do bolo&lt;/label&gt;
+        &lt;input id="sabor" value={dados.sabor} onChange={(e) =&gt; setDados({ ...dados, sabor: e.target.value })} /&gt;
+      &lt;/section&gt;
+
+      &lt;button id="proximo" onClick={() =&gt; setEtapa(etapa + 1)}&gt;Próximo&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p class="progresso"&gt;Etapa 1 de 3&lt;/p&gt;
+  &lt;section class="etapa-1"&gt;
+    &lt;label for="nome"&gt;Seu nome&lt;/label&gt;
+    &lt;input id="nome" value=""&gt;
+  &lt;/section&gt;
+  &lt;section class="etapa-2"&gt;
+    &lt;label for="sabor"&gt;Sabor do bolo&lt;/label&gt;
+    &lt;input id="sabor" value=""&gt;
+  &lt;/section&gt;
+  &lt;button id="proximo"&gt;Próximo&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [etapa, setEtapa] = useState(1);
+  const [dados, setDados] = useState({ nome: "", sabor: "" });
+
+  return (
+    &lt;div&gt;
+      &lt;p className="progresso"&gt;Etapa {etapa} de 3&lt;/p&gt;
+
+      {etapa === 1 &amp;&amp; (
+        &lt;section className="etapa-1"&gt;
+          &lt;label htmlFor="nome"&gt;Seu nome&lt;/label&gt;
+          &lt;input id="nome" value={dados.nome} onChange={(e) =&gt; setDados({ ...dados, nome: e.target.value })} /&gt;
+        &lt;/section&gt;
+      )}
+
+      {etapa === 2 &amp;&amp; (
+        &lt;section className="etapa-2"&gt;
+          &lt;label htmlFor="sabor"&gt;Sabor do bolo&lt;/label&gt;
+          &lt;input id="sabor" value={dados.sabor} onChange={(e) =&gt; setDados({ ...dados, sabor: e.target.value })} /&gt;
+        &lt;/section&gt;
+      )}
+
+      &lt;button id="proximo" onClick={() =&gt; setEtapa(etapa + 1)}&gt;Próximo&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois do clique, o painel mostra uma <code>section</code> só, a de sabor, e o progresso em "Etapa 2 de
+3". Repare que os dois campos continuam vivos: o de nome apenas não está desenhado. Quando a etapa volta
+para 1, o campo reaparece com o valor que estava em <code>dados</code> — porque o valor nunca saiu do
+estado, só saiu da tela.</p>
+
+<p>É a diferença entre desenhar e esconder, que a aula de
+<a href="renderizacao-condicional.html">Renderização Condicional</a> já apresentou. Aqui ela tem
+consequência prática: um campo escondido com CSS continua no formulário, continua sendo enviado e
+continua sendo lido por leitores de tela. Desenhar uma etapa por vez é mais simples e mais correto.</p>
+
+<p>Sobre o botão "Próximo": ele soma 1 sem conferir nada. Enquanto todas as etapas são opcionais, isso
+passa. No momento em que a primeira pergunta é obrigatória, esse <code>onClick</code> de uma linha vira o
+lugar do bug — e é o assunto da próxima seção.</p>
+
+<h2>5. A validação que segura o avanço</h2>
+
+<p>A regra é curta: não dá para ir para a etapa 2 sem um nome. O botão precisa conferir antes de mudar o
+número, e precisa dizer por que não mudou. Validar só no envio final seria mais fácil de escrever e pior
+para quem usa: a pessoa descobre o campo vazio três telas depois de tê-lo deixado em branco.</p>
+
+<div class="tryreact" data-goal="clique:#proximo;;texto:Informe o nome;;texto:Etapa 1 de 3">
+  <p class="try-task">O botão avança com o nome vazio e a área de erro fica sempre em branco. Impeça o
+  avanço quando o nome estiver vazio (só espaços não conta) e mostre <strong>Informe o nome</strong>.</p>
+  <pre class="jsx">function App() {
+  const [etapa, setEtapa] = useState(1);
+  const [nome, setNome] = useState("");
+  const semNome = nome.trim() === "";
+
+  function avancar() {
+    setEtapa(2);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;p className="progresso"&gt;Etapa {etapa} de 3&lt;/p&gt;
+      &lt;label htmlFor="nome"&gt;Seu nome&lt;/label&gt;
+      &lt;input id="nome" value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+      &lt;p className="erro" role="alert"&gt;&lt;/p&gt;
+      &lt;button id="proximo" onClick={avancar}&gt;Próximo&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p class="progresso"&gt;Etapa 1 de 3&lt;/p&gt;
+  &lt;label for="nome"&gt;Seu nome&lt;/label&gt;
+  &lt;input id="nome" value=""&gt;
+  &lt;p class="erro" role="alert"&gt;&lt;/p&gt;
+  &lt;button id="proximo"&gt;Próximo&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [etapa, setEtapa] = useState(1);
+  const [nome, setNome] = useState("");
+  const semNome = nome.trim() === "";
+
+  function avancar() {
+    if (semNome) return;
+    setEtapa(2);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;p className="progresso"&gt;Etapa {etapa} de 3&lt;/p&gt;
+      &lt;label htmlFor="nome"&gt;Seu nome&lt;/label&gt;
+      &lt;input id="nome" value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+      &lt;p className="erro" role="alert"&gt;{semNome ? "Informe o nome" : ""}&lt;/p&gt;
+      &lt;button id="proximo" onClick={avancar}&gt;Próximo&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois do clique, o progresso continua em "Etapa 1 de 3" e a linha de erro mostra "Informe o nome". As
+duas coisas juntas são a prova de que o avanço foi barrado, e não só de que a mensagem apareceu. O
+<code>return</code> cedo é o jeito mais curto de dizer "não faça o resto".</p>
+
+<p>O <code>trim()</code> merece o parágrafo: sem ele, um espaço no campo passa como nome válido. A regra
+<code>nome.trim() === ""</code> pega o vazio e o só-espaços de uma vez. E <code>semNome</code> é uma conta
+feita no desenho, não um estado — se fosse estado, você teria de lembrar de atualizá-lo a cada letra, e
+um dia esqueceria.</p>
+
+<dl class="anatomy">
+<dt>obrigatório</dt>
+<dd>O campo não pode ficar vazio. É a regra mais comum e a que o <code>trim()</code> resolve.</dd>
+<dt>formato</dt>
+<dd>O texto precisa ter cara de telefone ou de data. Vale uma conferência simples de tamanho e de
+dígitos; regex gigante fica para quando precisar.</dd>
+<dt>regra de negócio</dt>
+<dd>Não é sobre o texto, é sobre o mundo: bolo de três andares pede dois dias de antecedência. Mora na
+validação, não no campo.</dd>
+<dt>mensagem</dt>
+<dd>O texto que explica o que fazer. Fica perto do campo, ligada a ele por
+<code>aria-describedby</code>, e não num aviso genérico no rodapé.</dd>
+<dt>campo tocado</dt>
+<dd>Um booleano por campo que evita mostrar erro antes de a pessoa tentar. Sem ele, o formulário abre
+todo vermelho.</dd>
+</dl>
+
+<pre class="file" data-file="validacao.js">const semNome = dados.nome.trim() === "";
+const telefoneCurto = dados.telefone.replace(/\D/g, "").length &lt; 10;
+const podeSeguir = !semNome &amp;&amp; !telefoneCurto;
+
+console.log("podeSeguir: " + podeSeguir + " | falta: " + (semNome ? "nome" : "nada"));</pre>
+
+<p>Com o formulário em branco, o console mostra:</p>
+
+<pre class="term">console: podeSeguir: false | falta: nome</pre>
+
+<p>Essa é a forma mais útil de validação: uma conta que devolve verdadeiro ou falso, e um texto que diz o
+que falta. O botão pode usar a conta para se desligar; a mensagem pode usar o texto. Nenhum dos dois
+precisa de estado novo.</p>
+
+<h2>6. A revisão: o resumo antes de enviar</h2>
+
+<p>A terceira tela não pergunta nada. Ela lê <code>dados</code> e desenha um resumo em pares de termo e
+descrição — o mesmo formato de uma lista de definições no HTML. A vantagem de montar a revisão a partir
+do objeto, e não de campos escondidos, é que ela nunca fica desatualizada: mudou o dado, mudou o
+resumo.</p>
+
+<pre class="file" data-file="componentes/Revisao.jsx">function Revisao({ dados, aoEditar }) {
+  return (
+    &lt;section className="revisao"&gt;
+      &lt;h2&gt;Confira o pedido&lt;/h2&gt;
+      &lt;dl&gt;
+        &lt;dt&gt;Nome&lt;/dt&gt;&lt;dd&gt;{dados.nome}&lt;/dd&gt;
+        &lt;dt&gt;Telefone&lt;/dt&gt;&lt;dd&gt;{dados.telefone}&lt;/dd&gt;
+        &lt;dt&gt;Bolo&lt;/dt&gt;&lt;dd&gt;{dados.sabor}, tamanho {dados.tamanho}&lt;/dd&gt;
+        &lt;dt&gt;Retirada&lt;/dt&gt;&lt;dd&gt;{dados.retirada}&lt;/dd&gt;
+      &lt;/dl&gt;
+      &lt;button type="button" onClick={() =&gt; aoEditar(2)}&gt;Editar&lt;/button&gt;
+    &lt;/section&gt;
+  );
+}
+
+// no App: &lt;Revisao dados={dados} aoEditar={setEtapa} /&gt;</pre>
+
+<p>Dois detalhes de projeto aparecem nesse componente. O primeiro é o botão "Editar": ele não volta para
+o começo, volta para a etapa do dado que a pessoa quer corrigir — e recebe o <code>setEtapa</code> por
+prop, com o nome de <code>aoEditar</code>, porque quem guarda a etapa é o <code>App</code>. O segundo é o
+<code>type="button"</code> — dentro de um <code>form</code>, um botão sem tipo envia o formulário ao ser
+clicado, e o seu "Editar" viraria um envio acidental. A aula de <a href="envio-de-formulario.html">Envio de Formulário</a> explica
+o resto do par <code>onSubmit</code> com <code>preventDefault</code>.</p>
+
+<p>Um resumo bem feito tem quatro linhas e um botão. Se você sentir vontade de explicar cada campo com
+uma frase, é sinal de que o formulário está pedindo informação demais — o problema não é a revisão.</p>
+
+<h2>7. O envio simulado: a resposta não vem na hora</h2>
+
+<p>Enviar um pedido é uma conversa com um servidor: você manda, ele pensa, ele responde. Aqui não há
+rede, então a conversa é simulada com uma <code>Promise</code> e um <code>setTimeout</code> — a mesma
+ideia que a aula de <a href="envio-de-formulario.html">Envio de Formulário</a> usa. O código real, com
+<code>fetch</code>, fica no arquivo do projeto; aqui, o que importa é o que a tela faz enquanto
+espera.</p>
+
+<div class="tryreact" data-goal="clique:#enviar;;texto:Encomenda enviada — protocolo 42">
+  <p class="try-task">O botão só liga o "enviando" e nada mais acontece. Chame <code>enviarPedido</code>,
+  guarde o protocolo da resposta e desligue o "enviando" no fim.</p>
+  <pre class="jsx">function enviarPedido(pedido) {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok({ protocolo: 42 }), 0));
+}
+
+function App() {
+  const [enviando, setEnviando] = useState(false);
+  const [protocolo, setProtocolo] = useState(null);
+  const pedido = { nome: "Ana", sabor: "cenoura", tamanho: "médio" };
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{"Bolo de " + pedido.sabor + ", tamanho " + pedido.tamanho + ", para " + pedido.nome}&lt;/p&gt;
+      &lt;button id="enviar" disabled={enviando} onClick={() =&gt; setEnviando(true)}&gt;Enviar&lt;/button&gt;
+      {protocolo ? &lt;p className="sucesso"&gt;Encomenda enviada — protocolo {protocolo}&lt;/p&gt; : null}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Bolo de cenoura, tamanho médio, para Ana&lt;/p&gt;
+  &lt;button id="enviar"&gt;Enviar&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function enviarPedido(pedido) {
+  return new Promise((ok) =&gt; setTimeout(() =&gt; ok({ protocolo: 42 }), 0));
+}
+
+function App() {
+  const [enviando, setEnviando] = useState(false);
+  const [protocolo, setProtocolo] = useState(null);
+  const pedido = { nome: "Ana", sabor: "cenoura", tamanho: "médio" };
+
+  async function enviar() {
+    setEnviando(true);
+    const resposta = await enviarPedido(pedido);
+    setProtocolo(resposta.protocolo);
+    setEnviando(false);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{"Bolo de " + pedido.sabor + ", tamanho " + pedido.tamanho + ", para " + pedido.nome}&lt;/p&gt;
+      &lt;button id="enviar" disabled={enviando} onClick={enviar}&gt;Enviar&lt;/button&gt;
+      {protocolo ? &lt;p className="sucesso"&gt;Encomenda enviada — protocolo {protocolo}&lt;/p&gt; : null}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em Enviar e o painel mostra a confirmação com o protocolo 42. A ordem das três linhas dentro de
+<code>enviar</code> é o desenho inteiro: liga o "enviando" (para o botão desligar e ninguém clicar duas
+vezes), espera a resposta, guarda o protocolo e desliga o "enviando". Se você esquecer o
+<code>setEnviando(false)</code>, o botão fica travado para sempre — o bug mais comum de envio
+assíncrono.</p>
+
+<p>O <code>disabled={enviando}</code> é o que impede a encomenda duplicada. Sem ele, dois cliques rápidos
+mandam dois pedidos, e a Ana assa dois bolos. Repare que o botão não fica desabilitado por causa da
+validação, e sim por causa da <em>espera</em>: são dois motivos diferentes para desligar o mesmo
+botão.</p>
+
+<pre class="file" data-file="api.js">async function enviarPedido(pedido) {
+  const resposta = await fetch("https://loja.test/api/encomendas", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(pedido)
+  });
+  if (!resposta.ok) throw new Error("falha ao enviar");
+  return resposta.json();
+}
+
+console.log(JSON.stringify(pedido));</pre>
+
+<p>O corpo que o envio manda é o objeto do estado, em JSON — o console mostra exatamente isso:</p>
+
+<pre class="term">console: {"nome":"Ana","sabor":"cenoura","tamanho":"médio","retirada":"14/03/2026"}</pre>
+
+<p>É por isso que os campos ficam todos em um objeto: o que o formulário guarda é o que a API recebe. Se
+o servidor devolver erro, o <code>catch</code> devolve a pessoa para a etapa certa com o texto que ela já
+tinha digitado — perder o preenchimento é o pior erro possível num formulário.</p>
+
+<h2>8. O que quebra e a ordem de montagem</h2>
+
+<p>Formulário em etapas tem quatro bugs clássicos, e todos aparecem como "a tela esqueceu o que eu
+digitei". A tabela abaixo é o mapa do conserto.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que quebra</th><th>Como aparece</th><th>Conserto</th></tr>
+<tr><td>um <code>useState</code> por etapa</td><td>voltar apaga o que já foi preenchido</td><td>os dados moram acima das etapas</td></tr>
+<tr><td>validar só no envio</td><td>o erro aparece três telas depois</td><td>validar em cada avanço</td></tr>
+<tr><td><code>value</code> sem <code>onChange</code></td><td>o campo fica travado, não aceita letra</td><td>campo controlado completo</td></tr>
+<tr><td>botão sem <code>disabled</code></td><td>dois cliques, duas encomendas</td><td><code>disabled={enviando}</code></td></tr>
+</table>
+</div>
+
+<p>A ordem de montagem que evita retrabalho é a das caixas: primeiro o objeto de dados e a etapa, depois o
+que aparece em cada etapa, depois a validação, depois a revisão, por último o envio. Monte nesta ordem e
+teste cada passo com a tela: preencher, avançar, voltar, tentar avançar vazio, enviar. Cinco ações cobrem
+quase tudo o que pode dar errado.</p>
+
+<div class="cenario">
+<h3>Cenário 1: voltar apagou o nome</h3>
+<p>A Ana preencheu o nome, avançou, voltou e o campo estava vazio. Ela tinha guardado o nome dentro do
+componente da etapa 1 — ao voltar, a etapa foi desmontada e o estado foi com ela. O conserto é o mesmo
+desta aula inteira: os dados ficam no <code>App</code>, acima de quem aparece e desaparece. Componente que
+desmonta leva o estado junto; é a regra, não um acidente.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a encomenda chegou duas vezes</h3>
+<p>O botão Enviar ficou clicável durante o envio, e a Ana clicou duas vezes. O servidor recebeu dois
+pedidos. O <code>disabled={enviando}</code> resolve no botão, e a checagem dentro da função resolve no
+código: se já está enviando, retorne. Cinto e suspensório, porque o clique rápido é mais rápido do que a
+rede.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o nome era só espaço</h3>
+<p>A validação passou com um espaço no campo, e a encomenda chegou sem nome. Faltava o
+<code>trim()</code>. O mesmo cuidado vale para telefone: espaços, parênteses e traços não são dígitos, e
+contar o texto cru dá um número falso. Normalize antes de comparar — a aula de
+<a href="validacao.html">Validação</a> tem a lista completa.</p>
+</div>
+
+<h2>9. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Onde ficam os campos de todas as etapas?</p>
+<label><input type="radio" name="pf1"> um <code>useState</code> dentro de cada etapa</label>
+<label><input type="radio" name="pf1"> um objeto no componente que envolve as etapas</label>
+<label><input type="radio" name="pf1"> no <code>localStorage</code>, sempre</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Quando a validação de cada etapa deve rodar?</p>
+<label><input type="radio" name="pf2"> só quando o servidor responde</label>
+<label><input type="radio" name="pf2"> só na última etapa, antes de enviar</label>
+<label><input type="radio" name="pf2"> no clique que avança, antes de mudar a etapa</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Para que serve o <code>disabled={enviando}</code>?</p>
+<label><input type="radio" name="pf3"> impedir o segundo envio enquanto a resposta não chega</label>
+<label><input type="radio" name="pf3"> esconder o botão depois do envio</label>
+<label><input type="radio" name="pf3"> validar o formulário inteiro de uma vez</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: segurar o avanço</h2>
+<p>Complete a primeira linha da função para que o avanço pare quando o nome estiver vazio. Depois
+responda: por que <code>semNome</code> é uma conta e não um estado?</p>
+<div class="ex-code">function avancar() {
+  if (semNome) <input aria-label="resposta 1" data-answer="return" placeholder="...">;
+  setEtapa(etapa + 1);
+}</div>
+<p class="ex-dica">Dica: é a palavra que sai da função na hora, sem devolver valor — a mesma que você usa
+em uma função que termina cedo.</p>
+</div>
+
+<h2>10. Resumo</h2>
+
+<p>Formulário em etapas é um formulário só, com três pedaços visíveis um de cada vez. Os campos moram em
+um objeto no componente que envolve as etapas; a etapa atual é um número no estado e decide o que aparece.
+Voltar é só subtrair 1 — e nada se perde, porque o estado não está dentro da etapa que desmontou.</p>
+
+<p>A validação roda no clique que avança, com uma conta (não um estado) e uma mensagem perto do campo. O
+<code>trim()</code> pega o campo só com espaços; o <code>role="alert"</code> avisa quem não está olhando a
+tela. A revisão lê o mesmo objeto e desenha o resumo, então nunca fica desatualizada. O envio simula a
+rede com <code>Promise</code> e <code>setTimeout</code>, desliga o botão enquanto espera e guarda o
+protocolo quando a resposta chega.</p>
+
+<p>Quatro bugs cobrem quase todo o sofrimento desse tipo de tela: estado por etapa (voltar apaga), validar
+só no fim (erro tardio), <code>value</code> sem <code>onChange</code> (campo travado) e botão sem
+<code>disabled</code> (encomenda duplicada). Se a tela esquecer o que foi digitado, procure primeiro onde
+o estado mora.</p>
+
+<p>Quando o projeto crescer, os próximos passos já têm aula: guardar o rascunho no
+<code>localStorage</code> para sobreviver a um recarregamento, mostrar erro por campo com
+<code>aria-describedby</code>, trocar o <code>setTimeout</code> por <code>fetch</code> e transformar cada
+etapa em um endereço com rotas. O desenho desta aula continua o mesmo — muda só de onde os dados vêm e
+para onde vão.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Um formulário, três pedaços: nunca três formulários com estado próprio.</li>
+<li>Campos de todas as etapas em um objeto só — o mesmo que o envio manda.</li>
+<li>A etapa é um número no estado; ela decide o que é desenhado.</li>
+<li>Desenhar uma etapa por vez, nunca esconder as outras com CSS.</li>
+<li>Validar no clique que avança: <code>if (semNome) return;</code>.</li>
+<li><code>nome.trim() === ""</code> pega vazio e só-espaços; validação é conta, não estado.</li>
+<li>Mensagem perto do campo, com <code>role="alert"</code>.</li>
+<li>Revisão montada a partir do objeto; botão "Editar" com <code>type="button"</code>.</li>
+<li>Envio: liga <code>enviando</code>, espera, guarda o protocolo, desliga.</li>
+<li><code>disabled={enviando}</code> impede a encomenda duplicada.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

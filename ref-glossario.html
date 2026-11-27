@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glossário | Guia React</title>
+<meta name="description" content="Glossário do Guia React: componente, JSX, prop, estado, hook, efeito, chave, contexto, build e os pares de termos que mais confundem, com a aula de cada um.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Glossário</span></h1>
+<p class="intro">Toda profissão tem um vocabulário, e React não é diferente: componente, prop, estado, hook,
+efeito, chave, build. A maior parte da confusão de quem começa não é de lógica — é de palavra usada em dois
+sentidos. A Ana anota aqui os termos do jeito que o guia os usa, com sinônimo em inglês, a aula onde o assunto
+é ensinado e o exemplo mínimo.</p>
+
+<div class="note">
+<strong>Como usar esta página</strong>
+<ul>
+  <li>Os termos estão agrupados por assunto, na ordem em que aparecem no guia — não em ordem alfabética.</li>
+  <li>Cada verbete tem o termo, a definição curta e, quando importa, o sinônimo em inglês.</li>
+  <li>A tabela da seção 1 traduz o vocabulário que aparece em mensagem de erro e em documentação.</li>
+  <li>As duas caixas mostram três palavras do glossário funcionando juntas: prop, estado e valor derivado.</li>
+</ul>
+</div>
+
+<h2>1. Como ler este glossário</h2>
+
+<p>Uma palavra por vez, e sempre no sentido que o guia dá a ela. Quando um termo tem tradução consagrada em
+português, o guia usa a tradução; quando a tradução atrapalha, mantém o inglês e explica. “Desenho” é o caso
+do primeiro tipo: quase todo material chama de <em>render</em>, e aqui a palavra é desenho porque é o que o
+React faz — pega o que o componente devolveu e põe na tela.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Em inglês</th><th>No guia</th><th>Em uma frase</th></tr>
+<tr><td>render</td><td>desenho, desenhar</td><td>executar o componente e produzir o HTML</td></tr>
+<tr><td>state</td><td>estado</td><td>dado que nasce dentro do componente e muda com o uso — <a href="useState.html">O useState</a></td></tr>
+<tr><td>props</td><td>props</td><td>dados que chegam de fora, somente leitura</td></tr>
+<tr><td>effect</td><td>efeito</td><td>código que roda depois do desenho, para falar com o mundo</td></tr>
+<tr><td>hook</td><td>hook</td><td>função do React que dá um recurso ao componente</td></tr>
+<tr><td>key</td><td>chave</td><td>identidade de um item de lista — <a href="chaves-estaveis.html">Chaves Estáveis</a></td></tr>
+<tr><td>update</td><td>atualização</td><td>pedido de mudança de estado que gera novo desenho</td></tr>
+<tr><td>component</td><td>componente</td><td>função com nome maiúsculo que devolve JSX — <a href="primeiro-componente.html">O Primeiro Componente</a></td></tr>
+</table>
+</div>
+
+<p>Três palavras deste glossário têm sentido mais estreito do que na conversa do dia a dia. <strong>Desenho</strong>
+não é o resultado visual: é a execução do corpo do componente. <strong>Atualização</strong> não é o valor novo:
+é o pedido de mudança. E <strong>efeito</strong> não é consequência: é o trecho que roda depois do desenho.
+Guardar esses três sentidos resolve metade das dúvidas de leitura de código alheio.</p>
+
+<h2>2. Componentes, JSX e props</h2>
+
+<p>O vocabulário da tela. Tudo o que aparece aqui é sobre <em>o que</em> o React desenha e <em>de onde</em>
+vêm os dados que ele usa.</p>
+
+<dl class="anatomy">
+<dt>componente</dt>
+<dd>Função com nome em maiúscula que devolve JSX. O React chama a função e desenha o resultado:
+<code>function Cartao() { ... }</code>. Aula: <a href="primeiro-componente.html">O Primeiro Componente</a>.</dd>
+<dt>JSX</dt>
+<dd>A escrita parecida com HTML dentro do JavaScript. Não é HTML nem texto: é traduzida para chamadas que
+criam elementos. Aula: <a href="jsx-regras.html">As Regras do JSX</a>.</dd>
+<dt>elemento</dt>
+<dd>O que o JSX representa: a tag, os atributos e os filhos. Um elemento é uma descrição; o nó no DOM é o
+resultado de desenhá-lo.</dd>
+<dt>prop</dt>
+<dd>Dado que chega ao componente pela chamada: <code>&lt;Cartao nome="Ana" /&gt;</code>. Somente leitura.
+Aula: <a href="props.html">As Props</a>.</dd>
+<dt>children</dt>
+<dd>A prop especial que carrega o que foi escrito entre as tags. Serve para compor sem saber o que vem
+dentro. Aula: <a href="children.html">O children</a>.</dd>
+<dt>composição</dt>
+<dd>Montar telas juntando componentes em vez de herdar comportamento. Aula:
+<a href="composicao.html">Composição</a>.</dd>
+</dl>
+
+<p>Uma diferença que vale fixar no vocabulário: JSX parece HTML, mas obedece a regras do JavaScript. Os
+atributos são camelCase (<code>onClick</code>, <code>tabIndex</code>), a classe se escreve
+<code>className</code> e o rótulo de formulário usa <code>htmlFor</code>. Toda tag fecha, inclusive as vazias
+(<code>&lt;br /&gt;</code>, <code>&lt;img /&gt;</code>). E comentário é <code>{/* … */}</code>, porque
+<code>&lt;!-- --&gt;</code> não existe dentro de expressão.</p>
+
+<p>O resto do vocabulário desta família, em definições curtas:</p>
+
+<dl>
+<dt>expressão</dt>
+<dd>Tudo o que vai entre chaves no JSX e é avaliado como JavaScript: <code>{preco * 2}</code>,
+<code>{nome}</code>, <code>{itens.length}</code>.</dd>
+<dt>atributo de JSX</dt>
+<dd>O que vira atributo no HTML. A maioria tem o mesmo nome; duas exceções importam:
+<code>className</code> em vez de <code>class</code> e <code>htmlFor</code> em vez de <code>for</code>.</dd>
+<dt>renderização condicional</dt>
+<dd>Escolher o que desenhar com <code>?</code>, <code>&amp;&amp;</code> ou <code>if</code> antes do
+<code>return</code>. Aula: <a href="renderizacao-condicional.html">Renderização Condicional</a>.</dd>
+<dt>fragmento</dt>
+<dd>Casca invisível para devolver vários irmãos sem criar nó: <code>&lt;&gt;...&lt;/&gt;</code> ou
+<code>Fragment</code>. Aula: <a href="fragment.html">O Fragment</a>.</dd>
+<dt>prop drilling</dt>
+<dd>Passar a mesma prop por níveis que não a usam, só para ela chegar lá embaixo. Aula:
+<a href="props-drilling.html">Props Drilling</a>.</dd>
+<dt>valor padrão de prop</dt>
+<dd>O que o componente usa quando a prop não vem: <code>function Botao({ tipo = "submit" })</code>. Aula:
+<a href="props-padrao.html">Props Padrão</a>.</dd>
+</dl>
+
+<h2>3. Estado, eventos e atualizações</h2>
+
+<p>O vocabulário do que muda. Estado é o dado que o componente guarda; atualização é o pedido de mudança;
+desenho é a consequência.</p>
+
+<dl>
+<dt>estado</dt>
+<dd>Dado que nasce dentro do componente e sobrevive entre desenhos. Declarado com <code>useState</code>.
+Aula: <a href="useState.html">O useState</a>.</dd>
+<dt>função de troca</dt>
+<dd>O segundo item do <code>useState</code>: <code>setNome</code>. Chama-se <em>setter</em> na documentação.
+Chamar essa função agenda uma atualização.</dd>
+<dt>atualização</dt>
+<dd>O pedido de mudança de estado. Não muda a variável na hora: o valor novo chega no próximo desenho.</dd>
+<dt>desenho</dt>
+<dd>A execução do corpo do componente. Todo desenho lê o estado atual e devolve JSX novo.</dd>
+<dt>batching</dt>
+<dd>Agrupar várias atualizações do mesmo evento em um único desenho. Aula:
+<a href="batching.html">Batching</a>.</dd>
+<dt>estado derivado</dt>
+<dd>Valor calculado a partir de estado existente, sem <code>useState</code> próprio. Aula:
+<a href="estado-derivado.html">Estado Derivado</a>.</dd>
+<dt>elevar o estado</dt>
+<dd>Mover o estado para o ancestral comum de quem precisa dele. Aula:
+<a href="elevando-estado.html">Elevando o Estado</a>.</dd>
+<dt>evento sintético</dt>
+<dd>O objeto que o React entrega no manipulador, imitando o evento do navegador:
+<code>onClick</code>, <code>onChange</code>, <code>onSubmit</code>. Aula:
+<a href="eventos-onclick.html">Eventos e onClick</a>.</dd>
+<dt>manipulador</dt>
+<dd>A função que responde ao evento. Vai como referência (<code>onClick={somar}</code>), não chamada.</dd>
+</dl>
+
+
+<div class="tryreact" data-goal="clique:button;;clique:button;;texto:Total: R$ 4">
+  <p class="try-task">Três palavras do glossário no mesmo componente: <code>nome</code> é prop,
+  <code>paes</code> é estado e <code>total</code> é valor derivado — só que está fixo em 2. Troque por
+  <code>const total = paes * 2;</code> e clique duas vezes em “Somar pão”.</p>
+  <pre class="jsx">function Resumo({ nome }) {
+  const [paes, setPaes] = useState(0);
+  const total = 2;
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Cliente: {nome}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setPaes(paes + 1)}&gt;Somar pão&lt;/button&gt;
+      &lt;p&gt;Pães: {paes}&lt;/p&gt;
+      &lt;p&gt;Total: R$ {total}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return &lt;Resumo nome="Ana" /&gt;;
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Cliente: Ana&lt;/p&gt;
+  &lt;button&gt;Somar pão&lt;/button&gt;
+  &lt;p&gt;Pães: 0&lt;/p&gt;
+  &lt;p&gt;Total: R$ 2&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Resumo({ nome }) {
+  const [paes, setPaes] = useState(0);
+  const total = paes * 2;
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Cliente: {nome}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setPaes(paes + 1)}&gt;Somar pão&lt;/button&gt;
+      &lt;p&gt;Pães: {paes}&lt;/p&gt;
+      &lt;p&gt;Total: R$ {total}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return &lt;Resumo nome="Ana" /&gt;;
+}</pre>
+</div>
+
+<p>O botão muda o estado, o estado muda o desenho e o desenho recalcula o derivado. Nenhuma das três coisas
+precisa de hook extra: <code>total</code> não é estado, é conta. Guardar <code>total</code> em um
+<code>useState</code> seria a segunda fonte de verdade da qual a seção 3 fala.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Par que confunde</th><th>Um</th><th>O outro</th></tr>
+<tr><td>estado × prop</td><td>nasce dentro, muda com o uso — <a href="useState.html">O useState</a></td><td>chega de fora, somente leitura — <a href="props.html">As Props</a></td></tr>
+<tr><td>desenho × efeito</td><td>calcula e devolve JSX</td><td>roda depois, para falar com o mundo</td></tr>
+<tr><td>atualização × valor novo</td><td>o pedido de mudança</td><td>o que aparece no próximo desenho</td></tr>
+<tr><td>controlado × não controlado</td><td>o React manda no valor</td><td>o DOM manda no valor</td></tr>
+<tr><td><code>memo</code> × <code>useMemo</code></td><td>guarda o desenho do componente — <a href="memo.html">O memo</a></td><td>guarda o resultado de um cálculo — <a href="useMemo.html">O useMemo</a></td></tr>
+</table>
+</div>
+
+<h2>4. Hooks</h2>
+
+<p>Hook é a função do React que dá um recurso ao componente: memória, efeito, contexto, identidade. Todos
+começam com <code>use</code> e todos obedecem à mesma regra de lugar.</p>
+
+<p>Três deles são confundidos com frequência porque o nome é parecido e a diferença é de alvo:
+<code>useMemo</code> guarda <em>valor</em>, <code>useCallback</code> guarda <em>função</em> e
+<code>useRef</code> guarda <em>uma caixa</em> cujo conteúdo muda sem disparar desenho. E há o par que não é
+hook: <code>memo</code> é um embrulho de componente, não uma chamada dentro do corpo. Se a dúvida for de
+desempenho, a consulta é <a href="ref-performance.html">Performance</a>.</p>
+
+<dl>
+<dt>hook</dt>
+<dd>Função do React chamada no topo de um componente ou de outro hook. Não é classe, não é método e não
+existe fora do desenho.</dd>
+<dt>regra dos hooks</dt>
+<dd>Mesma quantidade e mesma ordem em todo desenho: nada de <code>if</code>, laço ou <code>return</code>
+antes. Aula: <a href="regras-dos-hooks.html">As Regras dos Hooks</a>.</dd>
+<dt>efeito</dt>
+<dd>Trecho que roda depois do desenho, para sincronizar com algo de fora: rede, título da aba, timer.
+Aula: <a href="useEffect.html">O useEffect</a>.</dd>
+<dt>dependências</dt>
+<dd>A lista que decide quando o efeito roda de novo. Aula:
+<a href="dependencias.html">As Dependências</a>.</dd>
+<dt>cleanup</dt>
+<dd>A função devolvida pelo efeito, que desfaz o que ele fez antes do próximo ciclo. Aula:
+<a href="cleanup.html">O Cleanup</a>.</dd>
+<dt><code>useRef</code></dt>
+<dd>Guarda um valor entre desenhos sem disparar desenho novo; também dá acesso a um nó do DOM. Aula:
+<a href="useRef.html">O useRef</a>.</dd>
+<dt><code>useMemo</code></dt>
+<dd>Guarda o resultado de um cálculo até as dependências mudarem. Aula: <a href="useMemo.html">O
+useMemo</a>.</dd>
+<dt><code>useCallback</code></dt>
+<dd>Guarda a identidade de uma função entre desenhos. Aula: <a href="useCallback.html">O useCallback</a>.</dd>
+<dt><code>useReducer</code></dt>
+<dd>Troca o par valor/setter por estado mais <code>dispatch</code>, com a regra em um reducer. Aula:
+<a href="useReducer.html">O useReducer</a>.</dd>
+<dt><code>useContext</code></dt>
+<dd>Lê o valor do provider mais próximo de um canal. Aula: <a href="useContext.html">O useContext</a>.</dd>
+<dt><code>useId</code></dt>
+<dd>Gera um id único e estável para ligar rótulo e campo. Aula: <a href="useId.html">O useId</a>.</dd>
+<dt><code>useTransition</code></dt>
+<dd>Marca uma atualização como não urgente e informa se ela está em curso. Aula:
+<a href="useTransition.html">O useTransition</a>.</dd>
+<dt><code>useDeferredValue</code></dt>
+<dd>Devolve uma versão atrasada de um valor, para a parte cara da tela esperar. Aula:
+<a href="useDeferredValue.html">O useDeferredValue</a>.</dd>
+<dt>hook próprio</dt>
+<dd>Função com nome <code>use...</code> que chama outros hooks e devolve o que o componente precisa. Aula:
+<a href="hooks-proprios.html">Hooks Próprios</a>.</dd>
+</dl>
+
+<p>Hook não é palavra do JavaScript: é do React, e por isso precisa ser importado no topo do arquivo. Nas
+caixas deste guia os hooks já estão no escopo, mas no projeto cada um vem de <code>"react"</code>. Esquecer o
+import produz a mensagem mais direta do vocabulário:</p>
+
+<pre class="term">Uncaught ReferenceError: useState is not defined</pre>
+
+<p>“<code>useState</code> não foi definido” quer dizer, quase sempre, “falta o import”. O conserto é a linha
+<code>import { useState } from "react"</code> — e, se o aviso persistir, confira se o nome está escrito igual
+ao do import, com maiúscula no lugar certo.</p>
+
+<h2>5. Listas, chaves e dados</h2>
+
+<p>O vocabulário de transformar array em tela. Quase tudo aqui é JavaScript comum; o React só pede a
+chave.</p>
+
+<dl>
+<dt>lista</dt>
+<dd>Array de dados desenhado item por item. Pode vir de prop, de estado ou de constante. Consulta:
+<a href="ref-listas.html">Listas</a>.</dd>
+<dt><code>map</code></dt>
+<dd>Método que transforma cada item em JSX e devolve um array de elementos. Aula:
+<a href="listas-com-map.html">Listas com map</a>.</dd>
+<dt>chave</dt>
+<dd>A identidade do item para o React, escrita em <code>key</code>. Vem do dado, não da posição. Aula:
+<a href="chaves-estaveis.html">Chaves Estáveis</a>.</dd>
+<dt>índice</dt>
+<dd>A posição do item no array. Serve como chave só em lista fixa, que nunca reordena.</dd>
+<dt>derivar</dt>
+<dd>Calcular a lista visível no desenho: filtrar, ordenar, cortar. Não vai para o estado. Aulas:
+<a href="filtrar.html">Filtrar</a> e <a href="ordenar.html">Ordenar</a>.</dd>
+<dt>vazio</dt>
+<dd>Lista sem item. É tela legítima, com mensagem própria, testada com <code>length === 0</code>. Aula:
+<a href="estados-vazios.html">Estados Vazios</a>.</dd>
+<dt>paginação</dt>
+<dd>Desenhar um pedaço por vez, com controle de página. Aula: <a href="paginacao.html">Paginação</a>.</dd>
+<dt>virtualização</dt>
+<dd>Desenhar só os itens visíveis, mantendo a rolagem do tamanho total. Aula:
+<a href="listas-grandes.html">Listas Grandes</a>.</dd>
+</dl>
+
+
+<div class="tryreact" data-goal="conta:li=0;;texto:Hoje não tem pão de queijo">
+  <p class="try-task">A lista está vazia e um <code>0</code> aparece na tela: <code>itens.length</code> vale
+  zero, e o <code>&amp;&amp;</code> desenha esse zero. Troque por
+  <code>itens.length === 0 ? &lt;p&gt;Hoje não tem pão de queijo&lt;/p&gt; : &lt;ul&gt;…&lt;/ul&gt;</code>.</p>
+  <pre class="jsx">function App() {
+  const [itens] = useState([]);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Vitrine&lt;/h1&gt;
+      {itens.length &amp;&amp; (
+        &lt;ul&gt;
+          {itens.map((p) =&gt; (
+            &lt;li key={p}&gt;{p}&lt;/li&gt;
+          ))}
+        &lt;/ul&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Vitrine&lt;/h1&gt;
+  0
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [itens] = useState([]);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Vitrine&lt;/h1&gt;
+      {itens.length === 0 ? (
+        &lt;p&gt;Hoje não tem pão de queijo&lt;/p&gt;
+      ) : (
+        &lt;ul&gt;
+          {itens.map((p) =&gt; (
+            &lt;li key={p}&gt;{p}&lt;/li&gt;
+          ))}
+        &lt;/ul&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<h2>6. Formulários e acessibilidade</h2>
+
+<p>O vocabulário do dado digitado e do dado anunciado. As duas coisas andam juntas: um campo sem rótulo é um
+campo que metade das pessoas não consegue usar.</p>
+
+<p>Acessibilidade não é um assunto separado — é vocabulário. Rótulo, descrição, estado de erro e ordem de
+foco são atributos do mesmo componente que você já está escrevendo. Um formulário “pronto” sem
+<code>label</code> ligado não está pronto: está funcionando para quem enxerga a tela e tem mouse.</p>
+
+<dl>
+<dt>campo controlado</dt>
+<dd>Campo cujo valor vem do estado, via <code>value</code>, e cuja mudança volta por <code>onChange</code>.
+Consulta: <a href="ref-formularios.html">Formulários</a>.</dd>
+<dt>não controlado</dt>
+<dd>Campo em que o DOM guarda o valor; o React só lê no envio. Valor inicial em <code>defaultValue</code>.
+Aula: <a href="controlado-e-nao-controlado.html">Controlado e Não Controlado</a>.</dd>
+<dt>evento de mudança</dt>
+<dd><code>onChange</code>, que no React dispara a cada tecla. O valor está em
+<code>e.target.value</code>.</dd>
+<dt>rótulo</dt>
+<dd>O <code>&lt;label&gt;</code> ligado ao campo por <code>htmlFor</code> e <code>id</code>. Sem ele, o
+campo não tem nome para quem usa leitor de tela. Aula:
+<a href="formulario-acessivel.html">Formulário Acessível</a>.</dd>
+<dt>descrição</dt>
+<dd>O texto que explica o campo, ligado por <code>aria-describedby</code>: formato esperado, mensagem de
+erro.</dd>
+<dt>validação</dt>
+<dd>Conferir o dado antes de enviar. A do navegador é declarativa (<code>required</code>); a do componente
+guarda a mensagem em estado. Aula: <a href="validacao.html">Validação</a>.</dd>
+<dt>envio</dt>
+<dd>O evento <code>onSubmit</code> do <code>&lt;form&gt;</code>, com <code>e.preventDefault()</code> na
+primeira linha. Aula: <a href="envio-de-formulario.html">Envio de Formulário</a>.</dd>
+</dl>
+
+<h2>7. Rede, assincronia e erros</h2>
+
+<p>O vocabulário do dado que demora e do dado que falha. É onde o estado de carregamento nasce.</p>
+
+<p>Três palavras desta seção não são sinônimos e viram três telas: <strong>carregando</strong> é “pedi e
+ainda não voltou”; <strong>vazio</strong> é “voltou e não tem nada”; <strong>erro</strong> é “voltou
+quebrado”. Desenhar a mesma mensagem nos três casos é o defeito mais comum de tela que busca dados — e o
+conserto é sempre separar os estados, não melhorar o texto.</p>
+
+<dl>
+<dt><code>fetch</code></dt>
+<dd>A função do navegador que faz requisição HTTP e devolve uma promessa. Aula:
+<a href="fetch.html">Fetch</a>.</dd>
+<dt>promessa</dt>
+<dd>Objeto que representa um valor futuro: pendente, resolvida ou rejeitada. Aula:
+<a href="async-await.html">Async/Await</a>.</dd>
+<dt>estado de carregamento</dt>
+<dd>O booleano ou texto que diz “estou buscando”. Sem ele, a tela parece travada. Aula:
+<a href="estados-de-carregamento.html">Estados de Carregamento</a>.</dd>
+<dt>erro de execução</dt>
+<dd>Exceção lançada durante o desenho ou em um evento. A mensagem vai para o console. Consulta:
+<a href="ref-erros.html">Mensagens de Erro</a>.</dd>
+<dt>error boundary</dt>
+<dd>Componente que captura o erro dos filhos e desenha uma tela de desculpa. Aula:
+<a href="tratamento-de-erro.html">Tratamento de Erro</a>.</dd>
+<dt><code>lazy</code> e <code>Suspense</code></dt>
+<dd>Carregar um componente só quando ele é necessário, com uma tela de espera enquanto chega. Aula:
+<a href="lazy-e-suspense.html">Lazy e Suspense</a>.</dd>
+</dl>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>De onde vem o dado</th><th>Como muda</th><th>Onde fica</th></tr>
+<tr><td>constante do arquivo</td><td>nunca</td><td>fora do componente</td></tr>
+<tr><td>prop</td><td>quando o pai passa outro valor</td><td>assinatura do componente — <a href="desestruturar-props.html">Desestruturar Props</a></td></tr>
+<tr><td>estado</td><td>quando a função de troca é chamada</td><td><code>useState</code> no componente</td></tr>
+<tr><td>contexto</td><td>quando o provider publica valor novo</td><td>canal mais o <code>Provider</code></td></tr>
+<tr><td>servidor</td><td>quando a requisição responde</td><td>estado que guarda a resposta — <a href="buscando-dados.html">Buscando Dados</a></td></tr>
+</table>
+</div>
+
+<h2>8. Ferramentas, build e produção</h2>
+
+<p>O vocabulário de fora do código: o programa que junta os arquivos, o comando que roda a versão de
+desenvolvimento e o que vai para o servidor no fim.</p>
+
+<p>Duas ideias resolvem a maior parte da confusão desta seção. A primeira: o que vai para o servidor é a
+pasta <code>dist</code>, gerada pelo build — não é o seu <code>src</code>, e não é o
+<code>node_modules</code>. A segunda: desenvolvimento e produção são programas diferentes, com avisos
+diferentes. Um erro que só aparece em produção quase sempre é aviso de desenvolvimento que ninguém
+consertou.</p>
+
+<dl>
+<dt>Vite</dt>
+<dd>A ferramenta que cria e serve o projeto React neste guia: desenvolvimento rápido e build no fim. Aula:
+<a href="criar-projeto-vite.html">Criar o Projeto com Vite</a>.</dd>
+<dt>bundler</dt>
+<dd>O programa que junta os módulos em poucos arquivos e traduz JSX. O Vite usa um por baixo.</dd>
+<dt>build de produção</dt>
+<dd>A versão final, empacotada e minificada, gerada por <code>npm run build</code>. Aula:
+<a href="build-de-producao.html">Build de Produção</a>.</dd>
+<dt>modo de desenvolvimento</dt>
+<dd>A versão com avisos e verificações extras, servida por <code>npm run dev</code>. Não é a que vai ao ar.</dd>
+<dt><code>StrictMode</code></dt>
+<dd>O embrulho que faz o React desenhar duas vezes em desenvolvimento para revelar efeitos mal feitos. Aula:
+<a href="strict-mode.html">Strict Mode</a>.</dd>
+<dt>DevTools</dt>
+<dd>As ferramentas do navegador, com o painel do React para ver componentes, props e desenhos. Aula:
+<a href="depurando-no-navegador.html">Depurando no Navegador</a>.</dd>
+<dt>ESLint</dt>
+<dd>O verificador de estilo e de regras que avisa antes de rodar — inclusive as regras dos hooks.</dd>
+<dt>deploy</dt>
+<dd>Publicar o build em um servidor ou serviço. Aula: <a href="publicando.html">Publicando</a>.</dd>
+</dl>
+
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Comando</th><th>O que faz</th><th>Quando usar</th></tr>
+<tr><td><code>npm create vite@latest vitrine -- --template react</code></td><td>cria a pasta do projeto com React e Vite</td><td>uma vez, no começo — <a href="criar-projeto-vite.html">Criar o Projeto com Vite</a></td></tr>
+<tr><td><code>npm install</code></td><td>baixa as dependências para <code>node_modules</code></td><td>ao clonar um projeto e ao adicionar pacote</td></tr>
+<tr><td><code>npm run dev</code></td><td>sobe o servidor de desenvolvimento com recarga</td><td>enquanto você escreve — <a href="scripts-do-package.html">Scripts do package.json</a></td></tr>
+<tr><td><code>npm run build</code></td><td>gera a versão de produção em <code>dist</code></td><td>antes de publicar — <a href="build-de-producao.html">Build de Produção</a></td></tr>
+<tr><td><code>npm run preview</code></td><td>serve a versão de produção localmente</td><td>para conferir o build</td></tr>
+</table>
+</div>
+
+<p>No terminal, a mensagem de comando errado é curta e específica. Ela aparece quando o
+<code>package.json</code> não tem o script que você pediu — comum em projeto criado com outro modelo, em que
+o comando de desenvolvimento tem outro nome:</p>
+
+<pre class="term">npm ERR! Missing script: "dev"</pre>
+
+<p>“Script dev faltando.” A lista do que existe está no <code>package.json</code>, na seção
+<code>scripts</code>; a aula <a href="scripts-do-package.html">Scripts do package.json</a> mostra os quatro
+do Vite e como criar os seus. E se o terminal disser que não achou <code>package.json</code>, você está na
+pasta errada: o comando roda dentro da pasta do projeto.</p>
+
+<h2>Resumo</h2>
+
+<p>O vocabulário do guia cabe em seis palavras: componente (função que devolve JSX), prop (dado que desce),
+estado (dado que nasce dentro e muda), desenho (execução do componente), efeito (o que roda depois) e hook
+(a função que dá o recurso). Tudo o mais — lista, chave, contexto, transition, build — é uma combinação
+dessas seis.</p>
+
+<p>Quando uma palavra parecer ambígua, procure o par: estado e prop, controlado e não controlado, desenho e
+efeito, memo e useMemo. A confusão quase sempre está em usar o mesmo nome para o pedido de mudança e para o
+valor novo. As duas caixas desta página mostram três termos juntos — prop, estado e valor derivado — e o
+resto do guia mostra cada um em uso.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Componente é função; JSX é a escrita que devolve elementos.</li>
+<li>Prop desce, estado fica: prop é somente leitura.</li>
+<li>Atualização é o pedido; o valor novo aparece no próximo desenho.</li>
+<li>Desenho executa o componente; efeito roda depois dele.</li>
+<li>Hook começa com <code>use</code> e fica no topo, sempre na mesma ordem.</li>
+<li>Chave de lista vem do dado e é estável entre desenhos.</li>
+<li>Lista visível é derivada: filtrar e ordenar não viram estado.</li>
+<li>Campo controlado é <code>value</code> mais <code>onChange</code>.</li>
+<li>Carregamento, vazio e erro são três telas diferentes.</li>
+<li>Desenvolvimento avisa; produção só entrega — build é outro programa.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

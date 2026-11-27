@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Formulários com Actions | Guia React</title>
+<meta name="description" content="Formulários com actions no React 19: o action recebendo FormData, o name de cada campo, validação dentro da ação, o reset automático e o histórico de envios.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Formulários com <span class="hl">Actions</span></h1>
+<p class="intro">O formulário de encomenda da Ana já funciona com <code>onSubmit</code>: ela lê os campos
+um por um, monta o objeto do pedido, chama <code>preventDefault</code> e reza para não esquecer nenhum
+passo. No React 19 existe um caminho mais curto: o atributo <code>action</code> do próprio
+<code>form</code> recebe uma função, e o React entrega os campos já reunidos. Nesta aula ela reescreve o
+formulário da padaria desse jeito e descobre o que o React faz — e o que continua sendo trabalho dela.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como o <code>action</code> substitui o <code>onSubmit</code> e o <code>preventDefault</code>.</li>
+  <li>O que é <code>FormData</code> e por que o <code>name</code> de cada campo importa tanto.</li>
+  <li>Como ler texto, número e caixa de seleção do formulário.</li>
+  <li>Como validar dentro da ação e devolver a mensagem para a tela.</li>
+  <li>O reset automático do formulário depois do envio.</li>
+  <li>Como guardar um histórico de pedidos sem perder os anteriores.</li>
+  <li>O que o painel mostra no atributo <code>action</code> e por que aquilo é normal.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o pedido que apagava a tela</h2>
+
+<p>Na aula de <a href="envio-de-formulario.html">Envio de Formulário</a>, a Ana aprendeu o caminho
+clássico: o <code>form</code> tem <code>onSubmit</code>, a função chama <code>event.preventDefault()</code>
+para o navegador não recarregar a página, lê cada campo com <code>event.target</code> e monta o objeto do
+pedido. Funciona, e é o que a maioria dos projetos ainda faz.</p>
+
+<p>O incômodo é a cerimônia. São quatro passos para cada formulário, e três deles são sempre iguais. Pior:
+quando um campo novo aparece, alguém precisa lembrar de ler mais um valor no lugar certo — e esquecer um
+campo não dá erro, só um pedido incompleto chegando na padaria.</p>
+
+<p>O React 19 olhou para isso e fez uma pergunta simples: se o navegador já sabe reunir os campos de um
+formulário, por que o React não usa isso? A resposta é o atributo <code>action</code> recebendo uma
+função. O React cuida do <code>preventDefault</code>, reúne os campos num <code>FormData</code> e entrega
+tudo pronto para a sua função — que passa a se chamar <strong>action</strong>.</p>
+
+<h2>2. O que muda: action, FormData e name</h2>
+
+<p>Três peças novas entram no formulário e uma antiga sai. Sai o <code>onSubmit</code> com
+<code>preventDefault</code>. Entram o <code>action</code> como função, o objeto <code>FormData</code> que
+ela recebe e a regra de que cada campo precisa de <code>name</code> para existir dentro desse objeto.</p>
+
+<dl class="anatomy">
+<dt>action</dt>
+<dd>O atributo do <code>form</code> que recebe uma função: <code>&lt;form action={enviar}&gt;</code>. O
+React chama essa função no envio, sem recarregar a página.</dd>
+<dt>FormData</dt>
+<dd>O objeto que a ação recebe, com todos os campos do formulário. Lê-se com
+<code>dados.get("nome")</code>.</dd>
+<dt>name</dt>
+<dd>O nome do campo dentro do <code>FormData</code>. Sem <code>name</code>, o campo não é enviado — nem
+para o React, nem para o servidor.</dd>
+<dt>ação assíncrona</dt>
+<dd>Uma ação que devolve promessa, como um <code>fetch</code>. O React segura o envio até ela terminar e
+marca o período como pendente.</dd>
+<dt>reset automático</dt>
+<dd>Depois de uma ação bem-sucedida, o React limpa os campos não controlados do formulário.</dd>
+<dt>pending</dt>
+<dd>O aviso de que a ação está em andamento. Vem do <code>useActionState</code> ou de um
+<code>useTransition</code> em volta do envio.</dd>
+</dl>
+
+<p>O ganho maior é o <code>FormData</code>. Em vez de uma linha de leitura por campo, a ação recebe o
+formulário inteiro e pergunta o que quiser. Um campo novo no JSX entra no pedido sem nenhuma mudança na
+função — desde que tenha <code>name</code>. E é aí que mora o primeiro tropeço de todo mundo.</p>
+
+<p>Há uma pergunta justa aqui: se o <code>action</code> aceita uma função, ele continua sendo um
+atributo do HTML? Continua. E é isso que permite os dois mundos conviverem. Um formulário pode ter
+<code>action="/encomenda"</code> — um endereço de verdade, que funciona mesmo sem JavaScript — ou uma
+função, que só existe quando o React assume. O React 19 foi desenhado para o segundo caso, mas o primeiro
+continua valendo quando você quer que o envio funcione mesmo numa conexão ruim ou com o JavaScript
+bloqueado.</p>
+
+<h2>3. A caixa: o nome do campo é a chave</h2>
+
+<p>Na caixa abaixo, a ação já está ligada ao formulário e lê <code>dados.get("pao")</code>. O campo,
+porém, está sem <code>name</code>: o <code>FormData</code> não tem essa chave, e o pedido chega como
+<code>null</code>. Digite um pão e clique em Encomendar para ver.</p>
+
+<div class="tryreact" data-goal="digite:input=Pão integral;;clique:button;;texto:Pedido: Pão integral">
+  <p class="try-task">Dê ao campo o nome que a ação procura: <code>name="pao"</code>. Depois digite
+  “Pão integral”, clique em Encomendar e veja o pedido aparecer.</p>
+  <pre class="jsx">function App() {
+  const [pedido, setPedido] = useState("(nada)");
+
+  return (
+    &lt;form action={function (dados) { setPedido(String(dados.get("pao"))); }}&gt;
+      &lt;input /&gt;
+      &lt;button&gt;Encomendar&lt;/button&gt;
+      &lt;p&gt;Pedido: {pedido}&lt;/p&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;form action="javascript:throw new Error('A React form was unexpectedly submitted. If you called form.submit() manually, consider using form.requestSubmit() instead. If you\'re trying to use event.stopPropagation() in a submit event handler, consider also calling event.preventDefault().')"&gt;
+  &lt;input&gt;
+  &lt;button&gt;Encomendar&lt;/button&gt;
+  &lt;p&gt;Pedido: (nada)&lt;/p&gt;
+&lt;/form&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [pedido, setPedido] = useState("(nada)");
+
+  return (
+    &lt;form action={function (dados) { setPedido(String(dados.get("pao"))); }}&gt;
+      &lt;input name="pao" /&gt;
+      &lt;button&gt;Encomendar&lt;/button&gt;
+      &lt;p&gt;Pedido: {pedido}&lt;/p&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+</div>
+
+<p>Repare em dois detalhes do painel. O primeiro: sem o conserto, o parágrafo mostraria “Pedido: null” —
+não um erro, só um valor vazio que virou texto. É o mesmo silêncio das props ausentes que você já viu:
+falta um nome, o dado não chega, e a tela mostra o que der.</p>
+
+<p>O segundo detalhe é aquele <code>action</code> enorme, cheio de JavaScript, que aparece no HTML
+gerado. Ele não é o seu código: é uma trava do React. Se o formulário for enviado antes de o JavaScript
+assumir — numa página que ainda está carregando, por exemplo —, o navegador executa aquela linha e mostra
+o erro em vez de navegar para outro lugar. Ignore o texto; o que importa é que o <code>form</code> está
+lá e a ação roda.</p>
+
+<h2>4. O que a ação recebe</h2>
+
+<p>Vale abrir o <code>FormData</code> para ver o que ele é. A ação pode listar as chaves que chegaram, e
+o console mostra a forma do objeto sem precisar de nenhuma biblioteca:</p>
+
+<pre class="file" data-file="src/Encomenda.jsx">function Encomenda() {
+  return (
+    &lt;form action={function (dados) {
+      dados.forEach(function (valor, chave) {
+        console.log("campo: " + chave + " = " + valor);
+      });
+    }}&gt;
+      &lt;input name="pao" /&gt;
+      &lt;input name="quem" /&gt;
+      &lt;button&gt;Encomendar&lt;/button&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+
+<p>Com “Baguete” no primeiro campo e “Ana” no segundo, o console mostra duas linhas:</p>
+
+<pre class="term">campo: pao = Baguete
+campo: quem = Ana</pre>
+
+<p>Duas coisas ficam claras. Primeiro, a ordem é a ordem dos campos no formulário. Segundo, só aparece o
+que tem <code>name</code> e só aparece o que tem valor — campo vazio simplesmente não entra. Isso explica
+por que a validação precisa acontecer dentro da ação: o <code>FormData</code> não reclama de nada, ele
+só entrega o que existe.</p>
+
+<p>Existe uma diferença importante entre os tipos de campo, e ela confunde na primeira vez. Texto, e-mail,
+número e área de texto chegam como texto — número também, ainda que você tenha digitado
+<code>type="number"</code>. Caixa de seleção marcada chega com o valor <code>"on"</code> quando não tem
+<code>value</code>, e desmarcada não chega. Vários campos com o mesmo <code>name</code> chegam todos, e
+para ler todos é preciso <code>dados.getAll("pao")</code>, não <code>get</code>.</p>
+
+<p>Um caso especial que vale reconhecer: arquivos. Um <code>input type="file"</code> também entra no
+<code>FormData</code>, e o valor lido com <code>get</code> é um <code>File</code>, não texto. É por isso
+que a caixa usa <code>String(dados.get("pao"))</code> antes de guardar: sem a conversão, o valor bruto é
+<code>null</code> ou o que veio, e o JSX reclama ao desenhar um objeto. Converter na entrada evita o erro
+mais adiante.</p>
+
+<h2>5. A caixa: validar dentro da ação</h2>
+
+<p>Validação em formulário com ação tem um lugar natural: a própria ação. Ela recebe os dados, decide se
+está tudo certo e devolve o que a tela deve mostrar. Para guardar esse retorno existe o
+<code>useActionState</code>, que devolve três coisas: o estado atual, a ação pronta para o
+<code>form</code> e um aviso de pendência.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Informe o pão;;digite:input=Baguete;;clique:button;;texto:Pedido: Baguete">
+  <p class="try-task">Clique em Encomendar com o campo vazio: hoje entra um pedido com “null”. Faça a
+  ação devolver <code>"Informe o pão"</code> quando o campo estiver vazio, e o pedido normal quando não
+  estiver.</p>
+  <pre class="jsx">function App() {
+  const [estado, enviar] = React.useActionState(function (anterior, dados) {
+    const pao = dados.get("pao");
+    return "Pedido: " + pao;
+  }, "(nada)");
+
+  return (
+    &lt;form action={enviar}&gt;
+      &lt;input name="pao" /&gt;
+      &lt;button&gt;Encomendar&lt;/button&gt;
+      &lt;p&gt;{estado}&lt;/p&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;form action="javascript:throw new Error('A React form was unexpectedly submitted. If you called form.submit() manually, consider using form.requestSubmit() instead. If you\'re trying to use event.stopPropagation() in a submit event handler, consider also calling event.preventDefault().')"&gt;
+  &lt;input name="pao"&gt;
+  &lt;button&gt;Encomendar&lt;/button&gt;
+  &lt;p&gt;(nada)&lt;/p&gt;
+&lt;/form&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [estado, enviar] = React.useActionState(function (anterior, dados) {
+    const pao = dados.get("pao");
+    if (!pao) return "Informe o pão";
+    return "Pedido: " + pao;
+  }, "(nada)");
+
+  return (
+    &lt;form action={enviar}&gt;
+      &lt;input name="pao" /&gt;
+      &lt;button&gt;Encomendar&lt;/button&gt;
+      &lt;p&gt;{estado}&lt;/p&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+</div>
+
+<p>A ação recebe dois argumentos: o estado anterior e o <code>FormData</code>. O valor que ela devolve
+vira o novo estado. Isso é diferente de <code>useState</code>, em que você chama o setter: aqui a ação
+<em>devolve</em> o próximo estado, e o React guarda. O primeiro argumento existe porque a próxima ação
+pode querer saber o que aconteceu antes — um histórico, um contador, um “acrescentar ao que já existe”.</p>
+
+<p>O <code>useActionState</code> é assunto da aula <a href="use-action-state.html">O useActionState</a>,
+onde ele aparece inteiro. Aqui ele entra só para você ver a validação no lugar certo, sem precisar de um
+estado separado nem de um <code>useState</code> paralelo. O terceiro item, que a caixa ignora, é a
+pendência — o “está enviando” que veremos na seção de armadilhas.</p>
+
+<p>Sobre a pendência, uma recomendação prática. Enquanto a ação roda, o React considera aquele envio
+em andamento e o <code>useActionState</code> devolve <code>pendente: true</code>. Use isso em três
+lugares: no <code>disabled</code> do botão, no texto dele (“Enviando…” em vez de “Encomendar”) e num
+aviso para leitor de tela, com <code>role="status"</code>. O primeiro evita o pedido duplicado; os outros
+dois evitam a dúvida de quem está olhando para a tela sem saber se o clique funcionou.</p>
+
+<h2>6. A caixa: o histórico que não perde pedido</h2>
+
+<p>Agora o caso que a Ana viveu na padaria. O formulário guarda os pedidos numa lista, e cada envio
+deveria somar um item. No código abaixo, o envio troca a lista inteira por um array de um item só: o
+cliente encomenda três vezes e vê só o último pedido.</p>
+
+<div class="tryreact" data-goal="digite:input=Francês;;clique:button;;digite:input=Baguete;;clique:button;;conta:li=2;;texto:Baguete">
+  <p class="try-task">Cada envio deve somar à lista, não substituir. Use a forma de atualização com o
+  valor anterior dentro do <code>setPedidos</code>, e encomende dois pães diferentes.</p>
+  <pre class="jsx">function App() {
+  const [pedidos, setPedidos] = useState([]);
+
+  return (
+    &lt;form action={function (dados) { setPedidos([String(dados.get("pao"))]); }}&gt;
+      &lt;input name="pao" /&gt;
+      &lt;button&gt;Encomendar&lt;/button&gt;
+      &lt;ul&gt;
+        {pedidos.map(function (pao, i) { return &lt;li key={i}&gt;{pao}&lt;/li&gt;; })}
+      &lt;/ul&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;form action="javascript:throw new Error('A React form was unexpectedly submitted. If you called form.submit() manually, consider using form.requestSubmit() instead. If you\'re trying to use event.stopPropagation() in a submit event handler, consider also calling event.preventDefault().')"&gt;
+  &lt;input name="pao"&gt;
+  &lt;button&gt;Encomendar&lt;/button&gt;
+  &lt;ul&gt;&lt;/ul&gt;
+&lt;/form&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [pedidos, setPedidos] = useState([]);
+
+  return (
+    &lt;form action={function (dados) {
+      const pao = String(dados.get("pao"));
+      setPedidos(function (anteriores) { return anteriores.concat(pao); });
+    }}&gt;
+      &lt;input name="pao" /&gt;
+      &lt;button&gt;Encomendar&lt;/button&gt;
+      &lt;ul&gt;
+        {pedidos.map(function (pao, i) { return &lt;li key={i}&gt;{pao}&lt;/li&gt;; })}
+      &lt;/ul&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois do primeiro envio, repare em uma coisa que não está no código: o campo voltou a ficar vazio
+sozinho. É o reset automático do React 19 para formulários não controlados — envio concluído, campos
+limpos. Ele é ótimo para uma encomenda e péssimo para um formulário de cadastro em que a pessoa perdeu o
+que digitou por causa de um erro; nesse caso, devolver o que ela escreveu faz parte da mensagem de erro.</p>
+
+<p>Se o formulário precisa manter o que a pessoa digitou depois de um erro, o reset automático vira
+um problema. Duas saídas comuns: tornar os campos controlados, guardando cada valor em estado e
+devolvendo-o na mensagem de erro, ou usar o estado que a ação devolve para preencher os campos com
+<code>defaultValue</code> na próxima renderização. As duas funcionam; a primeira dá mais trabalho e mais
+controle, a segunda é mais barata e combina com o jeito do React 19.</p>
+
+<p>A forma de atualização, <code>setPedidos(function (anteriores) { … })</code>, também merece atenção.
+Ela não é exclusividade de actions: vale em qualquer lugar. Serve porque a ação pode rodar depois de um
+tempo, quando o valor de <code>pedidos</code> no closure já está velho. Recebendo o anterior por
+parâmetro, você sempre soma sobre o valor mais recente — e nunca perde um pedido.</p>
+
+<h2>7. Action ou onSubmit?</h2>
+
+<p>O caminho antigo não morreu. Ele é necessário quando você precisa de algo que só o evento
+<code>submit</code> dá, ou quando está num projeto com uma biblioteca que toma conta do formulário. A
+diferença é de quem faz o trabalho de colher os campos.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Passo</th><th>Com onSubmit</th><th>Com action</th></tr>
+<tr><td>impedir o recarregamento</td><td><code>event.preventDefault()</code> na mão</td><td>o React faz</td></tr>
+<tr><td>reunir os campos</td><td><code>FormData(event.target)</code> na mão</td><td>o React entrega pronto</td></tr>
+<tr><td>avisar que está enviando</td><td>um <code>useState</code> ligado e desligado</td><td>o item <code>pending</code> do <code>useActionState</code></td></tr>
+<tr><td>limpar depois do envio</td><td>reset manual ou estado controlado</td><td>reset automático dos campos não controlados</td></tr>
+<tr><td>quando usar</td><td>evento com lógica própria, biblioteca externa</td><td>formulário comum que envia dados</td></tr>
+</table>
+</div>
+
+<p>Há uma diferença de comportamento que não aparece no JSX: o React executa a ação dentro de uma
+transição. Na prática, isso quer dizer que a interface continua respondendo enquanto o envio acontece — a
+pessoa pode clicar em outro lugar, digitar em outro campo, e a tela não trava esperando o servidor. É o
+mesmo mecanismo do <code>useTransition</code> da aula <a href="useTransition.html">O useTransition</a>,
+aplicado ao formulário: o envio é trabalho não urgente, e o React sabe disso.</p>
+
+<p>Repare que o <code>FormData</code> aparece nos dois caminhos. Ele não é uma invenção do React: é uma
+API do navegador, que existe desde muito antes. O React 19 só passou a construir e entregar esse objeto
+para você, no lugar de obrigar cada projeto a repetir as mesmas quatro linhas.</p>
+
+<h2>8. As armadilhas</h2>
+
+<p>Quatro tropeços concentram quase todos os problemas de formulário com ação. Três deles não dão erro
+nenhum: só produzem pedidos errados, o que é pior.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sintoma</th><th>Causa</th><th>Conserto</th></tr>
+<tr><td>o pedido chega com <code>null</code></td><td>o campo está sem <code>name</code></td><td>dar ao campo o mesmo nome que a ação lê</td></tr>
+<tr><td>o primeiro pedido funciona e o terceiro não</td><td>a ação substitui em vez de somar</td><td>atualizar com o valor anterior</td></tr>
+<tr><td>a caixa marcada chega como <code>"on"</code></td><td>falta <code>value</code> no campo</td><td><code>value="urgente"</code></td></tr>
+<tr><td>o botão pode ser clicado cinco vezes</td><td>a pendência foi ignorada</td><td><code>disabled={pendente}</code> no botão</td></tr>
+</table>
+</div>
+
+<p>A terceira linha é a que mais surpreende. Uma caixa de seleção sem <code>value</code> manda o texto
+<code>"on"</code>, e uma caixa desmarcada não manda nada — nem <code>false</code>, nem
+<code>"off"</code>. No servidor, “não veio” é o jeito de dizer “desmarcada”. Se você precisa de um valor
+com significado, escreva o valor:</p>
+
+<pre class="term">campo: pao = Baguete
+campo: urgente = on
+campo: observacao = sem cebola</pre>
+
+<p>Vale também saber o que o <code>preventDefault</code> deixou de existir. Com <code>action</code>, não
+existe mais evento chegando na sua função: o que chega é o <code>FormData</code>. Se você precisa do
+evento — para ler um campo que não tem <code>name</code>, ou para focar um elemento depois do envio —,
+guarde uma referência com <code>useRef</code> e use <code>ref.current</code> em vez de
+<code>event.target</code>.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o campo de observação que ninguém recebia</h3>
+<p>A Ana acrescentou “observação” ao formulário e esqueceu o <code>name</code>. Os pedidos chegavam sem
+o texto, e o cliente reclamava no balcão. Como a ação lia só os campos que existiam, nada quebrou: o
+pedido saiu sem o recado. O conserto foi uma palavra no JSX — e a lição de conferir o
+<code>FormData</code> no console antes de dizer que o formulário está pronto.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o formulário que limpava o nome da cliente</h3>
+<p>No cadastro de cliente, a ação recusou o telefone e devolveu a mensagem de erro. O React já havia
+limpado os campos, então a cliente teve de digitar tudo de novo — e desistiu. A saída foi devolver os
+valores na mensagem e preencher os campos com eles, ou manter o formulário controlado enquanto a
+validação não passa.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: a encomenda enviada duas vezes</h3>
+<p>O serviço da padaria demorava dois segundos. Sem desabilitar o botão durante a pendência, o cliente
+clicava três vezes e gerava três pedidos iguais. O <code>disabled={pendente}</code> resolveu na hora —
+e o aviso “Enviando…” no botão resolveu a dúvida de quem estava olhando para a tela.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. O que a função do <code>action</code> recebe?</p>
+<label><input type="radio" name="q1"> o evento de submit, como no <code>onSubmit</code></label>
+<label><input type="radio" name="q1"> o objeto do formulário com os valores já convertidos em número</label>
+<label><input type="radio" name="q1"> um <code>FormData</code> com os campos que têm <code>name</code></label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">2. Por que um campo sem <code>name</code> não chega na ação?</p>
+<label><input type="radio" name="q2"> porque o React descarta campos vazios</label>
+<label><input type="radio" name="q2"> porque o <code>FormData</code> só reúne campos nomeados</label>
+<label><input type="radio" name="q2"> porque o navegador exige <code>name</code> em todo input</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que o React faz depois de uma ação bem-sucedida num formulário não controlado?</p>
+<label><input type="radio" name="q3"> limpa os campos do formulário</label>
+<label><input type="radio" name="q3"> recarrega a página para atualizar os dados</label>
+<label><input type="radio" name="q3"> transforma os campos em controlados</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o nome que a ação procura</h2>
+<p>A ação lê <code>dados.get("quem")</code>, mas o campo está sem nome. Complete o atributo.</p>
+<div class="ex-code">&lt;input <input aria-label="resposta 1" data-answer="name=&quot;quem&quot;|name='quem'" placeholder="..."> /&gt;</div>
+<p class="ex-dica">Dica: o valor entre aspas é o mesmo texto que a ação passa para <code>get</code>. Sem
+ele, o campo não entra no <code>FormData</code>.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Com <code>action</code>, o formulário entrega os campos reunidos num <code>FormData</code> e o React
+cuida do <code>preventDefault</code>, do reset e do período de pendência. Cada campo precisa de
+<code>name</code>, e o nome é a chave que a ação usa para ler. Texto chega como texto, caixa marcada sem
+<code>value</code> chega como <code>"on"</code>, e campo vazio não chega.</p>
+
+<p>A validação mora dentro da ação. Com <code>useActionState</code>, o que a ação devolve vira o estado
+que a tela mostra — mensagem de erro ou confirmação —, e o terceiro item avisa quando o envio está em
+andamento. Para listas, atualize com o valor anterior, senão cada envio apaga o que veio antes.</p>
+
+<p>O resto é cuidado: desabilitar o botão enquanto envia, devolver os valores quando a validação falha e
+lembrar que o reset automático é ótimo para encomenda e ruim para cadastro. As actions têm aula própria
+em <a href="actions.html">As Actions</a>, e o estado delas em
+<a href="use-action-state.html">O useActionState</a> — o que você viu aqui é o suficiente para reescrever
+os formulários do site da padaria.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>&lt;form action={fn}&gt;</code> substitui <code>onSubmit</code> + <code>preventDefault</code>.</li>
+<li>A ação recebe um <code>FormData</code>; lê-se com <code>dados.get("nome")</code>.</li>
+<li>Sem <code>name</code> o campo não é enviado — e não dá erro.</li>
+<li>Número chega como texto; caixa marcada sem <code>value</code> chega como <code>"on"</code>.</li>
+<li>Vários campos com o mesmo nome: <code>getAll</code>, não <code>get</code>.</li>
+<li><code>useActionState</code> devolve estado, ação e pendência.</li>
+<li>A ação devolve o próximo estado; não chama setter.</li>
+<li>Lista se atualiza com o valor anterior, nunca substituindo.</li>
+<li>O React limpa os campos não controlados depois do envio.</li>
+<li>Desabilite o botão enquanto <code>pendente</code> para não duplicar pedido.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

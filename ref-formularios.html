@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Formulários | Guia React</title>
+<meta name="description" content="Consulta sobre formulários em React: campo controlado, value e onChange, select, checkbox, radio, envio, validação, acessibilidade e erros comuns.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Formulários</span></h1>
+<p class="intro">Formulário em React é sempre o mesmo circuito: um valor mora no estado, o campo mostra esse
+valor e o evento de mudança troca o estado. O que varia é o tipo de campo — texto, número, escolha única,
+marcação — e o que se faz com o valor no fim: validar, enviar, limpar. Esta página é a consulta da Ana para
+quando ela está escrevendo o formulário de encomenda e não quer reler quatro aulas para lembrar se checkbox
+usa <code>checked</code> ou <code>value</code>.</p>
+
+<div class="note">
+<strong>Como usar esta página</strong>
+<ul>
+  <li>Comece pela seção 1 se você só quer o padrão; vá direto à tabela da seção 2 se o campo é de outro
+  tipo.</li>
+  <li>Cada linha das tabelas aponta a aula que ensina o caso completo.</li>
+  <li>As duas caixas rodam com React 19: edite, clique em Rodar e leia o painel.</li>
+  <li>Os trechos de arquivo mostram o código como ele fica no projeto, com <code>import</code>.</li>
+</ul>
+</div>
+
+<h2>1. O padrão: valor no estado, mudança no evento</h2>
+
+<p>Um campo é <strong>controlado</strong> quando o React manda no que ele mostra. Isso significa duas coisas
+escritas juntas: <code>value</code> recebendo o estado e <code>onChange</code> trocando o estado. Sem o
+primeiro, o campo não reflete o dado; sem o segundo, o campo nem aceita digitação.</p>
+
+<pre class="file" data-file="CampoDeNome.jsx">import { useState } from "react";
+
+export function CampoDeNome() {
+  const [nome, setNome] = useState("");
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;p&gt;Você digitou: {nome}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>O evento chega como um objeto, e o valor digitado está em <code>e.target.value</code> — sempre texto, em
+qualquer tipo de campo. Quem define o que o estado guarda é você: <code>e.target.value</code> cru para texto,
+<code>Number(e.target.value)</code> para número, <code>e.target.checked</code> para marcação. Essa escolha
+aparece na seção 3 e é a origem da maior parte dos bugs de comparação em formulário.</p>
+
+<dl class="anatomy">
+<dt>campo controlado</dt>
+<dd>Campo cujo valor visível vem do estado do componente, via <code>value</code>, e cuja mudança volta pelo
+<code>onChange</code>.</dd>
+<dt>value</dt>
+<dd>O que o campo mostra. No JSX é sempre a variável do estado — nunca o valor digitado direto.</dd>
+<dt>onChange</dt>
+<dd>A função que roda a cada alteração. Recebe o evento e chama a função do <code>useState</code>.</dd>
+<dt>evento</dt>
+<dd>O objeto que o navegador entrega: <code>e.target.value</code> para texto,
+<code>e.target.checked</code> para checkbox e radio.</dd>
+<dt>name</dt>
+<dd>O nome do campo no HTML. Agrupa radios e é o que aparece num envio de formulário tradicional.</dd>
+<dt>submit</dt>
+<dd>O evento de envio do <code>&lt;form&gt;</code>, tratado com <code>onSubmit</code> mais
+<code>e.preventDefault()</code>.</dd>
+</dl>
+
+<p>Se você escrever <code>value</code> e esquecer o <code>onChange</code>, o campo fica somente leitura e o
+console do navegador avisa. É um dos avisos mais úteis do React, porque o sintoma na tela — “o campo não
+aceita nada” — parece problema de CSS:</p>
+
+<pre class="term">Warning: You provided a `value` prop to a form field without an `onChange` handler. This will render a read-only field.</pre>
+
+<p>O caminho de volta também confunde. Se você escrever só <code>onChange</code>, sem <code>value</code>, o
+campo aceita digitação e mostra o que o navegador quiser — o estado muda, mas a tela não obedece. É o modo
+não controlado, legítimo em formulários simples, e assunto da seção 7.</p>
+
+<p>Duas escolhas do evento merecem ser conhecidas desde o começo. O <code>onChange</code> do React dispara a
+cada tecla — é o evento <code>input</code> do navegador, e não o <code>change</code> que só dispara ao sair do
+campo. Quem quer validar no fim da digitação usa <code>onBlur</code>, que roda quando o campo perde o foco. E
+o valor pode ser lido de <code>e.target</code> (o elemento que disparou) ou de <code>e.currentTarget</code>
+(o elemento que tem o manipulador). Em campo simples os dois apontam para o mesmo lugar; em formulário com
+campos aninhados, <code>currentTarget</code> é o que você quer.</p>
+
+<h2>2. Um campo de cada tipo</h2>
+
+<p>A regra é a mesma para todos; o que muda é o atributo que carrega o valor e o lugar de onde ele vem no
+evento. Esta tabela é a consulta rápida:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Campo</th><th>O atributo</th><th>O que guardar</th><th>Aula</th></tr>
+<tr><td><code>&lt;input type="text"&gt;</code></td><td><code>value</code></td><td><code>e.target.value</code> (texto)</td><td><a href="input-controlado.html">Input Controlado</a></td></tr>
+<tr><td><code>&lt;input type="number"&gt;</code></td><td><code>value</code></td><td><code>Number(e.target.value)</code></td><td><a href="entrada-controlada.html">Entrada Controlada</a></td></tr>
+<tr><td><code>&lt;textarea&gt;</code></td><td><code>value</code></td><td><code>e.target.value</code> (nunca por filhos)</td><td><a href="textarea.html">Textarea</a></td></tr>
+<tr><td><code>&lt;select&gt;</code></td><td><code>value</code></td><td>o <code>value</code> da opção escolhida</td><td><a href="select.html">Select</a></td></tr>
+<tr><td><code>&lt;input type="checkbox"&gt;</code></td><td><code>checked</code></td><td><code>e.target.checked</code> (booleano)</td><td><a href="checkbox.html">Checkbox</a></td></tr>
+<tr><td><code>&lt;input type="radio"&gt;</code></td><td><code>checked</code></td><td>o valor da opção, comparado no <code>checked</code></td><td><a href="radio.html">Radio</a></td></tr>
+<tr><td><code>&lt;input type="file"&gt;</code></td><td>nenhum</td><td><code>e.target.files</code> — o valor é só leitura</td><td><a href="controlado-e-nao-controlado.html">Controlado e Não Controlado</a></td></tr>
+</table>
+</div>
+
+<p>Duas linhas dessa tabela explicam quase todos os bugs de formulário. A do checkbox: marcar não muda
+<code>value</code>, muda <code>checked</code> — quem lê <code>e.target.value</code> num checkbox recebe
+<code>"on"</code>, que é o valor padrão do HTML. A do arquivo: por segurança, o navegador não deixa o React
+definir o conteúdo de um seletor de arquivo, então ele não é controlado em nenhuma versão.</p>
+
+<p>O atributo <code>name</code>, que parece enfeite em formulário controlado, é o que permite ler o
+formulário inteiro de uma vez: <code>new FormData(e.currentTarget)</code> devolve um objeto com o valor de
+cada campo nomeado, pronto para <code>Object.fromEntries</code>. Em formulário controlado o estado já tem
+tudo, então o <code>name</code> fica para a acessibilidade e para o envio tradicional; em formulário não
+controlado, ele é o caminho de leitura. Os dois podem conviver na mesma tela, campo a campo.</p>
+
+<h2>3. Texto, número e área de texto</h2>
+
+<p>Campo de texto é o caso direto: <code>value={texto}</code> e <code>onChange</code> guardando
+<code>e.target.value</code>. O cuidado está no número. O navegador entrega texto mesmo em
+<code>type="number"</code>, e a diferença aparece na primeira conta.</p>
+
+<pre class="term">typeof e.target.value: string
+"3" + 1 = "31"
+"3" * 1 = 3</pre>
+
+<p>Por isso a conversão é explícita: <code>setQuantidade(Number(e.target.value))</code>. Se o campo puder
+ficar vazio durante a digitação, <code>Number("")</code> devolve <code>0</code> — e o total pisca para zero
+enquanto a pessoa apaga. Guardar o texto e converter no cálculo é a alternativa que evita o pisca; guardar o
+número é mais simples e serve quando o campo não é apagado no meio da edição.</p>
+
+<div class="tryreact" data-goal="digite:input=3;;texto:Total: R$ 18,00">
+  <p class="try-task">O campo guarda o valor inicial, mas não é controlado: digitar não muda o total. Ligue o
+  campo ao estado com <code>value={quantidade}</code> e
+  <code>onChange={(e) =&gt; setQuantidade(Number(e.target.value))}</code>.</p>
+  <pre class="jsx">function App() {
+  const [quantidade, setQuantidade] = useState(1);
+  const preco = 6;
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="qtd"&gt;Quantidade de pães&lt;/label&gt;
+      &lt;input id="qtd" type="number" defaultValue={quantidade} /&gt;
+      &lt;p&gt;Total: R$ {quantidade * preco + ",00"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="qtd"&gt;Quantidade de pães&lt;/label&gt;
+  &lt;input id="qtd" type="number" value="1"&gt;
+  &lt;p&gt;Total: R$ 6,00&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [quantidade, setQuantidade] = useState(1);
+  const preco = 6;
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="qtd"&gt;Quantidade de pães&lt;/label&gt;
+      &lt;input
+        id="qtd"
+        type="number"
+        value={quantidade}
+        onChange={(e) =&gt; setQuantidade(Number(e.target.value))}
+      /&gt;
+      &lt;p&gt;Total: R$ {quantidade * preco + ",00"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Repare no <code>+ ",00"</code>: dinheiro formatado à mão é o que aparece em exemplo de guia, e é o que
+menos dá problema quando os preços são redondos. Para valores com centavos, use
+<code>valor.toFixed(2).replace(".", ",")</code> ou um formatador de moeda — o assunto não é React, é
+apresentação.</p>
+
+<p>Se o seu formulário aceita preço digitado pelo cliente, o problema é outro: no Brasil se escreve
+<code>12,50</code>, e <code>Number("12,50")</code> devolve <code>NaN</code>. As saídas são guardar o texto e
+converter trocando a vírgula por ponto no momento do cálculo, ou usar <code>inputMode="decimal"</code> para o
+teclado do celular abrir com vírgula e tratar a conversão na função do <code>onChange</code>. O que não
+funciona é confiar no <code>type="number"</code>: ele recusa a vírgula em alguns navegadores e engole o valor
+em outros.</p>
+
+<p>A <code>&lt;textarea&gt;</code> tem uma diferença de HTML que confunde quem vem de fora: o conteúdo não
+vai entre as tags, vai no <code>value</code>. Escrever <code>&lt;textarea&gt;texto&lt;/textarea&gt;</code> no
+JSX não funciona como valor controlado; o React trata o que está entre as tags como valor inicial e avisa.
+A aula <a href="textarea.html">Textarea</a> mostra o campo de observação da encomenda, com contagem de
+caracteres.</p>
+
+<h2>4. Escolhas: select, checkbox e radio</h2>
+
+<p>Os três campos de escolha parecem parentes e funcionam de formas diferentes. A confusão nasce do mesmo
+lugar: <code>value</code> serve para o campo que guarda <em>um valor entre vários</em>;
+<code>checked</code> serve para o campo que guarda <em>um sim ou não</em>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Campo</th><th>Como fica no JSX</th><th>No evento</th></tr>
+<tr><td><code>select</code> simples</td><td><code>&lt;select value={tamanho} onChange={...}&gt;</code> com <code>&lt;option value="G"&gt;</code></td><td><code>e.target.value</code></td></tr>
+<tr><td><code>select</code> múltiplo</td><td><code>&lt;select multiple value={escolhas}&gt;</code></td><td><code>Array.from(e.target.selectedOptions, (o) =&gt; o.value)</code> — <a href="select.html">Select</a></td></tr>
+<tr><td><code>checkbox</code> único</td><td><code>&lt;input type="checkbox" checked={aceito} onChange={...} /&gt;</code></td><td><code>e.target.checked</code> — <a href="checkbox.html">Checkbox</a></td></tr>
+<tr><td>lista de checkboxes</td><td><code>checked={marcados.includes(id)}</code></td><td>novo array com o id dentro ou fora — <a href="estado-com-array.html">Estado com Array</a></td></tr>
+<tr><td><code>radio</code> (grupo)</td><td><code>checked={pagamento === "pix"}</code> mais <code>name="pagamento"</code></td><td><code>setPagamento("pix")</code> — <a href="radio.html">Radio</a></td></tr>
+</table>
+</div>
+
+<p>No <code>select</code>, o valor do estado é o <code>value</code> da <code>&lt;option&gt;</code>, não o
+texto que aparece. Se você esquecer o <code>value</code> na opção, o navegador usa o texto como valor — e o
+código passa a comparar com “Pix” maiúsculo sem ninguém entender por quê. No <code>radio</code>, o
+<code>name</code> igual em todas as opções é o que faz o navegador tratar o grupo como um só; o
+<code>checked</code> é uma comparação, e o <code>onChange</code> grava o valor daquela opção.</p>
+
+<p>Para listas de checkbox, o estado é um array de ids, e a função de troca devolve um array novo: dentro se
+o id não estava, fora se estava. Mutar o array com <code>push</code> não redesenha, pelo mesmo motivo de
+sempre — o React compara a referência. A aula <a href="checkbox.html">Checkbox</a> traz a versão com
+“marcar todos”, e a <a href="radio.html">Radio</a> mostra o grupo com <code>fieldset</code> e
+<code>legend</code>.</p>
+
+<p>Um detalhe que morde em formulário de edição: <code>select</code> com valor que não existe entre as
+opções mostra a primeira da lista, sem aviso. Se o estado guarda <code>"G"</code> e as opções são
+<code>"P"</code>, <code>"M"</code> e <code>"GG"</code>, a tela mente. O mesmo vale para o radio: nenhuma
+opção marcada quando o valor do estado não bate com nenhum <code>checked</code>. Ao carregar dados de fora,
+garanta que o valor do estado é um dos valores possíveis — ou inclua uma opção vazia com
+<code>&lt;option value=""&gt;Escolha&lt;/option&gt;</code> para o caso “ainda não escolhi”.</p>
+
+<h2>5. Envio: onSubmit, preventDefault e o botão certo</h2>
+
+<p>O envio é um evento do <code>&lt;form&gt;</code>, não do botão. Você escreve
+<code>&lt;form onSubmit={enviar}&gt;</code>, e o navegador chama <code>enviar</code> quando alguém clica no
+botão de envio ou aperta Enter dentro de um campo. A primeira linha do manipulador precisa ser
+<code>e.preventDefault()</code>: sem ela, o navegador faz o envio tradicional, recarrega a página e o estado
+todo se perde.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Digite seu nome;;digite:input=Ana;;clique:button;;texto:Pedido de Ana enviado">
+  <p class="try-task">O formulário envia vazio. Valide antes: se <code>nome.trim() === ""</code>, mostre
+  <code>Digite seu nome</code> e pare; se estiver preenchido, mostre
+  <code>"Pedido de " + nome + " enviado"</code>.</p>
+  <pre class="jsx">function App() {
+  const [nome, setNome] = useState("");
+  const [enviado, setEnviado] = useState("");
+
+  function enviar(e) {
+    e.preventDefault();
+    setEnviado("Pedido de " + nome + " enviado");
+  }
+
+  return (
+    &lt;form onSubmit={enviar}&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;button&gt;Enviar pedido&lt;/button&gt;
+      &lt;p&gt;{enviado}&lt;/p&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;form&gt;
+  &lt;label for="nome"&gt;Nome&lt;/label&gt;
+  &lt;input id="nome" value=""&gt;
+  &lt;button&gt;Enviar pedido&lt;/button&gt;
+  &lt;p&gt;&lt;/p&gt;
+&lt;/form&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nome, setNome] = useState("");
+  const [erro, setErro] = useState("");
+  const [enviado, setEnviado] = useState("");
+
+  function enviar(e) {
+    e.preventDefault();
+
+    if (nome.trim() === "") {
+      setErro("Digite seu nome");
+      return;
+    }
+
+    setErro("");
+    setEnviado("Pedido de " + nome + " enviado");
+  }
+
+  return (
+    &lt;form onSubmit={enviar}&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      {erro ? &lt;p&gt;{erro}&lt;/p&gt; : null}
+      &lt;button&gt;Enviar pedido&lt;/button&gt;
+      &lt;p&gt;{enviado}&lt;/p&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+</div>
+
+<p>Três detalhes que a caixa deixa visíveis. O <code>return</code> antecipado dentro do manipulador é
+legítimo — ele não é hook, então não quebra regra nenhuma. O <code>trim()</code> existe porque um espaço
+não é nome. E o botão dentro de um <code>&lt;form&gt;</code> já é <code>type="submit"</code> por padrão; se
+você quiser um botão que não envie, escreva <code>type="button"</code>, senão ele dispara o envio sem
+querer.</p>
+
+<p>Quando o envio espera o servidor, o padrão é travar o botão e mostrar o que está acontecendo — o mesmo
+<code>pendente</code> da aula <a href="useTransition.html">O useTransition</a>. A aula
+<a href="envio-de-formulario.html">Envio de Formulário</a> faz o caminho completo com espera simulada e
+mensagem de erro.</p>
+
+<p>Depois do envio bem-sucedido, limpar é uma decisão de produto. Em formulário controlado, limpar é chamar a
+função do estado com o valor inicial: <code>setNome("")</code>, <code>setQuantidade(1)</code>. Em formulário
+não controlado, é <code>e.currentTarget.reset()</code>, que devolve cada campo ao
+<code>defaultValue</code>. O que não se faz é limpar só alguns campos e deixar o resto — a pessoa vê metade
+do pedido anterior na tela e não sabe se enviou ou não.</p>
+
+<h2>6. Validação e mensagens que o leitor de tela ouve</h2>
+
+<p>Existem duas validações e elas convivem. A do navegador é declarativa —
+<code>required</code>, <code>minLength</code>, <code>type="email"</code> — e mostra o balão nativo antes de
+o <code>onSubmit</code> rodar. A do componente é sua: roda no envio, guarda a mensagem em estado e aparece
+na tela. A nativa cobre o básico; a do componente cobre o que o HTML não sabe, como “esse CEP não é da nossa
+área”.</p>
+
+<p>Para a mensagem ser acessível, três coisas: o campo tem <code>id</code> e <code>label</code> ligados por
+<code>htmlFor</code>; a mensagem tem um <code>id</code> próprio e o campo aponta para ela com
+<code>aria-describedby</code>; e o campo recebe <code>aria-invalid={Boolean(erro)}</code> para o leitor de
+tela anunciar o estado. Sem isso, a mensagem vermelha existe só para quem enxerga.</p>
+
+<pre class="file" data-file="CampoDeEmail.jsx">const id = useId();
+const erro = email.includes("@") ? "" : "Falta o @ no e-mail";
+
+&lt;label htmlFor={"email-" + id}&gt;E-mail&lt;/label&gt;
+&lt;input
+  id={"email-" + id}
+  value={email}
+  onChange={(e) =&gt; setEmail(e.target.value)}
+  aria-invalid={Boolean(erro)}
+  aria-describedby={erro ? "erro-" + id : undefined}
+/&gt;
+{erro ? &lt;p id={"erro-" + id}&gt;{erro}&lt;/p&gt; : null}</pre>
+
+<p>O <code>useId</code> entra porque o componente pode aparecer duas vezes na mesma página — veja
+<a href="useId.html">O useId</a>.</p>
+
+<p>A validação nativa tem um comportamento que surpreende em teste: o balão do navegador só aparece quando o
+formulário tenta enviar, e não quando o campo perde o foco. Se você quiser controlar a mensagem, pode desligar
+a nativa com <code>noValidate</code> no <code>&lt;form&gt;</code> e assumir a validação toda no
+<code>onSubmit</code> — é o que a maioria dos formulários com mensagem própria faz. O preço é reimplementar o
+básico: campo obrigatório, tamanho mínimo, formato de e-mail.</p>
+
+<p>E a validação não deve rodar a cada letra sem critério: mostrar “e-mail
+inválido” enquanto a pessoa digitou a primeira letra é hostil. Valide no envio, ou depois que o campo perde
+o foco; a aula <a href="validacao.html">Validação</a> compara os momentos e mostra a mensagem que aparece na
+hora certa.</p>
+
+<h2>7. Controlado, não controlado e o que o React 19 muda</h2>
+
+<p>Nem todo campo precisa de estado. Um formulário de uma linha, que só é lido no envio, pode usar
+<code>defaultValue</code> e ler os valores do próprio formulário. A escolha é entre ter o valor sempre à
+mão (controlado) e ter menos código (não controlado).</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você precisa…</th><th>Controlado</th><th>Não controlado</th></tr>
+<tr><td>validar enquanto digita</td><td>sim, é o ponto forte</td><td>não sem gambiarra</td></tr>
+<tr><td>habilitar botão só com formulário válido</td><td>sim</td><td>não</td></tr>
+<tr><td>limpar o formulário depois do envio</td><td><code>setValor("")</code></td><td><code>form.reset()</code> ou <code>e.target.reset()</code> — <a href="envio-de-formulario.html">Envio de Formulário</a></td></tr>
+<tr><td>ler um arquivo</td><td>impossível</td><td><code>e.target.files</code> — <a href="controlado-e-nao-controlado.html">Controlado e Não Controlado</a></td></tr>
+<tr><td>formulário grande, sem regra dinâmica</td><td>mais código</td><td>mais simples</td></tr>
+</table>
+</div>
+
+<p>O React 19 acrescentou um terceiro caminho: passar uma função para o <code>action</code> do formulário —
+<code>&lt;form action={enviar}&gt;</code> — e deixar o React cuidar do envio, do estado pendente e do
+resultado. É a base das <em>ações</em>, que a aula
+<a href="formularios-com-actions.html">Formulários com Actions</a> mostra com o mesmo formulário de
+encomenda. Para quem está começando, o caminho controlado continua sendo o que ensina o mecanismo; o
+<code>action</code> é a conveniência que vem depois.</p>
+
+<p>Um cuidado que vale para os dois: não misture <code>value</code> com <code>defaultValue</code> no mesmo
+campo, e não troque um pelo outro no meio da vida do componente. O React trata a troca como mudança de modo e
+avisa no console; o campo pode perder o que estava digitado.</p>
+
+<p>Se você escolher o caminho não controlado, o formulário continua tendo estado — só que ele mora no DOM. A
+leitura acontece no envio, com <code>new FormData(e.currentTarget)</code>, e o resultado é um
+<code>FormData</code> de onde se lê <code>dados.get("nome")</code>. A vantagem é menos código; a desvantagem é
+que qualquer regra “o botão só habilita com tudo preenchido” exige um estado paralelo só para isso. Por isso o
+guia começa pelo controlado: ele custa duas linhas e evita a segunda fonte de verdade.</p>
+
+<h2>8. Erros comuns</h2>
+
+<p>Cinco sintomas cobrem a maior parte dos formulários quebrados. A tabela vai do que aparece na tela ao
+conserto.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sintoma</th><th>Causa</th><th>Conserto</th></tr>
+<tr><td>o campo não aceita digitação</td><td><code>value</code> sem <code>onChange</code></td><td>ligar o <code>onChange</code> ao estado — <a href="input-controlado.html">Input Controlado</a></td></tr>
+<tr><td>a página recarrega ao enviar</td><td>falta <code>e.preventDefault()</code></td><td>primeira linha do <code>onSubmit</code> — <a href="envio-de-formulario.html">Envio de Formulário</a></td></tr>
+<tr><td>o checkbox nunca marca</td><td><code>value</code> em vez de <code>checked</code></td><td><code>checked={marcado}</code> e <code>e.target.checked</code></td></tr>
+<tr><td>o select mostra sempre a primeira opção</td><td><code>selected</code> na <code>&lt;option&gt;</code></td><td><code>value</code> no <code>&lt;select&gt;</code> — <a href="select.html">Select</a></td></tr>
+<tr><td>a comparação de número falha</td><td><code>e.target.value</code> é texto</td><td><code>Number(...)</code> ou <code>valueAsNumber</code> — <a href="entrada-controlada.html">Entrada Controlada</a></td></tr>
+</table>
+</div>
+
+<p>O caso do <code>selected</code> merece uma nota: no HTML puro, a opção escolhida é marcada com
+<code>selected</code>. No JSX controlado, quem manda é o <code>value</code> do <code>select</code>; escrever
+<code>selected</code> na opção faz o React tratar aquilo como valor inicial e brigar com o estado. Mesma
+ideia do <code>checked</code> em radio: o atributo existe, mas não é ele que você escreve.</p>
+
+<p>E o erro que não é erro: campo com <code>type="number"</code> aceitando letra no teclado do computador.
+O navegador filtra o que dá, mas deixa digitar <code>e</code>, <code>+</code> e <code>-</code>, porque são
+parte de notação científica. Se você precisa de um número inteiro positivo, valide no envio; o atributo
+<code>type</code> é uma dica, não uma garantia.</p>
+
+<p>Outro que não dá erro e confunde: o formulário que “não limpa”. Quase sempre o campo é controlado e o
+estado foi definido com o valor inicial fora do componente — uma constante que sobrevive entre montagens. Ao
+remontar a tela, o estado volta com o valor da constante e a impressão é de que o envio não terminou. O
+conserto é o valor inicial ser simples (<code>""</code>, <code>0</code>, <code>false</code>) e o dado
+carregado entrar por prop, com um efeito que copia uma vez só.</p>
+
+<h2>Resumo</h2>
+
+<p>Campo controlado é <code>value</code> mais <code>onChange</code>, com o estado mandando no que aparece.
+Texto e <code>textarea</code> guardam <code>e.target.value</code>; número precisa de
+<code>Number(...)</code>; <code>select</code> guarda o <code>value</code> da opção; checkbox e radio usam
+<code>checked</code> e <code>e.target.checked</code>. Arquivo não é controlado.</p>
+
+<p>O envio é do <code>&lt;form&gt;</code>: <code>onSubmit</code>, <code>preventDefault()</code> na primeira
+linha e o botão de envio dentro dele. A validação do navegador cobre o básico; a do componente cobre o
+resto e precisa de <code>label</code> ligado, <code>aria-describedby</code> para a mensagem e
+<code>aria-invalid</code> para o estado. Formulário simples pode ser não controlado, com
+<code>defaultValue</code>; o React 19 ainda oferece <code>action</code> no formulário, que a aula de actions
+detalha.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>value</code> sem <code>onChange</code> vira campo somente leitura.</li>
+<li><code>e.target.value</code> é sempre texto; converta número com <code>Number</code>.</li>
+<li><code>textarea</code> usa <code>value</code>, não conteúdo entre tags.</li>
+<li><code>select</code> usa <code>value</code> no select, não <code>selected</code> na opção.</li>
+<li>Checkbox e radio usam <code>checked</code>; lista de checkbox usa array de ids.</li>
+<li>Radio se agrupa pelo <code>name</code> igual em todas as opções.</li>
+<li>Envio: <code>onSubmit</code> mais <code>preventDefault()</code>, sempre.</li>
+<li>Mensagem de erro com <code>id</code> e <code>aria-describedby</code> no campo.</li>
+<li>Arquivo é sempre não controlado: leia <code>e.target.files</code>.</li>
+<li>Não misture <code>value</code> e <code>defaultValue</code> no mesmo campo.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

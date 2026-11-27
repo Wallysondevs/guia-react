@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Link e Navegação | Guia React</title>
+<meta name="description" content="Link e navegação no React: por que usar âncora em vez de botão, interceptar o clique com preventDefault, links externos e o menu que não recarrega.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Link e <span class="hl">Navegação</span></h1>
+<p class="intro">O menu da Ana funciona: clicar em "Pães" troca a tela e o endereço acompanha. Só que o
+menu é feito de botões, e botão não abre em nova aba, não tem "copiar endereço" e não aparece na lista de
+links do leitor de tela. Quando ela trocou por links de verdade, a página começou a piscar e o pedido em
+andamento se perdeu. Nesta aula ela acerta as duas coisas: a âncora que o navegador entende e o clique
+que não recarrega.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que navegação se escreve com <code>&lt;a href&gt;</code> e não com <code>&lt;button&gt;</code>.</li>
+  <li>O que o <code>preventDefault</code> faz e por que ele é obrigatório num link interno.</li>
+  <li>O componente <code>Link</code>: destino, rótulo e clique interceptado.</li>
+  <li>Como tratar links externos sem prendê-los no roteador.</li>
+  <li>O que fazer com <code>mailto</code>, <code>tel</code> e download.</li>
+  <li>Foco, rolagem e o item ativo depois da troca de tela.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o menu de botões</h2>
+
+<p>No fim da aula de <a href="rotas-por-hash.html">rotas por hash</a>, o site da Ana navegava. O menu,
+porém, era uma fileira de <code>&lt;button&gt;</code>, cada um chamando <code>irPara</code>. Funcionava
+no clique simples e falhava em tudo o mais: o Ctrl+clique não abria em nova aba, o botão do meio não fazia
+nada, o menu de contexto não oferecia "copiar endereço do link" e o leitor de tela anunciava "botão,
+Pães" — sem dizer que aquilo levava a outra página.</p>
+
+<p>A cliente reclamou do detalhe mais caro: ela queria mandar o link dos pães para a filha. Não havia link
+para copiar; havia um botão. O endereço até mudava depois do clique, mas o botão em si não levava a lugar
+nenhum.</p>
+
+<p>A correção parece pequena — trocar <code>&lt;button&gt;</code> por <code>&lt;a&gt;</code> — e mexe em
+três coisas ao mesmo tempo: semântica, comportamento do navegador e o roteador. É o que esta aula
+desmonta, peça por peça.</p>
+
+<h2>2. Por que âncora, e não botão</h2>
+
+<p>A regra é antiga e não tem a ver com React: <strong>link é para navegar, botão é para agir</strong>.
+Salvar, somar, abrir um modal — botão. Ir para outra tela, outro endereço — link. O navegador trata os
+dois de formas diferentes porque essa diferença é a base da web.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que o cliente faz</th><th><code>&lt;a href&gt;</code></th><th><code>&lt;button&gt;</code></th></tr>
+<tr><td>Ctrl+clique ou botão do meio</td><td>abre em outra aba</td><td>nada</td></tr>
+<tr><td>Menu de contexto</td><td>copiar endereço, abrir em nova janela</td><td>sem opções de link</td></tr>
+<tr><td>Teclado</td><td>Enter navega</td><td>Enter e espaço disparam o clique</td></tr>
+<tr><td>Leitor de tela</td><td>anuncia "link, Pães"</td><td>anuncia "botão, Pães"</td></tr>
+<tr><td>Antes do JavaScript carregar</td><td>já navega</td><td>não faz nada</td></tr>
+</table>
+</div>
+
+<p>Esse último item é o mais subestimado. Um site com links funciona em conexão ruim, em navegador antigo
+e quando o JavaScript quebra. Um site com botões depende do JavaScript para tudo — inclusive para o
+cliente saber que aquilo era um link.</p>
+
+<p>Então o menu passa a ser uma lista de âncoras com <code>href</code> de verdade:
+<code>&lt;a href="#/paes"&gt;Pães&lt;/a&gt;</code>. Se nada mais for feito, o navegador já troca o hash e o
+seu roteador, que escuta <code>hashchange</code>, desenha a tela nova. Meio caminho andado, sem uma linha
+de código.</p>
+
+<h2>3. O clique que recarrega a página</h2>
+
+<p>Se a âncora aponta para um caminho de verdade — <code>&lt;a href="/paes"&gt;</code> —, o navegador faz o
+que sabe: pede o documento ao servidor e recarrega tudo. O React é desmontado, o estado se perde, o
+carrinho esvazia e a tela pisca. Numa rota por hash o estrago é menor, mas o princípio é o mesmo: o clique
+padrão é uma navegação do navegador, não do seu roteador.</p>
+
+<pre class="term">GET https://loja.test/padaria/ 200 (from cache)
+documento recarregado — o estado do React foi perdido</pre>
+
+<p>Para uma aplicação de página única, o clique tem de ser interceptado: você cancela o comportamento
+padrão e faz a troca por conta própria. Isso é uma linha — <code>e.preventDefault()</code> — e é a
+diferença entre um site que pisca e um que desliza.</p>
+
+<p>Vale entender o que o <code>preventDefault</code> não faz: ele não impede o seu código de rodar, não
+cancela o evento para outros handlers e não tem nada a ver com <code>stopPropagation</code>. Ele cancela
+apenas a <em>ação padrão</em> do navegador para aquele evento — no caso de uma âncora, ir para o
+endereço.</p>
+
+<h2>4. O componente Link</h2>
+
+<p>Com a âncora e o <code>preventDefault</code> na mão, o componente fica curto: recebe o destino, monta o
+<code>href</code> e intercepta o clique para chamar o roteador. O rótulo vem por
+<code>children</code>.</p>
+
+<div class="tryreact" data-goal="attr:a|href=#/paes;;clique:a;;texto:Tela: paes">
+  <p class="try-task">O <code>Link</code> do menu está renderizando um botão, então não há link nenhum
+  para copiar. Troque por uma âncora com <code>href</code> e mantenha a troca de tela sem recarregar.</p>
+  <pre class="jsx">const janela = new EventTarget();
+janela.hash = "#/inicio";
+
+function irPara(hash) {
+  janela.hash = hash;
+  janela.dispatchEvent(new Event("hashchange"));
+}
+
+function useRota() {
+  const [rota, setRota] = useState(janela.hash);
+
+  useEffect(() =&gt; {
+    const aoMudar = () =&gt; setRota(janela.hash);
+    janela.addEventListener("hashchange", aoMudar);
+    return () =&gt; janela.removeEventListener("hashchange", aoMudar);
+  }, []);
+
+  return rota.replace(/^#\/?/, "") || "inicio";
+}
+
+function Link({ para, children }) {
+  return &lt;button onClick={() =&gt; irPara(para)}&gt;{children}&lt;/button&gt;;
+}
+
+function App() {
+  const rota = useRota();
+
+  return (
+    &lt;div&gt;
+      &lt;nav&gt;
+        &lt;Link para="#/paes"&gt;Pães&lt;/Link&gt;
+        &lt;Link para="#/contato"&gt;Contato&lt;/Link&gt;
+      &lt;/nav&gt;
+      &lt;p&gt;Tela: {rota}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;nav&gt;
+    &lt;button&gt;Pães&lt;/button&gt;
+    &lt;button&gt;Contato&lt;/button&gt;
+  &lt;/nav&gt;
+  &lt;p&gt;Tela: inicio&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const janela = new EventTarget();
+janela.hash = "#/inicio";
+
+function irPara(hash) {
+  janela.hash = hash;
+  janela.dispatchEvent(new Event("hashchange"));
+}
+
+function useRota() {
+  const [rota, setRota] = useState(janela.hash);
+
+  useEffect(() =&gt; {
+    const aoMudar = () =&gt; setRota(janela.hash);
+    janela.addEventListener("hashchange", aoMudar);
+    return () =&gt; janela.removeEventListener("hashchange", aoMudar);
+  }, []);
+
+  return rota.replace(/^#\/?/, "") || "inicio";
+}
+
+function Link({ para, children }) {
+  return (
+    &lt;a
+      href={para}
+      onClick={(e) =&gt; {
+        e.preventDefault();
+        irPara(para);
+      }}
+    &gt;
+      {children}
+    &lt;/a&gt;
+  );
+}
+
+function App() {
+  const rota = useRota();
+
+  return (
+    &lt;div&gt;
+      &lt;nav&gt;
+        &lt;Link para="#/paes"&gt;Pães&lt;/Link&gt;
+        &lt;Link para="#/contato"&gt;Contato&lt;/Link&gt;
+      &lt;/nav&gt;
+      &lt;p&gt;Tela: {rota}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Repare no que o <code>href</code> faz e o clique não precisa fazer: ele dá ao navegador o endereço real
+daquela tela. É o que permite copiar, abrir em nova aba e funcionar antes do JavaScript. O
+<code>onClick</code> só evita a recarga quando o cliente está na mesma aba e o roteador pode responder
+mais rápido.</p>
+
+<dl class="anatomy">
+<dt>href</dt>
+<dd>O endereço que a âncora representa. É o que o navegador mostra ao passar o mouse e o que o
+"copiar endereço" entrega.</dd>
+<dt>preventDefault</dt>
+<dd>Cancela a ação padrão do navegador naquele evento. Numa âncora, evita sair da página.</dd>
+<dt>children</dt>
+<dd>O conteúdo entre as tags do <code>Link</code> — o rótulo clicável. É por aqui que o texto
+aparece.</dd>
+<dt>link interno</dt>
+<dd>Um endereço do próprio site. É o que o roteador deve interceptar.</dd>
+<dt>link externo</dt>
+<dd>Um endereço de outro domínio. O roteador não tem o que fazer com ele: quem navega é o
+navegador.</dd>
+</dl>
+
+<p>O nome do componente é uma escolha infeliz da história: quase toda biblioteca de rotas chama o
+componente de <code>Link</code>, e o React tem uma tag interna chamada... <code>link</code>, de minúscula,
+que serve para carregar CSS. Como componente começa com maiúscula, não há confusão para o React; mas vale
+saber que <code>&lt;link&gt;</code> e <code>&lt;Link&gt;</code> não têm nada a ver.</p>
+
+<h2>5. Links externos, download e contato</h2>
+
+<p>Nem todo <code>href</code> é rota. Um link para o perfil no Instagram, um PDF do cardápio, um
+<code>mailto:</code> — nada disso deve passar pelo roteador. Se você interceptar todos os cliques, o
+cliente clica no Instagram e não acontece nada: o <code>preventDefault</code> cancelou a ida, e o seu
+<code>irPara</code> não conhece aquele destino.</p>
+
+<div class="tryreact" data-goal="attr:a[href^=https]|target=_blank;;attr:a[href^=https]|rel=noreferrer">
+  <p class="try-task">O link do cardápio aponta para outro site, mas usa o <code>Link</code> do roteador:
+  o clique é cancelado e nada abre. Crie um link externo que abra em outra aba com
+  <code>rel="noreferrer"</code>.</p>
+  <pre class="jsx">const janela = new EventTarget();
+janela.hash = "#/inicio";
+
+function irPara(hash) {
+  janela.hash = hash;
+  janela.dispatchEvent(new Event("hashchange"));
+}
+
+function Link({ para, children }) {
+  return (
+    &lt;a
+      href={para}
+      onClick={(e) =&gt; {
+        e.preventDefault();
+        irPara(para);
+      }}
+    &gt;
+      {children}
+    &lt;/a&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;Link para="https://exemplo.test/cardapio.pdf"&gt;Cardápio em PDF&lt;/Link&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;a href="https://exemplo.test/cardapio.pdf"&gt;Cardápio em PDF&lt;/a&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const janela = new EventTarget();
+janela.hash = "#/inicio";
+
+function irPara(hash) {
+  janela.hash = hash;
+  janela.dispatchEvent(new Event("hashchange"));
+}
+
+function Link({ para, children }) {
+  return (
+    &lt;a
+      href={para}
+      onClick={(e) =&gt; {
+        e.preventDefault();
+        irPara(para);
+      }}
+    &gt;
+      {children}
+    &lt;/a&gt;
+  );
+}
+
+function LinkExterno({ url, children }) {
+  return (
+    &lt;a href={url} target="_blank" rel="noreferrer"&gt;
+      {children}
+    &lt;/a&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;LinkExterno url="https://exemplo.test/cardapio.pdf"&gt;
+        Cardápio em PDF
+      &lt;/LinkExterno&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O <code>target="_blank"</code> abre em outra aba. O <code>rel="noreferrer"</code> acompanha por dois
+motivos: impede que a página de destino saiba de onde o cliente veio e evita uma falha de segurança
+conhecida em que a aba nova controla a antiga. Os navegadores modernos já protegem o caso comum, mas
+escrever o atributo é barato e explícito.</p>
+
+<p>Para download, o atributo é <code>download</code> no próprio <code>href</code>. Para telefone,
+<code>href="tel:+5511999990000"</code>; para e-mail, <code>href="mailto:ana@notebook"</code>. Nos três
+casos, nada de <code>preventDefault</code>: o navegador sabe o que fazer melhor do que o seu
+roteador.</p>
+
+<h2>6. O Link que discorda do href</h2>
+
+<p>Esquecer o <code>preventDefault</code> tem um sintoma conhecido: a página pisca e o estado some. Mas
+existe um irmão mais discreto desse bug: o <code>href</code> aponta para um lugar e o
+<code>onClick</code> manda para outro. O endereço que o cliente copia diz "pães"; a tela que abre diz
+"início".</p>
+
+<p>Os dois valores saem de fontes diferentes: o <code>href</code> é a prop que veio do menu, e o destino
+do <code>irPara</code> é o que o handler escreveu. Se alguém troca um e esquece o outro — numa
+refatoração, num teste, num copiar e colar —, o link passa a mentir. E o pior: o F5 costuma "consertar",
+porque aí a tela é lida do endereço. Você recarrega, funciona, e conclui que era cache.</p>
+
+<pre class="term">clique em Pães → href: #/paes | enviado: #/inicio
+tela depois do clique: inicio</pre>
+
+<p>Essas duas linhas são um <code>console.log</code> dentro do handler, imprimindo a prop e o valor que
+vai para o roteador. Quando os dois aparecem na mesma linha, a discordância fica óbvia — e é o tipo de log
+que vale a pena deixar no código enquanto você mexe em navegação.</p>
+
+<div class="tryreact" data-goal="clique:a;;texto:Tela: paes">
+  <p class="try-task">O link tem o <code>href</code> certo, mas o handler manda o roteador para a home:
+  uma variável esquecida de um teste anterior. Faça o clique levar para onde o <code>href</code> diz.</p>
+  <pre class="jsx">const janela = new EventTarget();
+janela.hash = "#/inicio";
+
+function irPara(hash) {
+  janela.hash = hash;
+  janela.dispatchEvent(new Event("hashchange"));
+}
+
+function useRota() {
+  const [rota, setRota] = useState(janela.hash);
+
+  useEffect(() =&gt; {
+    const aoMudar = () =&gt; setRota(janela.hash);
+    janela.addEventListener("hashchange", aoMudar);
+    return () =&gt; janela.removeEventListener("hashchange", aoMudar);
+  }, []);
+
+  return rota.replace(/^#\/?/, "") || "inicio";
+}
+
+function Link({ para, children }) {
+  const destino = "#/inicio";
+
+  return (
+    &lt;a
+      href={para}
+      onClick={(e) =&gt; {
+        e.preventDefault();
+        irPara(destino);
+      }}
+    &gt;
+      {children}
+    &lt;/a&gt;
+  );
+}
+
+function App() {
+  const rota = useRota();
+
+  return (
+    &lt;div&gt;
+      &lt;nav&gt;
+        &lt;Link para="#/paes"&gt;Pães&lt;/Link&gt;
+      &lt;/nav&gt;
+      &lt;p&gt;Tela: {rota}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;nav&gt;&lt;a href="#/paes"&gt;Pães&lt;/a&gt;&lt;/nav&gt;
+  &lt;p&gt;Tela: inicio&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const janela = new EventTarget();
+janela.hash = "#/inicio";
+
+function irPara(hash) {
+  janela.hash = hash;
+  janela.dispatchEvent(new Event("hashchange"));
+}
+
+function useRota() {
+  const [rota, setRota] = useState(janela.hash);
+
+  useEffect(() =&gt; {
+    const aoMudar = () =&gt; setRota(janela.hash);
+    janela.addEventListener("hashchange", aoMudar);
+    return () =&gt; janela.removeEventListener("hashchange", aoMudar);
+  }, []);
+
+  return rota.replace(/^#\/?/, "") || "inicio";
+}
+
+function Link({ para, children }) {
+  return (
+    &lt;a
+      href={para}
+      onClick={(e) =&gt; {
+        e.preventDefault();
+        irPara(para);
+      }}
+    &gt;
+      {children}
+    &lt;/a&gt;
+  );
+}
+
+function App() {
+  const rota = useRota();
+
+  return (
+    &lt;div&gt;
+      &lt;nav&gt;
+        &lt;Link para="#/paes"&gt;Pães&lt;/Link&gt;
+      &lt;/nav&gt;
+      &lt;p&gt;Tela: {rota}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A correção é tirar a variável do meio e usar a mesma prop nos dois lugares: <code>href={para}</code> e
+<code>irPara(para)</code>. Quando o <code>href</code> e o handler saem do mesmo dado, não há como
+discordarem. Sempre que puder, alimente as duas pontas com a mesma fonte.</p>
+
+<p>No painel, a prova é direta: no código quebrado o clique não muda o texto; no consertado, a tela passa
+para <code>paes</code>. No navegador de verdade, o sintoma é o endereço que não muda quando deveria — ou
+o contrário, a tela que muda e o endereço que fica.</p>
+
+<h2>7. Depois do clique: foco, rolagem e item ativo</h2>
+
+<p>Trocar de tela sem recarregar tem um efeito colateral invisível: o foco do teclado fica onde estava.
+Quem navega com o teclado aperta Enter no link e continua com o foco num elemento da tela antiga, que
+acabou de sair da árvore; o próximo Tab começa do topo do documento. Para quem usa leitor de tela, a
+mudança de tela passa em silêncio.</p>
+
+<p>A correção é mover o foco para o título da tela nova depois da troca. Como isso é efeito colateral,
+morre num <code>useEffect</code> que observa a rota:</p>
+
+<pre class="file" data-file="App.jsx">const titulo = useRef(null);
+
+useEffect(() =&gt; {
+  if (titulo.current) titulo.current.focus();
+}, [rota]);
+
+return &lt;h1 tabIndex={-1} ref={titulo}&gt;{nomeDaTela}&lt;/h1&gt;;</pre>
+
+<p>O <code>tabIndex={-1}</code> permite focar o elemento por código sem colocá-lo na ordem do Tab. A
+rolagem é o mesmo tipo de problema: o navegador mantém a posição e a tela nova pode abrir no meio. Rolar
+para o topo no mesmo efeito resolve os dois de uma vez.</p>
+
+<p>O terceiro item é o mais simples: marcar o link da tela atual. Com âncoras, o atributo é
+<code>aria-current="page"</code> — e ele vale tanto para o leitor de tela quanto para o seu CSS, que pode
+usar <code>a[aria-current="page"]</code> para destacar sem precisar de classe extra.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo de link</th><th>O que fazer no clique</th><th>Atributos</th></tr>
+<tr><td>Rota interna (<code>#/paes</code>)</td><td><code>preventDefault</code> e chamar o roteador</td><td><code>href</code>, <code>aria-current</code> no ativo</td></tr>
+<tr><td>Outro site (<code>https://…</code>)</td><td>não interceptar: deixar o navegador</td><td><code>target="_blank"</code>, <code>rel="noreferrer"</code></td></tr>
+<tr><td>Download (<code>/cardapio.pdf</code>)</td><td>não interceptar</td><td><code>download</code></td></tr>
+<tr><td>E-mail e telefone</td><td>não interceptar</td><td><code>mailto:</code>, <code>tel:</code></td></tr>
+<tr><td>Âncora na mesma página (<code>#precos</code>)</td><td>não interceptar</td><td><code>href="#precos"</code></td></tr>
+</table>
+</div>
+
+<p>Repare no último caso: <code>#precos</code> também é hash, e o seu roteador pode confundi-lo com uma
+rota. Uma regra simples resolve: rotas começam com <code>#/</code>, âncoras de página não. Quem normaliza
+a rota tirando <code>#/</code> já separa os dois mundos sem esforço.</p>
+
+<h2>8. Um clique, três caminhos</h2>
+
+<p>Vale juntar tudo num parágrafo, porque é fácil se perder. Quando o cliente clica num link interno, a
+ordem é: o seu <code>onClick</code> roda, cancela a navegação padrão e pede a troca de rota; o roteador
+muda o endereço; o evento de mudança avisa o componente; a tela nova é desenhada. Nenhum documento é
+baixado.</p>
+
+<p>Quando o cliente usa Ctrl+clique, o navegador abre em outra aba sem passar pelo seu <code>onClick</code>
+— e é assim que deve ser. Quando o link é externo, você nem registra handler: o navegador cuida de tudo.
+Três caminhos, um componente, e a diferença entre eles é justamente o que o <code>href</code> diz.</p>
+
+<p>Essa é a razão pela qual as bibliotecas de rota expõem um <code>&lt;Link&gt;</code> em vez de ensinar
+"use onClick". Elas querem que o elemento continue sendo um link de verdade, com endereço, com histórico
+e com o comportamento nativo que ninguém precisa reimplementar.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o menu que não dava para copiar</h3>
+<p>O menu era de botões e a cliente queria mandar o link dos pães para a filha. Não havia link: só um
+botão que, quando clicado, mudava o endereço. Trocado por âncoras, o "copiar endereço" apareceu no menu de
+contexto, e o Ctrl+clique passou a abrir em outra aba, já na tela certa.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o Instagram que não abria</h3>
+<p>Ela pôs o perfil da padaria no menu usando o mesmo <code>Link</code> do roteador. O clique não fazia
+nada: o <code>preventDefault</code> cancelava a ida ao Instagram e o roteador não conhecia aquele destino.
+Link externo pede âncora comum — sem interceptar, com <code>target</code> e <code>rel</code>.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o pedido que se perdia ao trocar de tela</h3>
+<p>A cliente preenchia o pedido, clicava em "Pães" para conferir o preço e voltava: o formulário estava
+vazio. Faltava o <code>preventDefault</code>, então cada clique recarregava o documento e o estado do
+React nascia do zero. O sintoma — "a página pisca e perde tudo" — é a assinatura de um link não
+interceptado.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="1"><p class="mc-q">1. Por que a navegação deve usar <code>&lt;a href&gt;</code> em vez de <code>&lt;button&gt;</code>?</p>
+<label><input type="radio" name="q1"> porque a âncora já traz nova aba, cópia do endereço, teclado e semântica</label>
+<label><input type="radio" name="q1"> porque o React não aceita <code>onClick</code> em botões</label>
+<label><input type="radio" name="q1"> porque a âncora é mais rápida para desenhar</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que <code>e.preventDefault()</code> faz no clique de um link interno?</p>
+<label><input type="radio" name="q2"> impede que o seu <code>onClick</code> rode</label>
+<label><input type="radio" name="q2"> impede que os outros elementos da página recebam o clique</label>
+<label><input type="radio" name="q2"> cancela a navegação padrão do navegador, sem recarregar</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. O que fazer com um link para outro site?</p>
+<label><input type="radio" name="q3"> usar o mesmo <code>Link</code> do roteador, para manter o padrão</label>
+<label><input type="radio" name="q3"> deixar o navegador navegar: âncora comum, com <code>target</code> e <code>rel</code></label>
+<label><input type="radio" name="q3"> trocar por um botão que chama <code>window.open</code></label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o Link e o link externo</h2>
+<p>Complete o <code>Link</code> interno e a âncora externa.</p>
+<div class="ex-code">function Link({ para, children }) {
+  return (
+    &lt;a href={para} onClick={(e) =&gt; { <input aria-label="resposta 1" data-answer="e.preventDefault()" placeholder="...">; irPara(para); }}&gt;
+      {children}
+    &lt;/a&gt;
+  );
+}
+
+&lt;a href="https://exemplo.test/cardapio.pdf" target="<input aria-label="resposta 2" data-answer="_blank" placeholder="...">" rel="noreferrer"&gt;PDF&lt;/a&gt;</div>
+<p class="ex-dica">Dica: no link interno, o primeiro comando do handler cancela a navegação padrão. Na
+âncora externa, o valor do <code>target</code> que abre em outra aba começa com sublinhado.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Navegação se escreve com âncora, não com botão. O <code>href</code> é o que faz o link ser link: dá
+endereço para copiar, abre em nova aba com Ctrl, funciona no teclado, é anunciado como link e navega
+mesmo antes do JavaScript carregar. Botão é para ação, e o navegador trata os dois de forma diferente
+porque a diferença é real.</p>
+
+<p>Num site de página única, o clique interno precisa ser interceptado:
+<code>e.preventDefault()</code> cancela a navegação do navegador e o seu roteador faz a troca. O
+componente <code>Link</code> junta as duas coisas — <code>href</code> de verdade e clique interceptado. Já
+os links externos, os downloads e os <code>mailto:</code> não se interceptam: quem navega ali é o próprio
+navegador.</p>
+
+<p>Depois da troca, cuide do que ninguém vê: foco no título da tela nova, rolagem para o topo e
+<code>aria-current</code> no link ativo. Na próxima aula, o endereço ganha a última peça que falta para
+parecer um site de verdade: o pedaço que muda por item, como o número do pedido em
+<a href="parametros-de-rota.html">parâmetros de rota</a>.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Link navega; botão age. Use <code>&lt;a href&gt;</code> para trocar de tela.</li>
+<li><code>href</code> dá nova aba, cópia do endereço, teclado e semântica de graça.</li>
+<li>Sem <code>preventDefault</code>, o clique recarrega o documento e o estado se perde.</li>
+<li><code>preventDefault</code> cancela só a ação padrão; não é <code>stopPropagation</code>.</li>
+<li><code>Link</code> = âncora com <code>href</code> mais <code>preventDefault</code> e o roteador.</li>
+<li>Link externo: âncora comum com <code>target="_blank"</code> e <code>rel="noreferrer"</code>.</li>
+<li>Download, <code>mailto:</code> e <code>tel:</code> não passam pelo roteador.</li>
+<li>Rotas começam com <code>#/</code>; âncoras de página, com <code>#</code> e sem barra.</li>
+<li><code>aria-current="page"</code> marca o link da tela atual.</li>
+<li>Depois da troca: foco no título e rolagem para o topo, num efeito.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Efeitos | Guia React</title>
+<meta name="description" content="Consulta rápida de efeitos no React 19: a forma do useEffect, dependências, cleanup, busca de dados com AbortController, timers e quando não usar efeito.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Efeitos</span></h1>
+<p class="intro">Efeito é o lugar onde o componente conversa com o mundo fora do React: buscar dados,
+ligar um timer, escutar o redimensionamento, mexer no título da aba. O <code>useEffect</code> roda depois
+que a tela apareceu e pode devolver uma função de limpeza. Esta página é a consulta rápida: a forma do
+hook, os três formatos do array de dependências, o cleanup, a busca de dados sem corrida e — o mais
+importante — quando o efeito não devia existir. A Ana usa efeitos no painel da padaria desde o relógio da
+vitrine; aqui está o resumo que ela consulta antes de escrever mais um.</p>
+
+<div class="note">
+<strong>Como usar esta página</strong>
+<ul>
+  <li>A tabela da seção 3 é a das dependências; a da seção 7 é a do "não use efeito".</li>
+  <li>As caixas rodam React 19: edite, clique em Rodar e leia o painel.</li>
+  <li>Se o efeito roda sem parar, comece pela seção 8; se a tela pisca, pela seção 4.</li>
+</ul>
+</div>
+
+<h2>1. O que é um efeito</h2>
+
+<p>Efeito é a ponte entre o componente e o que não é React. O render calcula o JSX; o efeito cuida do
+resto: chamar a rede, abrir um intervalo, adicionar um listener no <code>window</code>, gravar no
+<code>localStorage</code>, ajustar o título do documento. Tudo isso são ações que acontecem <em>fora</em>
+da árvore de elementos e que o React não controla.</p>
+
+<p>O <code>useEffect</code> não é um método de ciclo de vida com outro nome. Ele é uma forma de dizer:
+"depois que a tela refletir este estado, faça isto; e, quando os valores mudarem, desfaça o anterior e
+faça de novo". Pensar em sincronização, e não em "montou/desmontou", evita a maior parte dos bugs.</p>
+
+<pre class="file" data-file="Vitrine.jsx">function Vitrine() {
+  const [aberta, setAberta] = useState(false);
+
+  useEffect(() =&gt; {
+    document.title = aberta ? "Padaria aberta" : "Padaria fechada";
+  }, [aberta]);
+
+  return &lt;p&gt;{aberta ? "Aberto" : "Fechado"}&lt;/p&gt;;
+}</pre>
+
+<p>O efeito acima sincroniza o título da aba com um estado. Cada vez que <code>aberta</code> muda, o
+efeito roda de novo e o título acompanha. Não há botão, não há evento: a tela mudou, o mundo de fora
+acompanha. Esse é o desenho típico.</p>
+
+<dl class="anatomy">
+<dt>efeito</dt>
+<dd>O código que sincroniza o componente com algo fora do React: rede, timer, DOM global.</dd>
+<dt>dependências</dt>
+<dd>O array que decide quando o efeito roda de novo. Comparado item por item com o render anterior.</dd>
+<dt>cleanup</dt>
+<dd>A função que o efeito devolve. Desfaz o que ele criou: limpa timer, remove listener, aborta
+requisição.</dd>
+<dt>montagem</dt>
+<dd>A primeira vez que o componente aparece na tela. É quando o efeito com <code>[]</code> roda.</dd>
+<dt>corrida</dt>
+<dd>Duas respostas chegando fora de ordem. A antiga pode sobrescrever a nova se ninguém descartar.</dd>
+</dl>
+
+<p>Uma coisa que efeito não é: lugar de calcular. Total, lista filtrada, mensagem de erro e texto
+derivado se calculam no corpo do componente. Se o valor sai do que você já tem, não precisa de efeito — e
+a seção 7 é sobre esse instinto.</p>
+
+<p>Vale separar efeito de evento. Evento é algo que a pessoa fez: clique, tecla, envio. Efeito é a
+consequência de o componente estar na tela: o timer que precisa existir enquanto ele existe, o listener
+que precisa acompanhar a janela, o título que precisa refletir o estado. Se a ação nasce de um gesto, o
+lugar dela é o handler; se nasce da tela montada, é o efeito.</p>
+
+<h2>2. A forma do useEffect</h2>
+
+<p>A chamada tem duas partes: uma função e um array. A função é o trabalho; o array diz quando repetir. A
+função pode devolver outra função — o cleanup —, que roda antes da próxima execução e quando o componente
+sai da tela.</p>
+
+<pre class="file" data-file="Relogio.jsx">useEffect(() =&gt; {
+  const id = setInterval(() =&gt; setHora(new Date()), 1000);
+
+  return () =&gt; clearInterval(id);
+}, []);</pre>
+
+<p>O React executa os efeitos depois de pintar a tela. Isso significa que, dentro do efeito, o DOM já
+existe: dá para medir, focar e ler. E significa que o efeito não pode preparar dados para o render que já
+aconteceu — ele roda depois. Quando você precisa medir antes da pintura, o hook é
+<code>useLayoutEffect</code>.</p>
+
+<p>Com mais de um efeito, eles rodam na ordem em que foram declarados, de cima para baixo, sempre depois
+do render. A ordem ajuda a ler o console, mas não é uma garantia para construir lógica: se um efeito
+depende do outro, o desenho está errado.</p>
+
+<p>O console mostra a sequência em cada render: primeiro o corpo do componente, depois o efeito.</p>
+
+<pre class="term">render: 1
+efeito: 1
+render: 2
+efeito: 2</pre>
+
+<p>Se o efeito aparece antes do render no seu log, provavelmente ele está sendo chamado no lugar errado —
+ou o log está dentro de uma função que roda antes, como um evento.</p>
+
+<div class="tryreact" data-goal="texto:promoção: pão de queijo pela metade do preço">
+  <p class="try-task">A promoção nunca é preenchida. Escreva um <code>useEffect</code> com
+  <code>[]</code> que chama <code>setPromocao("pão de queijo pela metade do preço")</code> uma vez, na
+  montagem.</p>
+  <pre class="jsx">function App() {
+  const [promocao, setPromocao] = useState("");
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;promoção: {promocao}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;promoção:&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [promocao, setPromocao] = useState("");
+
+  useEffect(() =&gt; {
+    setPromocao("pão de queijo pela metade do preço");
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;promoção: {promocao}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O efeito roda depois do primeiro desenho, chama o setter e provoca um segundo render com a promoção
+preenchida — é por isso que o painel mostra a frase, e não a tela vazia. O <code>[]</code> garante que
+isso aconteça uma vez; sem ele, o efeito rodaria em todo render e o setter criaria um laço.</p>
+
+<h2>3. O array de dependências</h2>
+
+<p>Três formatos, três comportamentos. O array vazio roda uma vez, na montagem. Com valores, roda na
+montagem e sempre que algum deles mudar. Sem array, roda depois de todo render. A comparação é de
+identidade, item por item, com <code>Object.is</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Array</th><th>Quando o efeito roda</th><th>Use para</th><th>Aula</th></tr>
+<tr><td><code>[]</code></td><td>uma vez, na montagem</td><td>inicialização que não depende de nada</td><td><a href="useEffect.html">O useEffect</a></td></tr>
+<tr><td><code>[busca]</code></td><td>na montagem e quando <code>busca</code> muda</td><td>acompanhar um valor</td><td><a href="dependencias.html">As Dependências</a></td></tr>
+<tr><td><code>[a, b]</code></td><td>quando qualquer um muda</td><td>dois valores na mesma sincronização</td><td><a href="dependencias.html">As Dependências</a></td></tr>
+<tr><td>sem array</td><td>depois de todo render</td><td>quase nunca; causa laço se muda estado</td><td><a href="dependencias.html">As Dependências</a></td></tr>
+<tr><td>objeto criado no render</td><td>em todo render (identidade nova)</td><td>nunca; liste os campos lidos</td><td><a href="dependencias.html">As Dependências</a></td></tr>
+</table>
+</div>
+
+<p>O array precisa listar tudo o que o efeito lê de dentro do componente: estado, props e funções
+declaradas ali. Faltar um valor produz o bug mais silencioso do React — o efeito guarda uma versão velha
+da variável e age com ela. O ESLint avisa no editor:</p>
+
+<pre class="term">React Hook useEffect has a missing dependency: 'busca'.
+Either include it or remove the dependency array.
+  react-hooks/exhaustive-deps</pre>
+
+<p>Há duas saídas legítimas e uma errada. Incluir a dependência é a primeira. Mover para dentro do efeito
+o que você criou fora é a segunda — uma função usada só ali pode ser declarada ali. A saída errada é
+desligar o aviso e seguir: o código passa no teste e quebra quando o valor muda.</p>
+
+<p>Existe um terceiro caminho que resolve muitos casos: tirar a dependência do array porque ela não precisa
+estar ali. Se o efeito usa uma função que você criou no componente, declare a função dentro do efeito — ela
+deixa de ser dependência e o efeito passa a rodar só quando os dados mudarem. O mesmo vale para um objeto
+montado ali dentro: crie dentro, não fora.</p>
+
+<h2>4. Cleanup: desfazer o que o efeito fez</h2>
+
+<p>Todo efeito que cria algo precisa desfazer. Timer aberto continua rodando depois que o componente sai;
+listener no <code>window</code> continua chamando uma função que já não existe; requisição em voo pode
+chegar depois e gravar em um componente desmontado. O cleanup é a função devolvida pelo efeito.</p>
+
+<pre class="file" data-file="Aviso.jsx">useEffect(() =&gt; {
+  function aoTeclar(e) {
+    if (e.key === "Escape") setAberto(false);
+  }
+
+  window.addEventListener("keydown", aoTeclar);
+
+  return () =&gt; {
+    window.removeEventListener("keydown", aoTeclar);
+  };
+}, []);</pre>
+
+<p>O React chama o cleanup em dois momentos: antes de rodar o efeito de novo (quando uma dependência
+mudou) e quando o componente é removido. No caso do listener, isso evita duplicar o registro a cada
+mudança; no caso do timer, evita dois intervalos somando. Sem cleanup, o sintoma é sempre o mesmo: o
+trabalho acontece mais vezes do que devia.</p>
+
+<p>Um detalhe que engana em desenvolvimento: o <em>Strict Mode</em> monta, desmonta e monta de novo para
+denunciar efeitos sem cleanup. O console mostra o efeito rodando duas vezes e parece bug — é o teste
+funcionando. Em produção, o componente monta uma vez.</p>
+
+<p>Para remover um listener, a função precisa ser a mesma que foi registrada. Por isso ela é declarada com
+nome dentro do efeito e usada nas duas chamadas; uma arrow escrita direto no
+<code>addEventListener</code> não tem como ser removida depois, porque ninguém guardou a referência. O
+mesmo raciocínio vale para <code>setInterval</code>: guarde o id devolvido para poder cancelar.</p>
+
+<p>Efeito que não cria nada não precisa de cleanup: escrever no <code>localStorage</code>, ajustar o
+título ou chamar um <code>console.log</code> não deixam nada pendente. A pergunta é sempre "o que eu criei
+que continua vivo depois daqui?". Se a resposta for nada, não há o que devolver.</p>
+
+<h2>5. Buscar dados sem corrida</h2>
+
+<p>Buscar dados é o efeito mais comum e o mais fácil de errar. A chamada é assíncrona: o efeito começa,
+termina, e a resposta chega depois. Se o componente mudou de estado nesse meio-tempo — outra busca, outro
+item, saiu da tela —, a resposta antiga pode sobrescrever a nova. Isso é a corrida.</p>
+
+<pre class="file" data-file="Busca.jsx">useEffect(() =&gt; {
+  setCarregando(true);
+  let ativo = true;
+
+  buscarPaes(termo)
+    .then((dados) =&gt; {
+      if (!ativo) return;          // resposta velha: descarta
+      setPaes(dados);
+      setCarregando(false);
+    })
+    .catch((erro) =&gt; {
+      if (!ativo) return;
+      setErro(erro.message);
+      setCarregando(false);
+    });
+
+  return () =&gt; {
+    ativo = false;                 // desliga este efeito
+  };
+}, [termo]);</pre>
+
+<p>A flag <code>ativo</code> resolve a corrida sem cancelar a requisição. Se você quer cancelar de verdade,
+use <code>AbortController</code>: crie no efeito, passe o <code>signal</code> para o <code>fetch</code> e
+chame <code>abort()</code> no cleanup. O <code>catch</code> precisa ignorar o erro de cancelamento. A aula
+de <a href="abortar-pedido.html">abortar um pedido</a> mostra o código completo.</p>
+
+<p>Nos três estados, o padrão é sempre o mesmo: <code>carregando</code>, <code>dados</code> e
+<code>erro</code>, com o render escolhendo o que mostrar. A caixa abaixo simula a rede com
+<code>Promise</code> e <code>setTimeout</code>, porque o quadro do guia não tem servidor — o
+<code>fetch</code> de verdade entra no projeto, e o resto do componente fica igual.</p>
+
+<div class="tryreact" data-goal="digite:#busca=queijo;;texto:resultado: pão de queijo">
+  <p class="try-task">O efeito busca uma vez só, então a resposta não acompanha a busca. Coloque
+  <code>busca</code> nas dependências: digite "queijo" e confira o resultado.</p>
+  <pre class="jsx">const PAES = ["pão francês", "pão de queijo", "sonho"];
+
+function App() {
+  const [busca, setBusca] = useState("");
+  const [resultado, setResultado] = useState("");
+
+  useEffect(() =&gt; {
+    const achado = PAES.find((p) =&gt; p.includes(busca)) || "nada";
+    new Promise((ok) =&gt; setTimeout(() =&gt; ok(achado), 30)).then(setResultado);
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="busca"&gt;Busca&lt;/label&gt;
+      &lt;input
+        id="busca"
+        value={busca}
+        onChange={(e) =&gt; setBusca(e.target.value)}
+      /&gt;
+      &lt;p&gt;resultado: {resultado}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="busca"&gt;Busca&lt;/label&gt;
+  &lt;input id="busca" value=""&gt;
+  &lt;p&gt;resultado: pão francês&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const PAES = ["pão francês", "pão de queijo", "sonho"];
+
+function App() {
+  const [busca, setBusca] = useState("");
+  const [resultado, setResultado] = useState("");
+
+  useEffect(() =&gt; {
+    const achado = PAES.find((p) =&gt; p.includes(busca)) || "nada";
+    new Promise((ok) =&gt; setTimeout(() =&gt; ok(achado), 30)).then(setResultado);
+  }, [busca]);
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="busca"&gt;Busca&lt;/label&gt;
+      &lt;input
+        id="busca"
+        value={busca}
+        onChange={(e) =&gt; setBusca(e.target.value)}
+      /&gt;
+      &lt;p&gt;resultado: {resultado}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Com <code>[]</code>, digitar "queijo" não muda o resultado: o efeito já rodou e não roda mais. Com
+<code>[busca]</code>, cada tecla dispara uma busca nova e o painel acompanha. Na vida real, entrar e sair
+do campo rápido cria a corrida da seção anterior — e é aí que a flag ou o <code>AbortController</code>
+entram.</p>
+
+<h2>6. Timers, listeners e o mundo global</h2>
+
+<p>Três famílias de efeito aparecem sempre. Timer, para o que muda com o tempo; listener, para o que
+acontece no navegador; armazenamento, para o que precisa durar mais que a aba. Todas têm a mesma
+estrutura: cria, devolve o cleanup.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Para quê</th><th>Como se faz</th><th>Cleanup</th><th>Aula</th></tr>
+<tr><td>relógio na tela</td><td><code>setInterval</code> no efeito</td><td><code>clearInterval</code></td><td><a href="timers.html">Timers</a></td></tr>
+<tr><td>aviso que some</td><td><code>setTimeout</code> no efeito</td><td><code>clearTimeout</code></td><td><a href="timers.html">Timers</a></td></tr>
+<tr><td>tamanho da janela</td><td><code>addEventListener("resize")</code></td><td><code>removeEventListener</code></td><td><a href="cleanup.html">O Cleanup</a></td></tr>
+<tr><td>título da aba</td><td><code>document.title = ...</code></td><td>restaurar o anterior, se precisar</td><td><a href="useEffect.html">O useEffect</a></td></tr>
+<tr><td>guardar no navegador</td><td><code>localStorage.setItem</code></td><td>nenhum</td><td><a href="localStorage.html">O localStorage</a></td></tr>
+<tr><td>buscar dados</td><td><code>fetch</code> no efeito</td><td>flag ou <code>AbortController</code></td><td><a href="buscando-dados.html">Buscando Dados</a></td></tr>
+</table>
+</div>
+
+<p>Para o relógio, um cuidado de leitura de estado: dentro do intervalo, prefira a forma de função do
+setter — <code>setHora((h) =&gt; new Date())</code> ou <code>setSegundos((s) =&gt; s + 1)</code> —, porque a
+função guardada enxerga o valor do render em que nasceu. Sem isso, o contador pode ficar repetindo o
+mesmo número.</p>
+
+<p>Para armazenamento, o efeito é de mão única: escrever no <code>localStorage</code> quando o estado muda.
+Ler dali é trabalho do valor inicial do <code>useState</code>, com a forma de função
+(<code>useState(() =&gt; lerDoStorage())</code>), e não de um efeito que copia o valor depois — o efeito
+rodaria tarde demais para o primeiro render.</p>
+
+<p>Um caso que mistura os dois: sincronizar entre abas. O evento <code>storage</code> avisa quando outra
+aba gravou, e o efeito é o lugar certo para escutá-lo — com cleanup, como qualquer listener. Já a leitura
+inicial continua sendo do <code>useState</code>. Separar "ler uma vez" de "acompanhar mudanças" é o que
+mantém o componente previsível.</p>
+
+<h2>7. Quando não usar efeito</h2>
+
+<p>Esta é a seção que economiza mais código. A maior parte dos efeitos que se escreve por aí não precisava
+existir: era conta que podia ser feita no render, reação que pertencia ao evento, ou estado que podia ser
+derivado.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>O que se costuma fazer</th><th>O que fazer</th><th>Aula</th></tr>
+<tr><td>total, filtro, validação</td><td>efeito que chama setTotal</td><td>calcular no render</td><td><a href="estado-derivado.html">Estado Derivado</a></td></tr>
+<tr><td>reagir a um clique</td><td>efeito que observa uma flag</td><td>agir no próprio handler</td><td><a href="eventos-onclick.html">Eventos e onClick</a></td></tr>
+<tr><td>copiar prop para estado</td><td>efeito de sincronização</td><td>usar a prop, ou uma chave no componente</td><td><a href="estado-derivado.html">Estado Derivado</a></td></tr>
+<tr><td>enviar dados ao servidor ao mudar</td><td>efeito que observa o estado</td><td>enviar no evento que mudou</td><td><a href="quando-nao-usar-efeito.html">Quando Não Usar Efeito</a></td></tr>
+<tr><td>ajustar estado a partir de estado</td><td>efeito com dependência no estado</td><td>calcular na hora do setter</td><td><a href="quando-nao-usar-efeito.html">Quando Não Usar Efeito</a></td></tr>
+</table>
+</div>
+
+<p>O teste é uma pergunta: "isto precisa acontecer <em>depois</em> que a tela apareceu?". Se a resposta for
+não, não é efeito. Calcular acontece no render; reagir a um clique acontece no handler; sincronizar com
+fora acontece no efeito. Efeito é a exceção, não o lugar padrão.</p>
+
+<p>Quando o efeito muda um estado que ele mesmo observa, o resultado é o laço: efeito roda, estado muda,
+render acontece, efeito roda de novo. O React interrompe com "Maximum update depth exceeded". A correção
+nunca é desligar o aviso do ESLint: é tirar a dependência que muda a cada volta ou trocar o efeito por uma
+conta.</p>
+
+<h2>8. Erros comuns</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que aconteceu</th><th>Sintoma</th><th>Conserto</th><th>Aula</th></tr>
+<tr><td>efeito sem array mudando estado</td><td>laço infinito; "Maximum update depth exceeded"</td><td>definir dependências ou remover o efeito</td><td><a href="dependencias.html">As Dependências</a></td></tr>
+<tr><td>dependência faltando</td><td>valor velho; busca que não acompanha</td><td>listar o que o efeito lê</td><td><a href="dependencias.html">As Dependências</a></td></tr>
+<tr><td>objeto ou função no array</td><td>efeito roda em todo render</td><td>listar campos simples, ou memoizar</td><td><a href="dependencias.html">As Dependências</a></td></tr>
+<tr><td>timer sem cleanup</td><td>vários intervalos somando; memória crescendo</td><td>devolver <code>clearInterval</code></td><td><a href="timers.html">Timers</a></td></tr>
+<tr><td>busca sem descarte</td><td>resultado antigo sobrescreve o novo</td><td>flag ou <code>AbortController</code></td><td><a href="abortar-pedido.html">Abortar um Pedido</a></td></tr>
+<tr><td><code>useEffect</code> com função <code>async</code></td><td>o React reclama do retorno, que é Promise</td><td>criar a função async dentro e chamar</td><td><a href="async-await.html">async e await</a></td></tr>
+</table>
+</div>
+
+<p>O último caso tem uma explicação simples: o efeito pode devolver <em>uma função</em> de cleanup, e uma
+função <code>async</code> devolve sempre uma Promise. O React não sabe o que fazer com ela. A saída é
+declarar a função assíncrona dentro do efeito e chamá-la sem <code>await</code> no corpo do efeito.</p>
+
+<pre class="file" data-file="Busca.jsx">useEffect(() =&gt; {
+  async function carregar() {
+    const dados = await buscarPaes(termo);
+    setPaes(dados);
+  }
+  carregar();
+}, [termo]);</pre>
+
+<p>Com o tempo, o padrão fica automático: todo efeito que cria algo devolve o cleanup; todo efeito que lê
+um valor lista esse valor; todo valor que sai de outro valor nem vira efeito. Os três hábitos cobrem
+quase tudo o que esta página descreve.</p>
+
+<p>Se o efeito está difícil de escrever, geralmente o problema não é o hook: é o desenho. Um efeito que
+precisa de cinco dependências, que muda três estados e que depende da ordem dos outros costuma indicar que
+aquele trabalho pertence a um evento, a um hook próprio ou a um componente separado. Simplificar o desenho
+resolve mais do que ajustar o array.</p>
+
+<h2>Resumo</h2>
+
+<p><code>useEffect</code> sincroniza o componente com o que está fora do React e roda depois da pintura. A
+forma é uma função e um array: <code>[]</code> na montagem, com valores quando algo muda, sem array em
+todo render. O array precisa listar tudo o que o efeito lê, e a comparação é de identidade — objeto criado
+no render conta como novo.</p>
+
+<p>Todo efeito que cria algo devolve o cleanup: timer, listener e requisição. O React chama essa função
+antes da próxima execução e na saída de tela. Buscar dados pede três estados e um descarte de resposta
+velha, com flag ou <code>AbortController</code>, para não deixar a resposta antiga sobrescrever a nova.</p>
+
+<p>E o hábito que mais economiza código: antes de escrever um efeito, pergunte se o valor não é conta, se
+a reação não pertence ao evento e se o estado não é derivado. Efeito é para o que acontece depois da tela
+— não para tudo o que muda.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>useEffect</code> roda depois da pintura; <code>useLayoutEffect</code>, antes.</li>
+<li><code>[]</code> uma vez; <code>[valor]</code> quando muda; sem array, todo render.</li>
+<li>Liste tudo o que o efeito lê; o ESLint avisa.</li>
+<li>Objeto ou função nas dependências faz o efeito rodar sempre.</li>
+<li>Quem cria, limpa: devolva a função de cleanup.</li>
+<li>Busca de dados: carregando, dados e erro; descarte a resposta velha.</li>
+<li>Não use efeito para total, filtro ou validação.</li>
+<li>Reagir a clique é no handler, não no efeito.</li>
+<li>Efeito com <code>async</code> direto não pode: declare a função dentro.</li>
+<li>Laço infinito é dependência ou efeito que muda o que observa.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

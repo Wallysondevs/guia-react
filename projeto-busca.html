@@ -1,0 +1,688 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Busca com Filtros | Guia React</title>
+<meta name="description" content="Projeto de busca com filtros no React: texto, categoria e preço somados, ordenação, contagem, paginação e vazio — com useDeferredValue para a lista não engasgar.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Busca com <span class="hl">Filtros</span></h1>
+<p class="intro">O cliente pergunta “tem doce até dez reais?” e o site da Ana responde com a lista inteira, em
+ordem de cadastro, quarenta e dois itens. Ele desiste antes da terceira dobra. Neste projeto a Ana monta a
+busca de verdade: texto, categoria e preço somados, resultado ordenado, contagem honesta, páginas de três em
+três e uma mensagem clara quando nada casa. Cada caixa roda um pedaço funcional da busca.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como transformar cada pergunta do cliente num estado pequeno.</li>
+  <li>O encadeamento <code>filter</code> → <code>sort</code> → <code>slice</code> → <code>map</code>.</li>
+  <li>Como somar filtros de texto, categoria e preço sem um <code>if</code> gigante.</li>
+  <li>Por que ordenar depois de filtrar e antes de paginar.</li>
+  <li>Como mostrar “3 de 10” e quantas páginas existem.</li>
+  <li>O que fazer quando nenhum item passa nos filtros.</li>
+  <li>Quando vale usar <code>useMemo</code> e <code>useDeferredValue</code>.</li>
+  <li>Os tropeços que fazem a busca achar o item errado — ou nada.</li>
+</ul>
+</div>
+
+<h2>1. A cena: “tem doce até dez reais?”</h2>
+
+<p>A vitrine da Ana cresceu: são pães, doces e salgados, com preços que vão de dois a doze reais. O site
+mostra tudo numa lista só, na ordem em que ela cadastrou. Quem sabe o que quer — “pão de queijo” — rola a
+tela até achar. Quem não sabe desiste no caminho.</p>
+
+<p>A pergunta do cliente quase nunca é de um campo só. “Doce até dez reais” tem duas condições. “Pão até
+cinco, do mais barato” tem três. Cada condição é um filtro, e filtros se somam: o resultado é a parte da
+lista que passa em todos ao mesmo tempo.</p>
+
+<p>Somado a isso, uma boa busca responde três coisas além dos itens: quantos resultados existem, em que
+ordem e em que página. Sem a contagem, a pessoa não sabe se há mais; sem ordem, não compara; sem página, não
+chega ao fim.</p>
+
+<p>Este projeto monta esse quebra-cabeça em seis passos, e a ordem importa: primeiro o texto, depois
+categoria e preço, depois a ordenação, depois a página, depois a contagem e o vazio, e por fim o desempenho.
+Cada passo é uma caixa que roda de verdade.</p>
+
+<h2>2. O desenho: um estado por pergunta, uma conta no fim</h2>
+
+<p>A regra que organiza o projeto inteiro: cada pergunta do cliente vira um estado pequeno, e o resultado é
+uma conta feita no render. Nada de guardar a lista filtrada, nada de guardar a contagem. Guarde as perguntas
+e calcule as respostas.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pergunta do cliente</th><th>Estado</th><th>Conta no render</th></tr>
+<tr><td>“o que você tem?”</td><td><code>busca</code> (texto)</td><td><code>includes</code> no nome</td></tr>
+<tr><td>“de qual tipo?”</td><td><code>categoria</code> (texto)</td><td>comparação com o campo</td></tr>
+<tr><td>“até quanto?”</td><td><code>ate</code> (número ou <code>null</code>)</td><td><code>preco &lt;= ate</code></td></tr>
+<tr><td>“em que ordem?”</td><td><code>ordem</code> (texto)</td><td><code>sort</code> com comparador</td></tr>
+<tr><td>“qual página?”</td><td><code>pagina</code> (número)</td><td><code>slice</code> da fatia</td></tr>
+</table>
+</div>
+
+<p>Cinco estados, cinco perguntas. Repare que nenhum deles é a lista: a lista é uma constante do módulo, o
+catálogo que veio do banco. Se você colocasse o catálogo no estado, precisaria de um setter que nunca é
+chamado — e de uma explicação para quem ler depois.</p>
+
+<dl class="anatomy">
+<dt>consulta</dt>
+<dd>O texto digitado, guardado como está. A comparação normaliza na hora de usar (minúsculas e acentos).</dd>
+<dt>filtro</dt>
+<dd>Uma condição que um item precisa satisfazer para continuar na lista. Vários filtros se somam com
+<code>&amp;&amp;</code>.</dd>
+<dt>encadeamento</dt>
+<dd>A ordem das operações: <code>filter</code> → <code>sort</code> → <code>slice</code> →
+<code>map</code>. Cada uma recebe o resultado da anterior.</dd>
+<dt>página</dt>
+<dd>O número da fatia mostrada, começando em 1. Muda de significado quando os filtros mudam o total.</dd>
+<dt>contagem</dt>
+<dd><code>visiveis.length</code> e <code>total</code>. Derivada, nunca guardada.</dd>
+</dl>
+
+<p>Com esse mapa, o componente fica com cinco <code>useState</code> e um bloco de contas antes do
+<code>return</code>. É mais estado do que nas aulas anteriores, e é o mínimo para o que a tela promete. A
+alternativa — um objeto único com cinco campos — funciona, mas atualizar um campo exige espalhar o objeto
+inteiro, e um erro de digitação apaga os outros quatro.</p>
+
+<h2>3. Passo 1 — o texto</h2>
+
+<p>Comece pelo que a pessoa vê primeiro: o campo. Ele é controlado, como em
+<a href="entrada-controlada.html">Entrada Controlada</a>, e o filtro é uma linha com <code>includes</code>.
+Duas padronizações evitam a maior parte das reclamações: baixar os dois lados para minúsculas e remover
+acentos.</p>
+
+<pre class="file" data-file="Busca.jsx">function semAcento(texto) {
+  return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+const procurado = semAcento(busca).toLowerCase();
+
+const porTexto = produtos.filter((p) =&gt;
+  semAcento(p.nome).toLowerCase().includes(procurado)
+);</pre>
+
+<p>Sem o <code>semAcento</code>, “fuba” não encontra “Bolo de fubá” e “pao” não encontra “Pão francês”. Sem o
+<code>toLowerCase</code>, “PAO” não encontra nada. As duas coisas juntas fazem a busca parecer inteligente,
+mesmo sendo só comparação de texto.</p>
+
+<p>O <code>trim()</code> também merece lugar: quem digita “ pão” com espaço no começo não deveria ver uma
+lista vazia. <code>busca.trim()</code> antes de normalizar resolve, e o espaço no meio continua valendo —
+“pão de queijo” precisa dos espaços internos.</p>
+
+<pre class="term">&gt; produtos.filter((p) =&gt; p.nome.includes("queijo")).length
+1
+&gt; produtos.filter((p) =&gt; p.nome.includes("QUEIJO")).length
+0
+&gt; produtos.filter((p) =&gt; p.nome.toLowerCase().includes("queijo")).length
+1</pre>
+
+<p>A segunda linha mostra o problema e a terceira a correção. Guarde esse par: é o teste mais rápido para
+descobrir se a busca está padronizando os dois lados.</p>
+
+<div class="tryreact" data-goal="digite:input=queijo;;conta:.item=1;;texto:Pão de queijo">
+  <p class="try-task">O campo guarda o que a pessoa digita, mas a lista mostra os dez produtos sempre.
+  Filtre pelo nome, comparando os dois lados em minúsculas, para que “queijo” deixe um item.</p>
+  <pre class="jsx">const produtos = [
+  { id: 1, nome: "Pão francês", categoria: "paes", preco: 2 },
+  { id: 2, nome: "Pão de queijo", categoria: "salgados", preco: 4 },
+  { id: 3, nome: "Bolo de fubá", categoria: "doces", preco: 8 },
+  { id: 4, nome: "Sonho", categoria: "doces", preco: 5 },
+  { id: 5, nome: "Croissant", categoria: "doces", preco: 7 },
+  { id: 6, nome: "Broa de milho", categoria: "paes", preco: 6 },
+  { id: 7, nome: "Coxinha", categoria: "salgados", preco: 9 },
+  { id: 8, nome: "Baguete", categoria: "paes", preco: 3 },
+  { id: 9, nome: "Torta de frango", categoria: "salgados", preco: 12 },
+  { id: 10, nome: "Brioche", categoria: "doces", preco: 10 }
+];
+
+function App() {
+  const [busca, setBusca] = useState("");
+  return (
+    &lt;div&gt;
+      &lt;input
+        value={busca}
+        placeholder="Buscar produto"
+        onChange={(e) =&gt; setBusca(e.target.value)}
+      /&gt;
+      &lt;ul&gt;
+        {produtos.map((p) =&gt; (
+          &lt;li className="item" key={p.id}&gt;{p.nome} — R$ {p.preco}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input placeholder="Buscar produto" value=""&gt;
+  &lt;ul&gt;
+    &lt;li class="item"&gt;Pão francês — R$ 2&lt;/li&gt;
+    &lt;li class="item"&gt;Pão de queijo — R$ 4&lt;/li&gt;
+    &lt;li class="item"&gt;Bolo de fubá — R$ 8&lt;/li&gt;
+    &lt;li class="item"&gt;Sonho — R$ 5&lt;/li&gt;
+    &lt;li class="item"&gt;Croissant — R$ 7&lt;/li&gt;
+    &lt;li class="item"&gt;Broa de milho — R$ 6&lt;/li&gt;
+    &lt;li class="item"&gt;Coxinha — R$ 9&lt;/li&gt;
+    &lt;li class="item"&gt;Baguete — R$ 3&lt;/li&gt;
+    &lt;li class="item"&gt;Torta de frango — R$ 12&lt;/li&gt;
+    &lt;li class="item"&gt;Brioche — R$ 10&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const produtos = [
+  { id: 1, nome: "Pão francês", categoria: "paes", preco: 2 },
+  { id: 2, nome: "Pão de queijo", categoria: "salgados", preco: 4 },
+  { id: 3, nome: "Bolo de fubá", categoria: "doces", preco: 8 },
+  { id: 4, nome: "Sonho", categoria: "doces", preco: 5 },
+  { id: 5, nome: "Croissant", categoria: "doces", preco: 7 },
+  { id: 6, nome: "Broa de milho", categoria: "paes", preco: 6 },
+  { id: 7, nome: "Coxinha", categoria: "salgados", preco: 9 },
+  { id: 8, nome: "Baguete", categoria: "paes", preco: 3 },
+  { id: 9, nome: "Torta de frango", categoria: "salgados", preco: 12 },
+  { id: 10, nome: "Brioche", categoria: "doces", preco: 10 }
+];
+
+function App() {
+  const [busca, setBusca] = useState("");
+  const procurado = busca.trim().toLowerCase();
+  const encontrados = produtos.filter((p) =&gt;
+    p.nome.toLowerCase().includes(procurado)
+  );
+  return (
+    &lt;div&gt;
+      &lt;input
+        value={busca}
+        placeholder="Buscar produto"
+        onChange={(e) =&gt; setBusca(e.target.value)}
+      /&gt;
+      &lt;ul&gt;
+        {encontrados.map((p) =&gt; (
+          &lt;li className="item" key={p.id}&gt;{p.nome} — R$ {p.preco}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Ao digitar “queijo”, sobra um item. Se sobrarem dez, o <code>map</code> continua percorrendo
+<code>produtos</code> em vez de <code>encontrados</code>; se sobrar zero, o texto não foi padronizado ou a
+comparação está no campo errado.</p>
+
+<h2>4. Passo 2 — categoria e preço, somados</h2>
+
+<p>Com o texto funcionando, entram os outros dois filtros. A tentação é escrever um <code>if</code> para cada
+combinação — texto e categoria, categoria e preço, os três juntos — e o código vira uma árvore de oito
+caminhos. A solução é outra: cada filtro devolve <code>true</code> quando não se aplica.</p>
+
+<pre class="file" data-file="Busca.jsx">const filtrados = produtos.filter((p) =&gt; {
+  const combinaTexto =
+    procurado === "" || semAcento(p.nome).toLowerCase().includes(procurado);
+  const combinaCategoria = categoria === "todos" || p.categoria === categoria;
+  const combinaPreco = ate === null || p.preco &lt;= ate;
+  return combinaTexto &amp;&amp; combinaCategoria &amp;&amp; combinaPreco;
+});</pre>
+
+<p>Leia cada linha como uma pergunta que pode ser respondida com “não se aplica, deixa passar”. Sem texto
+digitado (<code>procurado === ""</code>), todos passam. Sem categoria escolhida, todos passam. Sem preço
+máximo, todos passam. Com os três filtros vazios, o resultado é o catálogo inteiro — que é exatamente o que
+a pessoa espera ao abrir a página.</p>
+
+<p>Essa propriedade tem nome: cada filtro é independente. Você pode acrescentar um quarto (só o que está
+disponível hoje) sem tocar nos outros três, desde que ele também saiba se desligar. É o que torna a busca
+fácil de crescer e difícil de quebrar.</p>
+
+<div class="tryreact" data-goal="clique:button.doces;;clique:button.ate8;;conta:.item=3;;texto:Bolo de fubá">
+  <p class="try-task">A categoria já filtra, mas o botão “Até R$ 8” só muda o estado <code>ate</code> e nada
+  acontece. Acrescente a condição de preço ao filtro e clique em Doces e depois em Até R$ 8.</p>
+  <pre class="jsx">const produtos = [
+  { id: 1, nome: "Pão francês", categoria: "paes", preco: 2 },
+  { id: 2, nome: "Pão de queijo", categoria: "salgados", preco: 4 },
+  { id: 3, nome: "Bolo de fubá", categoria: "doces", preco: 8 },
+  { id: 4, nome: "Sonho", categoria: "doces", preco: 5 },
+  { id: 5, nome: "Croissant", categoria: "doces", preco: 7 },
+  { id: 6, nome: "Broa de milho", categoria: "paes", preco: 6 },
+  { id: 7, nome: "Coxinha", categoria: "salgados", preco: 9 },
+  { id: 8, nome: "Baguete", categoria: "paes", preco: 3 },
+  { id: 9, nome: "Torta de frango", categoria: "salgados", preco: 12 },
+  { id: 10, nome: "Brioche", categoria: "doces", preco: 10 }
+];
+
+function App() {
+  const [categoria, setCategoria] = useState("todos");
+  const [ate, setAte] = useState(null);
+
+  const filtrados = produtos.filter(
+    (p) =&gt; categoria === "todos" || p.categoria === categoria
+  );
+
+  return (
+    &lt;div&gt;
+      &lt;button className="doces" onClick={() =&gt; setCategoria("doces")}&gt;Doces&lt;/button&gt;
+      &lt;button className="ate8" onClick={() =&gt; setAte(8)}&gt;Até R$ 8&lt;/button&gt;
+      &lt;ul&gt;
+        {filtrados.map((p) =&gt; (
+          &lt;li className="item" key={p.id}&gt;{p.nome} — R$ {p.preco}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button class="doces"&gt;Doces&lt;/button&gt;
+  &lt;button class="ate8"&gt;Até R$ 8&lt;/button&gt;
+  &lt;ul&gt;
+    &lt;li class="item"&gt;Pão francês — R$ 2&lt;/li&gt;
+    &lt;li class="item"&gt;Pão de queijo — R$ 4&lt;/li&gt;
+    &lt;li class="item"&gt;Bolo de fubá — R$ 8&lt;/li&gt;
+    &lt;li class="item"&gt;Sonho — R$ 5&lt;/li&gt;
+    &lt;li class="item"&gt;Croissant — R$ 7&lt;/li&gt;
+    &lt;li class="item"&gt;Broa de milho — R$ 6&lt;/li&gt;
+    &lt;li class="item"&gt;Coxinha — R$ 9&lt;/li&gt;
+    &lt;li class="item"&gt;Baguete — R$ 3&lt;/li&gt;
+    &lt;li class="item"&gt;Torta de frango — R$ 12&lt;/li&gt;
+    &lt;li class="item"&gt;Brioche — R$ 10&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const produtos = [
+  { id: 1, nome: "Pão francês", categoria: "paes", preco: 2 },
+  { id: 2, nome: "Pão de queijo", categoria: "salgados", preco: 4 },
+  { id: 3, nome: "Bolo de fubá", categoria: "doces", preco: 8 },
+  { id: 4, nome: "Sonho", categoria: "doces", preco: 5 },
+  { id: 5, nome: "Croissant", categoria: "doces", preco: 7 },
+  { id: 6, nome: "Broa de milho", categoria: "paes", preco: 6 },
+  { id: 7, nome: "Coxinha", categoria: "salgados", preco: 9 },
+  { id: 8, nome: "Baguete", categoria: "paes", preco: 3 },
+  { id: 9, nome: "Torta de frango", categoria: "salgados", preco: 12 },
+  { id: 10, nome: "Brioche", categoria: "doces", preco: 10 }
+];
+
+function App() {
+  const [categoria, setCategoria] = useState("todos");
+  const [ate, setAte] = useState(null);
+
+  const filtrados = produtos.filter((p) =&gt; {
+    const combinaCategoria = categoria === "todos" || p.categoria === categoria;
+    const combinaPreco = ate === null || p.preco &lt;= ate;
+    return combinaCategoria &amp;&amp; combinaPreco;
+  });
+
+  return (
+    &lt;div&gt;
+      &lt;button className="doces" onClick={() =&gt; setCategoria("doces")}&gt;Doces&lt;/button&gt;
+      &lt;button className="ate8" onClick={() =&gt; setAte(8)}&gt;Até R$ 8&lt;/button&gt;
+      &lt;ul&gt;
+        {filtrados.map((p) =&gt; (
+          &lt;li className="item" key={p.id}&gt;{p.nome} — R$ {p.preco}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois dos dois cliques, sobram três itens: bolo de fubá (8), sonho (5) e croissant (7). O brioche custa
+exatamente 10 e fica de fora porque a comparação é <code>&lt;=</code> com 8. Repare no detalhe do
+<code>ate === null</code>: sem ele, <code>p.preco &lt;= null</code> é falso para todo mundo e a lista
+começaria vazia.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Filtro</th><th>Quando está desligado</th><th>Exemplo que passa</th></tr>
+<tr><td>texto</td><td><code>procurado === ""</code></td><td>“queijo” casa com “Pão de queijo”</td></tr>
+<tr><td>categoria</td><td><code>categoria === "todos"</code></td><td>“doces” casa com Bolo de fubá</td></tr>
+<tr><td>preço</td><td><code>ate === null</code></td><td><code>preco &lt;= 8</code> casa com Sonho (5)</td></tr>
+<tr><td>os três juntos</td><td>basta um desligado</td><td>“doce até 8” devolve três itens</td></tr>
+</table>
+</div>
+
+<h2>5. Passo 3 — a ordem, depois dos filtros</h2>
+
+<p>A ordem é uma escolha, não um dado: o mesmo resultado pode ser mostrado do mais barato ao mais caro, do
+mais novo ao mais antigo ou em ordem alfabética. Como toda escolha, vira estado; como toda lista ordenada,
+sai de uma cópia.</p>
+
+<pre class="file" data-file="Busca.jsx">const ordenados = [...filtrados].sort((a, b) =&gt; {
+  if (ordem === "barato") return a.preco - b.preco;
+  if (ordem === "caro") return b.preco - a.preco;
+  if (ordem === "nome") return a.nome.localeCompare(b.nome, "pt-BR");
+  return 0;
+});</pre>
+
+<p>Três coisas importantes nesse trecho. A primeira é o spread: o <code>sort</code> ordena no lugar, e
+<code>filtrados</code> é o resultado de um <code>filter</code> — mexer nele não estraga o catálogo, mas
+estraga a variável que você ainda vai usar na contagem. A segunda é o <code>return 0</code> para a ordem
+“relevância”: devolver zero mantém a ordem original, que é o que o cliente espera quando não escolheu nada.
+A terceira é o <code>localeCompare</code> para nomes, com acentos.</p>
+
+<p>E por que ordenar <em>depois</em> de filtrar? Porque o trabalho é menor e o resultado é o mesmo. Ordenar
+quarenta e dois itens para mostrar três é desperdício; ordenar três é instantâneo. A ordem das operações
+também decide a paginação: você fatia o resultado já ordenado, senão a página 1 mostra uma ordem e a página 2
+outra.</p>
+
+<pre class="term">&gt; filtrados.map((p) =&gt; p.preco)
+[8, 5, 7]
+&gt; [...filtrados].sort((a, b) =&gt; a.preco - b.preco).map((p) =&gt; p.preco)
+[5, 7, 8]
+&gt; filtrados.map((p) =&gt; p.preco)
+[8, 5, 7]</pre>
+
+<p>A última linha é a prova de que o spread funcionou: <code>filtrados</code> continua na ordem original. Se
+ela sair <code>[5, 7, 8]</code>, você ordenou no lugar e vai ter uma surpresa na contagem ou na paginação.</p>
+
+<h2>6. Passo 4 — a página</h2>
+
+<p>Página é o último passo do encadeamento: depois de filtrar e ordenar, você fatia. A conta é a da aula
+<a href="paginacao.html">Paginação</a>, e a fatia usa o resultado já ordenado.</p>
+
+<pre class="file" data-file="Busca.jsx">const porPagina = 3;
+const totalPaginas = Math.max(1, Math.ceil(ordenados.length / porPagina));
+const inicio = (pagina - 1) * porPagina;
+const visiveis = ordenados.slice(inicio, inicio + porPagina);</pre>
+
+<p>O <code>Math.max(1, ...)</code> protege a lista vazia: zero itens dão zero páginas, e “Página 1 de 0” é
+uma frase sem sentido. Com o máximo, a tela mostra “Página 1 de 1” e o vazio que você vai desenhar no passo
+seguinte.</p>
+
+<p>O detalhe que mais dá bug: sempre que um filtro muda, a página precisa voltar para 1. Se a pessoa está na
+página 3 e digita “queijo”, o resultado tem um item — e a página 3 não existe mais. A tela fica vazia sem
+explicação. A correção mais simples é resetar no clique e na digitação:</p>
+
+<pre class="file" data-file="Busca.jsx">function mudarCategoria(nova) {
+  setCategoria(nova);
+  setPagina(1);
+}
+
+function mudarBusca(texto) {
+  setBusca(texto);
+  setPagina(1);
+}</pre>
+
+<p>Alternativa mais robusta, quando a página vem da URL ou de outro componente: limitar no render com
+<code>Math.min(pagina, totalPaginas)</code> e usar esse valor no <code>slice</code>. As duas funcionam; a
+primeira é mais fácil de entender, a segunda é mais difícil de esquecer.</p>
+
+<div class="tryreact" data-goal="clique:button.proxima;;conta:.item=3;;texto:Página 2 de 4">
+  <p class="try-task">A página soma no estado, mas a lista e o aviso estão fixos na primeira. Fatia os
+  produtos com <code>slice</code> e escreva “Página 2 de 4” quando avançar.</p>
+  <pre class="jsx">const produtos = [
+  { id: 1, nome: "Pão francês", preco: 2 },
+  { id: 2, nome: "Pão de queijo", preco: 4 },
+  { id: 3, nome: "Bolo de fubá", preco: 8 },
+  { id: 4, nome: "Sonho", preco: 5 },
+  { id: 5, nome: "Croissant", preco: 7 },
+  { id: 6, nome: "Broa de milho", preco: 6 },
+  { id: 7, nome: "Coxinha", preco: 9 },
+  { id: 8, nome: "Baguete", preco: 3 },
+  { id: 9, nome: "Torta de frango", preco: 12 },
+  { id: 10, nome: "Brioche", preco: 10 }
+];
+
+function App() {
+  const [pagina, setPagina] = useState(1);
+  const porPagina = 3;
+  const totalPaginas = Math.ceil(produtos.length / porPagina);
+  const visiveis = produtos;
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Página 1 de 4&lt;/p&gt;
+      &lt;ul&gt;
+        {visiveis.map((p) =&gt; (
+          &lt;li className="item" key={p.id}&gt;{p.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+      &lt;button className="proxima" onClick={() =&gt; setPagina(pagina + 1)}&gt;Próxima&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Página 1 de 4&lt;/p&gt;
+  &lt;ul&gt;
+    &lt;li class="item"&gt;Pão francês&lt;/li&gt;
+    &lt;li class="item"&gt;Pão de queijo&lt;/li&gt;
+    &lt;li class="item"&gt;Bolo de fubá&lt;/li&gt;
+    &lt;li class="item"&gt;Sonho&lt;/li&gt;
+    &lt;li class="item"&gt;Croissant&lt;/li&gt;
+    &lt;li class="item"&gt;Broa de milho&lt;/li&gt;
+    &lt;li class="item"&gt;Coxinha&lt;/li&gt;
+    &lt;li class="item"&gt;Baguete&lt;/li&gt;
+    &lt;li class="item"&gt;Torta de frango&lt;/li&gt;
+    &lt;li class="item"&gt;Brioche&lt;/li&gt;
+  &lt;/ul&gt;
+  &lt;button class="proxima"&gt;Próxima&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const produtos = [
+  { id: 1, nome: "Pão francês", preco: 2 },
+  { id: 2, nome: "Pão de queijo", preco: 4 },
+  { id: 3, nome: "Bolo de fubá", preco: 8 },
+  { id: 4, nome: "Sonho", preco: 5 },
+  { id: 5, nome: "Croissant", preco: 7 },
+  { id: 6, nome: "Broa de milho", preco: 6 },
+  { id: 7, nome: "Coxinha", preco: 9 },
+  { id: 8, nome: "Baguete", preco: 3 },
+  { id: 9, nome: "Torta de frango", preco: 12 },
+  { id: 10, nome: "Brioche", preco: 10 }
+];
+
+function App() {
+  const [pagina, setPagina] = useState(1);
+  const porPagina = 3;
+  const totalPaginas = Math.ceil(produtos.length / porPagina);
+  const inicio = (pagina - 1) * porPagina;
+  const visiveis = produtos.slice(inicio, inicio + porPagina);
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Página {pagina} de {totalPaginas}&lt;/p&gt;
+      &lt;ul&gt;
+        {visiveis.map((p) =&gt; (
+          &lt;li className="item" key={p.id}&gt;{p.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+      &lt;button className="proxima" onClick={() =&gt; setPagina(pagina + 1)}&gt;Próxima&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois do clique, três itens e “Página 2 de 4”. Se os dez continuarem aparecendo, o <code>slice</code>
+ficou de fora; se o aviso continuar em 1, falta a expressão <code>{pagina}</code>. E note que o
+<code>totalPaginas</code> aqui é calculado sobre o catálogo inteiro — no projeto completo, ele sai de
+<code>ordenados.length</code>, que já passou pelos filtros.</p>
+
+<pre class="term">&gt; Math.ceil(10 / 3)
+4
+&gt; produtos.slice(3, 6).map((p) =&gt; p.nome)
+["Sonho", "Croissant", "Broa de milho"]
+&gt; (4 - 1) * 3
+9</pre>
+
+<p>A segunda linha mostra a página 2 na prática: começa no índice 3, que é <code>(2 - 1) * 3</code>, e para
+no 6, exclusivo. A terceira é só a conta de conferência: com dez itens e três por página, a última página
+começa no índice 9 e tem um item.</p>
+
+<h2>7. Passo 5 — a contagem e o vazio</h2>
+
+<p>A busca precisa dizer quantos resultados existem, e precisa dizer quando não existe nenhum. As duas
+informações saem do mesmo lugar: <code>ordenados.length</code>.</p>
+
+<pre class="file" data-file="Busca.jsx">&lt;p className="contagem"&gt;
+  {visiveis.length} de {ordenados.length} — página {pagina} de {totalPaginas}
+&lt;/p&gt;
+
+{ordenados.length === 0 &amp;&amp; (
+  &lt;div className="vazio"&gt;
+    &lt;p&gt;Nenhum produto encontrado.&lt;/p&gt;
+    &lt;button onClick={limparFiltros}&gt;Limpar filtros&lt;/button&gt;
+  &lt;/div&gt;
+)}</pre>
+
+<p>“3 de 10” é mais informativo do que “10 resultados”: mostra o que está na tela e o tamanho do conjunto.
+Quando a pessoa filtra, os dois números mudam juntos, e ela percebe o efeito do que fez.</p>
+
+<p>O vazio precisa ser do filtro, não do catálogo. Se não há produto nenhum cadastrado, a mensagem é outra —
+“Nenhum produto cadastrado” — e o botão não é “limpar filtros”, é “cadastrar o primeiro”. A aula
+<a href="estados-vazios.html">Estados Vazios</a> trata dessa diferença; aqui você já tem as duas condições
+para separar.</p>
+
+<p>O botão de limpar faz quatro atualizações de uma vez: texto vazio, categoria “todos”, preço
+<code>null</code> e página 1. O React junta tudo num desenho só, então a tela nunca mostra um estado
+intermediário esquisito. É a mesma atualização em lote das aulas de estado, aplicada a um caso real.</p>
+
+<h2>8. Passo 6 — o desempenho, sem exagerar</h2>
+
+<p>Com dez produtos, tudo isso roda em menos de um milissegundo. Com dez mil, cada tecla digitada percorre
+dez mil itens, ordena o resultado e desenha — e o campo começa a engasgar. As ferramentas existem, mas a
+ordem de uso importa: medir, entender, otimizar.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ferramenta</th><th>Quando usar</th><th>O que resolve</th></tr>
+<tr><td>nada</td><td>até algumas centenas de itens</td><td>simplicidade: recalcular a cada render é barato</td></tr>
+<tr><td><code>useMemo</code></td><td>a conta é cara e outras coisas fazem o componente redesenhar</td><td>evita refazer o filtro quando nada mudou</td></tr>
+<tr><td><code>useDeferredValue</code></td><td>a digitação trava e a lista pode esperar</td><td>separa o texto do campo do valor usado na lista</td></tr>
+<tr><td>debounce</td><td>cada tecla dispara uma chamada de rede</td><td>reduz o número de requisições</td></tr>
+</table>
+</div>
+
+<p>O <code>useDeferredValue</code> é o mais indicado quando o problema está na digitação: o campo usa o valor
+imediato, e a lista usa o valor adiado, que o React atualiza quando sobra tempo. Na prática, o texto aparece
+na hora e a lista acompanha um instante depois. A aula
+<a href="useDeferredValue.html">O useDeferredValue</a> mostra o mecanismo com calma.</p>
+
+<pre class="file" data-file="Busca.jsx">const [busca, setBusca] = useState("");
+const buscaAdiada = useDeferredValue(busca);
+
+const procurado = semAcento(buscaAdiada.trim()).toLowerCase();</pre>
+
+<p>O <code>useMemo</code>, por sua vez, guarda o resultado do filtro entre renders. Vale quando o componente
+redesenha por outros motivos — uma animação, um contador — e você não quer refiltrar à toa. Com um estado
+só, o <code>useMemo</code> adiciona uma camada para economizar pouco.</p>
+
+<p>E o conselho que vale mais do que as três ferramentas: não otimize pelo número de itens que você imagina,
+otimize pelo que dói. Aqui o projeto tem dez produtos — e o código mais simples é o certo. Se a padaria
+chegar a dez mil, a aula <a href="listas-grandes.html">Listas Grandes</a> mostra o caminho.</p>
+
+<h2>9. O que quebra e o que conferir</h2>
+
+<p>Busca com filtros tem um sintoma traiçoeiro: ela não dá erro. Acha menos, acha a mais, ou mostra uma
+página vazia — e o console fica limpo. Por isso a conferência precisa ser feita com casos escolhidos a
+dedo.</p>
+
+<div class="cenario">
+<h3>Cenário 1: o filtro de preço some com tudo</h3>
+<p>A Ana escreveu <code>p.preco &lt;= ate</code> sem tratar o caso de <code>ate</code> ser
+<code>null</code>. Em JavaScript, número comparado com <code>null</code> dá falso, então a lista nasce
+vazia. A condição precisa começar por <code>ate === null ||</code> — o filtro desligado deixa todos
+passarem.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a página 3 fica em branco</h3>
+<p>Ela estava na terceira página e digitou “queijo”. O resultado tem um item, mas o estado da página
+continua 3, e o <code>slice</code> devolve nada. O conserto é voltar para a página 1 em toda mudança de
+filtro, ou limitar a página ao total no render. O sintoma é uma tela vazia com a contagem dizendo “1 de
+10”.</p>
+</div>
+
+<dl class="anatomy">
+<dt>filtro desligado</dt>
+<dd>A condição que devolve <code>true</code> quando aquele filtro não se aplica: texto vazio, categoria
+“todos”, preço <code>null</code>.</dd>
+<dt>contagem</dt>
+<dd>“<code>visiveis.length</code> de <code>ordenados.length</code>”: o que está na tela e o total filtrado.</dd>
+<dt>página segura</dt>
+<dd><code>Math.min(pagina, totalPaginas)</code>, para nunca fatiar além do fim.</dd>
+<dt>limpar filtros</dt>
+<dd>Voltar texto, categoria, preço e página ao inicial, tudo no mesmo clique.</dd>
+<dt>valor adiado</dt>
+<dd><code>useDeferredValue(busca)</code>: o campo responde na hora e a lista acompanha quando sobra tempo.</dd>
+</dl>
+
+<p>A sequência de teste que pega quase tudo: abra a página (catálogo inteiro), digite algo que existe,
+digite algo que não existe, escolha categoria, escolha preço, ordene pelo mais caro, avance até a última
+página, limpe os filtros. Em cada passo, confira a lista e a contagem — não só a lista.</p>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Qual é a ordem certa do encadeamento?</p>
+<label><input type="radio" name="q1"> <code>map</code> → <code>filter</code> → <code>sort</code></label>
+<label><input type="radio" name="q1"> <code>filter</code> → <code>sort</code> → <code>slice</code> → <code>map</code></label>
+<label><input type="radio" name="q1"> <code>sort</code> → <code>map</code> → <code>filter</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que deve ficar no estado numa busca com filtros?</p>
+<label><input type="radio" name="q2"> a lista filtrada e a contagem</label>
+<label><input type="radio" name="q2"> só a página</label>
+<label><input type="radio" name="q2"> as escolhas: texto, categoria, preço, ordem e página</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Por que o filtro de preço começa com <code>ate === null ||</code>?</p>
+<label><input type="radio" name="q3"> para o filtro desligado deixar todos os itens passarem</label>
+<label><input type="radio" name="q3"> para o preço aceitar texto</label>
+<label><input type="radio" name="q3"> para o <code>sort</code> funcionar</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a fatia da página</h2>
+<p>Complete a chamada que devolve só os itens da página atual, com 3 por página.</p>
+<div class="ex-code">const visiveis = ordenados.slice(inicio, inicio + <input aria-label="resposta 1" data-answer="porPagina" placeholder="...">);</div>
+<p class="ex-dica">Dica: é a constante que diz quantos itens cabem em cada página.</p>
+</div>
+
+<h2>10. Resumo</h2>
+
+<p>Busca com filtros é cinco estados pequenos e um encadeamento no render. Texto, categoria, preço, ordem e
+página ficam no <code>useState</code>; a lista visível é <code>filter</code> → <code>sort</code> →
+<code>slice</code> → <code>map</code>. Cada filtro sabe se desligar, e por isso os filtros se somam sem uma
+árvore de condições.</p>
+
+<p>O texto padroniza os dois lados com <code>toLowerCase</code> e <code>semAcento</code>; o preço trata
+<code>null</code> como “sem limite”; a ordem usa uma cópia com spread; a página usa
+<code>Math.ceil</code> e <code>slice</code>, com a página voltando a 1 quando um filtro muda. A contagem
+“3 de 10” e o vazio com “limpar filtros” fecham a experiência.</p>
+
+<p>Desempenho vem depois: com dez itens, código simples; com muitos, <code>useDeferredValue</code> para a
+digitação e <code>useMemo</code> para a conta. E a conferência é sempre a mesma: lista e contagem juntas, em
+cada combinação de filtro.</p>
+
+<p>Com isso o catálogo da Ana ficou pesquisável — e você fechou os três projetos deste bloco com as mesmas
+peças: lista, formulário, estado pequeno e contas no render.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Um estado por pergunta; a lista é conta, não estado.</li>
+<li>Encadeie <code>filter</code> → <code>sort</code> → <code>slice</code> → <code>map</code>.</li>
+<li>Filtro vazio devolve <code>true</code>: é assim que filtros se somam.</li>
+<li><code>ate === null</code> evita a lista vazia quando não há preço máximo.</li>
+<li>Ordene uma cópia (<code>[...lista]</code>) e compare números com subtração, texto com
+<code>localeCompare</code>.</li>
+<li>Página volta a 1 quando texto, categoria ou preço mudam.</li>
+<li>Contagem mostra o visível e o total: “3 de 10”.</li>
+<li>Vazio de filtro pede “limpar filtros”; vazio de catálogo pede cadastro.</li>
+<li><code>useDeferredValue</code> quando a digitação trava; <code>useMemo</code> quando a conta é
+repetida.</li>
+<li>Teste cada filtro sozinho, depois combinado, e confira a contagem.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

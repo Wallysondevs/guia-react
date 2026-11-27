@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Depurando no Navegador | Guia React</title>
+<meta name="description" content="Depurar React no navegador: console com rótulo, leitura de erro e stack trace, breakpoints no Sources, Elements, Network e React DevTools.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Depurando no <span class="hl">Navegador</span></h1>
+<p class="intro">O total da Ana apareceu como <code>NaN</code> na tela publicada, e o botão de pedir
+parou de responder sem mostrar erro nenhum. Ela passou a tarde comentando linhas no escuro, tentando
+lembrar o que tinha mexido. Na aula de hoje ela troca o chute por método: abre as ferramentas do
+navegador, lê a mensagem de erro até o fim, põe um ponto de parada e descobre em cinco minutos o que a
+tarde inteira não revelou.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Para que serve cada aba do DevTools — e qual delas responde à sua pergunta.</li>
+  <li>A ler uma mensagem de erro: mensagem, componente, arquivo e linha.</li>
+  <li>Como usar <code>console.log</code> sem virar arqueologia.</li>
+  <li>O que é um breakpoint e como andar linha por linha olhando o valor das variáveis.</li>
+  <li>Como o React DevTools mostra props, estado e hooks de um componente.</li>
+  <li>Um método para achar o culpado: reduzir, isolar, comparar.</li>
+</ul>
+</div>
+
+<h2>1. A cena: dois bugs, nenhuma pista</h2>
+
+<p>O primeiro bug é barulhento: o total do pedido virou <code>NaN</code>. O segundo é silencioso: o botão
+"Pedir" não faz nada. Nos dois casos a Ana fez o que todo mundo faz — olhou o código, não viu nada
+estranho, mudou uma linha qualquer, salvou, o bug continuou, e ela voltou a mexer. Depois de duas horas,
+o código estava pior e o bug estava lá.</p>
+
+<p>Depurar é investigar, não adivinhar. A diferença entre os dois estilos não está na inteligência: está
+no método. Em vez de perguntar "o que eu errei?", o depurador pergunta "onde exatamente o valor deixa de
+ser o esperado?". Cada pergunta dessas tem uma ferramenta no navegador que responde em segundos.</p>
+
+<p>E há uma boa notícia: o React facilita o trabalho. Ele guarda o estado de cada componente de forma
+visível, avisa no console quando algo suspeito acontece e escreve mensagens que citam o componente e a
+linha. Metade da depuração é parar de ignorar esses avisos.</p>
+
+<p>O <code>F12</code> abre as ferramentas (ou o menu do navegador, em "Mais ferramentas"). No Chrome,
+Firefox e Edge as abas têm os mesmos nomes, com pequenas diferenças. O que você aprende aqui vale nos
+três.</p>
+
+<h2>2. As abas e a pergunta que cada uma responde</h2>
+
+<p>O DevTools tem cinco abas que resolvem quase tudo, e cada uma responde a um tipo de pergunta. Escolher
+a aba certa é metade do trabalho: quem procura um problema de rede no Elements perde a tarde, e quem
+procura um problema de estilo no Network também.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Aba</th><th>Responde</th><th>Quando é a primeira a abrir</th></tr>
+<tr><td>Console</td><td>o que o código disse, avisos e erros</td><td>há uma mensagem vermelha na tela</td></tr>
+<tr><td>Elements</td><td>qual HTML o React gerou e qual estilo venceu</td><td>o layout ou o texto saiu errado</td></tr>
+<tr><td>Sources</td><td>o código que rodou, com ponto de parada e passo a passo</td><td>o valor está errado e você não sabe onde</td></tr>
+<tr><td>Network</td><td>pedidos, respostas, status e tempo</td><td>a tela depende de dados que não chegam</td></tr>
+<tr><td>Application</td><td>o que está guardado no navegador</td><td>a configuração ou o login se perde ao recarregar</td></tr>
+</table>
+</div>
+
+<p>Além dessas, uma aba extra aparece quando a página usa React: <strong>React DevTools</strong>. Ela
+mostra a árvore de componentes em vez da árvore de elementos, e é lá que se vê o estado de cada
+componente. A instalação é uma extensão do navegador; sem ela, as outras cinco abas continuam
+funcionando.</p>
+
+<dl class="anatomy">
+<dt>console</dt>
+<dd>A saída de texto do navegador. Recebe o que o seu código escreve e o que o próprio navegador e o
+React relatam.</dd>
+<dt>breakpoint</dt>
+<dd>Um ponto de parada marcado numa linha do código. Quando a execução chega ali, o navegador congela e
+mostra o valor de todas as variáveis.</dd>
+<dt>stack trace</dt>
+<dd>A lista de chamadas que levou até o erro: de baixo para cima, quem chamou quem, com arquivo e
+linha.</dd>
+<dt>source map</dt>
+<dd>O arquivo que liga o código minificado ao código-fonte. É o que faz o navegador mostrar
+<code>App.jsx</code> em vez de uma linha de letras embaralhadas.</dd>
+<dt>React DevTools</dt>
+<dd>A extensão que mostra a árvore de componentes React, com props, estado e hooks de cada um.</dd>
+</dl>
+
+<h2>3. O console: log com rótulo e objeto separado</h2>
+
+<p>O <code>console.log</code> continua sendo a ferramenta mais rápida quando o problema é simples. O que
+estraga o log é a forma: sem rótulo, ele vira uma pilha de valores sem dono; com <code>+</code>,
+qualquer objeto vira <code>[object Object]</code> e não diz nada.</p>
+
+<p>A regra é curta: passe uma etiqueta e o valor como argumentos separados, com vírgula. O console
+mostra a etiqueta e, ao lado, o objeto de verdade — no painel das caixas, em JSON.</p>
+
+<div class="tryreact" data-goal='console:cliente: {"nome":"Ana"};;console:itens: 3'>
+  <p class="try-task">Os dois logs não dizem nada: um virou <code>[object Object]</code> e o outro não
+  tem etiqueta. Escreva os dois com rótulo e o objeto separado por vírgula. A missão confere
+  <code>cliente: {"nome":"Ana"}</code> e <code>itens: 3</code> no painel.</p>
+  <pre class="jsx">function App() {
+  const cliente = { nome: "Ana" };
+  const itens = 3;
+
+  console.log("cliente: " + cliente);
+  console.log(itens);
+
+  return &lt;p&gt;Pedido de {cliente.nome}&lt;/p&gt;;
+}</pre>
+  <pre class="out">
+&lt;p&gt;Pedido de Ana&lt;/p&gt;
+console: cliente: [object Object]
+console: 3
+</pre>
+  <pre class="solucao">function App() {
+  const cliente = { nome: "Ana" };
+  const itens = 3;
+
+  console.log("cliente:", cliente);
+  console.log("itens:", itens);
+
+  return &lt;p&gt;Pedido de {cliente.nome}&lt;/p&gt;;
+}</pre>
+</div>
+
+<p>No DevTools de verdade o objeto aparece como uma árvore que você abre e fecha, e o valor é lido no
+momento do clique — o que confunde: um objeto logado e depois alterado mostra o estado novo. Se precisar
+congelar o retrato, logue uma cópia (<code>{ ...cliente }</code>) ou uma string com
+<code>JSON.stringify</code>.</p>
+
+<p>Três primos do <code>log</code> valem a viagem, embora o painel das caixas não os mostre:
+<code>console.table(lista)</code> desenha arrays de objetos em tabela, <code>console.count("pedido")</code>
+conta quantas vezes aquela linha rodou e <code>console.time("desenho")</code> com
+<code>console.timeEnd("desenho")</code> mede o tempo entre dois pontos. No painel da caixa você vê só o
+<code>console.log</code> — e só o do desenho inicial, quando a página monta.</p>
+
+<h2>4. Lendo uma mensagem de erro até o fim</h2>
+
+<p>A mensagem de erro tem quatro pedaços, e o pessoal costuma ler só o primeiro. O primeiro é o tipo e o
+texto (<code>TypeError: Cannot read properties of null</code>); o segundo é <em>o que</em> era nulo
+(<code>reading 'cliente'</code>); o terceiro é o <em>onde</em>, no stack trace; o quarto é o componente
+que o React cita, quando o erro acontece durante um desenho.</p>
+
+<p>No caso clássico, a leitura é literal: "não consigo ler a propriedade <code>cliente</code> de
+<code>null</code>". Não é o React, não é o JSX: é um valor que ainda não chegou e já está sendo
+usado.</p>
+
+<div class="tryreact" data-goal="texto:0 entregas hoje">
+  <p class="try-task">O código lê uma configuração que ainda não tem o bloco de entregas, e a caixa mostra
+  o erro. Leia a mensagem e trate o caso: a página deve aparecer com "0 entregas hoje".</p>
+  <pre class="jsx">const config = { loja: "Padaria da Ana" };
+const entregas = config.entregas.ativos;
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;{config.loja}&lt;/h1&gt;
+      &lt;p&gt;{entregas} entregas hoje&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+Erro: Cannot read properties of undefined (reading 'ativos')
+</pre>
+  <pre class="solucao">const config = { loja: "Padaria da Ana" };
+const entregas = config.entregas ? config.entregas.ativos : 0;
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;{config.loja}&lt;/h1&gt;
+      &lt;p&gt;{entregas} entregas hoje&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Repare na leitura: o erro não diz "deu ruim no App". Ele diz que não conseguiu ler a propriedade
+<code>ativos</code>, porque o valor do lado esquerdo (<code>config.entregas</code>) era
+<code>undefined</code>. A pergunta seguinte se responde sozinha: de onde deveria vir esse
+<code>entregas</code>? No painel da caixa o erro aparece completo; no navegador, ele vem com a linha
+exata e a pilha de chamadas:</p>
+
+<pre class="term">Uncaught TypeError: Cannot read properties of null (reading 'cliente')
+    at Pedido (App.jsx:7:22)
+    at renderWithHooks (react-dom_client.js:12171:18)</pre>
+
+<p>Leia de baixo para cima: a primeira linha de baixo é o React desenhando, e a de cima é o seu
+componente, na linha 7. Clicar em <code>App.jsx:7</code> abre o Sources já naquela linha — esse é o
+atalho que economiza a tarde.</p>
+
+<p>Quando o erro acontece <em>dentro</em> do desenho de um componente, o React 19 desmonta a árvore e
+deixa a área vazia: a tela fica em branco e o recado completo vai para o console. No painel das caixas,
+esse caso aparece como "(o React não desenhou nada)" — o que já é uma pista: o componente quebrou antes
+de produzir HTML.</p>
+
+<p>Nem todo erro é erro. O React também escreve <strong>avisos</strong>: chave faltando numa lista,
+<code>className</code> no lugar de <code>class</code>, campo controlado sem <code>onChange</code>. O
+aviso não impede a página de rodar, e é exatamente por isso que ele fica lá por meses. Um console limpo é
+parte de "pronto".</p>
+
+<h2>5. O breakpoint: parar o código e olhar dentro</h2>
+
+<p>Quando o <code>console.log</code> não basta — porque o valor está certo em um lugar e errado em outro,
+ou porque você não sabe nem onde procurar —, o caminho é parar o código. Na aba Sources, abra o arquivo,
+clique no número da linha e um marcador azul aparece. Quando a execução chegar ali, o navegador
+congela.</p>
+
+<p>Com o código parado, três painéis importam. <em>Scope</em> mostra as variáveis do trecho, com o valor
+de agora. <em>Watch</em> deixa você escrever expressões para acompanhar. E os botões de passo controlam a
+execução: "passo a passo" entra na função chamada, "por cima" executa a linha inteira, "continuar" segue
+até o próximo breakpoint.</p>
+
+<p>Para não parar em toda repetição de uma lista, use o breakpoint condicional: clique com o botão direito
+no número da linha e escreva a condição, como <code>id === 3</code>. O navegador só para quando aquela
+expressão for verdadeira.</p>
+
+<p>Existe também a forma manual, dentro do código: a linha <code>debugger;</code> faz o navegador parar
+ali como se fosse um breakpoint. É útil quando o trecho roda uma vez só, no início, e você não quer caçar
+o arquivo na lista. Só não deixe um <code>debugger</code> esquecido: em produção ele para a página de
+quem tiver o DevTools aberto.</p>
+
+<h2>6. Elements: o HTML que o React gerou</h2>
+
+<p>A aba Elements mostra o DOM de verdade, não o JSX. Isso é ouro em duas situações. A primeira: conferir
+se o elemento que você escreveu existe e com quais atributos — o <code>className</code> virou
+<code>class</code>? o <code>htmlFor</code> virou <code>for</code>? a lista tem os itens que você
+esperava?</p>
+
+<p>A segunda: descobrir por que um estilo não pega. O painel de estilos mostra as regras aplicadas, na
+ordem, com as riscadas indicando o que perdeu. Muitas vezes a classe está certa no JSX e a regra está
+sendo vencida por outra mais específica, ou por um estilo inline. Isso não é problema do React; é do
+CSS.</p>
+
+<p>Dois truques que economizam tempo: o botão de selecionar elemento (o quadradinho com uma seta) aponta
+para qualquer parte da página e leva ao nó correspondente; e o seletor de estado <code>:hov</code> força
+o <code>:hover</code>, <code>:focus</code> ou <code>:active</code>, para você inspecionar um estilo que
+só aparece com o mouse em cima.</p>
+
+<p>Um cuidado: o React redesenha o DOM quando o estado muda. Se você editar um texto no Elements, a
+edição vale até o próximo desenho — ela não volta para o estado. Ver a página mudar não quer dizer que o
+dado mudou.</p>
+
+<h2>7. Network: quem pediu, o que voltou e em quanto tempo</h2>
+
+<p>Quando a tela depende de dados, a pergunta "o dado chegou?" tem uma resposta objetiva na aba Network.
+Recarregue com ela aberta: cada pedido aparece com método, caminho, status, tamanho e tempo. Clique num
+pedido e você vê os cabeçalhos, o corpo da resposta e, quando é JSON, uma aba com a árvore.</p>
+
+<p>O que olhar primeiro: o status. <code>200</code> é sucesso; <code>404</code> é caminho errado;
+<code>500</code> é o servidor quebrando; <code>CORS</code> aparece como erro de rede, não como status.
+Depois, o tipo: JSON chegando como <code>text/html</code> costuma ser página de erro servida no lugar do
+dado. Por fim, o corpo: muitas vezes a resposta é <code>{"erro":"não autorizado"}</code> e o componente
+tenta ler uma lista que não existe.</p>
+
+<pre class="term">GET https://loja.test/api/pedidos 500 (Internal Server Error)  1.2 s
+GET https://loja.test/api/pedidos 200  312 ms  {"pedidos": []}</pre>
+
+<p>A segunda linha é uma armadilha comum: status 200, corpo vazio. O código não pode assumir que há
+itens; a tela precisa saber mostrar "nenhum pedido". A aula de
+<a href="estados-vazios.html">estados vazios</a> entra nesse caso.</p>
+
+<p>Marque "Disable cache" enquanto investiga. Sem isso, o navegador pode responder do cache e você jura
+que o servidor está devolvendo o valor antigo — quando o valor antigo está guardado no seu
+computador.</p>
+
+<h2>8. React DevTools: o estado à vista</h2>
+
+<p>A aba do React mostra a árvore de componentes, não de elementos. Cada nó é um componente seu, com as
+props que recebeu e os hooks que declarou. Selecionar um componente na tela (pelo botão de inspeção)
+seleciona o nó correspondente na árvore — e é assim que se descobre "de onde veio esta prop".</p>
+
+<p>No painel da direita, os <code>useState</code> aparecem na ordem em que foram declarados, com o valor
+atual e o nome da variável quando o build mantém os nomes. Você também vê os efeitos, com as dependências
+da última execução. É a resposta para "o estado mudou?" sem nenhum <code>console.log</code>.</p>
+
+<p>Um sintoma clássico que essa aba resolve em dez segundos: a tela mostra o valor antigo, mas o estado
+está novo. Aí o problema não é o estado, é o lugar que lê — outra variável, um valor calculado antes da
+atualização, uma prop que não foi passada adiante. Ver os dois lados separados evita consertar o lado
+errado.</p>
+
+<p>A aba tem ainda um <em>Profiler</em>: você grava uma interação e vê quais componentes desenharam, em
+que ordem e por quanto tempo. É a ferramenta da aula de
+<a href="medindo-performance.html">medindo performance</a>; para o bug do dia a dia, a árvore de
+componentes já resolve.</p>
+
+<p>O caso abaixo é o mais chato de todos, porque não há erro: o crachá aparece sem nome. O log das props,
+que já está no código, mostra o que o componente recebeu de verdade — e a resposta está na chave.</p>
+
+<div class="tryreact" data-goal="texto:Olá, Ana">
+  <p class="try-task">O crachá mostra "Olá, " e nenhum erro no console. Repare no log das props: o
+  componente lê <code>nome</code>, mas recebe outra chave. Conserte para aparecer "Olá, Ana".</p>
+  <pre class="jsx">function Cracha(props) {
+  console.log("props recebidas:", props);
+  return &lt;p&gt;Olá, {props.nome}&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Cracha name="Ana" /&gt;
+      &lt;p&gt;Pedido de hoje&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Olá,&lt;/p&gt;
+  &lt;p&gt;Pedido de hoje&lt;/p&gt;
+&lt;/div&gt;
+console: props recebidas: {"name":"Ana"}
+</pre>
+  <pre class="solucao">function Cracha(props) {
+  console.log("props recebidas:", props);
+  return &lt;p&gt;Olá, {props.nome}&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Cracha nome="Ana" /&gt;
+      &lt;p&gt;Pedido de hoje&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Com o log na mão, a comparação fica trivial: o componente pede <code>nome</code>, o pai manda
+<code>name</code>. Sem o log, o mesmo raciocínio levaria muito mais tempo, porque a tela não acusa nada —
+e o silêncio é o pior sintoma para depurar.</p>
+
+<h2>9. O método na prática</h2>
+
+<p>Ferramenta sem método vira clique aleatório. O método tem três passos e cabe num guardanapo.</p>
+
+<p><strong>1) Reduzir.</strong> Apague metade do componente e rode. Se o bug continua, o culpado está na
+metade que ficou; se sumiu, está na que saiu. Repita até sobrar uma linha. É mais rápido do que ler
+quarenta linhas, porque cada rodada elimina metade das hipóteses.</p>
+
+<p><strong>2) Isolar.</strong> Se o problema aparece só com certos dados, use só esses dados: um item na
+lista, um pedido com aquele preço, o nome com acento. Se aparece só numa tela, leve o componente para uma
+tela vazia. Bug que some ao isolar é bug de contexto — e o contexto também é uma pista.</p>
+
+<p><strong>3) Comparar.</strong> Tenha sempre uma versão que funciona: a versão publicada anterior, outro
+componente parecido, o exemplo do guia. Compare linha por linha o que difere. "Funciona no meu e não no
+celular" costuma ser largura da tela; "funciona em dev e quebra em produção" costuma ser build ou
+variável de ambiente.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sintoma</th><th>Onde olhar primeiro</th><th>Pista típica</th></tr>
+<tr><td>tela branca</td><td>Console</td><td>erro no desenho, caminho de módulo errado</td></tr>
+<tr><td>texto ou layout errado</td><td>Elements</td><td>HTML gerado diferente do esperado, estilo perdendo</td></tr>
+<tr><td>clique sem resposta</td><td>Console e Sources</td><td>erro engolido, handler com nome errado</td></tr>
+<tr><td>valor errado</td><td>React DevTools</td><td>estado certo, leitura errada (ou o contrário)</td></tr>
+<tr><td>dado que não chega</td><td>Network</td><td>404, 500, corpo vazio, CORS</td></tr>
+<tr><td>some ao recarregar</td><td>Application</td><td>nada foi salvo, ou a chave mudou</td></tr>
+</table>
+</div>
+
+<div class="cenario">
+<h3>Cenário 1: o clique que não chega no botão</h3>
+<p>O botão "Pedir" não respondia e o console estava limpo. O handler existia, a função estava certa. No
+Elements, a Ana viu um aviso flutuante do carrinho por cima do botão, com <code>position: fixed</code> e
+a altura de uma faixa inteira. O clique caía no aviso. A pista não estava no JavaScript: estava na
+geometria da página.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o estado novo e a tela velha</h3>
+<p>No React DevTools, o estado <code>pedidos</code> já tinha três itens. A tela mostrava dois. O JSX usava
+uma variável <code>lista</code> calculada no começo do componente, antes da atualização. O estado estava
+certo; a leitura, velha. Ver os dois lados na mesma tela evita a hora gasta consertando o setter.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: funciona no notebook e não no celular</h3>
+<p>No desktop, tudo no lugar. No celular, a tabela de preços empurrava a página para o lado e escondia o
+botão. Com o modo de dispositivo do DevTools em 375 px, o problema apareceu na hora: largura fixa em
+pixels num container sem rolagem. O bug não era de React, e o DevTools mostrou isso antes do código.</p>
+</div>
+
+<p>Um último recurso, quando nada dá certo: escrever a dúvida em uma frase. "O total está <code>NaN</code>
+depois de remover um item" já diz onde olhar, e muitas vezes o culpado aparece na própria frase. Depurar
+é formular a pergunta certa e usar a ferramenta que a responde.</p>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Você quer ver o HTML que o React gerou. Qual aba?</p>
+<label><input type="radio" name="q1"> Network</label>
+<label><input type="radio" name="q1"> Elements</label>
+<label><input type="radio" name="q1"> Application</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O erro cita <code>App.jsx:7:22</code>. O que isso significa?</p>
+<label><input type="radio" name="q2"> o componente tem sete props e vinte e duas linhas</label>
+<label><input type="radio" name="q2"> o erro aconteceu no sétimo desenho da página</label>
+<label><input type="radio" name="q2"> arquivo <code>App.jsx</code>, linha 7, coluna 22</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Qual log mostra o objeto de forma útil?</p>
+<label><input type="radio" name="q3"> <code>console.log("cliente:", cliente)</code></label>
+<label><input type="radio" name="q3"> <code>console.log("cliente: " + cliente)</code></label>
+<label><input type="radio" name="q3"> <code>console.log(cliente.toString())</code></label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a ferramenta certa</h2>
+<p>Complete as duas frases com a aba que responde a cada pergunta.</p>
+<div class="ex-code">// "o HTML que o React gerou está com a classe certa?"
+// → aba <input aria-label="resposta 1" data-answer="Elements" placeholder="...">
+
+// "o estado do componente Carrinho está com dois itens?"
+// → <input aria-label="resposta 2" data-answer="React DevTools|Components" placeholder="..."></div>
+<p class="ex-dica">Dica: a primeira aba mostra elementos do DOM; a segunda é a extensão que mostra a
+árvore de componentes, com props e hooks.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Depurar no navegador é escolher a ferramenta pela pergunta. Console para mensagens e valores; Elements
+para o HTML e o estilo que venceram; Sources para parar o código e ver as variáveis de verdade; Network
+para o que veio da rede; Application para o que ficou guardado. Com React, a extensão acrescenta a árvore
+de componentes com props, estado e hooks.</p>
+
+<p>Duas habilidades fazem a diferença mais que qualquer truque. A primeira é ler a mensagem inteira: tipo
+do erro, o que era nulo, o arquivo e a linha. A segunda é logar direito — etiqueta e valor separados por
+vírgula —, porque <code>[object Object]</code> não é informação. E lembre que aviso não é enfeite: um
+console limpo é parte do trabalho pronto.</p>
+
+<p>Quando nada disso resolve, o método: reduzir pela metade até sobrar uma linha, isolar o contexto em que
+o bug aparece e comparar com a versão que funciona. É mais lento que o chute na primeira tentativa e
+infinitamente mais rápido na segunda. Na aula seguinte, a Ana começa a construir as rotas do site — e o
+que ela aprendeu aqui vai ser usado a cada passo.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>F12</code> abre o DevTools; escolha a aba pela pergunta, não pelo hábito.</li>
+<li>Console limpo é requisito: aviso ignorado vira bug depois.</li>
+<li><code>console.log("cliente:", cliente)</code> — etiqueta e vírgula, nunca <code>+</code>.</li>
+<li>Objeto logado é lido no clique: para congelar, copie ou use <code>JSON.stringify</code>.</li>
+<li>"Cannot read properties of null" é valor que ainda não chegou.</li>
+<li><code>App.jsx:7:22</code> é arquivo, linha e coluna — clique e vá direto.</li>
+<li>Breakpoint no Sources congela e mostra as variáveis; o condicional filtra a repetição.</li>
+<li><code>debugger;</code> faz o mesmo dentro do código; não deixe esquecido.</li>
+<li>O estado pode estar certo e a leitura errada: veja os dois lados no React DevTools.</li>
+<li>Método: reduzir, isolar, comparar — e escrever a dúvida em uma frase.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

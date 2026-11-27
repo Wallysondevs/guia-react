@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portfólio | Guia React</title>
+<meta name="description" content="Projeto de portfólio no React: vitrine de trabalhos com map e key, filtro por categoria, ficha do trabalho escolhido, formulário validado, moldura da página e publicação.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Portfólio</span></h1>
+<p class="intro">A Ana faz bolos de festa por encomenda e mostra o trabalho do pior jeito possível: abre a
+galeria do celular e passa foto por foto para o cliente, no balcão, com fila esperando. Ela quer uma página
+só dela — uma vitrine com os trabalhos, filtro por categoria, a ficha de cada um e um formulário para pedir
+orçamento. Neste projeto ela monta esse portfólio em seis passos, e cada caixa roda um pedaço de verdade do
+site.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como dividir uma página em faixas e decidir o que cada uma mostra.</li>
+  <li>Uma vitrine de trabalhos com <code>map</code>, <code>key</code> e classes por categoria.</li>
+  <li>Filtrar a vitrine por categoria sem perder a lista original.</li>
+  <li>Uma ficha de detalhe que aparece ao escolher um trabalho.</li>
+  <li>Um formulário de contato com validação e confirmação.</li>
+  <li>A moldura da página: cabeçalho, conteúdo e rodapé em componentes de layout.</li>
+  <li>Publicar com imagem leve e texto alternativo, sem quebrar a leitura.</li>
+  <li>Os tropeços que fazem o portfólio parecer amador.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o portfólio dentro do celular</h2>
+
+<p>O trabalho da Ana é bom; a apresentação, não. Ela tem fotos de bolos espalhadas em três pastas, um
+depoimento salvo num print e nenhum lugar onde o cliente veja preço, tamanho e prazo. Toda conversa começa
+do zero: “me manda foto de um bolo de três andares”, “quanto custa para vinte pessoas?”. Ela responde uma
+vez por cliente, sempre as mesmas perguntas.</p>
+
+<p>Uma página de portfólio resolve isso porque responde antes de ser perguntada. Quem chega vê os
+trabalhos, escolhe uma categoria, abre a ficha do que gostou e manda uma mensagem. A Ana recebe pedidos mais
+completos e deixa de repetir o mesmo áudio de dez minutos.</p>
+
+<p>O site tem quatro faixas: a capa com o nome e a promessa, a vitrine de trabalhos, os depoimentos e o
+contato. Nenhuma delas é complexa; o que faz a página funcionar é a ordem e o fato de os dados virem de
+arrays, não de HTML copiado.</p>
+
+<p>Como no projeto anterior, o escopo é pequeno de propósito: sem servidor, sem login, sem pagamento. O
+formulário confirma na tela, as fotos são locais e o filtro roda no navegador. Menos peças, mais chance de
+você terminar com algo que dá orgulho de mostrar.</p>
+
+<h2>2. O desenho da página</h2>
+
+<p>Antes do código, a decisão que mais muda o resultado: o que é dado e o que é texto fixo. Os trabalhos
+mudam toda semana, então viram um array de objetos. O nome da Ana, a promessa da capa e o rodapé não mudam,
+então ficam escritos no JSX. Misturar os dois é o que transforma uma página bonita numa página impossível de
+atualizar.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Faixa</th><th>O que mostra</th><th>De onde vêm os dados</th></tr>
+<tr><td>capa</td><td>nome, promessa e um botão para ver os trabalhos</td><td>texto fixo no componente</td></tr>
+<tr><td>vitrine</td><td>cartões com foto, título e categoria</td><td>array <code>trabalhos</code></td></tr>
+<tr><td>ficha</td><td>detalhe do trabalho escolhido</td><td>estado <code>selecionado</code></td></tr>
+<tr><td>depoimento</td><td>uma frase de cliente, com nome</td><td>array de depoimentos</td></tr>
+<tr><td>contato</td><td>formulário com nome e pedido</td><td>estado dos campos</td></tr>
+</table>
+</div>
+
+<p>Repare que só a vitrine, a ficha e o contato têm estado. A capa e o depoimento são texto — e é bom que
+sejam, porque texto fixo não dá bug. A tentação de colocar tudo em estado é comum em quem está começando, e
+o resultado é um componente com seis <code>useState</code> que ninguém consegue seguir.</p>
+
+<dl class="anatomy">
+<dt>trabalho</dt>
+<dd>Objeto com <code>id</code>, <code>titulo</code>, <code>categoria</code>, <code>ano</code>,
+<code>foto</code> e <code>descricao</code>. O <code>id</code> é a <code>key</code> da vitrine.</dd>
+<dt>vitrine</dt>
+<dd>A lista de cartões. Mostra todos os trabalhos ou só os da categoria escolhida.</dd>
+<dt>ficha</dt>
+<dd>O detalhe do trabalho escolhido: foto grande, descrição e prazo. Aparece quando há
+<code>selecionado</code>.</dd>
+<dt>categoria</dt>
+<dd>O filtro ativo — <code>"todos"</code>, <code>"bolos"</code>, <code>"tortas"</code> ou
+<code>"salgados"</code>. Fica no estado.</dd>
+<dt>moldura</dt>
+<dd>O layout que envolve todas as faixas: cabeçalho em cima, conteúdo no meio, rodapé embaixo.</dd>
+</dl>
+
+<p>Com o mapa pronto, a ordem de montagem é a da tela: primeiro a vitrine, depois o filtro, depois a ficha,
+depois o formulário, depois a moldura e, por fim, a publicação. Cada passo é uma caixa que roda, e nenhum
+deles exige reescrever o anterior.</p>
+
+<h2>3. Passo 1 — a vitrine de trabalhos</h2>
+
+<p>A vitrine é a mesma lista com <code>map</code> de sempre, com uma diferença de marcação: cada trabalho é
+um <code>article</code> com a classe <code>trabalho</code>, e dentro dele a foto, o título e a categoria.
+Usar <code>article</code> em vez de <code>div</code> não muda o visual, mas diz ao navegador que aquilo é
+uma peça independente de conteúdo — e leitores de tela aproveitam.</p>
+
+<pre class="file" data-file="Vitrine.jsx">&lt;section className="vitrine"&gt;
+  {trabalhos.map((t) =&gt; (
+    &lt;article className="trabalho" key={t.id}&gt;
+      &lt;img src={t.foto} alt={t.titulo} /&gt;
+      &lt;h3&gt;{t.titulo}&lt;/h3&gt;
+      &lt;p&gt;{t.categoria} · {t.ano}&lt;/p&gt;
+    &lt;/article&gt;
+  ))}
+&lt;/section&gt;</pre>
+
+<p>O <code>alt</code> repete o título porque a imagem é o bolo — e quem não vê a foto precisa saber o que
+ela mostra. “Imagem” ou “foto do bolo” não ajudam ninguém: o texto alternativo deve descrever o conteúdo,
+não o formato. Mais adiante a gente volta nisso com mais cuidado, porque é o detalhe que separa portfólio
+de álbum.</p>
+
+<div class="tryreact" data-goal="conta:.trabalho=4;;texto:Bolo de casamento">
+  <p class="try-task">A vitrine mostra um cartão escrito à mão. Desenhe os quatro trabalhos do array com
+  <code>map</code>, classe <code>trabalho</code> e <code>key={t.id}</code>.</p>
+  <pre class="jsx">const trabalhos = [
+  { id: "t1", titulo: "Bolo de casamento", categoria: "bolos", ano: 2024 },
+  { id: "t2", titulo: "Bolo infantil", categoria: "bolos", ano: 2025 },
+  { id: "t3", titulo: "Torta de frutas", categoria: "tortas", ano: 2025 },
+  { id: "t4", titulo: "Mesa de salgados", categoria: "salgados", ano: 2023 }
+];
+
+function App() {
+  return (
+    &lt;section className="vitrine"&gt;
+      &lt;article className="trabalho"&gt;
+        &lt;h3&gt;Bolo de casamento&lt;/h3&gt;
+        &lt;p&gt;bolos · 2024&lt;/p&gt;
+      &lt;/article&gt;
+    &lt;/section&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;section class="vitrine"&gt;
+  &lt;article class="trabalho"&gt;
+    &lt;h3&gt;Bolo de casamento&lt;/h3&gt;
+    &lt;p&gt;bolos · 2024&lt;/p&gt;
+  &lt;/article&gt;
+&lt;/section&gt;
+</pre>
+  <pre class="solucao">const trabalhos = [
+  { id: "t1", titulo: "Bolo de casamento", categoria: "bolos", ano: 2024 },
+  { id: "t2", titulo: "Bolo infantil", categoria: "bolos", ano: 2025 },
+  { id: "t3", titulo: "Torta de frutas", categoria: "tortas", ano: 2025 },
+  { id: "t4", titulo: "Mesa de salgados", categoria: "salgados", ano: 2023 }
+];
+
+function App() {
+  return (
+    &lt;section className="vitrine"&gt;
+      {trabalhos.map((t) =&gt; (
+        &lt;article className="trabalho" key={t.id}&gt;
+          &lt;h3&gt;{t.titulo}&lt;/h3&gt;
+          &lt;p&gt;{t.categoria} · {t.ano}&lt;/p&gt;
+        &lt;/article&gt;
+      ))}
+    &lt;/section&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel passa a mostrar quatro cartões. Se aparecerem quatro <code>h3</code> e nenhum
+<code>article</code>, a classe ficou de fora; se aparecer apenas um, o <code>map</code> não entrou. E se o
+React reclamar de <code>key</code> duplicada, dois trabalhos têm o mesmo <code>id</code> — o que também
+acontece quando você usa o título como chave e repete o título.</p>
+
+<pre class="term">&gt; trabalhos.length
+4
+&gt; trabalhos.map((t) =&gt; t.categoria)
+["bolos", "bolos", "tortas", "salgados"]
+&gt; new Set(trabalhos.map((t) =&gt; t.categoria)).size
+3</pre>
+
+<p>Três categorias, quatro trabalhos. Essa contagem é o que o filtro vai usar — e repare que ela é derivada
+do array, não escrita à mão. Se amanhã entrar um bolo novo, a conta se ajusta sozinha.</p>
+
+<h2>4. Passo 2 — filtrar por categoria</h2>
+
+<p>O filtro é a aula de <a href="filtrar.html">Filtrar</a> aplicada: o estado guarda a categoria escolhida,
+a lista visível é calculada no render e a lista original nunca é tocada. Os botões só mudam o estado.</p>
+
+<pre class="file" data-file="Vitrine.jsx">const [categoria, setCategoria] = useState("todos");
+
+const visiveis = trabalhos.filter(
+  (t) =&gt; categoria === "todos" || t.categoria === categoria
+);
+
+&lt;button onClick={() =&gt; setCategoria("bolos")}&gt;Bolos&lt;/button&gt;</pre>
+
+<p>A condição tem duas partes de propósito. A primeira, <code>categoria === "todos"</code>, libera tudo
+quando nenhum filtro foi escolhido. A segunda compara a categoria do trabalho com a escolhida. Sem a
+primeira, “todos” viraria uma categoria inexistente e a vitrine ficaria vazia na abertura — um clássico.</p>
+
+<p>Os botões poderiam ser um <code>&lt;select&gt;</code>, mas aqui eles funcionam melhor: são poucos, ficam
+visíveis e mostram de imediato quantas opções existem. Um select esconde as opções até o clique, e num
+portfólio a pessoa quer ver que há bolos, tortas e salgados sem abrir nada.</p>
+
+<div class="tryreact" data-goal="clique:button.bolos;;conta:.trabalho=2;;texto:Bolo infantil">
+  <p class="try-task">Os botões já trocam o estado <code>categoria</code>, mas a vitrine ignora e mostra os
+  quatro. Filtre a lista antes do <code>map</code> e clique em Bolos.</p>
+  <pre class="jsx">const trabalhos = [
+  { id: "t1", titulo: "Bolo de casamento", categoria: "bolos", ano: 2024 },
+  { id: "t2", titulo: "Bolo infantil", categoria: "bolos", ano: 2025 },
+  { id: "t3", titulo: "Torta de frutas", categoria: "tortas", ano: 2025 },
+  { id: "t4", titulo: "Mesa de salgados", categoria: "salgados", ano: 2023 }
+];
+
+function App() {
+  const [categoria, setCategoria] = useState("todos");
+  return (
+    &lt;div&gt;
+      &lt;button className="todos" onClick={() =&gt; setCategoria("todos")}&gt;Todos&lt;/button&gt;
+      &lt;button className="bolos" onClick={() =&gt; setCategoria("bolos")}&gt;Bolos&lt;/button&gt;
+      &lt;button className="tortas" onClick={() =&gt; setCategoria("tortas")}&gt;Tortas&lt;/button&gt;
+      &lt;section className="vitrine"&gt;
+        {trabalhos.map((t) =&gt; (
+          &lt;article className="trabalho" key={t.id}&gt;{t.titulo}&lt;/article&gt;
+        ))}
+      &lt;/section&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button class="todos"&gt;Todos&lt;/button&gt;
+  &lt;button class="bolos"&gt;Bolos&lt;/button&gt;
+  &lt;button class="tortas"&gt;Tortas&lt;/button&gt;
+  &lt;section class="vitrine"&gt;
+    &lt;article class="trabalho"&gt;Bolo de casamento&lt;/article&gt;
+    &lt;article class="trabalho"&gt;Bolo infantil&lt;/article&gt;
+    &lt;article class="trabalho"&gt;Torta de frutas&lt;/article&gt;
+    &lt;article class="trabalho"&gt;Mesa de salgados&lt;/article&gt;
+  &lt;/section&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const trabalhos = [
+  { id: "t1", titulo: "Bolo de casamento", categoria: "bolos", ano: 2024 },
+  { id: "t2", titulo: "Bolo infantil", categoria: "bolos", ano: 2025 },
+  { id: "t3", titulo: "Torta de frutas", categoria: "tortas", ano: 2025 },
+  { id: "t4", titulo: "Mesa de salgados", categoria: "salgados", ano: 2023 }
+];
+
+function App() {
+  const [categoria, setCategoria] = useState("todos");
+  const visiveis = trabalhos.filter(
+    (t) =&gt; categoria === "todos" || t.categoria === categoria
+  );
+  return (
+    &lt;div&gt;
+      &lt;button className="todos" onClick={() =&gt; setCategoria("todos")}&gt;Todos&lt;/button&gt;
+      &lt;button className="bolos" onClick={() =&gt; setCategoria("bolos")}&gt;Bolos&lt;/button&gt;
+      &lt;button className="tortas" onClick={() =&gt; setCategoria("tortas")}&gt;Tortas&lt;/button&gt;
+      &lt;section className="vitrine"&gt;
+        {visiveis.map((t) =&gt; (
+          &lt;article className="trabalho" key={t.id}&gt;{t.titulo}&lt;/article&gt;
+        ))}
+      &lt;/section&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Ao clicar em Bolos, sobram dois cartões. Se sobrarem quatro, a vitrine continua percorrendo
+<code>trabalhos</code>; se não sobrar nenhum, a comparação de categoria está invertida ou o valor do estado
+não bate com o dado (maiúscula, acento, plural).</p>
+
+<p>Um refinamento que vale desde já: marque o botão ativo com <code>aria-pressed</code>. É um atributo
+booleano que diz “este filtro está ligado” para leitores de tela e pode ser estilizado com
+<code>[aria-pressed="true"]</code>. O visual muda por CSS, o significado vem do atributo.</p>
+
+<h2>5. Passo 3 — a ficha do trabalho escolhido</h2>
+
+<p>Ver quatro fotos pequenas é bom; abrir uma grande, com descrição e prazo, é o que fecha um orçamento. A
+ficha é um estado a mais: o <code>id</code> do trabalho selecionado, ou <code>null</code> quando nada está
+aberto.</p>
+
+<pre class="file" data-file="Vitrine.jsx">const [selecionado, setSelecionado] = useState(null);
+const ficha = trabalhos.find((t) =&gt; t.id === selecionado);
+
+&lt;article className="trabalho" key={t.id} onClick={() =&gt; setSelecionado(t.id)}&gt;
+  ...
+&lt;/article&gt;
+
+{ficha &amp;&amp; (
+  &lt;section className="ficha"&gt;
+    &lt;h2&gt;{ficha.titulo}&lt;/h2&gt;
+    &lt;p&gt;{ficha.descricao}&lt;/p&gt;
+    &lt;button onClick={() =&gt; setSelecionado(null)}&gt;Fechar&lt;/button&gt;
+  &lt;/section&gt;
+)}</pre>
+
+<p>O <code>find</code> procura o trabalho pelo <code>id</code> e devolve o objeto inteiro — não é preciso
+guardar o objeto no estado. Guardar o <code>id</code> tem uma vantagem grande: se os dados forem
+recarregados (um novo preço, uma foto melhor), a ficha mostra a versão atual, porque só a referência está no
+estado.</p>
+
+<p>O <code>{ficha &amp;&amp; ...}</code> é a renderização condicional de sempre: se não há seleção,
+<code>find</code> devolve <code>undefined</code>, e nada é desenhado. O <code>&amp;&amp;</code> só funciona
+porque <code>undefined</code> não desenha nada; com um número, cuidado — <code>0 &amp;&amp; ...</code>
+renderiza o zero. Aqui o valor é objeto ou <code>undefined</code>, então está seguro.</p>
+
+<p>Se você preferir uma ficha embutida, sem seção separada, dá para mostrar a descrição dentro do próprio
+cartão selecionado. As duas soluções funcionam; a seção separada ganha quando a descrição é longa e o
+cartão precisa continuar compacto.</p>
+
+<pre class="term">&gt; selecionado
+"t1"
+&gt; trabalhos.find((t) =&gt; t.id === selecionado).titulo
+"Bolo de casamento"
+&gt; selecionado
+null</pre>
+
+<p>Esse é o estado em três momentos: nada aberto, um trabalho aberto e, depois de fechar, nada aberto de
+novo. Repare que a ficha não guarda uma cópia do trabalho — ela guarda a chave para encontrá-lo. É a mesma
+ideia da <code>key</code> da lista, aplicada ao estado.</p>
+
+<h2>6. Passo 4 — o contato que não perde mensagem</h2>
+
+<p>O formulário é a parte do portfólio que traz dinheiro, e é a que mais gente implementa pela metade. Aqui
+ele tem dois campos — nome e pedido — e uma regra simples: não confirmar enquanto faltar informação. A
+validação acontece no <code>onSubmit</code>, com mensagens específicas.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Campo</th><th>Regra</th><th>Mensagem quando falha</th></tr>
+<tr><td>nome</td><td>não pode ficar vazio depois do <code>trim()</code></td><td>“Escreva seu nome para eu responder.”</td></tr>
+<tr><td>pedido</td><td>não pode ficar vazio depois do <code>trim()</code></td><td>“Conte o que você quer encomendar.”</td></tr>
+<tr><td>envio</td><td>só confirma com os dois válidos</td><td>“Mensagem enviada! Respondo ainda hoje.”</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="Contato.jsx">function enviar(e) {
+  e.preventDefault();
+  if (nome.trim() === "") {
+    setAviso("Escreva seu nome para eu responder.");
+    return;
+  }
+  if (pedido.trim() === "") {
+    setAviso("Conte o que você quer encomendar.");
+    return;
+  }
+  setAviso("Mensagem enviada! Respondo ainda hoje.");
+}</pre>
+
+<p>Os <code>returns</code> antecipados deixam a leitura linear: cada regra que falha interrompe o envio. É
+mais fácil de seguir do que um <code>if</code> gigante com <code>&amp;&amp;</code> entre as condições, e
+permite uma mensagem por problema, em vez de uma frase genérica que não ajuda.</p>
+
+<p>O aviso fica num elemento com <code>role="status"</code>, para leitores de tela anunciarem a mudança. E
+note que o formulário não limpa os campos quando dá erro: apagar o que a pessoa escreveu é uma das piores
+experiências possíveis num formulário. Limpe só depois do sucesso.</p>
+
+<div class="tryreact" data-goal="clique:button.enviar;;texto:Escreva seu nome;;digite:input#nome=Ana;;digite:input#pedido=Bolo de festa;;clique:button.enviar;;texto:Mensagem enviada">
+  <p class="try-task">O formulário confirma mesmo com os campos vazios. Valide o nome e o pedido antes de
+  confirmar: com o nome vazio, mostre “Escreva seu nome”; com os dois preenchidos, “Mensagem enviada”.</p>
+  <pre class="jsx">function App() {
+  const [nome, setNome] = useState("");
+  const [pedido, setPedido] = useState("");
+  const [aviso, setAviso] = useState("");
+
+  function enviar(e) {
+    e.preventDefault();
+    setAviso("Mensagem enviada");
+  }
+
+  return (
+    &lt;form onSubmit={enviar}&gt;
+      &lt;label htmlFor="nome"&gt;Seu nome&lt;/label&gt;
+      &lt;input id="nome" value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+      &lt;label htmlFor="pedido"&gt;O que você quer encomendar?&lt;/label&gt;
+      &lt;input id="pedido" value={pedido} onChange={(e) =&gt; setPedido(e.target.value)} /&gt;
+      &lt;button className="enviar"&gt;Enviar&lt;/button&gt;
+      &lt;p role="status"&gt;{aviso}&lt;/p&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;form&gt;
+  &lt;label for="nome"&gt;Seu nome&lt;/label&gt;
+  &lt;input id="nome" value=""&gt;
+  &lt;label for="pedido"&gt;O que você quer encomendar?&lt;/label&gt;
+  &lt;input id="pedido" value=""&gt;
+  &lt;button class="enviar"&gt;Enviar&lt;/button&gt;
+  &lt;p role="status"&gt;&lt;/p&gt;
+&lt;/form&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nome, setNome] = useState("");
+  const [pedido, setPedido] = useState("");
+  const [aviso, setAviso] = useState("");
+
+  function enviar(e) {
+    e.preventDefault();
+    if (nome.trim() === "") {
+      setAviso("Escreva seu nome para eu responder.");
+      return;
+    }
+    if (pedido.trim() === "") {
+      setAviso("Conte o que você quer encomendar.");
+      return;
+    }
+    setAviso("Mensagem enviada! Respondo ainda hoje.");
+  }
+
+  return (
+    &lt;form onSubmit={enviar}&gt;
+      &lt;label htmlFor="nome"&gt;Seu nome&lt;/label&gt;
+      &lt;input id="nome" value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+      &lt;label htmlFor="pedido"&gt;O que você quer encomendar?&lt;/label&gt;
+      &lt;input id="pedido" value={pedido} onChange={(e) =&gt; setPedido(e.target.value)} /&gt;
+      &lt;button className="enviar"&gt;Enviar&lt;/button&gt;
+      &lt;p role="status"&gt;{aviso}&lt;/p&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+</div>
+
+<p>A conferência clica em Enviar com tudo vazio e espera a mensagem do nome; depois preenche os dois campos,
+clica de novo e espera a confirmação. Se a primeira mensagem aparecer como “Mensagem enviada”, a validação
+ficou depois do <code>setAviso</code> de sucesso; se a segunda não aparecer, algum <code>return</code> está
+sobrando.</p>
+
+<p>No app real, depois de validar, você chamaria a API com <code>fetch</code> e esperaria a resposta. A
+estrutura é a do projeto anterior: estado de enviando, mensagem de erro, limpeza dos campos só no sucesso.
+Aqui a confirmação é local porque não há servidor no quadro da caixa — e porque o foco do projeto é o
+formulário, não a rede.</p>
+
+<h2>7. Passo 5 — a moldura da página</h2>
+
+<p>As faixas que você montou precisam de uma moldura: cabeçalho com o nome, conteúdo e rodapé com contato.
+Em vez de repetir esse HTML em cada tela, separe em componentes de layout — a mesma ideia da aula
+<a href="componentes-de-layout.html">Componentes de Layout</a>: a moldura por fora, o miolo por dentro.</p>
+
+<pre class="file" data-file="App.jsx">function Moldura({ children }) {
+  return (
+    &lt;div className="pagina"&gt;
+      &lt;header className="topo"&gt;
+        &lt;h1&gt;Bolos da Ana&lt;/h1&gt;
+        &lt;p&gt;Bolos de festa sob encomenda em São Paulo&lt;/p&gt;
+      &lt;/header&gt;
+      &lt;main&gt;{children}&lt;/main&gt;
+      &lt;footer className="rodape"&gt;
+        &lt;p&gt;Encomendas com 5 dias de antecedência.&lt;/p&gt;
+      &lt;/footer&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;Moldura&gt;
+      &lt;Vitrine /&gt;
+    &lt;/Moldura&gt;
+  );
+}</pre>
+
+<p>O <code>children</code> é o miolo: tudo que você escreve entre as tags do componente chega ali. A moldura
+não sabe o que está envolvendo, e é isso que a torna reutilizável — a mesma moldura serve para a vitrine, a
+ficha e a página de contato.</p>
+
+<p>Os elementos <code>header</code>, <code>main</code> e <code>footer</code> não são decoração: eles marcam
+as regiões da página para que leitores de tela ofereçam atalhos (“ir para o conteúdo principal”). Use um
+<code>main</code> por página, e não coloque o menu dentro dele. É um detalhe de HTML que muita gente
+esquece e que custa uma linha.</p>
+
+<p>Repare também no <code>h1</code> dentro do cabeçalho. Cada página tem um título principal, e os cartões
+usam <code>h3</code> porque estão abaixo dele na hierarquia. Pular de <code>h1</code> para
+<code>h4</code> porque “o <code>h2</code> ficou grande” é um erro comum: o tamanho se ajusta no CSS, a
+hierarquia não.</p>
+
+<h2>8. Passo 6 — publicar sem estragar</h2>
+
+<p>Portfólio é imagem, e imagem é o que mais pesa. Uma foto de bolo tirada com o celular tem quatro
+megabytes; seis delas fazem a página demorar a abrir no celular do cliente, que está na fila do banco com
+internet ruim. Publicar bem é, antes de tudo, reduzir.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Peça</th><th>O que fazer</th><th>Por quê</th></tr>
+<tr><td>foto</td><td>redimensionar para 1200 px de largura e salvar em WebP</td><td>o mesmo bolo em 150 kB em vez de 4 MB</td></tr>
+<tr><td>texto alternativo</td><td><code>alt</code> descrevendo o bolo, não “imagem”</td><td>quem não vê a foto entende o trabalho</td></tr>
+<tr><td>tamanho reservado</td><td><code>width</code> e <code>height</code> no <code>img</code></td><td>a página não “pula” quando a foto chega</td></tr>
+<tr><td>carregamento</td><td><code>loading="lazy"</code> nas fotos abaixo da dobra</td><td>o navegador só baixa o que será visto</td></tr>
+<tr><td>título da aba</td><td><code>title</code> e <code>description</code> próprios</td><td>é o que aparece no Google e no link compartilhado</td></tr>
+</table>
+</div>
+
+<pre class="term">&gt; document.querySelectorAll("img").length
+6
+&gt; document.querySelector("img").getAttribute("alt")
+"Bolo de casamento de três andares com flores brancas"
+&gt; document.querySelectorAll("img[alt='']").length
+0</pre>
+
+<p>A última linha é o teste que vale a pena decorar: zero imagens com <code>alt</code> vazio. Se der
+diferente de zero, há foto sem descrição — e, num portfólio, foto sem descrição é trabalho invisível para
+parte das pessoas.</p>
+
+<p>Sobre o endereço: o site publicado precisa de um domínio ou de um endereço de hospedagem. Para testar,
+use um endereço de exemplo como <code>loja.test</code>; nada de colocar dados reais de servidor na página.
+E lembre de conferir no celular: a maioria dos clientes da Ana abre o link no celular, na rua.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Antes de publicar</th><th>Como conferir</th><th>Sinal de problema</th></tr>
+<tr><td>o site abre em 375 px</td><td>diminua a janela até a largura de um celular</td><td>barra de rolagem horizontal</td></tr>
+<tr><td>as fotos têm descrição</td><td>veja o <code>alt</code> de cada <code>img</code></td><td><code>alt</code> vazio ou “foto”</td></tr>
+<tr><td>o formulário avisa</td><td>envie vazio e depois preenchido</td><td>confirma sem validar ou não confirma</td></tr>
+<tr><td>os links funcionam</td><td>clique em todos, inclusive no rodapé</td><td>link para página que não existe</td></tr>
+</table>
+</div>
+
+<h2>9. O que quebra e o que conferir</h2>
+
+<p>Portfólio tem pouco código e muita apresentação, então os erros costumam ser silenciosos: a página abre,
+parece certa e não converte. Esta é a lista do que a Ana confere antes de mandar o link para um cliente.</p>
+
+<div class="cenario">
+<h3>Cenário 1: o filtro some com a vitrine inteira</h3>
+<p>Ela escreveu <code>categoria === "todos" &amp;&amp; t.categoria === categoria</code> e, com “todos”
+selecionado, nada passa. O operador certo é <code>||</code>: ou o filtro é “todos”, ou a categoria bate.
+O sintoma é uma vitrine vazia na abertura, que o cliente lê como site quebrado.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a ficha mostra o trabalho errado depois de filtrar</h3>
+<p>Ela guardou o índice do cartão em vez do <code>id</code>. Quando o filtro muda, o índice 1 passa a ser
+outro trabalho, e a ficha abre o bolo errado. Guarde o <code>id</code> e procure com <code>find</code>; a
+posição na tela não é identidade.</p>
+</div>
+
+<dl class="anatomy">
+<dt>estado mínimo</dt>
+<dd>Só o que muda: categoria escolhida, id selecionado e os campos do contato. O resto é derivado.</dd>
+<dt>validação no envio</dt>
+<dd>Regras conferidas no <code>onSubmit</code>, com uma mensagem por problema e sem apagar o que foi
+digitado.</dd>
+<dt>texto alternativo</dt>
+<dd>O <code>alt</code> que descreve a imagem. Vazio só quando a imagem é puramente decorativa.</dd>
+<dt>moldura</dt>
+<dd>Componente com <code>children</code> que envolve a página: cabeçalho, <code>main</code> e rodapé.</dd>
+<dt>peso da página</dt>
+<dd>Soma do que o navegador baixa. No portfólio, quase tudo são fotos — e é por isso que elas são o
+alvo.</dd>
+</dl>
+
+<p>A ordem de teste segue o visitante: abre a página, filtra, abre uma ficha, fecha, preenche o contato
+errado de propósito, corrige e envia. Depois repita no celular. Se algo travar nesse caminho, o problema
+está em uma das quatro peças que você montou — e agora você sabe qual é.</p>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. O que deve ficar no estado do portfólio?</p>
+<label><input type="radio" name="q1"> a lista de trabalhos visíveis</label>
+<label><input type="radio" name="q1"> o texto de todas as seções</label>
+<label><input type="radio" name="q1"> a categoria escolhida, o id selecionado e os campos do contato</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. Por que guardar o <code>id</code> do trabalho, e não o objeto?</p>
+<label><input type="radio" name="q2"> porque o objeto pode ficar velho; o id encontra a versão atual</label>
+<label><input type="radio" name="q2"> porque o React não aceita objetos no estado</label>
+<label><input type="radio" name="q2"> porque o id ocupa menos espaço no <code>localStorage</code></label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. Qual é o operador certo no filtro de categoria?</p>
+<label><input type="radio" name="q3"> <code>&amp;&amp;</code>, porque as duas condições precisam ser verdadeiras</label>
+<label><input type="radio" name="q3"> <code>||</code>, porque ou o filtro é “todos” ou a categoria bate</label>
+<label><input type="radio" name="q3"> <code>===</code>, comparando direto com a categoria</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a vitrine filtrada</h2>
+<p>Complete a chamada que devolve só os trabalhos da categoria escolhida, sem alterar o array original.</p>
+<div class="ex-code">const visiveis = trabalhos.<input aria-label="resposta 1" data-answer="filter" placeholder="...">((t) =&gt; categoria === "todos" || t.categoria === categoria);</div>
+<p class="ex-dica">Dica: é o método que devolve um array novo com os itens aprovados pela função.</p>
+</div>
+
+<h2>10. Resumo</h2>
+
+<p>O portfólio é uma página de faixas: capa e rodapé fixos, vitrine vinda de um array, ficha escolhida por
+um <code>id</code> e contato com validação. Cada faixa tem sua responsabilidade, e só três coisas viram
+estado: a categoria, o <code>id</code> selecionado e os campos do formulário.</p>
+
+<p>A vitrine é <code>map</code> com <code>key={t.id}</code>; o filtro é <code>filter</code> com
+<code>||</code> para o caso “todos”; a ficha é <code>find</code> sobre o <code>id</code>, desenhada com
+<code>&amp;&amp;</code>. O contato valida no <code>onSubmit</code>, com uma mensagem por problema e sem
+apagar o que a pessoa escreveu. A moldura é um componente com <code>children</code>, e o
+<code>main</code> é um só.</p>
+
+<p>Publicar é reduzir: foto em WebP, <code>alt</code> descrevendo o trabalho, dimensões reservadas e
+carregamento preguiçoso. Confira no celular, clique em todos os links e teste o formulário vazio e
+preenchido. Um portfólio que abre rápido e responde às perguntas antes de serem feitas é o que transforma
+visita em encomenda.</p>
+
+<p>O próximo projeto pega tudo isso e acrescenta a parte mais difícil de qualquer catálogo: buscar e filtrar
+sobre muitos dados ao mesmo tempo, com contagem, ordenação e paginação.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Dados em array, texto fixo no JSX; estado só para o que muda.</li>
+<li>Vitrine: <code>map</code> com <code>key={t.id}</code> e <code>article</code> por trabalho.</li>
+<li>Filtro: <code>categoria === "todos" || t.categoria === categoria</code>.</li>
+<li>Ficha: guarde o <code>id</code>, encontre com <code>find</code>, desenhe com <code>&amp;&amp;</code>.</li>
+<li>Botão ativo ganha <code>aria-pressed</code>; o CSS cuida do visual.</li>
+<li>Contato valida no <code>onSubmit</code>, com <code>return</code> por regra.</li>
+<li>Não apague os campos quando o envio falha.</li>
+<li>Moldura com <code>children</code>; um <code>main</code> por página.</li>
+<li>Foto leve, <code>alt</code> descritivo e dimensões reservadas.</li>
+<li>Teste no celular, com o formulário vazio e preenchido.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

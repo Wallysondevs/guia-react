@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rotas por Hash | Guia React</title>
+<meta name="description" content="Rotas por hash no React: ler e escrever location.hash, ouvir o hashchange num efeito, normalizar a rota e ganhar F5, histórico e link compartilhado.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Rotas por <span class="hl">Hash</span></h1>
+<p class="intro">A Ana quis mandar o link da lista de pães no grupo da padaria e percebeu o problema: o
+endereço era sempre o mesmo, e a cliente caía na vitrine. Na aula passada a tela morava dentro de um
+estado; agora ela vai morar no <strong>endereço</strong>. O caminho mais curto para isso é o
+<code>hash</code> — o pedaço que vem depois do <code>#</code> —, que muda sem recarregar a página, não
+pergunta nada ao servidor e sobrevive ao F5, ao voltar e ao link no grupo.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é o hash e por que ele não chega ao servidor.</li>
+  <li>Como ler o hash quando a página abre, para o link direto funcionar.</li>
+  <li>Como trocar de tela escrevendo em <code>window.location.hash</code>.</li>
+  <li>Como ouvir o evento <code>hashchange</code> num efeito, com limpeza.</li>
+  <li>Por que o estado pode ser só um espelho da URL.</li>
+  <li>Como normalizar a rota e tratar o endereço vazio.</li>
+  <li>O que muda — e o que ainda não muda — em relação à rota por estado.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o link que abre na vitrine</h2>
+
+<p>Na aula de <a href="rotas-com-estado.html">rotas com estado</a>, a Ana trocou de tela sem recarregar. O
+endereço, porém, continuava <code>https://loja.test/</code> em qualquer tela. Mandar "o link dos pães"
+era mandar o link da vitrine: a cliente abria, via "Bem-vindo" e desistia.</p>
+
+<p>A saída é colocar a tela no endereço. Existem dois jeitos clássicos: usar o caminho
+(<code>https://loja.test/paes</code>) ou usar o hash (<code>https://loja.test/#/paes</code>). O caminho é
+mais bonito e melhor para busca, mas exige que o servidor devolva o <code>index.html</code> em qualquer
+rota — a regra de rewrite da aula de <a href="publicando.html">publicando</a>. O hash não exige nada: o
+navegador não manda o que vem depois do <code>#</code> para o servidor.</p>
+
+<p>Começar pelo hash é bom por dois motivos. Ele funciona em qualquer host, inclusive no GitHub Pages,
+onde rewrite não existe. E ele obriga a entender a peça central de qualquer roteador: a URL guarda a
+rota, o componente lê a URL, e um evento avisa quando ela muda. Trocando <code>hash</code> por
+<code>pathname</code> mais uma biblioteca, é o mesmo desenho.</p>
+
+<h2>2. O que é o hash, exatamente</h2>
+
+<p>A URL tem partes. <code>https</code> é o esquema, <code>loja.test</code> é o domínio,
+<code>/padaria</code> é o caminho, <code>#/paes</code> é o fragmento (o hash) e <code>?destaque=1</code> é a
+query. O navegador envia ao servidor o esquema, o domínio, o caminho e a query. O fragmento fica no
+computador do cliente — ele nunca sai na requisição.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parte</th><th>Exemplo</th><th>Vai ao servidor?</th></tr>
+<tr><td>esquema e domínio</td><td><code>https://loja.test</code></td><td>sim, é para onde o pedido vai</td></tr>
+<tr><td>caminho</td><td><code>/padaria/paes</code></td><td>sim, o servidor precisa achar o arquivo</td></tr>
+<tr><td>query</td><td><code>?ordem=preco</code></td><td>sim, chega junto com o caminho</td></tr>
+<tr><td>fragmento (hash)</td><td><code>#/paes</code></td><td>não: fica só no navegador</td></tr>
+</table>
+</div>
+
+<p>Duas consequências caem daí. A boa: mudar só o hash não recarrega a página nem gera pedido — é
+instantâneo e funciona offline. A ruim: o servidor não vê a rota, então buscadores e prévias de link não
+enxergam aquele conteúdo. Para a padaria, que quer o link funcionando no grupo, é um preço aceitável; para
+uma loja que vive de busca, o caminho é o caminho.</p>
+
+<p>O navegador ainda faz um favor: toda vez que o hash muda, ele dispara um evento chamado
+<code>hashchange</code> na janela e registra a mudança no histórico. É esse par — propriedade e evento —
+que transforma o hash num roteador de verdade.</p>
+
+<h2>3. Lendo o hash quando a página abre</h2>
+
+<p>A primeira metade do roteador é ler. Quando alguém abre <code>https://loja.test/#/contato</code>, o
+navegador carrega o <code>index.html</code> e entrega o endereço completo para o JavaScript. A tela
+inicial tem de sair dali, e não de um valor fixo — senão o link direto abre sempre na vitrine.</p>
+
+<pre class="file" data-file="App.jsx">function rotaDoEndereco() {
+  const hash = window.location.hash;      // "#/contato"
+  const semCerquilha = hash.replace(/^#\/?/, "");
+  return semCerquilha || "inicio";
+}</pre>
+
+<p>O <code>replace</code> tira a cerquilha e a barra; se sobrar vazio — caso de
+<code>https://loja.test/</code> —, a rota é <code>"inicio"</code>. Essa pequena normalização é o que
+impede a área em branco quando alguém abre o site sem hash nenhum.</p>
+
+<p>Nas caixas desta aula, o motor roda o componente num quadro isolado, sem um endereço de verdade: um
+<code>window.location.hash</code> ali não sobrevive ao clique. Para você poder experimentar, as caixas usam
+uma <code>janela</code> de mentira que tem as mesmas peças — uma propriedade <code>hash</code> e o evento
+<code>hashchange</code> —, criada com <code>new EventTarget()</code>. O código de um projeto de verdade é
+o do bloco acima, com <code>window</code> no lugar de <code>janela</code>; a lógica é idêntica.</p>
+
+<div class="tryreact" data-goal="texto:Contato — 9999-0000">
+  <p class="try-task">O site abriu direto em <code>#/contato</code>, mas a tela mostra a vitrine, porque o
+  estado começa fixo em <code>"inicio"</code>. Inicie o estado a partir do hash da <code>janela</code>.</p>
+  <pre class="jsx">const janela = new EventTarget();
+janela.hash = "#/contato";
+
+function App() {
+  const [rota, setRota] = useState("inicio");
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Rota: {rota}&lt;/p&gt;
+      {rota === "contato" ? &lt;p&gt;Contato — 9999-0000&lt;/p&gt; : &lt;p&gt;Vitrine&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Rota: inicio&lt;/p&gt;
+  &lt;p&gt;Vitrine&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const janela = new EventTarget();
+janela.hash = "#/contato";
+
+function App() {
+  const [rota, setRota] = useState(
+    janela.hash.replace(/^#\/?/, "") || "inicio"
+  );
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Rota: {rota}&lt;/p&gt;
+      {rota === "contato" ? &lt;p&gt;Contato — 9999-0000&lt;/p&gt; : &lt;p&gt;Vitrine&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O valor inicial do <code>useState</code> é calculado uma vez, na montagem — que é exatamente o momento
+em que a página abriu. Ler o endereço ali é o que faz o link direto e o F5 funcionarem: não há estado
+antigo para restaurar, porque o endereço já diz tudo.</p>
+
+<h2>4. Escrevendo no hash para trocar de tela</h2>
+
+<p>A segunda metade é escrever. Em vez de chamar o setter, o botão muda o endereço; o evento avisa o
+componente; o componente lê o hash de novo. Quem manda é a URL, e o estado só repete o que ela diz.</p>
+
+<pre class="file" data-file="App.jsx">function irPara(rota) {
+  window.location.hash = "#/" + rota;
+}</pre>
+
+<p>Atribuir a <code>location.hash</code> faz três coisas de uma vez: muda a barra de endereço, cria uma
+entrada no histórico e dispara o <code>hashchange</code>. Note que isso não recarrega a página — o
+navegador já tem o documento e só guarda o novo fragmento.</p>
+
+<p>Se você escrever o mesmo hash duas vezes seguidas, nada acontece: o navegador compara o valor e não
+dispara evento quando o endereço não mudou. É o mesmo raciocínio do <code>setState</code> com valor igual
+— e a mesma surpresa de "cliquei e não aconteceu nada".</p>
+
+<p>Tem um bônus importante aqui: um link comum, <code>&lt;a href="#/paes"&gt;Pães&lt;/a&gt;</code>, muda o
+hash sozinho, sem uma linha de JavaScript. O navegador troca o fragmento, entra no histórico e dispara o
+<code>hashchange</code>; o seu efeito faz o resto. Isso significa que a navegação por hash funciona mesmo
+antes do JavaScript carregar — o endereço muda e, quando o componente monta, ele lê o hash novo e desenha
+a tela certa. É a razão pela qual os roteadores por hash são tão robustos em conexão ruim.</p>
+
+<p>O caminho inverso também é útil: <code>history.back()</code> e o botão do navegador só mexem no
+histórico. Como cada mudança de hash é uma entrada, voltar dispara <code>hashchange</code> e a tela
+acompanha sem que você escreva nada para isso.</p>
+
+<h2>5. Ouvindo o hashchange</h2>
+
+<p>Ler na montagem resolve o link direto. Falta o meio do caminho: quando o hash muda <em>depois</em> que a
+página abriu, alguém precisa avisar o componente. Esse alguém é o evento <code>hashchange</code>, e o
+lugar de assinar um evento da janela é dentro de um efeito.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Rota atual: #/paes">
+  <p class="try-task">O clique muda o hash da <code>janela</code>, mas a tela não acompanha: ninguém está
+  escutando o <code>hashchange</code>. Assine o evento num efeito e atualize a rota. A missão clica em
+  Pães e confere <code>#/paes</code>.</p>
+  <pre class="jsx">const janela = new EventTarget();
+janela.hash = "#/inicio";
+
+function irPara(hash) {
+  janela.hash = hash;
+  janela.dispatchEvent(new Event("hashchange"));
+}
+
+function App() {
+  const [rota, setRota] = useState(janela.hash);
+
+  return (
+    &lt;div&gt;
+      &lt;nav&gt;
+        &lt;button onClick={() =&gt; irPara("#/paes")}&gt;Pães&lt;/button&gt;
+      &lt;/nav&gt;
+      &lt;p&gt;Rota atual: {rota}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;nav&gt;
+    &lt;button&gt;Pães&lt;/button&gt;
+  &lt;/nav&gt;
+  &lt;p&gt;Rota atual: #/inicio&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const janela = new EventTarget();
+janela.hash = "#/inicio";
+
+function irPara(hash) {
+  janela.hash = hash;
+  janela.dispatchEvent(new Event("hashchange"));
+}
+
+function App() {
+  const [rota, setRota] = useState(janela.hash);
+
+  useEffect(() =&gt; {
+    function aoMudar() {
+      setRota(janela.hash);
+    }
+    janela.addEventListener("hashchange", aoMudar);
+    return () =&gt; janela.removeEventListener("hashchange", aoMudar);
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;nav&gt;
+        &lt;button onClick={() =&gt; irPara("#/paes")}&gt;Pães&lt;/button&gt;
+      &lt;/nav&gt;
+      &lt;p&gt;Rota atual: {rota}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O efeito tem as três partes que você já conhece: assina na entrada, atualiza o estado quando o evento
+chega e desassina na limpeza. A limpeza não é enfeite — ela roda quando o componente sai da tela e evita
+uma função pendurada em cada montagem, o que vira vazamento de memória e aviso de estado atualizado em
+componente desmontado.</p>
+
+<p>A lista de dependências vazia (<code>[]</code>) está certa aqui: <code>setRota</code> é estável e
+<code>janela</code> nasce fora do componente. O efeito assina uma vez só na vida do componente, o que é
+exatamente o comportamento desejado para um evento global.</p>
+
+<pre class="term">hashchange → "#/paes"
+hashchange → "#/contato"</pre>
+
+<p>Cada linha é um <code>console.log</code> dentro do <code>aoMudar</code>, mostrando o valor novo. Se você
+clicar nos dois botões e não ver nenhuma linha, o problema não é o desenho: é a assinatura do evento, que
+não foi feita, foi feita fora do efeito ou foi desfeita cedo demais.</p>
+
+<h2>6. A URL é a fonte, o estado é o espelho</h2>
+
+<p>Junte as duas metades e o desenho fica claro: a URL guarda a rota, o componente lê a URL para desenhar e
+escreve na URL para trocar. O estado não decide nada — ele copia o endereço para o React ter algo para
+comparar e redesenhar.</p>
+
+<dl class="anatomy">
+<dt>hash (fragmento)</dt>
+<dd>O trecho depois do <code>#</code>, que não vai ao servidor. Aqui ele carrega a rota:
+<code>#/paes</code>.</dd>
+<dt><code>window.location.hash</code></dt>
+<dd>A propriedade que lê e escreve o fragmento. Atribuir muda o endereço, cria histórico e dispara o
+evento.</dd>
+<dt><code>hashchange</code></dt>
+<dd>O evento da janela avisando que o fragmento mudou. É o que mantém a tela em sincronia com a
+barra.</dd>
+<dt>fonte da verdade</dt>
+<dd>O lugar onde a informação mora. Numa rota por hash, é a URL; o estado é cópia para desenhar.</dd>
+<dt>link direto (<em>deep link</em>)</dt>
+<dd>Um endereço que abre o site já numa tela interna. É o que o hash entrega de graça.</dd>
+</dl>
+
+<p>O ciclo completo, em uma frase: o cliente clica, o hash muda, o navegador dispara o evento, o efeito
+lê o hash e chama <code>setRota</code>, o componente desenha a tela nova. São dois passos em vez de um — e
+é por isso que existe um desenho extra. O custo é irrelevante e a vantagem é grande: o mesmo caminho
+funciona quando a mudança vem do link, do botão voltar ou do endereço digitado à mão.</p>
+
+<p>Há um detalhe de nomenclatura que ajuda: chame o estado de <code>rota</code> e a função de
+<code>irPara</code>. Quando alguém lê <code>setRota</code> no código, precisa ficar óbvio que aquilo
+acontece em resposta ao evento, e não uma decisão futura. Espelho é espelho.</p>
+
+<p>E se a URL for a fonte, o que acontece se o estado divergir? O componente desenha a tela errada até o
+próximo <code>hashchange</code>. Por isso a regra: nunca chame <code>setRota</code> com um valor inventado
+— sempre com o que o endereço diz. Quem quer trocar de tela muda o endereço.</p>
+
+<h2>7. Normalizar a rota</h2>
+
+<p>O hash é texto livre: <code>#/paes</code>, <code>#/Paes</code>, <code>#paes</code>,
+<code>#/paes/</code> e <code>#</code> são cinco endereços diferentes. O roteador precisa de um padrão —
+uma função que transforme qualquer um deles no nome que as telas conhecem.</p>
+
+<div class="tryreact" data-goal="texto:Tela: paes">
+  <p class="try-task">A função que lê a rota devolve o hash cru, com cerquilha e barra, e nenhuma tela casa.
+  Normalize: tire <code>#/</code>, devolva <code>inicio</code> quando estiver vazio. A missão confere
+  "Tela: paes".</p>
+  <pre class="jsx">function nomeDaRota(hash) {
+  return hash;
+}
+
+function App() {
+  const [rota] = useState("#/paes");
+  const nome = nomeDaRota(rota);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Tela: {nome}&lt;/p&gt;
+      &lt;button onClick={() =&gt; {}}&gt;Ver pães&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Tela: #/paes&lt;/p&gt;
+  &lt;button&gt;Ver pães&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function nomeDaRota(hash) {
+  return hash.replace(/^#\/?/, "") || "inicio";
+}
+
+function App() {
+  const [rota] = useState("#/paes");
+  const nome = nomeDaRota(rota);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Tela: {nome}&lt;/p&gt;
+      &lt;button onClick={() =&gt; {}}&gt;Ver pães&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A expressão regular <code>/^#\/?/</code> lê assim: no começo do texto, uma cerquilha e, se existir, uma
+barra. As duas saem. O <code>|| "inicio"</code> cobre o resto: se a string ficou vazia, a rota é a
+vitrine.</p>
+
+<p>Uma decisão que vale tomar de uma vez: guarde a rota sempre em minúsculas e sem barra no fim. Se você
+aceitar <code>#/Pães</code>, vai precisar comparar com cuidado em cada lugar — ou normalizar na entrada,
+numa função só, e usar o resultado em todo o resto. Uma função de normalização bem feita evita uma classe
+inteira de bugs de rota.</p>
+
+<h2>8. O que muda em relação à rota por estado</h2>
+
+<p>Com o hash no lugar, as três limitações da aula passada caem. O F5 abre a tela certa, porque a tela
+está no endereço. O botão voltar do navegador volta uma tela, porque cada mudança de hash entrou no
+histórico. E o link do grupo abre na tela que a Ana queria mandar.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pergunta</th><th>Rota por estado</th><th>Rota por hash</th></tr>
+<tr><td>Troca de tela sem recarregar?</td><td>sim</td><td>sim</td></tr>
+<tr><td>Recarregar mantém a tela?</td><td>não</td><td>sim, se você lê o hash na montagem</td></tr>
+<tr><td>O voltar do navegador funciona?</td><td>não</td><td>sim: cada mudança é uma entrada no histórico</td></tr>
+<tr><td>Dá para mandar o link de uma tela?</td><td>não</td><td>sim: o hash vai junto no link</td></tr>
+<tr><td>Precisa de configuração no host?</td><td>não</td><td>não: o hash nem chega ao servidor</td></tr>
+<tr><td>Buscadores e prévias veem a tela?</td><td>não</td><td>não: o fragmento não é enviado</td></tr>
+</table>
+</div>
+
+<pre class="term">console: abriu com hash "#/paes"
+console: servidor recebeu apenas "/"</pre>
+
+<p>As duas linhas resumem o preço e a vantagem: o servidor não sabe da rota (por isso nenhuma configuração
+é necessária) e o navegador sabe (por isso o link funciona). Quem precisa das duas coisas — link bonito,
+busca e nenhuma configuração — usa um roteador de verdade, que combina caminhos no servidor com rewrite e
+um pouco mais de código no cliente.</p>
+
+<p>Vale conhecer também o <code>history.pushState</code>, que muda o caminho sem recarregar e sem o
+<code>#</code>. Ele resolve a estética, mas traz de volta o problema do F5: o caminho novo precisa existir
+no servidor. É por isso que a escolha entre hash e caminho é, no fundo, uma escolha sobre quem vai
+responder ao pedido.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o link do grupo abria a vitrine</h3>
+<p>A Ana mandou <code>https://loja.test/#/paes</code> e a cliente viu a vitrine. O componente lia o hash,
+mas o <code>useState</code> começava com o texto <code>"inicio"</code> fixo, e a leitura só acontecia num
+efeito posterior — tarde demais para o primeiro desenho. Passar a leitura para o valor inicial resolveu:
+o primeiro desenho já nasce na tela certa.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o endereço mudou e a tela não</h3>
+<p>Ela escreveu a função que troca o hash e o link passou a mudar na barra. Só que a tela continuava a
+mesma até recarregar. Faltava o outro lado: ouvir o <code>hashchange</code>. Sem a assinatura no efeito, o
+React não tem por que redesenhar — ninguém avisou que o mundo mudou.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o endereço vazio deixou a área em branco</h3>
+<p>Quem abria <code>https://loja.test/</code> via a página sem conteúdo. O hash era
+<code>""</code>, a normalização devolvia <code>""</code> e nenhuma tela casava. O
+<code>|| "inicio"</code> no fim da função é a linha que evita esse silêncio — e vale para todo endereço
+inesperado que alguém colar no navegador.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="1"><p class="mc-q">1. O que o hash tem de especial?</p>
+<label><input type="radio" name="q1"> ele não é enviado ao servidor, então funciona em qualquer host estático</label>
+<label><input type="radio" name="q1"> ele é mais rápido porque o React o compila</label>
+<label><input type="radio" name="q1"> ele substitui o <code>useState</code> e dispensa o estado</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Quem avisa o componente de que o endereço mudou?</p>
+<label><input type="radio" name="q2"> o <code>useState</code>, que observa a barra de endereço</label>
+<label><input type="radio" name="q2"> o React, que redesenha a cada segundo</label>
+<label><input type="radio" name="q2"> o evento <code>hashchange</code>, assinado num efeito</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. O que acontece ao atribuir <code>window.location.hash</code>?</p>
+<label><input type="radio" name="q3"> a página recarrega do servidor com o novo caminho</label>
+<label><input type="radio" name="q3"> o endereço muda, entra no histórico e o evento é disparado</label>
+<label><input type="radio" name="q3"> o React desenha de novo sem nenhum evento</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: as duas metades do roteador</h2>
+<p>Complete as duas linhas: o evento que avisa que o endereço mudou e a atribuição que troca para a lista
+de pães.</p>
+<div class="ex-code">// 1) escutar a mudança do endereço
+window.addEventListener(<input aria-label="resposta 1" data-answer="hashchange" placeholder="...">, aoMudar);
+
+// 2) trocar de tela sem recarregar
+window.location.hash = <input aria-label="resposta 2" data-answer="#/paes" placeholder="...">;</div>
+<p class="ex-dica">Dica: o nome do evento é o mesmo da propriedade que mudou, com "change" no fim. O valor
+escrito é o hash com a barra, começando pela cerquilha.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O hash é a parte do endereço que o navegador guarda sem mandar ao servidor. Isso o torna o roteador mais
+barato que existe: muda de tela sem recarregar, funciona em qualquer host estático e não precisa de
+rewrite. O preço é que buscadores e prévias de link não veem a rota.</p>
+
+<p>O desenho tem duas metades. Na montagem, leia <code>window.location.hash</code> e normalize numa
+função só — tirando <code>#/</code> e caindo em <code>"inicio"</code> quando estiver vazio. Depois, assine
+<code>hashchange</code> num efeito com limpeza, para a tela acompanhar cada mudança; e troque de tela
+escrevendo em <code>location.hash</code>, não chamando o setter. A URL é a fonte da verdade; o estado é
+espelho.</p>
+
+<p>Com isso, F5, voltar e link compartilhado passam a funcionar. Falta o que o cliente realmente usa: um
+link de verdade na tela, com o comportamento que ele espera — abrir na mesma aba, abrir em nova aba com o
+Ctrl, funcionar no teclado. É o assunto da próxima aula, sobre o componente de
+<a href="link-e-navegacao.html">link e navegação</a>.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>O hash (fragmento) não vai ao servidor: funciona em qualquer host.</li>
+<li>A URL é a fonte da verdade; o estado é só um espelho para desenhar.</li>
+<li>Leia o hash no valor inicial do <code>useState</code>: o link direto nasce certo.</li>
+<li>Trocar de tela é <code>window.location.hash = "#/paes"</code>, não <code>setRota</code>.</li>
+<li>Atribuir ao hash muda o endereço, cria histórico e dispara <code>hashchange</code>.</li>
+<li>Assine <code>hashchange</code> num efeito com lista vazia e remova na limpeza.</li>
+<li>Normalize: tire <code>#/</code>, use minúsculas e caia em <code>"inicio"</code> quando vazio.</li>
+<li>Endereço vazio sem fallback = área em branco, sem erro.</li>
+<li>Repetir o mesmo hash não dispara evento: o endereço não mudou.</li>
+<li>Buscadores não veem o fragmento; para eles, só com caminho e rewrite.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

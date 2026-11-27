@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chat | Guia React</title>
+<meta name="description" content="Projeto de um chat no React, do zero: lista de mensagens com key, campo controlado, envio com form, resposta simulada com Promise, rolagem automática e histórico no localStorage.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Chat</span></h1>
+<p class="intro">A Ana atende os clientes pelo celular e já perdeu três encomendas deste mês: o recado chegou
+enquanto ela tirava pão do forno, ficou embaixo de uma conversa antiga e ninguém viu. A solução não é
+digitar mais rápido — é um chat no site da padaria, onde cada pedido fica registrado na ordem em que chegou.
+Neste projeto ela monta esse chat do zero, em seis passos, e cada caixa roda um pedaço funcional do
+app.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como planejar um app antes de escrever a primeira linha: dados, estado e telas.</li>
+  <li>Uma lista de mensagens com <code>map</code>, <code>key</code> e classe por remetente.</li>
+  <li>Um campo controlado dentro de um formulário que não recarrega a página.</li>
+  <li>Como acrescentar a mensagem na lista e limpar o campo.</li>
+  <li>Como simular a resposta do cliente com <code>Promise</code> e <code>await</code>.</li>
+  <li>Rolar até a última mensagem com <code>useRef</code> e <code>useEffect</code>.</li>
+  <li>Guardar o histórico no <code>localStorage</code> sem quebrar quando o dado está velho.</li>
+  <li>Os erros que aparecem na ordem errada e como depurar cada um.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o recado que ninguém viu</h2>
+
+<p>O chat da padaria não existe ainda. O que existe é o celular da Ana com quatro conversas abertas, uma
+lista de recados no guardanapo e a memória — que falha às seis da manhã. O cliente pergunta “tem pão de
+queijo?”, ela responde “tem sim”, ele pede “separa dois”, e no meio disso o forno apita. Quando ela volta,
+a conversa já desceu na tela.</p>
+
+<p>O app que resolve isso tem uma tela só: a conversa. Em cima, as mensagens na ordem em que chegaram; em
+baixo, o campo para responder. Quem escreveu aparece de um jeito, quem atende aparece de outro. Quando a
+Ana envia, a mensagem entra na hora; quando o cliente responde, ela entra quando chega.</p>
+
+<p>Parece pouco, e é por isso que serve como projeto: o chat tem tudo o que um app de verdade tem — uma
+lista, um formulário, um estado de espera, uma resposta que demora e um histórico que precisa sobreviver ao
+recarregamento. Montar essa tela pequena ensina o esqueleto de todas as outras.</p>
+
+<p>Uma decisão de escopo antes de começar: não haverá login, nem servidor de verdade, nem notificação. O
+cliente é simulado por um botão, o servidor é uma <code>Promise</code> que você controla e o histórico fica
+no navegador. Menos peças, mais aprendizado por peça.</p>
+
+<h2>2. O desenho antes do código</h2>
+
+<p>Todo projeto começa com três listas. A primeira é o <strong>dado</strong>: o que o app mostra. A segunda
+é o <strong>estado</strong>: o que muda enquanto a pessoa usa. A terceira é o <strong>derivado</strong>: o
+que pode ser calculado a partir das outras duas. Confundir as três é a origem de quase todo bug de
+arquitetura.</p>
+
+<p>No chat, o dado é uma lista de mensagens. Cada mensagem tem um identificador, o remetente
+(<code>"eu"</code> ou <code>"cliente"</code>), o texto e o horário. O estado é essa lista — que muda quando
+alguém envia — mais o texto que está sendo digitado e um aviso de “digitando…”. O derivado é a última
+mensagem, a contagem e a ordem: tudo isso sai da lista.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Peça</th><th>Exemplo</th><th>Onde fica</th></tr>
+<tr><td>mensagens</td><td><code>[{ id, de, texto, hora }]</code></td><td>estado, com <code>useState</code></td></tr>
+<tr><td>texto do campo</td><td><code>"separa dois"</code></td><td>estado, com <code>useState</code></td></tr>
+<tr><td>cliente digitando</td><td><code>true</code> / <code>false</code></td><td>estado, com <code>useState</code></td></tr>
+<tr><td>última mensagem</td><td><code>mensagens[mensagens.length - 1]</code></td><td>derivado, na hora de desenhar</td></tr>
+<tr><td>quantas mensagens</td><td><code>mensagens.length</code></td><td>derivado</td></tr>
+</table>
+</div>
+
+<p>Repare que “última mensagem” e “quantas mensagens” não ganham <code>useState</code>. Se você guardasse a
+contagem num estado separado, teria de atualizá-la em cada envio, em cada remoção e em cada carregamento do
+histórico — e um dia esqueceria. Conta é conta, não estado.</p>
+
+<dl class="anatomy">
+<dt>mensagem</dt>
+<dd>Um objeto com <code>id</code>, <code>de</code>, <code>texto</code> e <code>hora</code>. O
+<code>id</code> é a <code>key</code> da lista.</dd>
+<dt>remetente</dt>
+<dd>Quem escreveu: <code>"eu"</code> para a Ana, <code>"cliente"</code> para quem pediu. Define a classe
+visual da bolha.</dd>
+<dt>campo controlado</dt>
+<dd>O <code>input</code> cujo valor vem do estado e que avisa cada tecla com <code>onChange</code>.</dd>
+<dt>estado de espera</dt>
+<dd>Um booleano como <code>digitando</code> que mostra “digitando…” enquanto a resposta não chega.</dd>
+<dt>histórico</dt>
+<dd>A lista de mensagens gravada no <code>localStorage</code>, para sobreviver ao recarregamento.</dd>
+</dl>
+
+<p>Com esse desenho, o componente tem três estados e algumas contas. A ordem de montagem segue a tela: primeiro
+a lista, depois o campo, depois o envio, depois a resposta, depois a rolagem e, por fim, o histórico. Cada
+passo é uma caixa que roda de verdade — e o app cresce sem você reescrever o que já funciona.</p>
+
+<h2>3. Passo 1 — a lista de mensagens</h2>
+
+<p>O primeiro passo é o mais parecido com o que você já fez em <a href="listas-com-map.html">Listas com
+map</a>: pegar o array e transformar em elementos. A diferença é que cada item é um objeto e que a classe
+muda conforme o remetente.</p>
+
+<pre class="file" data-file="Conversa.jsx">&lt;ul className="chat"&gt;
+  {mensagens.map((m) =&gt; (
+    &lt;li className={"mensagem " + m.de} key={m.id}&gt;
+      {m.texto}
+    &lt;/li&gt;
+  ))}
+&lt;/ul&gt;</pre>
+
+<p>A <code>key</code> é o <code>id</code> da mensagem, não o índice. Mensagem é o exemplo clássico de lista
+que só cresce e onde a identidade importa: com índice, quando o histórico é recarregado ou uma mensagem é
+apagada, o React associa o texto à linha errada e a conversa parece embaralhada. A aula
+<a href="a-key.html">A key</a> explica o mecanismo; aqui basta aplicar.</p>
+
+<div class="tryreact" data-goal="conta:li.mensagem=3;;texto:Separa dois, por favor">
+  <p class="try-task">A conversa tem três mensagens no array, mas a tela mostra só a primeira, escrita à
+  mão. Desenhe as três com <code>map</code>, usando <code>className={"mensagem " + m.de}</code> e
+  <code>key={m.id}</code>.</p>
+  <pre class="jsx">const mensagens = [
+  { id: "m1", de: "cliente", texto: "Bom dia! Tem pão de queijo?" },
+  { id: "m2", de: "eu", texto: "Tem sim, saiu agora do forno." },
+  { id: "m3", de: "cliente", texto: "Separa dois, por favor." }
+];
+
+function App() {
+  return (
+    &lt;ul className="chat"&gt;
+      &lt;li className="mensagem cliente"&gt;Bom dia! Tem pão de queijo?&lt;/li&gt;
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul class="chat"&gt;
+  &lt;li class="mensagem cliente"&gt;Bom dia! Tem pão de queijo?&lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">const mensagens = [
+  { id: "m1", de: "cliente", texto: "Bom dia! Tem pão de queijo?" },
+  { id: "m2", de: "eu", texto: "Tem sim, saiu agora do forno." },
+  { id: "m3", de: "cliente", texto: "Separa dois, por favor." }
+];
+
+function App() {
+  return (
+    &lt;ul className="chat"&gt;
+      {mensagens.map((m) =&gt; (
+        &lt;li className={"mensagem " + m.de} key={m.id}&gt;
+          {m.texto}
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra três <code>li</code> com classes diferentes: <code>mensagem cliente</code> e
+<code>mensagem eu</code>. É essa classe que o CSS usa para alinhar de um lado ou do outro. Se as três
+saírem com a mesma classe, você escreveu <code>className="mensagem"</code> sem a parte variável; se saírem
+sem classe, o <code>className</code> ficou de fora.</p>
+
+<pre class="term">&gt; mensagens.length
+3
+&gt; mensagens[2].de
+"cliente"
+&gt; mensagens.map((m) =&gt; m.id)
+["m1", "m2", "m3"]</pre>
+
+<p>Três mensagens, três ids distintos. É o mínimo para a lista funcionar: se dois ids coincidirem, o React
+reclama de <code>key</code> duplicada em desenvolvimento e o resultado visual fica imprevisível. Aqui os
+ids vêm prontos do array — no app de verdade, quem cria é o servidor.</p>
+
+<h2>4. Passo 2 — o campo controlado e o envio</h2>
+
+<p>Agora a parte de baixo da tela: o campo onde a Ana escreve. Ele é uma entrada controlada, como em
+<a href="entrada-controlada.html">Entrada Controlada</a>: <code>value={texto}</code> manda o estado para o
+campo e <code>onChange</code> guarda cada tecla.</p>
+
+<p>O envio merece um <code>&lt;form&gt;</code>, e não um botão solto, por dois motivos. Primeiro, porque o
+Enter no campo dispara o envio — é o que qualquer pessoa espera de um chat. Segundo, porque o navegador
+recarrega a página ao enviar um formulário, e o <code>onSubmit</code> com <code>preventDefault()</code> é o
+lugar certo para impedir isso. A aula <a href="envio-de-formulario.html">Envio de Formulário</a> destrincha
+o assunto; aqui ele aparece em cinco linhas.</p>
+
+<pre class="file" data-file="Conversa.jsx">function enviar(e) {
+  e.preventDefault();
+  if (texto.trim() === "") return;
+  setMensagens([...mensagens, { id: "m" + (mensagens.length + 1), de: "eu", texto: texto }]);
+  setTexto("");
+}
+
+&lt;form onSubmit={enviar}&gt;
+  &lt;input value={texto} onChange={(e) =&gt; setTexto(e.target.value)} placeholder="Escreva sua mensagem" /&gt;
+  &lt;button className="enviar"&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;</pre>
+
+<p>Três cuidados escondidos nessas linhas. O primeiro é o <code>trim()</code>: sem ele, um espaço em branco
+vira mensagem e o chat ganha bolhas vazias. O segundo é criar a lista nova com
+<code>[...mensagens, nova]</code> em vez de <code>push</code> — <code>push</code> altera o array no lugar e
+o React pode não redesenhar. O terceiro é limpar o campo depois de enviar, senão a mensagem fica no
+<code>input</code> e a pessoa envia duas vezes.</p>
+
+<div class="tryreact" data-goal="digite:input=Cheguei;;clique:button.enviar;;conta:li.mensagem=3;;texto:Cheguei">
+  <p class="try-task">O formulário já segura a página e limpa o campo, mas não acrescenta nada à conversa.
+  Complete o envio: crie a mensagem com <code>de: "eu"</code> e um id novo, acrescente ao array e limpe o
+  campo. Depois digite “Cheguei” e clique em Enviar.</p>
+  <pre class="jsx">const inicio = [
+  { id: "m1", de: "cliente", texto: "Bom dia! Tem pão de queijo?" },
+  { id: "m2", de: "eu", texto: "Tem sim, saiu agora do forno." }
+];
+
+function App() {
+  const [mensagens, setMensagens] = useState(inicio);
+  const [texto, setTexto] = useState("");
+
+  function enviar(e) {
+    e.preventDefault();
+    if (texto.trim() === "") return;
+    setTexto("");
+  }
+
+  return (
+    &lt;form onSubmit={enviar}&gt;
+      &lt;input
+        value={texto}
+        onChange={(e) =&gt; setTexto(e.target.value)}
+        placeholder="Escreva sua mensagem"
+      /&gt;
+      &lt;button className="enviar"&gt;Enviar&lt;/button&gt;
+      &lt;ul className="chat"&gt;
+        {mensagens.map((m) =&gt; (
+          &lt;li className={"mensagem " + m.de} key={m.id}&gt;{m.texto}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;form&gt;
+  &lt;input placeholder="Escreva sua mensagem" value=""&gt;
+  &lt;button class="enviar"&gt;Enviar&lt;/button&gt;
+  &lt;ul class="chat"&gt;
+    &lt;li class="mensagem cliente"&gt;Bom dia! Tem pão de queijo?&lt;/li&gt;
+    &lt;li class="mensagem eu"&gt;Tem sim, saiu agora do forno.&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/form&gt;
+</pre>
+  <pre class="solucao">const inicio = [
+  { id: "m1", de: "cliente", texto: "Bom dia! Tem pão de queijo?" },
+  { id: "m2", de: "eu", texto: "Tem sim, saiu agora do forno." }
+];
+
+function App() {
+  const [mensagens, setMensagens] = useState(inicio);
+  const [texto, setTexto] = useState("");
+
+  function enviar(e) {
+    e.preventDefault();
+    if (texto.trim() === "") return;
+    setMensagens([
+      ...mensagens,
+      { id: "m" + (mensagens.length + 1), de: "eu", texto: texto }
+    ]);
+    setTexto("");
+  }
+
+  return (
+    &lt;form onSubmit={enviar}&gt;
+      &lt;input
+        value={texto}
+        onChange={(e) =&gt; setTexto(e.target.value)}
+        placeholder="Escreva sua mensagem"
+      /&gt;
+      &lt;button className="enviar"&gt;Enviar&lt;/button&gt;
+      &lt;ul className="chat"&gt;
+        {mensagens.map((m) =&gt; (
+          &lt;li className={"mensagem " + m.de} key={m.id}&gt;{m.texto}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+</div>
+
+<p>A conferência digita “Cheguei”, clica em Enviar e espera três mensagens na lista, com o texto novo
+visível. Se a contagem continuar em duas, falta o <code>setMensagens</code>; se aparecerem quatro, você
+enviou duas vezes — provavelmente limpou o campo depois de já ter enviado, ou não limpou e o teste digitou
+de novo.</p>
+
+<p>Uma armadilha que este projeto evita de propósito: guardar o array com <code>push</code>. Escrever
+<code>mensagens.push(nova)</code> até parece mais curto, mas o array continua o mesmo objeto e o React
+compara referências. A tela não muda, e você fica olhando para o console sem entender. Lista nova, tela
+nova.</p>
+
+<h2>5. Passo 3 — quem falou</h2>
+
+<p>Um chat sem distinção de remetente é um diário. A classe que você montou no passo 1 resolve isso com CSS,
+sem nenhuma lógica nova no componente:</p>
+
+<pre class="term">.chat { display: flex; flex-direction: column; gap: 8px; }
+
+.mensagem {
+  max-width: 80%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #f1f1f1;
+}
+
+.mensagem.eu {
+  align-self: flex-end;
+  background: #d8f0c8;
+}</pre>
+
+<p>A regra <code>.mensagem.eu</code> só se aplica às bolhas que têm as duas classes. O cliente fica à
+esquerda, com o cinza padrão; a Ana fica à direita, com o verde. Repare que não há
+<code>if</code> no JSX para decidir o lado: a decisão está no dado (<code>de</code>) e o CSS cuida da
+apresentação. Separar as duas coisas é o que permite mudar o visual sem tocar na lógica.</p>
+
+<p>Se você quiser um visual diferente sem CSS, o caminho é o <code>style</code> inline, que também é um
+objeto: <code>style={{ alignSelf: m.de === "eu" ? "flex-end" : "flex-start" }}</code>. Funciona e é mais
+difícil de manter. O guia usa classe sempre que a variação é previsível, e guarda o inline para o valor que
+vem do estado — como a cor escolhida pelo usuário em <a href="style-inline.html">style Inline</a>.</p>
+
+<p>Há um detalhe de acessibilidade fácil de esquecer: a cor não deve ser a única marca de quem falou. Aqui
+o alinhamento ajuda, mas quem usa leitor de tela não vê lado nenhum. Duas opções: incluir o nome antes do
+texto (<code>Ana:</code> / <code>Cliente:</code>) ou um <code>aria-label</code> no item. A primeira é mais
+simples e serve para todo mundo.</p>
+
+<h2>6. Passo 4 — a resposta que demora</h2>
+
+<p>Até aqui, tudo acontece na hora. O cliente, não: ele lê, pensa e responde — e esse intervalo é o que dá
+a sensação de conversa. No app, ele é o estado <code>digitando</code>, que mostra “digitando…” enquanto a
+resposta não chega.</p>
+
+<p>Para simular sem rede, o truque é o mesmo da aula <a href="atualizacao-otimista.html">Atualização
+Otimista</a>: uma <code>Promise</code> que fica pendurada até alguém chamar o <code>ok</code>. Guardamos
+essa função numa variável de fora do componente e um segundo botão a chama — é o “servidor” respondendo
+quando você manda.</p>
+
+<pre class="file" data-file="Conversa.jsx">let responder = null;
+
+function pedirResposta() {
+  return new Promise((ok) =&gt; {
+    responder = ok;
+  });
+}
+
+async function enviar() {
+  setMensagens([...mensagens, { id: "m3", de: "eu", texto: texto }]);
+  setDigitando(true);
+  await pedirResposta();
+  setMensagens((lista) =&gt; [...lista, { id: "m4", de: "cliente", texto: "Obrigada pelo pedido!" }]);
+  setDigitando(false);
+}</pre>
+
+<p>Quatro linhas contam a história toda. Primeiro a mensagem da Ana entra na lista, para a tela responder na
+hora. Depois o aviso liga. O <code>await</code> pausa a função — e só ela — até a resposta chegar. Quando
+chega, a mensagem do cliente entra e o aviso desliga. A tela nunca fica travada, porque o JavaScript
+continua atendendo cliques enquanto espera.</p>
+
+<p>O <code>setMensagens((lista) =&gt; ...)</code> com função é importante aqui: como a resposta chega depois,
+o <code>mensagens</code> capturado no começo pode estar velho. A forma funcional recebe a lista atual do
+React, e não a cópia do momento do clique. É a mesma recomendação da aula de
+<a href="atualizar-estado.html">Atualizar o Estado</a>, e no código assíncrono ela deixa de ser estilo para
+ser necessidade.</p>
+
+<div class="tryreact" data-goal="clique:button.enviar;;texto:digitando;;clique:button.responder;;texto:Obrigada pelo pedido!">
+  <p class="try-task">O envio já põe a mensagem da Ana na lista, mas não avisa que o cliente está digitando
+  nem espera a resposta. Ligue o aviso, aguarde <code>pedirResposta()</code> com <code>await</code> e
+  acrescente a resposta do cliente antes de desligar o aviso.</p>
+  <pre class="jsx">let responder = null;
+
+function pedirResposta() {
+  return new Promise((ok) =&gt; {
+    responder = ok;
+  });
+}
+
+function App() {
+  const [mensagens, setMensagens] = useState([
+    { id: "m1", de: "cliente", texto: "Bom dia! Tem pão de queijo?" }
+  ]);
+  const [digitando, setDigitando] = useState(false);
+
+  async function enviar() {
+    setMensagens([
+      ...mensagens,
+      { id: "m2", de: "eu", texto: "Separo dois agora." }
+    ]);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button className="enviar" onClick={enviar}&gt;Enviar pedido&lt;/button&gt;
+      &lt;button className="responder" onClick={() =&gt; responder &amp;&amp; responder()}&gt;Cliente responde&lt;/button&gt;
+      &lt;p className="aviso"&gt;{digitando ? "digitando…" : ""}&lt;/p&gt;
+      &lt;ul className="chat"&gt;
+        {mensagens.map((m) =&gt; (
+          &lt;li className={"mensagem " + m.de} key={m.id}&gt;{m.texto}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button class="enviar"&gt;Enviar pedido&lt;/button&gt;
+  &lt;button class="responder"&gt;Cliente responde&lt;/button&gt;
+  &lt;p class="aviso"&gt;&lt;/p&gt;
+  &lt;ul class="chat"&gt;
+    &lt;li class="mensagem cliente"&gt;Bom dia! Tem pão de queijo?&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">let responder = null;
+
+function pedirResposta() {
+  return new Promise((ok) =&gt; {
+    responder = ok;
+  });
+}
+
+function App() {
+  const [mensagens, setMensagens] = useState([
+    { id: "m1", de: "cliente", texto: "Bom dia! Tem pão de queijo?" }
+  ]);
+  const [digitando, setDigitando] = useState(false);
+
+  async function enviar() {
+    setMensagens([
+      ...mensagens,
+      { id: "m2", de: "eu", texto: "Separo dois agora." }
+    ]);
+    setDigitando(true);
+    await pedirResposta();
+    setMensagens((lista) =&gt; [
+      ...lista,
+      { id: "m3", de: "cliente", texto: "Obrigada pelo pedido!" }
+    ]);
+    setDigitando(false);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button className="enviar" onClick={enviar}&gt;Enviar pedido&lt;/button&gt;
+      &lt;button className="responder" onClick={() =&gt; responder &amp;&amp; responder()}&gt;Cliente responde&lt;/button&gt;
+      &lt;p className="aviso"&gt;{digitando ? "digitando…" : ""}&lt;/p&gt;
+      &lt;ul className="chat"&gt;
+        {mensagens.map((m) =&gt; (
+          &lt;li className={"mensagem " + m.de} key={m.id}&gt;{m.texto}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em Enviar pedido e repare que a mensagem da Ana entra imediatamente, enquanto o aviso “digitando…”
+aparece embaixo. Só quando você clica em Cliente responde é que a mensagem final entra e o aviso some. Essa
+separação entre “o que eu fiz” e “o que o outro fez” é o coração de qualquer chat.</p>
+
+<p>No app de verdade, <code>pedirResposta</code> seria uma chamada de rede. A forma é a mesma:
+<code>await fetch(...)</code> no lugar do <code>await pedirResposta()</code>, e um <code>try/catch</code>
+em volta para o caso de a rede falhar. O que muda é o tempo e a possibilidade de erro; a estrutura do
+estado é idêntica.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Momento</th><th>O que a tela mostra</th><th>O que o estado guarda</th></tr>
+<tr><td>escrevendo</td><td>o texto no campo</td><td><code>texto</code></td></tr>
+<tr><td>enviando</td><td>a mensagem da Ana e “digitando…”</td><td><code>mensagens</code> + <code>digitando: true</code></td></tr>
+<tr><td>respondido</td><td>a resposta do cliente, sem o aviso</td><td><code>mensagens</code> + <code>digitando: false</code></td></tr>
+<tr><td>falhou</td><td>“não consegui enviar”, com tentar de novo</td><td><code>erro</code> + <code>digitando: false</code></td></tr>
+</table>
+</div>
+
+<h2>7. Passo 5 — rolar até a última mensagem</h2>
+
+<p>Mensagem nova entra no fim da lista, e o fim da lista costuma estar fora da tela. Sem rolagem
+automática, a Ana envia uma resposta e não vê o que enviou. A correção é um efeito que roda quando a lista
+muda e leva o navegador até o fim.</p>
+
+<pre class="file" data-file="Conversa.jsx">const fim = useRef(null);
+
+useEffect(() =&gt; {
+  if (fim.current) fim.current.scrollIntoView({ block: "end" });
+}, [mensagens]);
+
+&lt;ul className="chat"&gt;
+  {mensagens.map((m) =&gt; (
+    &lt;li className={"mensagem " + m.de} key={m.id}&gt;{m.texto}&lt;/li&gt;
+  ))}
+  &lt;li ref={fim} aria-hidden="true"&gt;&lt;/li&gt;
+&lt;/ul&gt;</pre>
+
+<p>O <code>useRef</code> guarda uma referência a um elemento — no caso, um <code>li</code> vazio no fim da
+lista. O <code>useEffect</code> roda depois que a tela foi desenhada, e é aí que o elemento já existe para
+receber o <code>scrollIntoView</code>. Se você tentasse rolar durante o render, o elemento novo ainda não
+estaria na página.</p>
+
+<p>A lista de dependências <code>[mensagens]</code> diz quando o efeito deve rodar: sempre que a lista mudar
+de identidade. Como cada envio cria um array novo, o efeito roda no momento certo. É a mesma lógica de
+<a href="dependencias.html">As Dependências</a>: o efeito é uma reação, e a lista é o gatilho.</p>
+
+<p>Duas armadilhas comuns. A primeira é usar <code>[mensagens.length]</code>: se uma mensagem for editada
+sem mudar o tamanho, a rolagem não acontece. A segunda é esquecer o <code>if (fim.current)</code>: na
+primeira renderização o <code>ref</code> pode estar vazio, e você recebe “Cannot read properties of
+null”. Um <code>if</code> de uma linha evita o erro.</p>
+
+<h2>8. Passo 6 — guardar a conversa</h2>
+
+<p>Recarregar a página apaga o estado. Num chat, isso significa perder a conversa inteira — e a Ana não vai
+aceitar. O <code>localStorage</code> resolve para um app pequeno: é um armário de textos no navegador, que
+sobrevive ao recarregamento e some se a pessoa limpar os dados do site.</p>
+
+<pre class="file" data-file="Conversa.jsx">const [mensagens, setMensagens] = useState(() =&gt; {
+  try {
+    const salvo = localStorage.getItem("chat-ana");
+    return salvo ? JSON.parse(salvo) : inicio;
+  } catch (e) {
+    return inicio;
+  }
+});
+
+useEffect(() =&gt; {
+  localStorage.setItem("chat-ana", JSON.stringify(mensagens));
+}, [mensagens]);</pre>
+
+<p>A leitura acontece dentro de uma função passada ao <code>useState</code>. Essa forma é intencional: o
+código ali roda uma vez, na montagem, e não a cada render. Se você chamasse
+<code>JSON.parse(localStorage.getItem(...))</code> direto no corpo do componente, leria o armário em cada
+desenho — lento e sujeito a surpresas.</p>
+
+<p>O <code>try/catch</code> não é enfeite. O armário pode conter lixo: um texto cortado, um JSON de uma
+versão antiga do app, algo que outra pessoa gravou. <code>JSON.parse</code> lança erro nesses casos, e sem
+o <code>catch</code> o componente quebra na primeira renderização — a pior hora possível. Com ele, o app
+volta para o exemplo inicial e segue funcionando.</p>
+
+<pre class="term">&gt; localStorage.getItem("chat-ana")
+[{"id":"m1","de":"cliente","texto":"Bom dia! Tem pão de queijo?"}]
+&gt; JSON.parse(localStorage.getItem("chat-ana")).length
+1</pre>
+
+<p>A gravação fica num efeito que observa <code>mensagens</code>. Toda vez que a lista muda, o armário é
+atualizado. É o padrão da aula <a href="localStorage.html">O localStorage</a>, e ele tem um custo que vale
+conhecer: gravar a cada tecla digitada seria desperdício, por isso o efeito observa apenas a lista, e não o
+texto do campo.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que guardar</th><th>Guardar?</th><th>Por quê</th></tr>
+<tr><td>a lista de mensagens</td><td>sim</td><td>é o histórico que a pessoa espera reencontrar</td></tr>
+<tr><td>o texto do campo</td><td>não</td><td>rascunho efêmero; voltar com ele surpreende</td></tr>
+<tr><td>o aviso “digitando”</td><td>não</td><td>é transitório: no recarregamento, ninguém está digitando</td></tr>
+<tr><td>a posição da rolagem</td><td>não</td><td>o próprio efeito recoloca no fim</td></tr>
+</table>
+</div>
+
+<div class="cenario">
+<h3>Cenário 1: a conversa volta vazia depois de recarregar</h3>
+<p>A Ana gravou no <code>localStorage</code>, mas leu com a chave errada: gravou em
+<code>"chat-ana"</code> e leu <code>"chat"</code>. O armário é indexado por nome, e um caractere de
+diferença cria outra gaveta. O sintoma é uma conversa vazia sem erro no console. Antes de suspeitar do
+efeito, confira as duas strings.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o app quebra ao abrir, e só em um computador</h3>
+<p>O <code>localStorage</code> daquele navegador tem um JSON inválido — de uma versão anterior, ou de um
+teste antigo. Sem <code>try/catch</code>, <code>JSON.parse</code> lança e a tela fica em branco. Com o
+tratamento, o app ignora o lixo e começa do exemplo. Dado guardado é dado não confiável: trate sempre.</p>
+</div>
+
+<h2>9. O que quebra e o que conferir</h2>
+
+<p>Um projeto se prova pelo que acontece quando dá errado. Esta é a lista de conferência da Ana, na ordem em
+que ela testaria o chat antes de mostrar para um cliente.</p>
+
+<dl class="anatomy">
+<dt>chave do histórico</dt>
+<dd>O nome usado no <code>localStorage</code> (<code>"chat-ana"</code>). Precisa ser idêntico na leitura e na
+gravação.</dd>
+<dt>lista nova</dt>
+<dd>Cada envio cria um array novo com spread. <code>push</code> altera no lugar e a tela pode não
+atualizar.</dd>
+<dt>atualização funcional</dt>
+<dd><code>setMensagens((lista) =&gt; ...)</code> usa a lista atual, não a do momento do clique — essencial
+depois de um <code>await</code>.</dd>
+<dt>efeito de rolagem</dt>
+<dd><code>useEffect</code> com <code>[mensagens]</code> que chama <code>scrollIntoView</code> no
+<code>ref</code> do fim.</dd>
+<dt>formulário contido</dt>
+<dd><code>onSubmit</code> com <code>preventDefault()</code>; sem isso, o navegador recarrega e apaga o
+estado.</dd>
+</dl>
+
+<p>A ordem de teste também importa. Comece pelo envio: escreva, envie, veja a mensagem entrar e o campo
+limpar. Depois recarregue e confira o histórico. Só então simule a resposta do cliente e observe o aviso. Se
+você começar pela resposta, um erro no envio fica escondido atrás de outro.</p>
+
+<p>Três perguntas para fechar o assunto:</p>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Por que a <code>key</code> da mensagem é o <code>id</code>, e não o índice?</p>
+<label><input type="radio" name="q1"> porque o índice deixa a lista mais lenta</label>
+<label><input type="radio" name="q1"> porque o índice muda quando a lista muda, e o React perde a identidade</label>
+<label><input type="radio" name="q1"> porque o React não aceita números como chave</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que o <code>await pedirResposta()</code> faz?</p>
+<label><input type="radio" name="q2"> recarrega o componente até a resposta chegar</label>
+<label><input type="radio" name="q2"> apaga a mensagem anterior</label>
+<label><input type="radio" name="q2"> pausa aquela função até a Promise resolver, sem travar a tela</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Onde a leitura do <code>localStorage</code> deve acontecer?</p>
+<label><input type="radio" name="q3"> dentro da função passada ao <code>useState</code>, uma vez na montagem</label>
+<label><input type="radio" name="q3"> no corpo do componente, a cada render</label>
+<label><input type="radio" name="q3"> dentro do <code>onChange</code> do campo</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a linha que acrescenta</h2>
+<p>Complete a atualização que acrescenta a mensagem nova no fim da lista, usando a lista atual do React.</p>
+<div class="ex-code">setMensagens((lista) =&gt; [...lista, <input aria-label="resposta 1" data-answer="nova" placeholder="...">]);</div>
+<p class="ex-dica">Dica: o nome da variável que guarda a mensagem recém-criada no passo 2.</p>
+</div>
+
+<h2>10. Resumo</h2>
+
+<p>O chat é uma lista de mensagens, um campo controlado e um envio que cria um array novo. Cada mensagem tem
+<code>id</code>, remetente e texto; a <code>key</code> é o <code>id</code>, e a classe combina
+<code>mensagem</code> com o remetente para o CSS decidir o lado. Nada disso é específico de chat: é o mesmo
+desenho de qualquer lista com formulário.</p>
+
+<p>A resposta que demora é uma <code>Promise</code> aguardada com <code>await</code>, e o aviso “digitando”
+é um booleano que liga antes e desliga depois. Quando a atualização depende da lista atual — e depois de um
+<code>await</code> sempre depende —, use a forma funcional do setter. A tela continua respondendo enquanto
+espera.</p>
+
+<p>A rolagem automática é um efeito com <code>useRef</code>: um elemento vazio no fim da lista recebe a
+referência e o efeito chama <code>scrollIntoView</code> quando as mensagens mudam. E o histórico vive no
+<code>localStorage</code>, com leitura preguiçosa no <code>useState</code>, gravação num efeito e
+<code>try/catch</code> para o dado podre.</p>
+
+<p>Com o chat pronto, a Ana nunca mais perde um pedido embaixo de outra conversa. O próximo projeto usa as
+mesmas peças — lista, filtro, detalhe e formulário — numa vitrine em vez de uma conversa.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Planeje com três listas: dado, estado e derivado.</li>
+<li>Lista de mensagens: <code>map</code> com <code>key={m.id}</code> e classe por remetente.</li>
+<li>Envio em <code>&lt;form onSubmit&gt;</code> com <code>preventDefault()</code> e <code>trim()</code>.</li>
+<li>Acrescente com <code>[...mensagens, nova]</code>; nunca <code>push</code>.</li>
+<li>Resposta simulada: <code>Promise</code> + <code>await</code> + estado de espera.</li>
+<li>Depois de <code>await</code>, use <code>setMensagens((lista) =&gt; ...)</code>.</li>
+<li>Rolagem: <code>useRef</code> no fim da lista e <code>useEffect</code> com <code>[mensagens]</code>.</li>
+<li>Histórico: ler no <code>useState</code>, gravar no <code>useEffect</code>, tratar erro no
+<code>JSON.parse</code>.</li>
+<li>Guarde só o que faz sentido reencontrar ao abrir o app.</li>
+<li>Teste na ordem: envio, recarregamento, resposta, rolagem.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

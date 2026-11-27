@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A Rota 404 | Guia React</title>
+<meta name="description" content="A rota 404 na prática: por que a tela em branco é o pior aviso, o que a página precisa dizer, como escrever a regra curinga e por que a ordem das rotas importa.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>A Rota <span class="hl">404</span></h1>
+<p class="intro">A Ana mandou o endereço do site novo no grupo da família e foi dormir. No dia seguinte
+tinha oito mensagens: "o link das encomendas não abre". O link era antigo, apontava para
+<code>/encomendas</code>, e essa página não existe mais. O site da padaria respondia com uma tela em
+branco — pior do que um erro, porque um erro pelo menos explica. Nesta aula ela escreve a rota que
+recebe todos os caminhos errados, conta o que aconteceu e oferece o caminho de volta.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que significa "a rota não existe" dentro de uma aplicação React.</li>
+  <li>Como um roteador simples escolhe a página a partir do caminho.</li>
+  <li>Como escrever a regra curinga que recebe qualquer caminho desconhecido.</li>
+  <li>O que uma página 404 precisa dizer para ser útil, e não só decorativa.</li>
+  <li>Por que a regra curinga tem de ser a última da lista.</li>
+  <li>A diferença entre o 404 do servidor e o 404 dentro do aplicativo.</li>
+  <li>O que fazer com caminhos parecidos: <code>/paes</code>, <code>/pães</code> e <code>/paes/</code>.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o link que leva a lugar nenhum</h2>
+
+<p>O site da Ana tem quatro endereços: a vitrine (<code>/</code>), o cardápio (<code>/paes</code>), o
+contato (<code>/contato</code>) e as encomendas (<code>/encomendas</code>). Esse último saiu do ar quando
+ela parou de aceitar encomenda pelo site. O endereço, porém, continuou circulando: no grupo da família,
+num cartão impresso, num post de dois anos atrás.</p>
+
+<p>Quem clica em <code>/encomendas</code> hoje vê o topo da padaria e, abaixo dele, nada. A página não
+quebra, não mostra erro, não dá nenhuma pista. Para quem está do outro lado, isso não parece "essa página
+não existe mais"; parece "o site está com problema". A pessoa tenta de novo, fecha, e às vezes conclui
+que a padaria fechou.</p>
+
+<p>O assunto desta aula é o endereço que não corresponde a nenhuma tela. Em qualquer aplicação com rotas,
+existe um conjunto de caminhos conhecidos e um resto — o resto é onde mora o 404. A escolha é sempre entre
+duas atitudes: deixar o resto invisível, que é o que o site da Ana fazia, ou receber o resto com uma página
+que explica, orienta e devolve o visitante ao lugar certo.</p>
+
+<p>A segunda atitude custa umas vinte linhas de código e resolve o problema para sempre. E não é só
+gentileza: é a diferença entre um site que parece cuidado e um site que parece abandonado.</p>
+
+<h2>2. O que é uma rota que não existe</h2>
+
+<p>Dentro de uma aplicação, a "rota" é a ligação entre um caminho e um componente. <code>/paes</code>
+leva ao <code>Cardapio</code>; <code>/contato</code> leva ao <code>Contato</code>. Quando o caminho atual
+não casa com nenhuma dessas ligações, não há componente para desenhar. O roteador poderia lançar um erro,
+mas a escolha da maioria é desenhar o que você mandar — e se você não mandar nada, ele não desenha nada.</p>
+
+<dl class="anatomy">
+<dt>rota</dt>
+<dd>O par caminho + componente: <code>"/paes"</code> desenha o <code>Cardapio</code>.</dd>
+<dt>curinga</dt>
+<dd>A regra que casa com qualquer caminho, escrita <code>"*"</code>. É a última da lista e recebe o que
+ninguém quis.</dd>
+<dt>404</dt>
+<dd>O código que quer dizer "não encontrei este recurso". No servidor, é o status HTTP; no aplicativo, é
+a tela que você desenha para o caso.</dd>
+<dt>página de erro</dt>
+<dd>O componente que o caminho desconhecido recebe. Não é um erro técnico: é uma tela normal, com texto
+compreensível.</dd>
+<dt>caminho</dt>
+<dd>A parte da URL que o roteador lê: <code>/encomendas</code>. Não inclui o domínio nem a query.</dd>
+</dl>
+
+<p>Repare que o 404 não é um "erro de programação". O seu código está certo: o visitante pediu um
+endereço que não existe, e a resposta adequada é uma tela que diz isso. O erro de programação seria
+justamente a tela em branco, porque ela esconde a informação em vez de mostrá-la.</p>
+
+<p>Vale saber que existe um caso vizinho, chamado 410 (gone, "foi embora"): é para quando a página
+existiu e foi removida de propósito, como as encomendas da Ana. A diferença interessa a buscadores, e
+não muda nada no seu componente — a tela é a mesma. Na prática, quase todo mundo usa 404 para os dois.</p>
+
+<h2>3. O roteador em forma mínima</h2>
+
+<p>Antes da caixa, vale ver o roteador reduzido ao mínimo, porque é o que as caixas usam. Ele tem um
+estado com o caminho atual, um objeto que liga caminho a componente e uma linha que escolhe. Trocando o
+objeto por uma lista maior, você tem o suficiente para o site da padaria.</p>
+
+<pre class="file" data-file="App.jsx">const PAGINAS = { "/": Vitrine, "/paes": Cardapio, "/contato": Contato };
+
+function App() {
+  const [caminho, setCaminho] = useState("/");
+  const Pagina = PAGINAS[caminho];
+
+  return (
+    &lt;div&gt;
+      &lt;Topo irPara={setCaminho} /&gt;
+      {Pagina ? &lt;Pagina /&gt; : &lt;p&gt;nada aqui&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Nesse desenho, o caminho desconhecido cai no <code>else</code> — e é ali que o problema aparece. A
+maioria dos roteadores de verdade tem recursos a mais (<a href="parametros-de-rota.html">parâmetros</a>,
+<a href="layout-com-rotas.html">aninhamento</a>, <a href="lazy-e-suspense.html">carregamento sob
+demanda</a>), mas todos tomam a mesma decisão: quando nada casa, qual componente desenhar?</p>
+
+<p>No projeto da Ana, o roteador é um pouco maior e o caminho vem da URL, não de um estado. O botão que
+"navega" na caixa é a versão de brinquedo do que, no site, é um link de verdade: ele troca o caminho e o
+resto acontece igual. É por isso que vale aprender o mecanismo nessa forma pequena — o comportamento do
+404 é o mesmo nos dois casos.</p>
+
+<h2>4. A tela em branco é o pior aviso</h2>
+
+<p>A caixa começa com o site do jeito que estava: três botões de navegação e a frase <code>nada
+aqui</code> para o caminho desconhecido. Clique em <strong>Encomendas</strong> e repare: o caminho muda
+para <code>/encomendas</code> e a área da página diz "nada aqui". É a tela em branco com um rótulo
+técnico.</p>
+
+<div class="tryreact" data-goal="clique:#ir-encomendas;;texto:Página não encontrada: /encomendas">
+  <p class="try-task">O caminho desconhecido cai em "nada aqui". Escreva o componente
+  <code>NaoEncontrada</code>, que recebe <code>caminho</code> e mostra o parágrafo
+  <strong>Página não encontrada: /encomendas</strong>, e use-o quando a página não existir. Depois clique
+  em Encomendas.</p>
+  <pre class="jsx">function Vitrine() {
+  return &lt;p&gt;pães quentinhos na vitrine&lt;/p&gt;;
+}
+
+function Cardapio() {
+  return &lt;p&gt;pão francês, sonho, pão de queijo&lt;/p&gt;;
+}
+
+const PAGINAS = { "/": Vitrine, "/paes": Cardapio };
+
+function App() {
+  const [caminho, setCaminho] = useState("/");
+  const Pagina = PAGINAS[caminho];
+
+  return (
+    &lt;div&gt;
+      &lt;button id="ir-vitrine" onClick={() =&gt; setCaminho("/")}&gt;Vitrine&lt;/button&gt;
+      &lt;button id="ir-paes" onClick={() =&gt; setCaminho("/paes")}&gt;Cardápio&lt;/button&gt;
+      &lt;button id="ir-encomendas" onClick={() =&gt; setCaminho("/encomendas")}&gt;Encomendas&lt;/button&gt;
+      &lt;p&gt;caminho: {caminho}&lt;/p&gt;
+      {Pagina ? &lt;Pagina /&gt; : &lt;p&gt;nada aqui&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="ir-vitrine"&gt;Vitrine&lt;/button&gt;
+  &lt;button id="ir-paes"&gt;Cardápio&lt;/button&gt;
+  &lt;button id="ir-encomendas"&gt;Encomendas&lt;/button&gt;
+  &lt;p&gt;caminho: /&lt;/p&gt;
+  &lt;p&gt;pães quentinhos na vitrine&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Vitrine() {
+  return &lt;p&gt;pães quentinhos na vitrine&lt;/p&gt;;
+}
+
+function Cardapio() {
+  return &lt;p&gt;pão francês, sonho, pão de queijo&lt;/p&gt;;
+}
+
+const PAGINAS = { "/": Vitrine, "/paes": Cardapio };
+
+function NaoEncontrada({ caminho }) {
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Página não encontrada&lt;/h2&gt;
+      &lt;p&gt;Página não encontrada: {caminho}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const [caminho, setCaminho] = useState("/");
+  const Pagina = PAGINAS[caminho] || NaoEncontrada;
+
+  return (
+    &lt;div&gt;
+      &lt;button id="ir-vitrine" onClick={() =&gt; setCaminho("/")}&gt;Vitrine&lt;/button&gt;
+      &lt;button id="ir-paes" onClick={() =&gt; setCaminho("/paes")}&gt;Cardápio&lt;/button&gt;
+      &lt;button id="ir-encomendas" onClick={() =&gt; setCaminho("/encomendas")}&gt;Encomendas&lt;/button&gt;
+      &lt;p&gt;caminho: {caminho}&lt;/p&gt;
+      &lt;Pagina caminho={caminho} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Enquanto a tela em branco está no ar, o console do navegador costuma ser o único lugar com alguma
+informação — e só quem abre o DevTools vê:</p>
+
+<pre class="term">rota desconhecida: /encomendas</pre>
+
+<p>Duas linhas fazem o trabalho. A primeira é <code>PAGINAS[caminho] || NaoEncontrada</code>: quando a
+busca no objeto não encontra nada, o <code>||</code> entrega o componente de reserva. A segunda é a
+passagem do <code>caminho</code> como prop, para a página de erro mostrar qual endereço falhou — sem isso
+ela é genérica, e uma mensagem genérica não ajuda ninguém a descobrir o que deu errado.</p>
+
+<p>Repare que a solução troca o <code>? :</code> por um desenho único: agora sempre existe uma página para
+mostrar. Isso simplifica a leitura do componente e evita o caso em que uma das metades do
+<code>? :</code> fica sem manutenção. É o mesmo princípio da renderização condicional com
+<code>return</code> antecipado: um caminho para cada estado, todos previsíveis.</p>
+
+<h2>5. O que a 404 precisa dizer</h2>
+
+<p>Uma página de erro útil responde a três perguntas do visitante: o que aconteceu, o que existe, e como
+eu saio daqui. A frase "Página não encontrada" responde à primeira. O caminho que falhou ajuda a pessoa a
+perceber que o link está velho. E o botão de volta responde à terceira — que é a que realmente importa,
+porque o visitante não quer um diagnóstico, quer o pão.</p>
+
+<p>Na caixa, a página de erro já aparece, mas é um beco sem saída: o botão "Voltar para a vitrine" ainda
+não existe. Repare que o componente recebe <code>voltar</code> nas props — quem monta a página de erro
+passa a função que sabe navegar. Assim a página 404 não precisa conhecer o roteador; ela só chama o que
+recebeu.</p>
+
+<div class="tryreact" data-goal="clique:#ir-encomendas;;clique:#voltar;;texto:pães quentinhos na vitrine">
+  <p class="try-task">A página de erro não tem saída. Use a prop <code>voltar</code> para desenhar um botão
+  com <code>id="voltar"</code> e o texto <strong>Voltar para a vitrine</strong>. Depois clique em
+  Encomendas e no novo botão.</p>
+  <pre class="jsx">function Vitrine() {
+  return &lt;p&gt;pães quentinhos na vitrine&lt;/p&gt;;
+}
+
+function Cardapio() {
+  return &lt;p&gt;pão francês, sonho, pão de queijo&lt;/p&gt;;
+}
+
+const PAGINAS = { "/": Vitrine, "/paes": Cardapio };
+
+function NaoEncontrada({ caminho }) {
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Página não encontrada&lt;/h2&gt;
+      &lt;p&gt;Página não encontrada: {caminho}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const [caminho, setCaminho] = useState("/");
+  const Pagina = PAGINAS[caminho] || NaoEncontrada;
+
+  return (
+    &lt;div&gt;
+      &lt;button id="ir-vitrine" onClick={() =&gt; setCaminho("/")}&gt;Vitrine&lt;/button&gt;
+      &lt;button id="ir-encomendas" onClick={() =&gt; setCaminho("/encomendas")}&gt;Encomendas&lt;/button&gt;
+      &lt;p&gt;caminho: {caminho}&lt;/p&gt;
+      &lt;Pagina caminho={caminho} voltar={() =&gt; setCaminho("/")} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="ir-vitrine"&gt;Vitrine&lt;/button&gt;
+  &lt;button id="ir-encomendas"&gt;Encomendas&lt;/button&gt;
+  &lt;p&gt;caminho: /&lt;/p&gt;
+  &lt;p&gt;pães quentinhos na vitrine&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Vitrine() {
+  return &lt;p&gt;pães quentinhos na vitrine&lt;/p&gt;;
+}
+
+function Cardapio() {
+  return &lt;p&gt;pão francês, sonho, pão de queijo&lt;/p&gt;;
+}
+
+const PAGINAS = { "/": Vitrine, "/paes": Cardapio };
+
+function NaoEncontrada({ caminho, voltar }) {
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Página não encontrada&lt;/h2&gt;
+      &lt;p&gt;Página não encontrada: {caminho}&lt;/p&gt;
+      &lt;button id="voltar" onClick={voltar}&gt;Voltar para a vitrine&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const [caminho, setCaminho] = useState("/");
+  const Pagina = PAGINAS[caminho] || NaoEncontrada;
+
+  return (
+    &lt;div&gt;
+      &lt;button id="ir-vitrine" onClick={() =&gt; setCaminho("/")}&gt;Vitrine&lt;/button&gt;
+      &lt;button id="ir-encomendas" onClick={() =&gt; setCaminho("/encomendas")}&gt;Encomendas&lt;/button&gt;
+      &lt;p&gt;caminho: {caminho}&lt;/p&gt;
+      &lt;Pagina caminho={caminho} voltar={() =&gt; setCaminho("/")} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra o resultado depois dos dois cliques: o caminho voltou para <code>/</code> e a vitrine
+está no lugar do erro. Esse é o desenho que funciona — a página 404 não conserta o link velho, mas impede
+que ele vire uma porta fechada.</p>
+
+<p>Cuidado com uma tentação: colocar na 404 um redirecionamento automático para a página inicial. Parece
+gentil e atrapalha. Quem chega pelo link das encomendas é levado para a vitrine sem entender o que houve,
+e a impressão é de site que faz coisas por conta própria. Mostrar o erro e oferecer o botão dá o controle
+a quem está do outro lado — e o mesmo vale para o buscador, que assim entende que aquele endereço já não
+existe.</p>
+
+<h2>6. A ordem das regras</h2>
+
+<p>Quando as rotas estão em uma lista, a ordem decide quem recebe o caminho. A regra curinga casa com
+tudo, então ela precisa ser a última: se vier antes, engole os caminhos válidos e o site inteiro vira 404.
+É um erro bobo e comum, porque a lista parece um conjunto, mas é uma sequência.</p>
+
+<p>Na caixa, as regras estão em um array e a função <code>achar</code> percorre com <code>find</code>, que
+devolve a primeira que casar. O <code>*</code> está na frente, e por isso o botão Cardápio mostra
+"Página não encontrada: /paes" — o caminho existe, mas nunca é consultado.</p>
+
+<div class="tryreact" data-goal="clique:#ir-paes;;texto:pão de queijo">
+  <p class="try-task">A regra <code>*</code> está antes das rotas de verdade e engole tudo. Mova a regra
+  curinga para o fim da lista, para <code>/paes</code> voltar a abrir o cardápio. Depois clique em
+  Cardápio.</p>
+  <pre class="jsx">function Vitrine() {
+  return &lt;p&gt;pães quentinhos na vitrine&lt;/p&gt;;
+}
+
+function Cardapio() {
+  return &lt;p&gt;pão francês, sonho, pão de queijo&lt;/p&gt;;
+}
+
+function NaoEncontrada({ caminho }) {
+  return &lt;p&gt;Página não encontrada: {caminho}&lt;/p&gt;;
+}
+
+const REGRAS = [
+  { quando: "*", Pagina: NaoEncontrada },
+  { quando: "/", Pagina: Vitrine },
+  { quando: "/paes", Pagina: Cardapio },
+];
+
+function achar(caminho) {
+  const regra = REGRAS.find((r) =&gt; r.quando === "*" || r.quando === caminho);
+  return regra ? regra.Pagina : null;
+}
+
+function App() {
+  const [caminho, setCaminho] = useState("/");
+  const Pagina = achar(caminho) || NaoEncontrada;
+
+  return (
+    &lt;div&gt;
+      &lt;button id="ir-paes" onClick={() =&gt; setCaminho("/paes")}&gt;Cardápio&lt;/button&gt;
+      &lt;p&gt;caminho: {caminho}&lt;/p&gt;
+      &lt;Pagina caminho={caminho} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="ir-paes"&gt;Cardápio&lt;/button&gt;
+  &lt;p&gt;caminho: /&lt;/p&gt;
+  &lt;p&gt;Página não encontrada: /&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Vitrine() {
+  return &lt;p&gt;pães quentinhos na vitrine&lt;/p&gt;;
+}
+
+function Cardapio() {
+  return &lt;p&gt;pão francês, sonho, pão de queijo&lt;/p&gt;;
+}
+
+function NaoEncontrada({ caminho }) {
+  return &lt;p&gt;Página não encontrada: {caminho}&lt;/p&gt;;
+}
+
+const REGRAS = [
+  { quando: "/", Pagina: Vitrine },
+  { quando: "/paes", Pagina: Cardapio },
+  { quando: "*", Pagina: NaoEncontrada },
+];
+
+function achar(caminho) {
+  const regra = REGRAS.find((r) =&gt; r.quando === "*" || r.quando === caminho);
+  return regra ? regra.Pagina : null;
+}
+
+function App() {
+  const [caminho, setCaminho] = useState("/");
+  const Pagina = achar(caminho) || NaoEncontrada;
+
+  return (
+    &lt;div&gt;
+      &lt;button id="ir-paes" onClick={() =&gt; setCaminho("/paes")}&gt;Cardápio&lt;/button&gt;
+      &lt;p&gt;caminho: {caminho}&lt;/p&gt;
+      &lt;Pagina caminho={caminho} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel do código inicial já mostra o sintoma antes de qualquer clique: o caminho é <code>/</code>,
+que é a vitrine, e mesmo assim aparece "Página não encontrada: /". O <code>*</code> na frente pegou até a
+página inicial. Depois da correção, o painel mostra a vitrine no caminho <code>/</code> e o botão Cardápio
+leva ao cardápio de verdade.</p>
+
+<p>Se você usar uma biblioteca de rotas, o mesmo cuidado continua valendo: a rota <code>path="*"</code>
+tem de ficar por último na lista de <code>&lt;Route&gt;</code>. A biblioteca percorre as rotas declaradas
+na ordem em que aparecem, e a primeira que casar ganha. Guarde a regra: o curinga é o <em>default</em> de
+um <code>if</code> — e <code>default</code> vai no fim.</p>
+
+<h2>7. O 404 do servidor e o 404 do aplicativo</h2>
+
+<p>Existe uma diferença entre o 404 que o servidor devolve e o 404 que o aplicativo desenha, e ela
+aparece quando você publica. Se o site é uma aplicação de página única, o servidor costuma estar
+configurado para entregar o <code>index.html</code> em qualquer caminho e deixar o roteador decidir. Nesse
+arranjo, <code>/encomendas</code> devolve <strong>200</strong> com a sua tela de 404 dentro — o visitante
+vê a mensagem certa, mas o buscador recebe "está tudo bem aqui, esta página existe".</p>
+
+<p>A saída é dizer ao servidor quais caminhos são de verdade e deixar o resto responder 404 de fato. Em
+hospedagens estáticas, isso é um arquivo de redirecionamento; em servidor próprio, é uma regra. É um
+assunto de publicação, não de componente, mas vale saber que existe — porque o sintoma ("o Google indexou
+a minha página de erro") é confuso se você não conhece a causa.</p>
+
+<pre class="term">192.0.2.10 - "GET /paes HTTP/1.1" 200
+192.0.2.10 - "GET /encomendas HTTP/1.1" 404</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Status do servidor</th><th>O que o visitante vê</th></tr>
+<tr><td>página existe</td><td>200</td><td>a página</td></tr>
+<tr><td>página não existe, servidor sabe</td><td>404</td><td>a sua tela de erro</td></tr>
+<tr><td>página não existe, servidor entrega o app</td><td>200</td><td>a sua tela de erro, com o status errado</td></tr>
+<tr><td>página existiu e saiu do ar de propósito</td><td>410</td><td>a mesma tela, com outra mensagem</td></tr>
+</table>
+</div>
+
+<p>A terceira linha é a mais comum em aplicações React e a mais fácil de esquecer. Não muda nada para
+quem navega — a tela é a mesma, o botão de voltar está lá —, mas muda para quem chega de fora: buscadores,
+integrações, o link colado no grupo da família. Se o seu site é institucional, vale acertar. Se é um
+painel interno, provavelmente não vale o esforço.</p>
+
+<h2>8. Caminhos parecidos e a segunda chance</h2>
+
+<p>Boa parte dos 404 reais não é link morto: é erro de digitação. <code>/pães</code> com acento,
+<code>/paes/</code> com barra no fim, <code>/Paes</code> com maiúscula. Antes de mostrar a página de erro,
+vale normalizar o caminho: tirar a barra final, comparar sem diferenciar maiúsculas e, se o endereço sem
+acento existir, redirecionar em silêncio.</p>
+
+<p>Há também a segunda chance mais útil de todas: transformar o erro em busca. Uma página 404 que recebe
+o caminho tentado pode mostrar os links parecidos — "você procurou por <code>/encomendas</code>; hoje
+temos o cardápio e o contato". A Ana fez isso: pegou a última parte do caminho, procurou nas rotas
+conhecidas e listou o que tinha alguma palavra em comum.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O visitante digitou</th><th>O que aconteceu</th><th>A resposta melhor</th></tr>
+<tr><td><code>/paes</code></td><td>rota existe</td><td>abre o cardápio</td></tr>
+<tr><td><code>/paes/</code></td><td>barra sobrando</td><td>normalizar e abrir o cardápio</td></tr>
+<tr><td><code>/encomendas</code></td><td>rota removida</td><td>404 com "as encomendas agora são pelo telefone"</td></tr>
+<tr><td><code>/contatoo</code></td><td>erro de digitação</td><td>404 com sugestão do contato</td></tr>
+</table>
+</div>
+
+<p>A lista de sugestões não precisa de algoritmo esperto. Comparar as primeiras letras e mostrar o que
+casa já resolve a maior parte. O que não pode é a página ficar sem nenhum link: uma 404 sem saída obriga o
+visitante a usar o botão de voltar do navegador, e aí ele volta — provavelmente para o buscador.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o 404 só aparece depois de recarregar</h3>
+<p>Navegando dentro do app, o caminho errado mostra o erro certinho; recarregando a página naquele
+endereço, aparece o 404 do servidor, sem o site. É a configuração de hospedagem: falta mandar todos os
+caminhos para o <code>index.html</code>. Nas hospedagens estáticas isso é um arquivo de
+redirecionamento; em servidor próprio, uma regra de reescrita.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a 404 aparece no meio da página em vez de ocupar a tela</h3>
+<p>Acontece quando a regra curinga está <em>dentro</em> do layout, no lugar errado da árvore: o topo
+aparece, o menu aparece e a página de erro fica espremida na área de conteúdo — ou pior, o layout inteiro
+some. O caminho é o mesmo desta aula, mas a decisão de onde a fronteira fica é o assunto da aula de
+<em>layout com rotas</em>.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o endereço antigo ainda está no cartão impresso</h3>
+<p>Não há código que conserte papel. A saída é manter a rota antiga viva por um tempo, com uma mensagem
+"mudou de lugar" e um botão para o novo endereço. É um 404 com perdão: você reconhece o caminho velho,
+explica e leva a pessoa adiante. Dois anos depois, a rota sai e o curinga faz o trabalho.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que a regra <code>"*"</code> faz?</p>
+<label><input type="radio" name="q1"> impede o acesso a rotas protegidas</label>
+<label><input type="radio" name="q1"> recebe qualquer caminho que não casou com as outras regras</label>
+<label><input type="radio" name="q1"> recarrega a página quando o caminho muda</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que a regra curinga tem de ser a última?</p>
+<label><input type="radio" name="q2"> porque o React exige a ordem alfabética</label>
+<label><input type="radio" name="q2"> porque a última regra é a mais rápida</label>
+<label><input type="radio" name="q2"> porque a busca para na primeira regra que casa, e o curinga casa com tudo</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Qual é a melhor página de erro?</p>
+<label><input type="radio" name="q1"> a que diz o que aconteceu, mostra o caminho e oferece como voltar</label>
+<label><input type="radio" name="q1"> a que redireciona sozinha para a página inicial</label>
+<label><input type="radio" name="q1"> a que mostra só "erro 404"</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a página de reserva</h2>
+<p>Complete a linha que escolhe a página e cai no componente de erro quando o caminho não existe:</p>
+<div class="ex-code">const Pagina = PAGINAS[caminho] <input aria-label="resposta 1" data-answer="||" placeholder="..."> NaoEncontrada;</div>
+<p class="ex-dica">Dica: é o operador que devolve o lado direito quando o esquerdo é <code>undefined</code>.
+São duas barras verticais.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Uma rota que não existe é um caminho que não casou com nenhuma regra. O roteador, quando não encontra
+nada, não desenha nada — e a tela em branco é o pior aviso possível, porque o visitante não sabe se o site
+quebrou ou se a página saiu do ar. A solução é uma regra curinga, <code>*</code>, que recebe todos os
+caminhos desconhecidos e desenha uma página de erro de verdade.</p>
+
+<p>Essa página precisa de três coisas: dizer o que aconteceu, mostrar o caminho que falhou e oferecer uma
+saída. O botão de voltar recebe a função por prop, então a página de erro não precisa conhecer o roteador.
+A regra curinga fica sempre no fim da lista, porque a busca para na primeira que casa; no topo, ela engole
+o site inteiro.</p>
+
+<p>Fora do componente, lembre que o status do servidor conta outra história: entregar o aplicativo com 200
+para um caminho inexistente faz o buscador achar que a página existe. E que boa parte dos 404 reais é erro
+de digitação — normalizar a barra final e sugerir o caminho certo transforma o beco sem saída em
+continuação da visita.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Rota inexistente = caminho que não casou com nenhuma regra.</li>
+<li>A regra curinga é <code>"*"</code> e desenha a página de erro.</li>
+<li>Ela vem por último: <code>find</code> para na primeira que casa.</li>
+<li>A página 404 diz o que houve, mostra o caminho e oferece como voltar.</li>
+<li>Passe a função de voltar por prop: a 404 não precisa conhecer o roteador.</li>
+<li>Não redirecione sozinho: mostre o erro e deixe a pessoa decidir.</li>
+<li>No servidor, o status certo é 404 — o app entregue com 200 engana buscadores.</li>
+<li><code>/paes/</code> e <code>/pães</code> merecem normalização antes do erro.</li>
+<li>Um 404 com sugestões de rotas parecidas salva a visita.</li>
+<li>Rota removida de propósito pode virar 410, com a mesma tela.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

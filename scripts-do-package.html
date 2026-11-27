@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Os Scripts do package.json | Guia React</title>
+<meta name="description" content="Como o npm run encontra e executa os scripts do package.json: os quatro do Vite, passar argumentos com --, encadear comandos, hooks pre e post e o uso no CI.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Os Scripts do <span class="hl">package.json</span></h1>
+<p class="intro">A Ana decora <code>vite --port 3000 --host</code> e erra na terceira letra. O time dela
+digita <code>npm run dev</code> e funciona. A diferença está numa seção pequena do
+<code>package.json</code> que quase ninguém lê: os <em>scripts</em>. Nesta aula ela entende como o
+<code>npm run</code> acha o programa, como passar argumentos, como encadear comandos e como deixar o
+projeto rodando com um comando só — na máquina dela e no servidor.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um script e como o <code>npm run nome</code> o executa.</li>
+  <li>Por que <code>vite</code> funciona sem <code>npx</code> e sem instalação global.</li>
+  <li>O que cada um dos quatro scripts do Vite faz e quando rodar.</li>
+  <li>Como passar argumentos com o <code>--</code> separador.</li>
+  <li>Encadear comandos com <code>&amp;&amp;</code>, usar <code>pre</code>/<code>post</code> e rodar dois de uma vez.</li>
+  <li>Scripts para o time e para o CI, com código de saída.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o comando comprido que ninguém decora</h2>
+
+<p>Para abrir o site no celular, a Ana precisa subir o servidor na porta 3000 e expor na rede. Ela
+digita <code>npx vite --port 3000 --host</code>, erra uma letra, tenta de novo, e no dia seguinte esqueceu
+o comando. O colega dela digita <code>npm run dev</code> e o servidor abre na porta certa, com as opções
+certas, sem pensar.</p>
+
+<p>A diferença é que o comando do colega está escrito no <code>package.json</code>, na seção
+<code>scripts</code>. Um script é um apelido: um nome curto que aponta para uma linha de comando. Em vez de
+lembrar de flags, você lembra de <code>dev</code>, <code>build</code>, <code>test</code>. E, melhor: o
+script fica versionado junto com o projeto, então todo mundo que clona roda a mesma coisa.</p>
+
+<p>Este é o assunto da aula: a seção mais subestimada do projeto e a que mais economiza tempo no dia a
+dia. No fim, você vai saber ler qualquer <code>package.json</code> e entender o que cada
+<code>npm run</code> faz por baixo.</p>
+
+<h2>2. O que é um script</h2>
+
+<p>No <code>package.json</code>, a chave <code>scripts</code> é um objeto de pares nome e comando. O nome é
+livre; o comando é uma linha de terminal. Quando você digita <code>npm run dev</code>, o npm procura a
+chave <code>dev</code> e executa o comando dela — com uma diferença importante em relação a rodar o mesmo
+comando à mão: o npm coloca a pasta <code>node_modules/.bin</code> na frente do caminho de busca.</p>
+
+<pre class="file" data-file="package.json">{
+  "name": "padaria",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint ."
+  }
+}</pre>
+
+<p>É essa injeção de caminho que explica a pergunta mais comum: por que <code>vite</code> funciona dentro
+do script se não está instalado globalmente? Porque o npm procura primeiro em
+<code>node_modules/.bin</code>, onde o Vite foi instalado como dependência de desenvolvimento. Fora do
+script, o mesmo <code>vite</code> não é encontrado — a não ser que você use <code>npx vite</code>. É a
+mesma ideia do <code>PATH</code> do sistema, aplicada ao projeto.</p>
+
+<dl class="anatomy">
+<dt>script</dt>
+<dd>Um par nome e comando dentro do <code>package.json</code>: <code>"dev": "vite"</code>.</dd>
+<dt>runner</dt>
+<dd>O <code>npm run</code>: ele lê o nome, acha o comando e executa.</dd>
+<dt><code>.bin</code></dt>
+<dd>A pasta <code>node_modules/.bin</code>, onde ficam os atalhos dos programas instalados.</dd>
+<dt>argumento</dt>
+<dd>Uma opção passada ao comando: <code>--port 3000</code>. No npm, vai depois do <code>--</code>.</dd>
+<dt>gancho</dt>
+<dd>Um script <code>pre</code> ou <code>post</code> que roda em volta do principal.</dd>
+<dt>código de saída</dt>
+<dd>O número que o comando devolve: zero é sucesso, qualquer outro reprova o CI.</dd>
+</dl>
+
+<p>Rodar <code>npm run</code> sem nome nenhum lista os scripts disponíveis. É o comando que responde "o que
+esse projeto sabe fazer?" sem abrir arquivo nenhum:</p>
+
+<pre class="term">$ npm run
+
+Scripts available in padaria@0.0.0 via `npm run`:
+  dev
+    vite
+  build
+    vite build
+  preview
+    vite preview
+  lint
+    eslint .</pre>
+
+<p>Repare que a saída mostra o nome e, embaixo, o comando real. Isso é ouro quando você entra num projeto
+que não conhece: dá para ver se o time usa <code>test</code> ou <code>test:unit</code>, se existe um
+<code>format</code>, se o build tem etapas a mais. Antes de perguntar para alguém, rode <code>npm
+run</code>.</p>
+
+<div class="tryreact" data-goal="texto:Missing script: &quot;test&quot;;;texto:vite build;;texto:eslint .">
+  <p class="try-task">A função <code>executar</code> deveria imitar o <code>npm run</code>: devolver o
+  comando quando o script existe e uma mensagem de erro quando não existe. Hoje ela devolve
+  <code>undefined</code> para tudo. Corrija para a lista mostrar os comandos e o aviso de script
+  ausente.</p>
+  <pre class="jsx">const scripts = {
+  dev: "vite",
+  build: "vite build",
+  lint: "eslint ."
+};
+
+function executar(nome) {
+  return undefined;
+}
+
+function App() {
+  const pedidos = ["dev", "build", "lint", "test"];
+
+  return (
+    &lt;ul&gt;
+      {pedidos.map((nome) =&gt; (
+        &lt;li key={nome}&gt;
+          npm run {nome} → {executar(nome)}
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul&gt;
+  &lt;li&gt;npm run dev →&lt;/li&gt;
+  &lt;li&gt;npm run build →&lt;/li&gt;
+  &lt;li&gt;npm run lint →&lt;/li&gt;
+  &lt;li&gt;npm run test →&lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">const scripts = {
+  dev: "vite",
+  build: "vite build",
+  lint: "eslint ."
+};
+
+function executar(nome) {
+  if (scripts[nome]) {
+    return scripts[nome];
+  }
+
+  return 'Missing script: "' + nome + '"';
+}
+
+function App() {
+  const pedidos = ["dev", "build", "lint", "test"];
+
+  return (
+    &lt;ul&gt;
+      {pedidos.map((nome) =&gt; (
+        &lt;li key={nome}&gt;
+          npm run {nome} → {executar(nome)}
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p>Dá para ler a saída como o próprio terminal leria: cada linha é um pedido e a resposta. Quando o script
+existe, o comando aparece; quando não existe, a mensagem é a que o npm imprime de verdade —
+<code>Missing script: "test"</code>, com o nome entre aspas. É um erro claro, e a saída dele é justamente
+"você digitou um nome que não está aqui".</p>
+
+<p>Um detalhe de sintaxe que vale guardar: ao acrescentar um script, não esqueça a vírgula entre as
+entradas e as aspas no comando. O <code>package.json</code> é JSON, e JSON é rígido. O editor costuma
+mostrar o erro na hora, mas se o <code>npm run</code> começar a reclamar de arquivo inválido, a causa é
+essa.</p>
+
+<h2>3. Os quatro scripts que o Vite escreve</h2>
+
+<p>O template do Vite cria quatro scripts, e cada um resolve um momento diferente do trabalho. Conhecê-los
+evita rodar o comando errado na hora errada — o que, no caso do <code>build</code>, faz diferença.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Script</th><th>Comando</th><th>Quando rodar</th></tr>
+<tr><td><code>dev</code></td><td><code>vite</code></td><td>enquanto trabalha: servidor com HMR</td></tr>
+<tr><td><code>build</code></td><td><code>vite build</code></td><td>ao publicar: gera a versão final em <code>dist/</code></td></tr>
+<tr><td><code>preview</code></td><td><code>vite preview</code></td><td>antes de publicar: serve o <code>dist/</code> localmente</td></tr>
+<tr><td><code>lint</code></td><td><code>eslint .</code></td><td>antes de entregar: aponta código suspeito</td></tr>
+</table>
+</div>
+
+<p>O <code>dev</code> é o do dia a dia e não gera arquivo nenhum: ele serve o código na hora, como você viu
+na aula do Vite. O <code>build</code> é o único que produz a pasta <code>dist</code> — e é o que roda no
+servidor de publicação. O <code>preview</code> existe para conferir esse resultado sem publicar: ele sobe
+um servidor comum em cima do <code>dist</code>, para você ver se os caminhos e as imagens continuam
+funcionando.</p>
+
+<p>O <code>lint</code> é o mais ignorado e o mais barato de rodar. Ele lê os arquivos e aponta variável não
+usada, import quebrado, efeito com dependência faltando. Não conserta sozinho, mas lista o que consertar.
+Muitos projetos têm também <code>lint:fix</code>, que aplica as correções automáticas.</p>
+
+<p>Uma confusão comum: rodar <code>npm run build</code> para "ver o site" e depois abrir o
+<code>dist/index.html</code> com dois cliques. Não funciona — os caminhos gerados são absolutos e precisam
+de um servidor. Para ver o resultado, <code>npm run preview</code>. O build não é para olhar; é para
+publicar.</p>
+
+<h2>4. Passando argumentos com o --</h2>
+
+<p>Chega o dia em que você precisa de uma opção que não está no script: mudar a porta, abrir o navegador,
+expor na rede. O caminho intuitivo é <code>npm run dev --port 3000</code> — e ele não faz o que você
+espera. O npm entende <code>--port</code> como uma opção <em>dele</em>, e o Vite continua na porta padrão.
+Para separar as opções do npm das opções do programa, existe o <code>--</code> sozinho no meio.</p>
+
+<pre class="term">$ npm run dev -- --port 3000
+
+  VITE v7.1.0  ready in 288 ms
+
+  ➜  Local:   http://localhost:3000/
+  ➜  press h + enter to show help</pre>
+
+<p>Tudo o que vem depois do <code>--</code> é repassado ao comando do script, como se você o tivesse
+digitado lá. É por isso que a linha aparece com a porta 3000. A regra é fácil de lembrar: as opções antes
+do <code>--</code> são do npm (raras), as depois são do programa (as que você quer).</p>
+
+<p>Se uma opção é usada sempre — a porta 3000, por exemplo —, o lugar dela é dentro do script, não na
+linha de comando: <code>"dev": "vite --port 3000"</code>. Aí todo mundo que roda <code>npm run dev</code>
+tem o mesmo comportamento, e ninguém precisa lembrar da flag. Script é justamente para o que se repete.</p>
+
+<div class="tryreact" data-goal="texto:vite --port 3000;;texto:vite --host;;conta:li=3">
+  <p class="try-task">A função <code>montar</code> deveria juntar o comando do script com os argumentos
+  recebidos, mas está ignorando os argumentos. Faça as três linhas mostrarem o comando completo:
+  <code>vite</code>, <code>vite --port 3000</code> e <code>vite --host</code>.</p>
+  <pre class="jsx">const script = "vite";
+
+const chamadas = [
+  { texto: "npm run dev", args: [] },
+  { texto: "npm run dev -- --port 3000", args: ["--port", "3000"] },
+  { texto: "npm run dev -- --host", args: ["--host"] }
+];
+
+function montar(comando, args) {
+  return comando;
+}
+
+function App() {
+  return (
+    &lt;ul&gt;
+      {chamadas.map((c) =&gt; (
+        &lt;li key={c.texto}&gt;
+          {c.texto} → {montar(script, c.args)}
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul&gt;
+  &lt;li&gt;npm run dev → vite&lt;/li&gt;
+  &lt;li&gt;npm run dev -- --port 3000 → vite&lt;/li&gt;
+  &lt;li&gt;npm run dev -- --host → vite&lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">const script = "vite";
+
+const chamadas = [
+  { texto: "npm run dev", args: [] },
+  { texto: "npm run dev -- --port 3000", args: ["--port", "3000"] },
+  { texto: "npm run dev -- --host", args: ["--host"] }
+];
+
+function montar(comando, args) {
+  if (!args.length) {
+    return comando;
+  }
+
+  return comando + " " + args.join(" ");
+}
+
+function App() {
+  return (
+    &lt;ul&gt;
+      {chamadas.map((c) =&gt; (
+        &lt;li key={c.texto}&gt;
+          {c.texto} → {montar(script, c.args)}
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p>A lista vazia precisa de um caso à parte, senão o comando ganharia um espaço no fim — detalhe pequeno
+que, num script de verdade, pode virar argumento vazio e erro de leitura. O <code>join(" ")</code> monta a
+linha final. É literalmente isso que o npm faz: pega o comando do script e concatena os argumentos que
+vieram depois do <code>--</code>.</p>
+
+<h2>5. Encadeando comandos</h2>
+
+<p>Scripts podem chamar outros scripts e outros comandos. Duas formas resolvem quase tudo. A primeira é o
+<code>&amp;&amp;</code>, que executa em sequência e para no primeiro erro:</p>
+
+<pre class="file" data-file="package.json">{
+  "scripts": {
+    "check": "npm run lint &amp;&amp; npm run build",
+    "dev": "vite"
+  }
+}</pre>
+
+<p>Com <code>check</code>, o lint roda primeiro; se ele falhar, o build nem começa. Essa é a diferença
+entre <code>&amp;&amp;</code> e <code>;</code>: o ponto e vírgula continua mesmo com erro, o
+<code>&amp;&amp;</code> para. Para verificação, você quer parar — não adianta gerar o build de um código
+que acabou de ser reprovado.</p>
+
+<p>A segunda forma são os scripts <strong>pre</strong> e <strong>post</strong>: o npm procura
+automaticamente por <code>pre&lt;nome&gt;</code> e <code>post&lt;nome&gt;</code> e os executa antes e
+depois do script principal. É um gancho antigo e ainda útil, especialmente no build:</p>
+
+<pre class="file" data-file="package.json">{
+  "scripts": {
+    "prebuild": "npm run lint",
+    "build": "vite build",
+    "postbuild": "node scripts/copiar-robots.js"
+  }
+}</pre>
+
+<p>Ao rodar <code>npm run build</code>, o npm executa <code>prebuild</code>, depois <code>build</code>,
+depois <code>postbuild</code> — nessa ordem, e parando se algum falhar. Use com moderação: quando há muitos
+ganchos, fica difícil saber o que um comando faz só de olhar. Se a ordem importa e é longa, prefira um
+script único e explícito com <code>&amp;&amp;</code>.</p>
+
+<div class="tryreact" data-goal="conta:li=3;;texto:prebuild;;texto:build;;texto:postbuild">
+  <p class="try-task">A função <code>ordem</code> devolve só o script principal. Monte a sequência que o
+  npm executa: o <code>prebuild</code> antes, o <code>build</code> no meio e o <code>postbuild</code>
+  depois — três itens na lista, nesta ordem.</p>
+  <pre class="jsx">const scripts = {
+  prebuild: "npm run lint",
+  build: "vite build",
+  postbuild: "node scripts/copiar-robots.js"
+};
+
+function ordem(nome) {
+  return [nome];
+}
+
+function App() {
+  const sequencia = ordem("build");
+
+  return (
+    &lt;ol&gt;
+      {sequencia.map((passo) =&gt; (
+        &lt;li key={passo}&gt;npm run {passo}&lt;/li&gt;
+      ))}
+    &lt;/ol&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ol&gt;
+  &lt;li&gt;npm run build&lt;/li&gt;
+&lt;/ol&gt;
+</pre>
+  <pre class="solucao">const scripts = {
+  prebuild: "npm run lint",
+  build: "vite build",
+  postbuild: "node scripts/copiar-robots.js"
+};
+
+function ordem(nome) {
+  const passos = [];
+
+  if (scripts["pre" + nome]) {
+    passos.push("pre" + nome);
+  }
+
+  passos.push(nome);
+
+  if (scripts["post" + nome]) {
+    passos.push("post" + nome);
+  }
+
+  return passos;
+}
+
+function App() {
+  const sequencia = ordem("build");
+
+  return (
+    &lt;ol&gt;
+      {sequencia.map((passo) =&gt; (
+        &lt;li key={passo}&gt;npm run {passo}&lt;/li&gt;
+      ))}
+    &lt;/ol&gt;
+  );
+}</pre>
+</div>
+
+<p>O <code>&lt;ol&gt;</code> em vez de <code>&lt;ul&gt;</code> é proposital: a ordem faz parte do
+resultado. E o teste com <code>scripts["pre" + nome]</code> mostra a ideia por trás dos ganchos — o npm
+não tem uma lista fixa, ele simplesmente procura o nome com o prefixo e roda se existir.</p>
+
+<h2>6. Rodando dois servidores de uma vez</h2>
+
+<p>Quando o projeto cresce, aparece a necessidade de rodar duas coisas ao mesmo tempo: o Vite e uma API
+local, por exemplo. O <code>&amp;&amp;</code> não serve, porque o primeiro comando não termina nunca — e o
+segundo nunca começa. Para paralelismo, a ferramenta mais usada é o <code>concurrently</code>:</p>
+
+<pre class="file" data-file="package.json">{
+  "scripts": {
+    "dev": "vite",
+    "api": "node servidor/api.js",
+    "dev:full": "concurrently \"npm run dev\" \"npm run api\""
+  }
+}</pre>
+
+<p>O <code>concurrently</code> é uma dependência de desenvolvimento (<code>npm install -D
+concurrently</code>) e recebe os comandos entre aspas. A saída dos dois aparece no mesmo terminal, com
+prefixos coloridos, e <code>Ctrl + C</code> derruba os dois de uma vez. Existe também o
+<code>npm-run-all</code>, com outra sintaxe; qualquer um resolve.</p>
+
+<p>Para variáveis de ambiente dentro de scripts, cuidado com a diferença entre sistemas. No Linux e no
+macOS, <code>"dev": "VITE_API=local vite"</code> funciona; no Windows, o mesmo script falha. O
+<code>cross-env</code> resolve: <code>"dev": "cross-env VITE_API=local vite"</code>. Hoje o Vite também lê
+arquivos <code>.env</code>, que são a solução mais limpa — e o assunto da última aula deste bloco.</p>
+
+<h2>7. Scripts para o time</h2>
+
+<p>Um projeto maduro tem scripts que padronizam o que todo mundo faz. Não é burocracia: é a diferença
+entre "rode o eslint aí, acho que é <code>npx eslint src</code>" e <code>npm run lint</code>. Alguns nomes
+se tornaram convenção:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Script</th><th>Comando típico</th><th>Para quê</th></tr>
+<tr><td><code>lint</code></td><td><code>eslint .</code></td><td>apontar problemas sem alterar arquivos</td></tr>
+<tr><td><code>lint:fix</code></td><td><code>eslint . --fix</code></td><td>aplicar as correções automáticas</td></tr>
+<tr><td><code>format</code></td><td><code>prettier --write .</code></td><td>padronizar espaçamento e aspas</td></tr>
+<tr><td><code>test</code></td><td><code>vitest run</code></td><td>rodar os testes uma vez</td></tr>
+<tr><td><code>test:watch</code></td><td><code>vitest</code></td><td>rodar os testes enquanto trabalha</td></tr>
+<tr><td><code>typecheck</code></td><td><code>tsc --noEmit</code></td><td>conferir tipos sem gerar arquivo</td></tr>
+</table>
+</div>
+
+<p>O sufixo com dois-pontos é uma convenção para variações do mesmo assunto: <code>test</code> e
+<code>test:watch</code>, <code>lint</code> e <code>lint:fix</code>. Não muda o funcionamento — o nome é
+livre —, mas ajuda a agrupar na lista do <code>npm run</code> e na cabeça de quem lê.</p>
+
+<p>Dois nomes têm significado especial e vale conhecer: <code>npm start</code> roda o script
+<code>start</code> sem precisar do <code>run</code>, e <code>npm test</code> roda o <code>test</code>. O
+template do Vite não cria <code>start</code>, porque o nome dele é <code>dev</code>; se você criar
+<code>start</code> apontando para o mesmo comando, os dois funcionam.</p>
+
+<h2>8. Scripts no CI</h2>
+
+<p>Servidor de integração contínua não tem memória: ele baixa o código, instala e roda comandos. Os
+scripts são a interface entre o seu projeto e essa máquina. Um pipeline mínimo de um projeto Vite é
+assim:</p>
+
+<pre class="file" data-file=".github/workflows/ci.yml">name: ci
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build</pre>
+
+<p>Três comandos, e todos existem porque estão no <code>package.json</code>. Se o lint falhar, ele para ali
+— e o motivo é o <strong>código de saída</strong>: todo comando devolve zero quando dá certo e outro
+número quando dá errado. O npm repassa esse número, e o CI usa isso para decidir se o trabalho passou. Um
+script que engole o erro com <code>|| true</code> faz o CI ficar verde com código quebrado.</p>
+
+<p>O <code>npm ci</code> na primeira linha, em vez de <code>npm install</code>, é a mesma escolha da aula
+de npm: instalar exatamente o lock, sem mexer em versões. A partir daí, <code>npm run lint</code> e
+<code>npm run build</code> fazem o resto — e se um deles não existir, o CI falha com
+<code>Missing script</code>, o que também é informação.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o script que não existe</h3>
+<p>Ela digitou <code>npm run tests</code>, no plural. O npm respondeu
+<code>Missing script: "tests"</code> e listou os que existiam. A causa era só o plural; o conserto, um
+<code>npm run test</code>. Vale reparar que a mensagem mostra a lista completa — é a forma mais rápida de
+descobrir o nome certo sem abrir o arquivo.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a opção foi para o lugar errado</h3>
+<p>Ela rodou <code>npm run dev --port 3000</code> e o servidor abriu na 5173. O npm tratou a opção como
+dele e não repassou nada. Faltou o <code>--</code> separador: <code>npm run dev -- --port 3000</code>. Se
+a opção é usada todo dia, o melhor é colocá-la dentro do script e nunca mais digitar.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o build passou, mas o CI falhou</h3>
+<p>O build local funcionava e o CI reclamava de módulo não encontrado. O script chamava uma ferramenta que
+estava em <code>devDependencies</code>, e o CI rodava <code>npm ci --omit=dev</code> antes. A ferramenta
+não existia naquele ambiente. O conserto foi mover o pacote para <code>dependencies</code> — ou parar de
+usá-lo no build, que era o caso, porque ele só servia para gerar um arquivo estático.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="1"><p class="mc-q">1. Como o script encontra o Vite sem instalação global?</p>
+<label><input type="radio" name="q1"> o npm coloca <code>node_modules/.bin</code> no caminho de busca</label>
+<label><input type="radio" name="q1"> o Vite vem dentro do Node</label>
+<label><input type="radio" name="q1"> o script baixa o pacote toda vez que roda</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que <code>npm run dev -- --port 3000</code> faz?</p>
+<label><input type="radio" name="q2"> muda a porta do npm para 3000</label>
+<label><input type="radio" name="q2"> roda o script <code>dev</code> e ignora as opções extras</label>
+<label><input type="radio" name="q2"> repassa <code>--port 3000</code> para o comando do script</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. O que <code>&amp;&amp;</code> faz entre dois comandos?</p>
+<label><input type="radio" name="q3"> roda os dois ao mesmo tempo</label>
+<label><input type="radio" name="q3"> roda o segundo só se o primeiro terminar sem erro</label>
+<label><input type="radio" name="q3"> roda o segundo mesmo se o primeiro falhar</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o script do dia a dia</h2>
+<p>Complete o script que sobe o servidor de desenvolvimento na porta 3000, sem precisar digitar a opção
+toda vez:</p>
+<div class="ex-code">"dev": "vite <input aria-label="resposta 1" data-answer="--port 3000|--port=3000" placeholder="...">"</div>
+<p class="ex-dica">Dica: é a opção do Vite que define a porta, seguida do número. Dentro do script não
+existe o separador <code>--</code> do npm — ele só é usado na linha de comando.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Script é apelido: um nome no <code>package.json</code> que aponta para uma linha de comando. O
+<code>npm run nome</code> procura a chave, coloca <code>node_modules/.bin</code> no caminho e executa — é
+por isso que o Vite funciona sem instalação global. Sem nome, <code>npm run</code> lista tudo o que o
+projeto sabe fazer.</p>
+
+<p>Os quatro scripts do Vite cobrem o ciclo: <code>dev</code> para trabalhar, <code>build</code> para
+gerar, <code>preview</code> para conferir o resultado, <code>lint</code> para revisar. Argumentos extras
+vão depois do <code>--</code>. Para sequência, <code>&amp;&amp;</code> para no primeiro erro; para
+paralelismo, <code>concurrently</code>; para ganchos automáticos, os prefixos <code>pre</code> e
+<code>post</code>.</p>
+
+<p>E o valor maior aparece no time e no CI: um comando só, igual para todo mundo, com código de saída que
+diz se passou. Com o projeto organizado e os comandos padronizados, falta entender o que o build faz com
+os arquivos — por que o site fica em <code>dist</code>, o que é o hash no nome e por que o pacote final é
+menor que a soma das partes. É a próxima aula.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>scripts</code> no <code>package.json</code>: nome → comando.</li>
+<li><code>npm run</code> sem nome lista os scripts do projeto.</li>
+<li>O npm põe <code>node_modules/.bin</code> no caminho: nada de instalação global.</li>
+<li><code>dev</code>, <code>build</code>, <code>preview</code> e <code>lint</code> são os quatro do Vite.</li>
+<li>Argumento extra vai depois do <code>--</code>: <code>npm run dev -- --port 3000</code>.</li>
+<li><code>&amp;&amp;</code> para no primeiro erro; <code>;</code> continua mesmo assim.</li>
+<li><code>prebuild</code> e <code>postbuild</code> rodam em volta do <code>build</code>.</li>
+<li>Dois servidores: <code>concurrently</code>; variável no Windows: <code>cross-env</code>.</li>
+<li>Sufixos como <code>lint:fix</code> e <code>test:watch</code> agrupam variações.</li>
+<li>No CI: <code>npm ci</code> + <code>npm run build</code>; código de saída diferente de zero reprova.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

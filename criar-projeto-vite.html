@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O Projeto com Vite | Guia React</title>
+<meta name="description" content="O que o create-vite faz, qual variante escolher, como o servidor de desenvolvimento serve JSX sem empacotar, o HMR e o vite.config.js explicados.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O Projeto com <span class="hl">Vite</span></h1>
+<p class="intro">A Ana já criou um projeto com o Vite uma vez, seguindo a receita. Agora ela vai abrir
+uma segunda vitrine e quer entender o que responde no assistente: React com JavaScript ou TypeScript? O
+que é SWC? Por que o servidor abre em 300 milissegundos enquanto o build demora? O que exatamente existe
+dentro do <code>vite.config.js</code>? Nesta aula ela olha para a ferramenta em vez de só usá-la.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que o <code>npm create vite@latest</code> faz antes de fazer qualquer pergunta.</li>
+  <li>Qual variante escolher e o que muda entre React, React + TypeScript e React + SWC.</li>
+  <li>Como o servidor de desenvolvimento serve JSX sem empacotar tudo antes.</li>
+  <li>O que o HMR preserva — e quando ele perde o estado de qualquer jeito.</li>
+  <li>O que escrever no <code>vite.config.js</code>: plugins, porta, host e saída do build.</li>
+  <li>Por que o endereço <code>localhost</code> não abre no celular e o que fazer para abrir.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o segundo projeto e as perguntas do assistente</h2>
+
+<p>O primeiro projeto da Ana nasceu com um tutorial ao lado: ela respondeu "React", "JavaScript" e
+apertou enter sem pensar. Funcionou. Agora ela quer uma vitrine separada, para as encomendas de festa, e
+o assistente faz perguntas que ela não sabe responder — algumas versões nem perguntam nada, outras
+oferecem "React + SWC", e ela não quer descobrir no meio do caminho que escolheu errado.</p>
+
+<p>O Vite não é uma caixa-preta: ele é um programa que copia arquivos e outro que serve a página. A
+primeira parte roda uma vez; a segunda, todo dia. Entender a diferença resolve a maior parte das dúvidas
+de quem começa — inclusive a mais comum, "por que meu projeto não tem um <code>webpack.config.js</code>?".</p>
+
+<h2>2. O que o comando faz antes de perguntar</h2>
+
+<p><code>npm create vite@latest</code> é uma forma abreviada de baixar e rodar o pacote
+<code>create-vite</code>. O npm baixa esse pacote para o cache, executa o assistente no terminal e, no
+fim, copia para a pasta escolhida um conjunto de arquivos de partida — o <strong>template</strong>. Nada
+de mágica: são arquivos de texto comuns, que você pode abrir e editar. O que o comando <em>não</em> faz é
+instalar as dependências; isso continua sendo um <code>npm install</code> depois.</p>
+
+<p>Existe uma forma sem perguntas, ótima para quando você já sabe o que quer (e obrigatória em
+automação): passar o nome do projeto e o template de uma vez, com dois traços antes da opção. O
+<code>--</code> separa as opções do npm das opções do programa que ele está rodando.</p>
+
+<pre class="term">$ npm create vite@latest vitrine -- --template react
+
+Scaffolding project in /home/ana/estudos/vitrine...
+
+Done. Now run:
+
+  cd vitrine
+  npm install
+  npm run dev</pre>
+
+<p>A mensagem final é literalmente a receita dos próximos três passos. Se você esquecer, ela está lá —
+e também no <code>README.md</code> que o template escreve. O que costuma confundir é o nome: o comando
+cria uma <em>pasta</em> chamada <code>vitrine</code>. Se você rodar dentro de uma pasta que já tem
+arquivos, o assistente avisa e oferece continuar na pasta atual ou cancelar.</p>
+
+<h2>3. Escolhendo o modelo</h2>
+
+<p>O template é o ponto de partida: quais arquivos nascem, com qual extensão e com qual configuração. A
+pergunta do assistente tem duas partes — framework e variante. Para React, as variantes que aparecem hoje
+são quatro, e a diferença é menor do que parece.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Variante</th><th>Extensões</th><th>Quando escolher</th></tr>
+<tr><td>React</td><td><code>.jsx</code></td><td>o padrão para quem está começando; JSX com JavaScript</td></tr>
+<tr><td>React + TypeScript</td><td><code>.tsx</code></td><td>quando você já sabe TypeScript ou o time exige tipos</td></tr>
+<tr><td>React + SWC</td><td><code>.jsx</code></td><td>mesmo resultado do padrão, com outro compilador (mais rápido)</td></tr>
+<tr><td>React + SWC + TypeScript</td><td><code>.tsx</code></td><td>a combinação das duas escolhas anteriores</td></tr>
+</table>
+</div>
+
+<p>SWC é um compilador escrito em Rust que faz o mesmo trabalho do Babel, só que mais rápido. No
+desenvolvimento a diferença é pequena; em projetos grandes, ela aparece. Para aprender React, tanto faz —
+o código que você escreve é idêntico. TypeScript é outra história: ele acrescenta tipos, e tipo errado
+vira erro antes de a página abrir. É uma boa ferramenta e uma péssima segunda coisa para aprender junto
+com a primeira.</p>
+
+<p>A caixa abaixo mostra a lista de arquivos que cada variante cria. A escolha foi parar em
+<code>react-ts</code> por engano, e a missão é voltar para o template com JavaScript:</p>
+
+<div class="tryreact" data-goal="conta:.jsx=2;;conta:.tsx=0;;texto:src/App.jsx">
+  <p class="try-task">O projeto foi criado com TypeScript sem querer: os arquivos são <code>.tsx</code>.
+  Troque a escolha para o template <code>react</code>, para a lista mostrar <code>main.jsx</code> e
+  <code>App.jsx</code>.</p>
+  <pre class="jsx">const templates = {
+  react: ["src/main.jsx", "src/App.jsx", "src/App.css"],
+  "react-ts": ["src/main.tsx", "src/App.tsx", "src/App.css"]
+};
+
+const escolhido = "react-ts";
+
+function App() {
+  const arquivos = templates[escolhido];
+
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;npm create vite@latest -- --template {escolhido}&lt;/h2&gt;
+      &lt;ul&gt;
+        {arquivos.map((a) =&gt; (
+          &lt;li key={a} className={a.endsWith(".tsx") ? "tsx" : a.endsWith(".jsx") ? "jsx" : "css"}&gt;
+            {a}
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h2&gt;npm create vite@latest -- --template react-ts&lt;/h2&gt;
+  &lt;ul&gt;
+    &lt;li class="tsx"&gt;src/main.tsx&lt;/li&gt;
+    &lt;li class="tsx"&gt;src/App.tsx&lt;/li&gt;
+    &lt;li class="css"&gt;src/App.css&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const templates = {
+  react: ["src/main.jsx", "src/App.jsx", "src/App.css"],
+  "react-ts": ["src/main.tsx", "src/App.tsx", "src/App.css"]
+};
+
+const escolhido = "react";
+
+function App() {
+  const arquivos = templates[escolhido];
+
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;npm create vite@latest -- --template {escolhido}&lt;/h2&gt;
+      &lt;ul&gt;
+        {arquivos.map((a) =&gt; (
+          &lt;li key={a} className={a.endsWith(".tsx") ? "tsx" : a.endsWith(".jsx") ? "jsx" : "css"}&gt;
+            {a}
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A troca é de uma palavra e muda tudo o que nasce: extensão dos arquivos, conteúdo do
+<code>main.jsx</code> (que em TypeScript ganha tipos) e as dependências do <code>package.json</code>. Por
+isso vale decidir antes de escrever código: converter um projeto de JavaScript para TypeScript depois é
+possível, mas é trabalho.</p>
+
+<p>Se você já criou errado, não precisa começar de novo. Para um projeto de estudo, o caminho mais
+barato é criar outra pasta com o template certo e mover os seus componentes para lá — eles são só
+JavaScript e não sabem em qual projeto estão.</p>
+
+<h2>4. O que nasce na pasta</h2>
+
+<p>O template é pequeno de propósito: um <code>index.html</code> na raiz, um <code>package.json</code>,
+um <code>vite.config.js</code> e a pasta <code>src</code> com o <code>main.jsx</code>, o
+<code>App.jsx</code> e dois arquivos de estilo. Nada disso é obrigatório pela ferramenta — o Vite aceita
+qualquer organização —, mas o modelo é uma convenção que a comunidade reconhece.</p>
+
+<p>O <code>vite.config.js</code> merece atenção porque é o único arquivo que fala com a ferramenta. Ele
+começa quase vazio e ganha linhas quando você precisa de algo: um plugin, uma porta fixa, um caminho
+diferente para os arquivos finais. É configuração, não código de aplicação: você mexe nele raramente e
+sempre com um motivo.</p>
+
+<pre class="file" data-file="vite.config.js">import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()]
+});</pre>
+
+<p>São quatro linhas e três ideias. O <code>defineConfig</code> existe só para o editor ajudar com
+autocompletar — a configuração é o objeto que você passa para ele. O <code>plugins</code> recebe uma
+lista, e o <code>@vitejs/plugin-react</code> é o que ensina o Vite a transformar JSX e a ligar o HMR do
+React. Sem esse plugin, um arquivo <code>.jsx</code> não seria entendido como componente.</p>
+
+<p>Uma dúvida que aparece no primeiro dia: por que não preciso de <code>import React from "react"</code>
+no topo dos arquivos? Porque o plugin usa o <strong>runtime automático</strong> do JSX, que importa as
+funções necessárias por conta própria. Em código antigo você vai ver o import explícito; nos projetos
+novos ele é desnecessário.</p>
+
+<h2>5. Como o Vite serve a página sem empacotar</h2>
+
+<p>Aqui está a diferença que explica a velocidade. Ferramentas mais antigas, como o webpack, juntavam
+todos os arquivos num pacote antes de abrir a página: mudar uma linha podia custar segundos. O Vite faz
+outra coisa no desenvolvimento — ele não empacota nada. O navegador já sabe carregar módulos JavaScript
+(ESM), então o servidor entrega cada arquivo separado, do jeito que está no disco, e transforma apenas o
+que o navegador não entende: <code>.jsx</code>, <code>.tsx</code> e imports de CSS.</p>
+
+<p>Quando você abre a página, o <code>index.html</code> aponta para o <code>/src/main.jsx</code>; o
+navegador pede esse arquivo; o Vite transforma o JSX em JavaScript em milissegundos e responde; o
+<code>main.jsx</code> importa o <code>App.jsx</code>, e o ciclo continua arquivo por arquivo. Só o que a
+página usa é transformado. É por isso que o servidor sobe em 300 ms, mesmo num projeto com centenas de
+componentes: ele não fez nada ainda.</p>
+
+<dl class="anatomy">
+<dt>scaffold</dt>
+<dd>O ato de criar a pasta do projeto a partir de um modelo, com os arquivos de partida.</dd>
+<dt>template</dt>
+<dd>O conjunto de arquivos copiado: <code>react</code>, <code>react-ts</code>,
+<code>react-swc</code>.</dd>
+<dt>ESM</dt>
+<dd>Os módulos nativos do JavaScript: cada arquivo importa o que precisa, e o navegador carrega.</dd>
+<dt>servidor de desenvolvimento</dt>
+<dd>O programa que responde em <code>localhost</code> e transforma os arquivos sob demanda.</dd>
+<dt>HMR</dt>
+<dd>Hot Module Replacement: trocar um módulo na página aberta sem recarregar tudo.</dd>
+<dt>build</dt>
+<dd>A versão final, empacotada e minificada, gerada pelo <code>npm run build</code>.</dd>
+</dl>
+
+<p>Essa escolha tem uma consequência que confunde: no desenvolvimento, o que roda no navegador são
+dezenas de arquivos separados; na versão final, são poucos arquivos grandes. O comportamento do React é o
+mesmo, mas o número de requisições não. É por isso que "funciona no dev, quebra no build" é um sintoma
+possível — e por isso existe o <code>npm run preview</code>, que serve a versão final localmente antes de
+publicar.</p>
+
+<h2>6. O HMR na prática</h2>
+
+<p>Salvar um arquivo e ver a mudança sem apertar F5 é o recurso que mais muda o ritmo de trabalho. O
+nome técnico é <strong>Hot Module Replacement</strong>: o Vite avisa o navegador de que um módulo mudou,
+o navegador pede a versão nova e o React troca aquele componente na árvore, sem recarregar a página. O
+estado dos outros componentes fica onde está.</p>
+
+<p>Mas HMR não é mágica de preservar tudo. O que ele preserva é o estado dos componentes que
+<em>não</em> foram substituídos. Se você editar o componente que guarda o contador, ele é trocado, e o
+estado dele recomeça — porque a função nova é outra função, com outros valores iniciais. É por isso que,
+às vezes, um número "volta a zero sozinho" enquanto você trabalha: você editou justamente aquele
+componente.</p>
+
+<div class="tryreact" data-goal="clique:button.somar;;clique:button.somar;;texto:Cliques: 2;;clique:button.editar;;texto:edição;;texto:Cliques: 2;;clique:button.recarregar;;texto:Cliques: 0">
+  <p class="try-task">Os dois botões simulam o que acontece no navegador. "Editar" troca o título e o
+  contador deve continuar em 2 — é o HMR. "Recarregar" precisa zerar o contador, como um F5 de verdade.
+  Dê ao <code>&lt;Contador /&gt;</code> uma <code>key={reloads}</code> para o recarregar recriar o
+  componente.</p>
+  <pre class="jsx">function Contador() {
+  const [cliques, setCliques] = useState(0);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Cliques: {cliques}&lt;/p&gt;
+      &lt;button className="somar" onClick={() =&gt; setCliques(cliques + 1)}&gt;+1&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const [titulo, setTitulo] = useState("Pão do dia");
+  const [reloads, setReloads] = useState(0);
+
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;{titulo}&lt;/h2&gt;
+      &lt;Contador /&gt;
+      &lt;button className="editar" onClick={() =&gt; setTitulo("Pão do dia — edição")}&gt;Editar&lt;/button&gt;
+      &lt;button className="recarregar" onClick={() =&gt; setReloads(reloads + 1)}&gt;Recarregar&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h2&gt;Pão do dia&lt;/h2&gt;
+  &lt;div&gt;
+    &lt;p&gt;Cliques: 0&lt;/p&gt;
+    &lt;button class="somar"&gt;+1&lt;/button&gt;
+  &lt;/div&gt;
+  &lt;button class="editar"&gt;Editar&lt;/button&gt;
+  &lt;button class="recarregar"&gt;Recarregar&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Contador() {
+  const [cliques, setCliques] = useState(0);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Cliques: {cliques}&lt;/p&gt;
+      &lt;button className="somar" onClick={() =&gt; setCliques(cliques + 1)}&gt;+1&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const [titulo, setTitulo] = useState("Pão do dia");
+  const [reloads, setReloads] = useState(0);
+
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;{titulo}&lt;/h2&gt;
+      &lt;Contador key={reloads} /&gt;
+      &lt;button className="editar" onClick={() =&gt; setTitulo("Pão do dia — edição")}&gt;Editar&lt;/button&gt;
+      &lt;button className="recarregar" onClick={() =&gt; setReloads(reloads + 1)}&gt;Recarregar&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A <code>key</code> aqui não é sobre lista: é sobre identidade. Mudar a key diz ao React "este é outro
+componente, não o mesmo" — e ele descarta o antigo e cria um novo, com estado inicial. É exatamente o que
+um recarregamento de página faria com o componente inteiro. Trocar a key é uma forma controlada de forçar
+um recomeço, usada até em produção quando um formulário precisa limpar depois do envio.</p>
+
+<p>O HMR real tem um detalhe a mais: quando o arquivo editado tem erro de sintaxe, o Vite mostra a
+mensagem numa sobreposição e mantém a última versão boa na tela. Corrigiu, salvou, a página atualiza
+sozinha. Vale reparar nesse ciclo enquanto trabalha — ele é o motivo de o desenvolvimento em React ser
+tão rápido hoje.</p>
+
+<h2>7. O arquivo vite.config.js</h2>
+
+<p>A configuração é um objeto. Você acrescenta chaves conforme a necessidade, e cada uma tem um efeito
+claro. As que aparecem mais cedo na vida de um projeto são poucas:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Chave</th><th>O que faz</th><th>Exemplo</th></tr>
+<tr><td><code>plugins</code></td><td>liga transformações e recursos extras</td><td><code>[react()]</code></td></tr>
+<tr><td><code>server.port</code></td><td>fixa a porta do servidor de desenvolvimento</td><td><code>3000</code></td></tr>
+<tr><td><code>server.host</code></td><td>expõe o servidor na rede local</td><td><code>true</code></td></tr>
+<tr><td><code>server.open</code></td><td>abre o navegador sozinho ao subir</td><td><code>true</code></td></tr>
+<tr><td><code>base</code></td><td>prefixo dos caminhos, para publicar em subpasta</td><td><code>"/padaria/"</code></td></tr>
+<tr><td><code>build.outDir</code></td><td>pasta da versão final</td><td><code>"dist"</code></td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="vite.config.js">import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 3000,
+    open: true
+  }
+});</pre>
+
+<p>Configuração é lida quando o servidor sobe. Mudou o arquivo? O Vite reinicia sozinho — mas, se algo
+parecer ignorado, feche com <code>Ctrl + C</code> e suba de novo. Esse é o primeiro suspeito quando uma
+opção "não pega".</p>
+
+<p>Repare que o <code>server</code> é um objeto dentro do objeto. Essa forma aparece em toda a
+configuração do Vite: agrupar por assunto (<code>server</code>, <code>build</code>,
+<code>preview</code>, <code>resolve</code>). Quando você vir uma configuração grande na internet, leia
+por blocos, não linha a linha.</p>
+
+<h2>8. Porta, host e a rede local</h2>
+
+<p>Por padrão o servidor escuta em <code>localhost:5173</code>, e <code>localhost</code> quer dizer
+"este computador". Se a porta estiver ocupada por outro projeto, o Vite escolhe a próxima livre e avisa
+no terminal. Quando você precisa abrir a página no celular — para testar o layout de verdade —,
+<code>localhost</code> não serve: o celular não é o seu computador. É aí que entra o <code>--host</code>.</p>
+
+<pre class="term">$ npm run dev -- --host
+
+VITE v7.1.0  ready in 297 ms
+
+➜  Local:   http://localhost:5173/
+➜  Network: http://192.0.2.10:5173/
+➜  press h + enter to show help</pre>
+
+<p>A linha <em>Network</em> mostra o endereço na rede local. Digitando esse endereço no navegador do
+celular — no mesmo wi-fi —, a página abre. Se não abrir, o suspeito é o firewall do computador, que pode
+estar bloqueando a porta; liberar a rede privada resolve. Isso vale para desenvolvimento: em produção
+quem serve a página é a hospedagem.</p>
+
+<div class="tryreact" data-goal="texto:http://localhost:5175/">
+  <p class="try-task">A função <code>portaLivre</code> devolve sempre a porta pedida, mesmo quando ela
+  está ocupada. Faça ela pular para a primeira porta livre a partir de 5173 — com 5173 e 5174 ocupadas,
+  o endereço precisa ser <code>http://localhost:5175/</code>.</p>
+  <pre class="jsx">const ocupadas = [5173, 5174];
+
+function portaLivre(inicial, ocupadas) {
+  return inicial;
+}
+
+function App() {
+  const porta = portaLivre(5173, ocupadas);
+
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;VITE v7.1.0 ready&lt;/h2&gt;
+      &lt;p&gt;{"➜ Local: http://localhost:" + porta + "/"}&lt;/p&gt;
+      &lt;p&gt;➜ Network: use --host to expose&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h2&gt;VITE v7.1.0 ready&lt;/h2&gt;
+  &lt;p&gt;➜ Local: http://localhost:5173/&lt;/p&gt;
+  &lt;p&gt;➜ Network: use --host to expose&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const ocupadas = [5173, 5174];
+
+function portaLivre(inicial, ocupadas) {
+  let porta = inicial;
+
+  while (ocupadas.includes(porta)) {
+    porta = porta + 1;
+  }
+
+  return porta;
+}
+
+function App() {
+  const porta = portaLivre(5173, ocupadas);
+
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;VITE v7.1.0 ready&lt;/h2&gt;
+      &lt;p&gt;{"➜ Local: http://localhost:" + porta + "/"}&lt;/p&gt;
+      &lt;p&gt;➜ Network: use --host to expose&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O laço continua enquanto a porta estiver na lista, e para na primeira livre. É uma versão de brinquedo
+do que o Vite faz de verdade — a diferença é que ele descobre se a porta está ocupada tentando abrir um
+servidor nela, e não consultando uma lista. O conceito é o mesmo: procurar até achar, e mostrar no
+terminal a porta que valeu.</p>
+
+<p>Por isso a regra de ouro ao pedir ajuda: copie a linha que o terminal mostrou. Se o Vite disse 5174,
+o endereço é 5174 — abrir o 5173 antigo vai dar erro de conexão e você vai procurar o problema no lugar
+errado.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a versão do Node é antiga</h3>
+<p>O Vite 7 exige uma versão recente do Node. Com uma versão antiga, o comando falha antes de qualquer
+coisa com uma mensagem de versão mínima. A Ana atualizou o Node pelo site oficial, fechou e abriu o
+terminal — e o comando passou. "Feche e abra o terminal" não é superstição: o caminho do programa novo só
+entra na sessão seguinte.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o projeto nasceu dentro de outra pasta</h3>
+<p>Ela rodou o assistente dentro de <code>Documentos</code> e o Vite criou
+<code>Documentos/vitrine</code>. Depois rodou de novo, sem sair da pasta, e ficou com
+<code>Documentos/vitrine/vitrine</code>. O sintoma é um <code>npm install</code> que instala o dobro e um
+servidor que abre o projeto errado. O conserto é mover a pasta interna para cima e conferir se o
+<code>package.json</code> está na raiz.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o CSS do modelo brigando com o seu</h3>
+<p>O template traz <code>App.css</code> e <code>index.css</code> com estilos de exemplo, e eles valem
+para a página inteira. A Ana escreveu a vitrine e o layout saiu torto: o <code>body</code> tinha
+<code>display: flex</code> e <code>place-items: center</code> vindos do modelo. Apagar o conteúdo desses
+dois arquivos — mantendo os imports — é o primeiro passo de todo projeto novo.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. O que o <code>create-vite</code> faz?</p>
+<label><input type="radio" name="q1"> instala as dependências e sobe o servidor</label>
+<label><input type="radio" name="q1"> compila o projeto para produção</label>
+<label><input type="radio" name="q1"> copia um template de arquivos para uma pasta nova</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. Por que o servidor de desenvolvimento sobe rápido?</p>
+<label><input type="radio" name="q2"> porque não empacota: transforma cada arquivo quando o navegador pede</label>
+<label><input type="radio" name="q2"> porque usa uma versão mais leve do React</label>
+<label><input type="radio" name="q2"> porque guarda a página em cache no navegador</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. O que o <code>--host</code> faz?</p>
+<label><input type="radio" name="q3"> muda a porta do servidor para 80</label>
+<label><input type="radio" name="q3"> expõe o servidor na rede local, para abrir no celular</label>
+<label><input type="radio" name="q3"> publica o site na internet</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a variante sem TypeScript</h2>
+<p>Complete o comando que cria o projeto já com o template de React em JavaScript, sem passar pelo
+assistente:</p>
+<div class="ex-code">npm create vite@latest vitrine -- --template <input aria-label="resposta 1" data-answer="react" placeholder="..."></div>
+<p class="ex-dica">Dica: é o nome curto da variante com JavaScript. O de TypeScript tem
+<code>-ts</code> no fim, e o de SWC tem <code>-swc</code>.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O <code>npm create vite@latest</code> baixa o <code>create-vite</code>, pergunta framework e variante
+e copia um template para uma pasta nova. Ele não instala dependências: o <code>npm install</code> vem
+depois. A variante decide a extensão dos arquivos — <code>.jsx</code> para JavaScript,
+<code>.tsx</code> para TypeScript — e o SWC troca o compilador por um mais rápido, sem mudar o código que
+você escreve.</p>
+
+<p>No desenvolvimento, o Vite não empacota: entrega os módulos separados, transformando JSX sob demanda,
+e é por isso que sobe em centenas de milissegundos. O HMR troca o módulo alterado e preserva o estado do
+resto; editar o próprio componente do contador reinicia o contador. O <code>vite.config.js</code> é o
+lugar de plugins, porta, host e pasta de saída, e ele é lido quando o servidor sobe.</p>
+
+<p>Com o projeto criado e entendido, a pergunta seguinte é onde cada arquivo deve morar quando o site
+cresce: uma pasta para componentes, uma para telas, uma para hooks, imagens em dois lugares diferentes.
+É o assunto da próxima aula — a estrutura de um projeto que passa de dez arquivos.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>npm create vite@latest nome -- --template react</code> cria sem perguntas.</li>
+<li>Template <code>react</code> gera <code>.jsx</code>; <code>react-ts</code> gera <code>.tsx</code>.</li>
+<li>O <code>create-vite</code> não instala dependências: rode <code>npm install</code> depois.</li>
+<li>No dev o Vite não empacota: transforma cada arquivo quando o navegador pede.</li>
+<li>O plugin <code>@vitejs/plugin-react</code> é quem ensina o Vite a entender JSX.</li>
+<li>HMR troca o módulo e preserva o resto; editar o próprio componente reinicia o estado dele.</li>
+<li><code>key</code> diferente = componente novo, com estado inicial.</li>
+<li><code>vite.config.js</code>: <code>plugins</code>, <code>server</code>, <code>base</code>,
+<code>build</code>.</li>
+<li>Porta ocupada? O Vite escolhe a próxima e mostra no terminal — use a mostrada.</li>
+<li><code>--host</code> expõe na rede local para testar no celular.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

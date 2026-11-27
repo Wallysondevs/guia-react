@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Props | Guia React</title>
+<meta name="description" content="Consulta rápida de props no React 19: passar valores com aspas e chaves, desestruturar, valores padrão, callbacks, children, props drilling e erros comuns.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Props</span></h1>
+<p class="intro">Props são os dados que entram num componente: o que quem chama manda e o componente
+recebe como um objeto. Esta página é a consulta rápida do assunto — como passar texto, número, objeto,
+array e função, como receber com desestruturação e valor padrão, o que é <code>children</code>, quando o
+repasse vira <em>drilling</em> e quais erros aparecem no caminho. A Ana usa props desde que separou o
+cabeçalho da padaria em um componente; aqui está o resumo que ela consulta antes de desenhar um
+componente novo.</p>
+
+<div class="note">
+<strong>Como usar esta página</strong>
+<ul>
+  <li>As tabelas são para consultar no meio do código; cada linha aponta para a aula completa.</li>
+  <li>As duas caixas rodam React 19: edite, clique em Rodar e leia o HTML gerado no painel.</li>
+  <li>A ordem das seções vai do "como se passa" ao "como se desenha o contrato" de um componente.</li>
+</ul>
+</div>
+
+<h2>1. O que são props</h2>
+
+<p>Prop é o dado que um componente recebe de fora. Quem chama escreve os valores como atributos no JSX;
+o React junta tudo num objeto e entrega como primeiro parâmetro da função. É por isso que
+<code>&lt;Cartao nome="Ana" preco={2.5} /&gt;</code> chega no componente como
+<code>{ nome: "Ana", preco: 2.5 }</code>.</p>
+
+<p>Duas consequências vêm junto com essa definição. A primeira: props são <strong>somente leitura</strong>.
+O componente usa os valores, mas não os altera — quem manda no dado é quem chama. A segunda: mudar uma
+prop muda o componente, porque o React chama a função de novo com o objeto novo. Não existe "atualizar
+props" de dentro: existe outro render, com outros valores, vindo do pai.</p>
+
+<pre class="file" data-file="Cartao.jsx">function Cartao(props) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h3&gt;{props.nome}&lt;/h3&gt;
+      &lt;p&gt;R$ {props.preco.toFixed(2)}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Cartao nome="pão francês" preco={0.9} /&gt;
+      &lt;Cartao nome="pão de queijo" preco={2.5} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>O objeto de props é montado pelo React, não por você. Ele não tem métodos nem campos mágicos: é o que
+você escreveu, com as chaves iguais aos nomes dos atributos. <code>key</code> é a exceção — o React a
+consome para identificar o item e não a repassa. Se precisar do identificador dentro do componente, passe
+outro atributo, como <code>id</code>.</p>
+
+<p>Para conferir o que chegou, um <code>console.log(props)</code> na primeira linha do componente resolve.
+No console do navegador, o objeto aparece com as chaves na ordem em que foram escritas:</p>
+
+<pre class="term">props: { nome: "pão de queijo", preco: 2.5, destaque: true }</pre>
+
+<p>É um jeito rápido de descobrir o nome errado de uma prop: se a chave que você espera não está no
+objeto, o problema está na chamada, não no componente.</p>
+
+<dl class="anatomy">
+<dt>prop</dt>
+<dd>Um valor passado a um componente: <code>nome="Ana"</code>, <code>preco={2.5}</code>.</dd>
+<dt>props</dt>
+<dd>O objeto com todas as props recebidas. É o primeiro parâmetro da função componente.</dd>
+<dt>desestruturar</dt>
+<dd>Tirar os campos do objeto direto no parâmetro: <code>function Cartao({ nome, preco })</code>.</dd>
+<dt><code>children</code></dt>
+<dd>O que fica entre a abertura e o fechamento da tag. Chega como uma prop chamada <code>children</code>.</dd>
+<dt>callback</dt>
+<dd>Uma função passada como prop, que o filho chama para avisar o pai: <code>aoSalvar</code>.</dd>
+</dl>
+
+<p>Um detalhe de leitura: o nome da prop é livre, mas o objeto que chega é sempre um só. Não existe
+"segundo parâmetro" nem "props posicionais". Se o componente precisa de dois valores, são duas chaves do
+mesmo objeto.</p>
+
+<h2>2. Passando props</h2>
+
+<p>A regra é a mesma do JSX para qualquer atributo: <strong>aspas entregam texto, chaves entregam
+JavaScript</strong>. <code>nome="Ana"</code> passa a string; <code>preco={2.5}</code> passa o número;
+<code>itens={lista}</code> passa o array; <code>aoSalvar={salvar}</code> passa a função — sem parênteses,
+senão o que chega é o retorno dela.</p>
+
+<p>Booleanos têm atalho. <code>&lt;Cartao destaque /&gt;</code> é o mesmo que
+<code>destaque={true}</code>, e <code>destaque={false}</code> desliga. Já para um valor que pode ser
+<code>null</code> ou <code>undefined</code>, não existe atalho: escreva a chave com o valor.</p>
+
+<pre class="file" data-file="App.jsx">&lt;Cartao nome="pão de queijo" preco={2.5} /&gt;
+&lt;Cartao nome={produto.nome} preco={produto.preco} destaque /&gt;
+&lt;Cartao {...produto} /&gt;            {/* repassa nome, preco e o que mais houver */}
+&lt;Cartao nome={nome || "sem nome"} /&gt;
+
+{/* key é da lista, não é prop */}
+{produtos.map((p) =&gt; &lt;Cartao key={p.id} nome={p.nome} /&gt;)}</pre>
+
+<p>O spread <code>{...produto}</code> é útil quando o objeto já tem as chaves certas, e perigoso quando
+não tem: ele passa tudo, inclusive campos que o componente não espera. Em código de time, prefira listar
+as props que importam — quem lê a chamada entende o contrato sem abrir o objeto.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Como passar</th><th>Como receber</th><th>Aula</th></tr>
+<tr><td>texto</td><td><code>nome="Ana"</code></td><td><code>props.nome</code></td><td><a href="props.html">Props</a></td></tr>
+<tr><td>número</td><td><code>preco={2.5}</code></td><td><code>props.preco</code></td><td><a href="props.html">Props</a></td></tr>
+<tr><td>booleano</td><td><code>destaque</code> ou <code>destaque={false}</code></td><td><code>props.destaque</code></td><td><a href="props-padrao.html">Props Padrão</a></td></tr>
+<tr><td>objeto</td><td><code>pedido={pedido}</code></td><td><code>props.pedido.nome</code></td><td><a href="props-com-objetos.html">Props com Objetos</a></td></tr>
+<tr><td>array</td><td><code>itens={lista}</code></td><td><code>props.itens.map(...)</code></td><td><a href="listas-com-map.html">Listas com map</a></td></tr>
+<tr><td>função</td><td><code>aoSalvar={salvar}</code></td><td><code>onClick={props.aoSalvar}</code></td><td><a href="eventos-onclick.html">Eventos e onClick</a></td></tr>
+<tr><td>children</td><td><code>&lt;Cartao&gt;texto&lt;/Cartao&gt;</code></td><td><code>props.children</code></td><td><a href="children.html">O children</a></td></tr>
+</table>
+</div>
+
+<p>Repare na linha da função: <code>aoSalvar={salvar}</code> passa a referência; <code>aoSalvar={salvar()}</code>
+chama a função durante o render e passa o retorno. Esses parênteses a mais são um dos erros mais comuns do
+React, e o sintoma é estranho: a função roda sem clique, ou o componente quebra com um valor que não é
+função.</p>
+
+<h2>3. Recebendo props</h2>
+
+<p>Você pode receber o objeto inteiro e acessar cada campo, ou desestruturar no parâmetro. O segundo jeito
+é o mais usado porque deixa o corpo do componente limpo e o contrato visível na primeira linha.</p>
+
+<pre class="file" data-file="Cartao.jsx">// objeto inteiro
+function Cartao(props) {
+  return &lt;p&gt;{props.nome} — R$ {props.preco}&lt;/p&gt;;
+}
+
+// desestruturado no parâmetro (o mais comum)
+function Cartao({ nome, preco }) {
+  return &lt;p&gt;{nome} — R$ {preco}&lt;/p&gt;;
+}
+
+// com valor padrão e renomeação
+function Cartao({ nome = "pão francês", preco: valor }) {
+  return &lt;p&gt;{nome} — R$ {valor}&lt;/p&gt;;
+}</pre>
+
+<p>O nome <code>props</code> é convenção, não regra: qualquer nome serve, porque o parâmetro é só o
+primeiro argumento da função. A convenção existe para quem lê. Ao desestruturar, você troca o nome
+genérico pela lista de campos — e o contrato do componente aparece na primeira linha, sem precisar
+procurar <code>props.</code> pelo corpo.</p>
+
+<p>O valor padrão só vale quando a prop chega <code>undefined</code> — que é o caso de quem não passa
+nada. Se chegar <code>null</code>, o padrão não entra; para cobrir os dois, use
+<code>nome ?? "pão francês"</code> (o operador que só troca <code>null</code> e
+<code>undefined</code>). E cuidado com padrão em objeto: <code>{ pedido = {} }</code> protege contra
+<code>undefined</code>, mas não contra um objeto sem os campos — aí a proteção é no acesso,
+<code>pedido.nome ?? "sem nome"</code>.</p>
+
+<p>Um cuidado ao desestruturar: você está lendo os campos, não copiando os valores. Se a prop é um objeto e
+o componente faz <code>const { pedido } = props</code>, <code>pedido</code> continua sendo o mesmo objeto
+do pai — mexer nele é mexer no estado de quem chamou. Desestruturar deixa o código mais curto, mas não
+protege contra mutação; quem protege é a disciplina de tratar prop como somente leitura.</p>
+
+<p>Vale saber também que o objeto de props é novo a cada render do pai. Isso não muda nada para texto e
+número, mas importa quando a prop é objeto, array ou função: a identidade muda, e componentes
+embrulhados em <code>memo</code> redesenham. O assunto é das aulas de <a href="useMemo.html">useMemo</a> e
+<a href="useCallback.html">useCallback</a>; na prática, o que se estabiliza é o valor, não a prop.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>Quando usar</th><th>Aula</th></tr>
+<tr><td>objeto inteiro</td><td><code>function C(props)</code></td><td>quando precisa repassar <code>props</code> adiante</td><td><a href="props.html">Props</a></td></tr>
+<tr><td>desestruturar no parâmetro</td><td><code>function C({ nome })</code></td><td>padrão do dia a dia</td><td><a href="desestruturar-props.html">Desestruturar Props</a></td></tr>
+<tr><td>desestruturar no corpo</td><td><code>const { nome } = props;</code></td><td>quando há cálculo antes de usar</td><td><a href="desestruturar-props.html">Desestruturar Props</a></td></tr>
+<tr><td>valor padrão</td><td><code>{ nome = "pão" }</code></td><td>prop opcional, ausente ou <code>undefined</code></td><td><a href="props-padrao.html">Props Padrão</a></td></tr>
+<tr><td>renomear</td><td><code>{ preco: valor }</code></td><td>quando o nome interno precisa ser outro</td><td><a href="desestruturar-props.html">Desestruturar Props</a></td></tr>
+</table>
+</div>
+
+<h3>O primeiro erro de prop: o nome não bate</h3>
+
+<p>Se quem chama escreve <code>nomeCompleto</code> e o componente lê <code>nome</code>, a prop chega
+<code>undefined</code>. Não há erro de compilação: o JSX aceita qualquer atributo. O sintoma é uma tela
+com buraco ou um <code>TypeError</code> ao acessar um campo de algo que não existe.</p>
+
+<pre class="term">TypeError: Cannot read properties of undefined (reading 'nome')</pre>
+
+<p>A leitura: em algum lugar você fez <code>props.pedido.nome</code> e <code>props.pedido</code> é
+<code>undefined</code> — ou a prop não foi passada, ou o nome está diferente. Confira os dois lados: a
+chave na chamada e a chave no parâmetro. Em projeto com TypeScript, esse erro é pego no editor; em
+JavaScript puro, é o console que avisa, tarde.</p>
+
+<h2>4. Props com objetos, arrays e funções</h2>
+
+<p>Props não são só texto. Um objeto inteiro pode ir como prop, e o componente decide o que mostrar dele.
+A vantagem é passar uma coisa só; a desvantagem é que o contrato fica escondido — quem lê o componente
+precisa saber quais campos o objeto tem. Para dois ou três campos, listar as props costuma ser mais
+claro.</p>
+
+<pre class="file" data-file="Pedido.jsx">function Resumo({ pedido }) {
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{pedido.nome} — {pedido.itens.length} itens&lt;/p&gt;
+      &lt;p&gt;total: R$ {pedido.total.toFixed(2)}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Array entra do mesmo jeito, e o componente costuma usar <code>map</code> — com <code>key</code>, como
+manda o JSX. Função entra para o filho avisar o pai: o filho recebe <code>aoSalvar</code> e chama no
+clique; quem sabe o que fazer com o dado é o pai, que é o dono do estado. Esse é o caminho normal para
+"o filho pediu, o pai mudou".</p>
+
+<pre class="file" data-file="Linha.jsx">function Linha({ pao, aoPedir }) {
+  return (
+    &lt;li&gt;
+      {pao.nome}
+      &lt;button onClick={() =&gt; aoPedir(pao.id)}&gt;Pedir&lt;/button&gt;
+    &lt;/li&gt;
+  );
+}
+
+function Lista() {
+  const [pedidos, setPedidos] = useState([]);
+
+  function pedir(id) {
+    setPedidos((lista) =&gt; [...lista, id]);
+  }
+
+  return (
+    &lt;ul&gt;
+      {PAES.map((p) =&gt; (
+        &lt;Linha key={p.id} pao={p} aoPedir={pedir} /&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+
+<p>Repare no <code>onClick={() =&gt; aoPedir(pao.id)}</code>: sem a função intermediária, o
+<code>aoPedir</code> rodaria no render. É o mesmo cuidado do <code>salvar()</code> com parênteses, agora
+com um argumento. A função nova a cada render não é problema aqui, porque ela não atravessa um
+<code>memo</code>; se atravessar, a aula de <a href="useCallback.html">useCallback</a> explica o que
+fazer.</p>
+
+<div class="tryreact" data-goal="clique:#pedir;;texto:pedido feito">
+  <p class="try-task">O botão recebe <code>aoPedir</code>, mas o <code>App</code> não passa nada. Passe
+  <code>aoPedir={pedir}</code> e clique em Pedir: o aviso tem de aparecer.</p>
+  <pre class="jsx">function Botao({ aoPedir }) {
+  return (
+    &lt;button id="pedir" onClick={aoPedir}&gt;
+      Pedir pão de queijo
+    &lt;/button&gt;
+  );
+}
+
+function App() {
+  const [aviso, setAviso] = useState("");
+
+  function pedir() {
+    setAviso("pedido feito");
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;Botao /&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button id="pedir"&gt;Pedir pão de queijo&lt;/button&gt;
+  &lt;p&gt;&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Botao({ aoPedir }) {
+  return (
+    &lt;button id="pedir" onClick={aoPedir}&gt;
+      Pedir pão de queijo
+    &lt;/button&gt;
+  );
+}
+
+function App() {
+  const [aviso, setAviso] = useState("");
+
+  function pedir() {
+    setAviso("pedido feito");
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;Botao aoPedir={pedir} /&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Sem a prop, <code>aoPedir</code> é <code>undefined</code> e o <code>onClick</code> fica sem função: o
+clique não faz nada e não há erro. Com a prop, o filho chama a função do pai, o pai muda o estado e o
+aviso aparece. Repare que o filho não sabe o que é "pedido feito" — ele só avisa; quem decide o texto é
+quem é dono do estado.</p>
+
+<h2>5. children: o conteúdo entre as tags</h2>
+
+<p>O que você escreve entre a abertura e o fechamento de um componente vira a prop
+<code>children</code>. Serve para o componente embrulhar conteúdo que ele não conhece: um cartão, um
+painel, um modal. O componente cuida da moldura; quem chama decide o miolo.</p>
+
+<pre class="file" data-file="Cartao.jsx">function Cartao({ titulo, children }) {
+  return (
+    &lt;section className="cartao"&gt;
+      &lt;h3&gt;{titulo}&lt;/h3&gt;
+      {children}
+    &lt;/section&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;Cartao titulo="Promoções"&gt;
+      &lt;p&gt;pão de queijo pela metade do preço&lt;/p&gt;
+      &lt;button&gt;Aproveitar&lt;/button&gt;
+    &lt;/Cartao&gt;
+  );
+}</pre>
+
+<p><code>children</code> pode ser texto, um elemento ou vários — nesse caso, um array. Se o componente
+precisa de mais de um "buraco", use props normais com nomes próprios
+(<code>cabecalho</code>, <code>rodape</code>) e passe elementos por elas; é o padrão de slots da aula de
+<a href="slots-com-children.html">slots com children</a>. O que não vale é tentar adivinhar: se o
+componente precisa saber o que está em volta, o desenho está errado.</p>
+
+<p>Um detalhe que evita surpresa: nem sempre há children. Num componente usado como
+<code>&lt;Cartao titulo="Promoções" /&gt;</code>, a prop chega <code>undefined</code> — e desenhar
+<code>{children}</code> não quebra, porque <code>undefined</code> não vira texto. Só não conte com ele
+para medir altura, contar itens ou aplicar estilo: se o componente depende do conteúdo, peça o dado por
+prop e deixe o <code>children</code> para o que é decorativo ou opcional.</p>
+
+<h2>6. Props drilling e as saídas</h2>
+
+<p>Quando um dado precisa descer três ou quatro níveis, cada componente intermediário vira um carteiro:
+recebe a prop, não usa, repassa. Isso se chama <em>props drilling</em>. Com um nível ou dois, é o jeito
+mais simples e mais explícito; com cinco, vira ruído e todo mundo mexe em componentes que não têm nada a
+ver com o dado.</p>
+
+<p>As saídas são conhecidas. A primeira é <strong>composição</strong>: em vez de passar o dado até o
+fundo, passe o elemento pronto — quem está embaixo recebe o JSX e nem sabe de onde veio. A segunda é
+<strong>contexto</strong>: um valor disponível para toda a árvore, sem intermediários, bom para tema,
+idioma e usuário logado. A terceira é <strong>elevar o estado</strong> para um ancestral comum que faça
+o dado circular menos.</p>
+
+<pre class="file" data-file="Painel.jsx">function Painel() {
+  const [usuario, setUsuario] = useState("Ana");
+
+  return &lt;Barra usuario={usuario} /&gt;;
+}
+
+function Barra({ usuario }) {
+  // não usa usuario: só repassa
+  return &lt;Saudacao usuario={usuario} /&gt;;
+}
+
+function Saudacao({ usuario }) {
+  return &lt;p&gt;Olá, {usuario}&lt;/p&gt;;
+}</pre>
+
+<p>Esse é o drilling em forma pura: <code>Barra</code> recebe e entrega, sem usar. Um nível assim é
+aceitável; três iguais já pedem uma decisão. Se <code>Barra</code> só existe para posicionar
+<code>Saudacao</code>, a composição resolve — <code>&lt;Barra&gt;&lt;Saudacao usuario={usuario} /&gt;&lt;/Barra&gt;</code>
+—, porque o dado deixa de atravessar quem não o usa.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Saída</th><th>Quando resolve</th><th>Custo</th><th>Aula</th></tr>
+<tr><td>passar a prop</td><td>um ou dois níveis</td><td>nenhum; é explícito</td><td><a href="props.html">Props</a></td></tr>
+<tr><td>composição (<code>children</code>)</td><td>o intermediário só embrulha</td><td>muda o desenho dos componentes</td><td><a href="composicao.html">Composição</a></td></tr>
+<tr><td>contexto</td><td>o mesmo dado em muitos lugares distantes</td><td>mais indireção; difícil de rastrear se abusar</td><td><a href="contexto-introducao.html">Introdução ao Contexto</a></td></tr>
+<tr><td>elevar o estado</td><td>dois irmãos precisam do mesmo dado</td><td>o pai fica maior</td><td><a href="elevando-estado.html">Elevando o Estado</a></td></tr>
+</table>
+</div>
+
+<p>O critério prático: enquanto a prop é usada por quem a recebe, ela é informação. Quando ela só passa
+adiante, é transporte — e transporte em excesso pede uma das saídas acima. Não comece com contexto por
+precaução: comece passando props e mude quando o repasse doer de verdade.</p>
+
+<h2>7. Erros comuns com props</h2>
+
+<p>Estes são os que aparecem toda semana. O padrão é sempre o mesmo: o componente recebe algo diferente do
+que esperava, e o sintoma aparece longe da causa.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que aconteceu</th><th>Sintoma</th><th>Conserto</th><th>Aula</th></tr>
+<tr><td>alterar <code>props.nome</code></td><td>o valor muda até o próximo render; comportamento estranho</td><td>copiar para uma variável ou criar estado no pai</td><td><a href="props.html">Props</a></td></tr>
+<tr><td><code>aoSalvar={salvar()}</code></td><td>a função roda no render, não no clique</td><td>passar a referência: <code>aoSalvar={salvar}</code></td><td><a href="eventos-onclick.html">Eventos e onClick</a></td></tr>
+<tr><td>nome da prop diferente</td><td><code>undefined</code> na tela ou <code>TypeError</code></td><td>alinhar chamada e parâmetro</td><td><a href="props.html">Props</a></td></tr>
+<tr><td>esperar <code>key</code> como prop</td><td><code>props.key</code> é <code>undefined</code></td><td>passar <code>id</code> também</td><td><a href="a-key.html">A key</a></td></tr>
+<tr><td>valor padrão só no corpo</td><td>o padrão não vale para <code>null</code></td><td>usar <code>??</code> quando o <code>null</code> é possível</td><td><a href="props-padrao.html">Props Padrão</a></td></tr>
+<tr><td>passar objeto inteiro sem precisar</td><td>o filho conhece campos demais e quebra fácil</td><td>passar os dois ou três campos usados</td><td><a href="props-com-objetos.html">Props com Objetos</a></td></tr>
+</table>
+</div>
+
+<div class="tryreact" data-goal="texto:pão francês - R$ 2.5">
+  <p class="try-task">O cartão recebe só o <code>preco</code> e mostra um buraco no lugar do nome.
+  Desestruture no parâmetro com valor padrão: <code>{ nome = "pão francês", preco }</code>.</p>
+  <pre class="jsx">function Cartao(props) {
+  return (
+    &lt;p&gt;
+      {props.nome} - R$ {props.preco}
+    &lt;/p&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Cartao preco={2.5} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;- R$ 2.5&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Cartao({ nome = "pão francês", preco }) {
+  return (
+    &lt;p&gt;
+      {nome} - R$ {preco}
+    &lt;/p&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Cartao preco={2.5} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel do código inicial mostra o buraco antes do hífen: <code>undefined</code> não vira texto, então
+o JSX desenha só o espaço. Depois da solução, o padrão entra em ação e o nome aparece. Note que o
+<code>preco</code> continua vindo de fora — o padrão é só para a prop que pode faltar.</p>
+
+<h2>8. Desenhando o contrato de um componente</h2>
+
+<p>Antes de escrever o componente, responda quatro perguntas. Quais dados ele precisa para desenhar? Quais
+são opcionais e têm padrão? Ele precisa avisar o pai de algo, e por meio de qual função? Ele embrulha
+conteúdo de fora (<code>children</code>) ou é fechado?</p>
+
+<p>As respostas viram o parâmetro desestruturado. Um componente com duas props e um callback é fácil de
+usar e de testar; um com doze props é um formulário disfarçado. Se o número crescer, agrupe o que anda
+junto num objeto — mas só quando o objeto tiver um nome que faça sentido no domínio
+(<code>pedido</code>, <code>cliente</code>), não um <code>config</code> genérico.</p>
+
+<pre class="file" data-file="Botao.jsx">function Botao({
+  texto = "Salvar",
+  tipo = "button",
+  carregando = false,
+  aoClicar,
+  children,
+}) {
+  return (
+    &lt;button type={tipo} disabled={carregando} onClick={aoClicar}&gt;
+      {carregando ? "Salvando..." : texto}
+      {children}
+    &lt;/button&gt;
+  );
+}</pre>
+
+<p>Três convenções que economizam conversa no time. Primeira: nome de callback começa com
+<code>ao</code> — <code>aoSalvar</code>, <code>aoPedir</code>, <code>aoFechar</code> —, o que deixa claro
+que é uma função, e não um dado. Segunda: prop booleana tem nome positivo (<code>aberto</code>, não
+<code>naoFechado</code>), porque <code>aberto={false}</code> lê melhor que uma negação dupla. Terceira:
+valor padrão para tudo que é opcional, na própria desestruturação, para o componente nunca receber
+<code>undefined</code> onde espera texto.</p>
+
+<p>Com o contrato definido, o componente não precisa saber quem o chama. Ele recebe, desenha e avisa. Essa
+separação é o que permite reaproveitar o mesmo cartão na padaria, na livraria e no painel de pedidos: o
+dado muda, o componente não.</p>
+
+<h2>Resumo</h2>
+
+<p>Props são o objeto que o componente recebe de fora, montado a partir dos atributos do JSX. Aspas
+passam texto, chaves passam JavaScript; booleanos têm atalho e spread repassa um objeto inteiro. Do lado
+de dentro, desestruturar no parâmetro é o padrão, com valor padrão para o que é opcional e
+<code>??</code> quando o <code>null</code> é possível.</p>
+
+<p>Objetos, arrays e funções também são props. Função é o caminho do filho avisar o pai — sempre passada
+como referência, nunca chamada na hora. <code>children</code> é o conteúdo entre as tags e serve para
+embrulhar o que o componente não conhece. Quando o repasse de props vira transporte em vários níveis,
+as saídas são composição, contexto ou elevar o estado.</p>
+
+<p>Os erros vêm sempre do mesmo lugar: nome que não bate, função chamada com parênteses, <code>key</code>
+esperada como prop, prop mutada. Se o componente mostra <code>undefined</code>, confira primeiro a
+chamada; se quebra ao acessar um campo, confira se o objeto chegou; se a função roda sozinha, procure os
+parênteses.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Props chegam como um objeto só: o primeiro parâmetro da função.</li>
+<li>Props são somente leitura; quem muda o valor é quem chama.</li>
+<li>Aspas = texto; chaves = JavaScript; <code>{funcao}</code> sem parênteses.</li>
+<li>Desestruturar no parâmetro deixa o contrato visível.</li>
+<li>Valor padrão só cobre <code>undefined</code>; para <code>null</code>, use <code>??</code>.</li>
+<li><code>children</code> é o que fica entre as tags.</li>
+<li>Callback com prefixo <code>ao</code> e passado por referência.</li>
+<li><code>key</code> não é prop: passe <code>id</code> se precisar do valor.</li>
+<li>Drilling de um ou dois níveis é normal; acima disso, composição ou contexto.</li>
+<li>Prop mutada funciona até o próximo render — e depois vira bug.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

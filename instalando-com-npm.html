@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instalando com npm | Guia React</title>
+<meta name="description" content="Como o npm instala, atualiza e remove pacotes num projeto React: versões semver, dependências de desenvolvimento, package-lock, npm ci e os erros mais comuns.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Instalando com <span class="hl">npm</span></h1>
+<p class="intro">O projeto da Ana já existe na pasta do notebook, criado pelo Vite, e agora ela quer
+formatar as datas das encomendas — "sábado, 15 de março, 14h30" — sem escrever a lista de meses à mão.
+Alguém sugere <code>npm install date-fns</code>, ela roda, funciona. E ficam as perguntas: o que o npm
+acabou de fazer? De onde veio o <code>^</code> na versão? Por que a pasta ficou com centenas de
+pastas? Nesta aula ela entende o gerenciador de pacotes por dentro — instalar, versionar, separar o que
+é de desenvolvimento e sair dos erros clássicos.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O caminho de um pacote do catálogo público até o <code>node_modules</code>.</li>
+  <li>Como instalar, remover e atualizar pacotes com o npm.</li>
+  <li>A ler versões: <code>4.1.0</code>, <code>^4.1.0</code>, <code>~4.1.0</code> e o que cada símbolo aceita.</li>
+  <li>A diferença entre <code>dependencies</code> e <code>devDependencies</code> — e por que ela economiza espaço.</li>
+  <li>Para que serve o <code>package-lock.json</code> e quando usar <code>npm ci</code>.</li>
+  <li><code>npx</code>, o cache e os três erros que mais aparecem (404, ERESOLVE, permissão).</li>
+</ul>
+</div>
+
+<h2>1. A cena: a data que não formata</h2>
+
+<p>A página de encomendas da padaria mostra a data do jeito que o banco entrega:
+<code>2025-03-15T14:30:00.000Z</code>. É preciso, mas ninguém entende. A Ana quer "sábado, 15 de março,
+14h30". Ela tenta resolver sozinha: cria um array com os meses, outro com os dias da semana, divide a
+string por hífens e monta o texto. Funciona no primeiro teste e quebra no segundo — o horário vem em
+UTC, a padaria está em São Paulo, e três horas de diferença transformam o almoço em café da manhã.</p>
+
+<p>Uma amiga que programa em React diz: "instala o <code>date-fns</code>". A Ana abre o terminal na
+pasta do projeto e roda o comando. Em dois segundos aparece <code>added 1 package</code>, e o
+<code>format</code> da biblioteca resolve a data, o fuso e o idioma. Maravilhoso — e completamente
+misterioso. Ela quer entender o que aconteceu, porque a próxima coisa que precisa é de uma biblioteca de
+testes, e ela não quer descobrir na prática se vai quebrar o projeto.</p>
+
+<p>Este é o assunto da aula: o npm não é uma caixa-preta que baixa coisa. Ele tem um catálogo, um
+manifesto, um arquivo de trava e uma pasta de depósitos. Quem entende esses quatro lugares instala,
+atualiza e conserta sem medo — e sabe exatamente o que vai junto para produção e o que é só ferramenta
+de trabalho.</p>
+
+<h2>2. O caminho de um pacote até o seu projeto</h2>
+
+<p>Quando você digita <code>npm install date-fns</code>, o npm faz cinco coisas em sequência. Primeiro
+consulta o <strong>registro</strong>, o catálogo público onde os pacotes do mundo inteiro moram
+(<code>registry.npmjs.org</code>). Lá ele descobre qual é a versão mais nova que combina com o nome
+pedido e baixa o <strong>tarball</strong>, um arquivo compactado com o código daquele pacote. Depois
+extrai o conteúdo para dentro de <code>node_modules/date-fns</code>. Em quarto lugar anota a dependência
+no <code>package.json</code>, para que qualquer pessoa saiba que o projeto precisa dela. E, por último,
+atualiza o <code>package-lock.json</code> com a versão exata que foi baixada.</p>
+
+<p>Repare que são dois arquivos com papéis diferentes. O <code>package.json</code> é o <strong>manifesto
+do seu projeto</strong>: nome, tipo de módulo, dependências e scripts. Ele guarda a <em>intenção</em> —
+"este projeto usa date-fns na linha 4". O <code>package-lock.json</code> guarda o <em>resultado</em> —
+"a versão instalada foi a 4.1.0, e o arquivo dela tem este hash". Um é a receita; o outro é a foto do
+bolo.</p>
+
+<dl class="anatomy">
+<dt>registro</dt>
+<dd>O catálogo público de pacotes: <code>registry.npmjs.org</code>. É de lá que o npm baixa.</dd>
+<dt>pacote</dt>
+<dd>Uma pasta publicada com código, um <code>package.json</code> e uma versão. <code>date-fns</code>,
+<code>react</code>, <code>vite</code>.</dd>
+<dt>dependência</dt>
+<dd>Um pacote que o seu projeto usa. Fica listada no <code>package.json</code>.</dd>
+<dt>faixa de versão</dt>
+<dd>O intervalo aceito, escrito com símbolos: <code>^4.1.0</code>, <code>~4.1.0</code>,
+<code>4.1.0</code>.</dd>
+<dt>lockfile</dt>
+<dd>O <code>package-lock.json</code>: a árvore exata que foi instalada, com versões e hashes.</dd>
+<dt>node_modules</dt>
+<dd>A pasta onde o código baixado fica. Gerada pelo npm, nunca editada à mão.</dd>
+</dl>
+
+<p>Uma consequência prática que evita muita confusão: <code>node_modules</code> não vai para o
+Git. Ela é derivada do <code>package.json</code> mais o <code>package-lock.json</code> — e qualquer
+pessoa recria com um comando. Já os dois arquivos JSON vão para o Git, porque são o que conta a história
+do projeto. O <code>.gitignore</code> do modelo do Vite já traz <code>node_modules</code> na lista, e é
+por isso que você nunca o vê num repositório.</p>
+
+<h2>3. Instalando um pacote</h2>
+
+<p>O comando de instalação tem duas formas e um lugar certo para rodar. O lugar é a pasta do projeto:
+aquela que tem o <code>package.json</code>. Se você rodar em outra pasta, o npm cria um
+<code>package.json</code> novo ali ou reclama que não achou — os dois casos dão dor de cabeça. A forma
+curta é <code>npm i</code>, e a longa é <code>npm install</code>; as duas fazem a mesma coisa.</p>
+
+<pre class="term">$ npm install date-fns
+
+added 1 package, and audited 156 packages in 1s
+
+found 0 vulnerabilities</pre>
+
+<p>Três linhas, três informações. "added 1 package" diz quantos pacotes entraram — o
+<code>date-fns</code> não tem dependências próprias, então foi só ele. "audited 156 packages" conta
+todos os pacotes da árvore que o npm conferiu em busca de falhas conhecidas, incluindo os que já
+estavam lá. "found 0 vulnerabilities" é o resultado dessa conferência: nada grave encontrado. Se
+aparecesse um número ali, o npm imprimiria uma tabela com o pacote, a falha e a versão que corrige.</p>
+
+<p>Sem nome de pacote, <code>npm install</code> lê o <code>package.json</code> e instala tudo o que está
+listado. É o comando que você roda ao clonar um projeto ou ao trocar de computador — e é o mesmo que o
+Vite mandou rodar depois de criar o modelo. Com nome, ele acrescenta uma dependência nova e já a
+instala. Com <code>@versão</code>, escolhe uma versão específica: <code>npm install date-fns@3.6.0</code>.</p>
+
+<p>Uma nota sobre o que aparece no <code>package.json</code>: o npm escreve <code>^4.1.0</code>, não
+<code>4.1.0</code>. Ele assume que você quer receber correções e melhorias compatíveis, e o
+<code>^</code> é a forma de dizer isso. Para travar exatamente uma versão, use
+<code>npm install --save-exact date-fns</code> — que grava <code>4.1.0</code> sem símbolo nenhum. Vale
+saber por que você pode querer as duas coisas, e é o que vem a seguir.</p>
+
+<h2>4. As versões e os símbolos</h2>
+
+<p>Todo pacote do npm segue o <strong>semver</strong>, a convenção de três números:
+<code>maior.menor.correção</code>. Em <code>4.1.0</code>, o 4 é a versão maior, o 1 é a menor e o 0 é a
+correção. A promessa da convenção é simples: correção não quebra nada, versão menor acrescenta sem
+quebrar, versão maior pode quebrar. É essa promessa que permite escrever faixas em vez de versões
+exatas.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Símbolo</th><th>Aceita</th><th>Exemplo com 4.1.0</th></tr>
+<tr><td><code>^4.1.0</code></td><td>de 4.1.0 até antes de 5.0.0</td><td>4.1.0, 4.2.0, 4.9.9 — não 5.0.0</td></tr>
+<tr><td><code>~4.1.0</code></td><td>de 4.1.0 até antes de 4.2.0</td><td>4.1.0, 4.1.7 — não 4.2.0</td></tr>
+<tr><td><code>4.1.0</code></td><td>só essa versão</td><td>4.1.0</td></tr>
+<tr><td><code>&gt;=4.1.0 &lt;5</code></td><td>o intervalo escrito à mão</td><td>o mesmo que o <code>^</code></td></tr>
+<tr><td><code>*</code></td><td>qualquer versão</td><td>a mais nova que existir</td></tr>
+</table>
+</div>
+
+<p>O <code>^</code> é o padrão do npm porque ele equilibra as duas vontades: receber correções de
+segurança sem precisar reinstalar, e não ser surpreendido por uma mudança que quebra a API. O
+<code>~</code> é mais conservador e aparece quando até uma versão menor pode mudar comportamento. E a
+versão exata aparece quando você precisa reproduzir um bug ou congelar o projeto.</p>
+
+<p>A caixa abaixo simula a conta que o npm faz ao escolher entre as versões disponíveis. A função
+<code>aceita</code> decide se uma versão entra na faixa <code>^19.0.0</code> — hoje ela aceita tudo, e a
+missão é corrigir a regra do <code>^</code>: mesma versão maior, e nunca abaixo da mínima.</p>
+
+<div class="tryreact" data-goal="conta:.ok=2;;conta:.fora=2;;texto:19.2.0 — aceita">
+  <p class="try-task">A função <code>aceita</code> está devolvendo <code>true</code> para tudo, então as
+  quatro versões aparecem como aceitas. Implemente a regra do <code>^</code>: mesma versão maior e nunca
+  abaixo de 19.0.0. O resultado precisa ser 19.0.0 e 19.2.0 aceitas, 18.3.1 e 20.0.0 fora.</p>
+  <pre class="jsx">const versoes = ["18.3.1", "19.0.0", "19.2.0", "20.0.0"];
+
+function aceita(versao, faixa) {
+  const alvo = faixa.slice(1).split(".").map(Number);
+  const v = versao.split(".").map(Number);
+
+  return true;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;react ^19.0.0&lt;/h2&gt;
+      &lt;ul&gt;
+        {versoes.map((v) =&gt; (
+          &lt;li key={v} className={aceita(v, "^19.0.0") ? "ok" : "fora"}&gt;
+            {v} — {aceita(v, "^19.0.0") ? "aceita" : "fora da faixa"}
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h2&gt;react ^19.0.0&lt;/h2&gt;
+  &lt;ul&gt;
+    &lt;li class="ok"&gt;18.3.1 — aceita&lt;/li&gt;
+    &lt;li class="ok"&gt;19.0.0 — aceita&lt;/li&gt;
+    &lt;li class="ok"&gt;19.2.0 — aceita&lt;/li&gt;
+    &lt;li class="ok"&gt;20.0.0 — aceita&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const versoes = ["18.3.1", "19.0.0", "19.2.0", "20.0.0"];
+
+function aceita(versao, faixa) {
+  const alvo = faixa.slice(1).split(".").map(Number);
+  const v = versao.split(".").map(Number);
+
+  if (v[0] !== alvo[0]) {
+    return false;
+  }
+
+  if (v[1] !== alvo[1]) {
+    return v[1] &gt; alvo[1];
+  }
+
+  return v[2] &gt;= alvo[2];
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;react ^19.0.0&lt;/h2&gt;
+      &lt;ul&gt;
+        {versoes.map((v) =&gt; (
+          &lt;li key={v} className={aceita(v, "^19.0.0") ? "ok" : "fora"}&gt;
+            {v} — {aceita(v, "^19.0.0") ? "aceita" : "fora da faixa"}
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel depois da correção mostra a faixa funcionando: 18 fica de fora porque a versão maior é
+outra; 20 fica de fora porque subir a maior é justamente o que o <code>^</code> não faz. 19.0.0 entra
+porque é o piso; 19.2.0 entra porque está acima do piso e abaixo do teto. Essa é a conta que transforma
+um intervalo escrito no <code>package.json</code> numa versão concreta dentro do
+<code>node_modules</code>.</p>
+
+<p>Para ver o que está instalado hoje, sem adivinhar, existe um comando: <code>npm ls date-fns</code>
+mostra a versão resolvida e onde ela está na árvore. Com <code>npm ls</code> sozinho, o npm imprime a
+árvore inteira — útil quando duas bibliotecas pedem versões diferentes de uma terceira.</p>
+
+<h2>5. Dependências e devDependencies</h2>
+
+<p>Nem todo pacote tem o mesmo destino. O <code>react</code> e o <code>date-fns</code> precisam existir
+quando a página roda no navegador: são <strong>dependências</strong>. Já o <code>vite</code>, o
+<code>eslint</code> e o <code>vitest</code> só trabalham na sua máquina, durante o desenvolvimento, o
+build e os testes: são <strong>dependências de desenvolvimento</strong>. O npm separa as duas em listas
+diferentes, e a diferença importa na hora de publicar e de economizar tempo.</p>
+
+<pre class="file" data-file="package.json">{
+  "name": "padaria",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "date-fns": "^4.1.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.17.0",
+    "vite": "^7.1.0",
+    "vitest": "^2.1.8"
+  }
+}</pre>
+
+<p>O comando para instalar como desenvolvimento é o mesmo com uma bandeira:
+<code>npm install -D vitest</code>. O <code>-D</code> é o apelido de <code>--save-dev</code>, e o npm
+grava o pacote em <code>devDependencies</code>. Se você esquecer o <code>-D</code>, o vitest entra em
+<code>dependencies</code> e passa a ser instalado também em produção — onde ele não serve para nada e só
+ocupa espaço.</p>
+
+<p>Por que isso importa de verdade: quando o site vai para um servidor, dá para instalar só o que é de
+produção com <code>npm install --omit=dev</code> (ou usar <code>NODE_ENV=production</code>). A imagem
+fica menor, a instalação mais rápida e a superfície de ataque também. Em muitos serviços de hospedagem
+essa é a instalação padrão. Se uma biblioteca de desenvolvimento entrou na lista errada, o build passa a
+falhar no servidor com "Cannot find module" — e o motivo é esse.</p>
+
+<div class="tryreact" data-goal="conta:.deps li=4;;conta:.producao li=2">
+  <p class="try-task">A segunda lista deveria mostrar só o que sobra com
+  <code>npm install --omit=dev</code>, mas ela está repetindo os quatro pacotes. Filtre os que têm
+  <code>dev: false</code> — a lista de produção precisa ficar com dois itens.</p>
+  <pre class="jsx">const pacotes = [
+  { nome: "react", versao: "^19.0.0", dev: false },
+  { nome: "date-fns", versao: "^4.1.0", dev: false },
+  { nome: "vitest", versao: "^2.1.0", dev: true },
+  { nome: "eslint", versao: "^9.0.0", dev: true }
+];
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;package.json&lt;/h2&gt;
+      &lt;ul className="deps"&gt;
+        {pacotes.map((p) =&gt; (
+          &lt;li key={p.nome}&gt;{p.nome} {p.versao}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+
+      &lt;h2&gt;npm install --omit=dev&lt;/h2&gt;
+      &lt;ul className="producao"&gt;
+        {pacotes.map((p) =&gt; (
+          &lt;li key={p.nome}&gt;{p.nome} {p.versao}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h2&gt;package.json&lt;/h2&gt;
+  &lt;ul class="deps"&gt;
+    &lt;li&gt;react ^19.0.0&lt;/li&gt;
+    &lt;li&gt;date-fns ^4.1.0&lt;/li&gt;
+    &lt;li&gt;vitest ^2.1.0&lt;/li&gt;
+    &lt;li&gt;eslint ^9.0.0&lt;/li&gt;
+  &lt;/ul&gt;
+  &lt;h2&gt;npm install --omit=dev&lt;/h2&gt;
+  &lt;ul class="producao"&gt;
+    &lt;li&gt;react ^19.0.0&lt;/li&gt;
+    &lt;li&gt;date-fns ^4.1.0&lt;/li&gt;
+    &lt;li&gt;vitest ^2.1.0&lt;/li&gt;
+    &lt;li&gt;eslint ^9.0.0&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const pacotes = [
+  { nome: "react", versao: "^19.0.0", dev: false },
+  { nome: "date-fns", versao: "^4.1.0", dev: false },
+  { nome: "vitest", versao: "^2.1.0", dev: true },
+  { nome: "eslint", versao: "^9.0.0", dev: true }
+];
+
+function App() {
+  const producao = pacotes.filter((p) =&gt; p.dev === false);
+
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;package.json&lt;/h2&gt;
+      &lt;ul className="deps"&gt;
+        {pacotes.map((p) =&gt; (
+          &lt;li key={p.nome}&gt;{p.nome} {p.versao}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+
+      &lt;h2&gt;npm install --omit=dev&lt;/h2&gt;
+      &lt;ul className="producao"&gt;
+        {producao.map((p) =&gt; (
+          &lt;li key={p.nome}&gt;{p.nome} {p.versao}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O filtro roda antes do <code>map</code>, e a lista nasce já sem os pacotes de desenvolvimento. Note
+que a <code>key</code> continua sendo o nome do pacote: são os mesmos itens, só menos. E note também que
+não mudamos o <code>package.json</code> — a lista original continua inteira, porque é ela que descreve a
+intenção do projeto. A instalação de produção apenas ignora uma parte dela.</p>
+
+<p>Uma dúvida comum: e se um pacote for necessário só para o build, como o
+<code>@vitejs/plugin-react</code>? Ele é de desenvolvimento. A regra de bolso é perguntar "o navegador
+de quem visita o site precisa disso?". Se sim, é dependência; se só a sua máquina precisa, é
+desenvolvimento.</p>
+
+<h2>6. O package-lock.json e o npm ci</h2>
+
+<p>O <code>package-lock.json</code> parece um arquivo gigante e inútil: milhares de linhas com nomes,
+versões e hashes. Ele resolve um problema específico: garantir que <em>toda</em> instalação do mesmo
+projeto produza a mesma árvore. Sem ele, o <code>^4.1.0</code> de hoje baixaria uma versão e o de amanhã
+outra — e o bug que aparece na sua máquina não aparece na do cliente.</p>
+
+<p>O arquivo guarda a versão exata de cada pacote, inclusive os indiretos (as dependências das
+dependências), e um hash de integridade para conferir que o download é o mesmo. Ele é gerado sozinho no
+primeiro <code>npm install</code> e atualizado a cada instalação. A regra é simples: ele vai para o Git
+junto com o <code>package.json</code>, e você não o edita à mão.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Comando</th><th>O que faz</th><th>Quando usar</th></tr>
+<tr><td><code>npm install</code></td><td>instala o que falta e pode atualizar dentro das faixas</td><td>no dia a dia, ao acrescentar algo</td></tr>
+<tr><td><code>npm ci</code></td><td>apaga <code>node_modules</code> e instala exatamente o lock</td><td>no servidor de build, CI e ao clonar</td></tr>
+<tr><td><code>npm update</code></td><td>sobe versões dentro das faixas declaradas</td><td>de vez em quando, com os testes abertos</td></tr>
+<tr><td><code>npm outdated</code></td><td>lista o que está atrás da versão mais nova</td><td>antes de decidir atualizar</td></tr>
+</table>
+</div>
+
+<p>O <code>npm ci</code> é o comando preferido de qualquer automação por três motivos: ele não altera o
+lock, ele falha se o <code>package.json</code> e o lock estiverem fora de sincronia (o que é um aviso
+bom) e ele é mais rápido, porque remove a pasta e instala de uma vez, em vez de conferir item por item.
+Se você já viu um arquivo de CI começando com <code>npm ci</code>, agora sabe por quê.</p>
+
+<h2>7. Atualizando e removendo</h2>
+
+<p>Atualizar não é rodar <code>npm install</code> de novo e esperar o melhor. O caminho é perguntar
+primeiro o que está atrasado:</p>
+
+<pre class="term">$ npm outdated
+
+Package   Current  Wanted  Latest  Location
+react     18.3.1   18.3.1  19.2.0  node_modules/react
+vite       7.1.0    7.1.3   7.1.3  node_modules/vite
+eslint     9.12.0   9.15.1  9.15.1 node_modules/eslint
+date-fns   3.6.0    3.6.0   4.1.0  node_modules/date-fns</pre>
+
+<p>Três colunas merecem atenção. <strong>Current</strong> é o que está instalado agora.
+<strong>Wanted</strong> é a maior versão que a faixa do <code>package.json</code> permite — o que um
+<code>npm update</code> instalaria. <strong>Latest</strong> é a mais nova publicada, mesmo que esteja
+fora da faixa. Quando Current e Wanted são iguais e Latest é maior, significa que a faixa está segurando
+a atualização: só um <code>npm install pacote@latest</code> (ou editar a faixa) sobe a versão maior.</p>
+
+<p>O <code>npm update</code> respeita as faixas e sobe dentro delas; ele nunca pula para uma versão maior
+sozinho. Isso é proteção, não preguiça: versão maior pode quebrar a API, e quem decide correr esse risco
+é você, lendo o changelog e rodando os testes. Para remover um pacote, <code>npm uninstall vitest</code>
+tira do <code>node_modules</code>, do <code>package.json</code> e do lock de uma vez.</p>
+
+<div class="tryreact" data-goal="conta:.major=2;;conta:.minor=1;;conta:.patch=1;;texto:19.2.0">
+  <p class="try-task">A tabela classifica toda atualização como <code>patch</code>, mas cada tipo pede
+  uma decisão diferente. Compare a versão instalada com a última e marque <code>major</code> quando a
+  primeira casa mudar, <code>minor</code> quando mudar a segunda e <code>patch</code> quando só a
+  terceira mudar.</p>
+  <pre class="jsx">const pacotes = [
+  { nome: "react", instalada: "18.3.1", ultima: "19.2.0" },
+  { nome: "vite", instalada: "7.1.0", ultima: "7.1.3" },
+  { nome: "eslint", instalada: "9.12.0", ultima: "9.15.1" },
+  { nome: "date-fns", instalada: "3.6.0", ultima: "4.1.0" }
+];
+
+function tipo(instalada, ultima) {
+  return "patch";
+}
+
+function App() {
+  return (
+    &lt;table&gt;
+      &lt;thead&gt;
+        &lt;tr&gt;&lt;th&gt;pacote&lt;/th&gt;&lt;th&gt;instalada&lt;/th&gt;&lt;th&gt;última&lt;/th&gt;&lt;th&gt;tipo&lt;/th&gt;&lt;/tr&gt;
+      &lt;/thead&gt;
+      &lt;tbody&gt;
+        {pacotes.map((p) =&gt; {
+          const t = tipo(p.instalada, p.ultima);
+          return (
+            &lt;tr key={p.nome} className={t}&gt;
+              &lt;td&gt;{p.nome}&lt;/td&gt;
+              &lt;td&gt;{p.instalada}&lt;/td&gt;
+              &lt;td&gt;{p.ultima}&lt;/td&gt;
+              &lt;td&gt;{t}&lt;/td&gt;
+            &lt;/tr&gt;
+          );
+        })}
+      &lt;/tbody&gt;
+    &lt;/table&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;table&gt;
+  &lt;thead&gt;
+    &lt;tr&gt;
+      &lt;th&gt;pacote&lt;/th&gt;
+      &lt;th&gt;instalada&lt;/th&gt;
+      &lt;th&gt;última&lt;/th&gt;
+      &lt;th&gt;tipo&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody&gt;
+    &lt;tr class="patch"&gt;
+      &lt;td&gt;react&lt;/td&gt;
+      &lt;td&gt;18.3.1&lt;/td&gt;
+      &lt;td&gt;19.2.0&lt;/td&gt;
+      &lt;td&gt;patch&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr class="patch"&gt;
+      &lt;td&gt;vite&lt;/td&gt;
+      &lt;td&gt;7.1.0&lt;/td&gt;
+      &lt;td&gt;7.1.3&lt;/td&gt;
+      &lt;td&gt;patch&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr class="patch"&gt;
+      &lt;td&gt;eslint&lt;/td&gt;
+      &lt;td&gt;9.12.0&lt;/td&gt;
+      &lt;td&gt;9.15.1&lt;/td&gt;
+      &lt;td&gt;patch&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr class="patch"&gt;
+      &lt;td&gt;date-fns&lt;/td&gt;
+      &lt;td&gt;3.6.0&lt;/td&gt;
+      &lt;td&gt;4.1.0&lt;/td&gt;
+      &lt;td&gt;patch&lt;/td&gt;
+    &lt;/tr&gt;
+  &lt;/tbody&gt;
+&lt;/table&gt;
+</pre>
+  <pre class="solucao">const pacotes = [
+  { nome: "react", instalada: "18.3.1", ultima: "19.2.0" },
+  { nome: "vite", instalada: "7.1.0", ultima: "7.1.3" },
+  { nome: "eslint", instalada: "9.12.0", ultima: "9.15.1" },
+  { nome: "date-fns", instalada: "3.6.0", ultima: "4.1.0" }
+];
+
+function tipo(instalada, ultima) {
+  const a = instalada.split(".").map(Number);
+  const b = ultima.split(".").map(Number);
+
+  if (a[0] !== b[0]) {
+    return "major";
+  }
+
+  if (a[1] !== b[1]) {
+    return "minor";
+  }
+
+  return "patch";
+}
+
+function App() {
+  return (
+    &lt;table&gt;
+      &lt;thead&gt;
+        &lt;tr&gt;&lt;th&gt;pacote&lt;/th&gt;&lt;th&gt;instalada&lt;/th&gt;&lt;th&gt;última&lt;/th&gt;&lt;th&gt;tipo&lt;/th&gt;&lt;/tr&gt;
+      &lt;/thead&gt;
+      &lt;tbody&gt;
+        {pacotes.map((p) =&gt; {
+          const t = tipo(p.instalada, p.ultima);
+          return (
+            &lt;tr key={p.nome} className={t}&gt;
+              &lt;td&gt;{p.nome}&lt;/td&gt;
+              &lt;td&gt;{p.instalada}&lt;/td&gt;
+              &lt;td&gt;{p.ultima}&lt;/td&gt;
+              &lt;td&gt;{t}&lt;/td&gt;
+            &lt;/tr&gt;
+          );
+        })}
+      &lt;/tbody&gt;
+    &lt;/table&gt;
+  );
+}</pre>
+</div>
+
+<p>Com a classificação certa, a tabela vira uma ferramenta de decisão. Dois <code>major</code> (react e
+date-fns) pedem leitura de changelog, testes e um plano; um <code>minor</code> (eslint) costuma ser
+seguro e traz regras novas; um <code>patch</code> (vite) é o caso de atualizar sem pensar duas vezes. É
+muito mais útil do que "tem atualização?" — a pergunta certa é "que tipo de atualização?".</p>
+
+<h2>8. npx e o cache</h2>
+
+<p>Existe um comando que parece instalar e não instala: <code>npx</code>. Ele executa o programa de um
+pacote sem acrescentá-lo ao projeto. Se o pacote não estiver no <code>node_modules</code>, o npx baixa
+para um cache temporário, roda e segue a vida. É assim que se usam ferramentas de uma vez só:</p>
+
+<pre class="term">$ npx vite --version
+
+vite/7.1.0 linux-x64 node-v22.14.0</pre>
+
+<p>O caso mais comum no começo é <code>npx create-vite@latest padaria</code>, que roda o assistente de
+criação sem instalar o <code>create-vite</code> globalmente. Também aparece quando um tutorial manda
+<code>npx prettier --write .</code> e você não quer o prettier no <code>package.json</code>. A regra:
+ferramenta que o projeto usa sempre vira dependência de desenvolvimento; ferramenta de uma vez só pode
+ser <code>npx</code>.</p>
+
+<p>Sobre o cache: o npm guarda os tarballs baixados numa pasta do usuário e reaproveita nas próximas
+instalações. É por isso que o segundo <code>npm install</code> do mesmo projeto é mais rápido. Quando
+algo parece corrompido, <code>npm cache verify</code> confere a integridade; o
+<code>npm cache clean --force</code> existe, mas raramente é a solução — na maioria das vezes, apagar
+<code>node_modules</code> e o lock e instalar de novo resolve sem mexer no cache global.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o nome errado</h3>
+<p>A Ana digitou <code>npm install date-fsn</code> e recebeu <code>404 Not Found</code>. O npm procurou
+um pacote que não existe no registro. A mensagem mostra a URL consultada, e é ali que se vê o erro de
+digitação. Antes de culpar a rede, confira o nome no site do npm e a ortografia; se o pacote for privado,
+confira também se você está autenticado.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o conflito de versões</h3>
+<p>Ela tentou instalar uma biblioteca de calendário que declarava suporte só ao React 18, e o npm
+respondeu <code>ERESOLVE unable to resolve dependency tree</code>. É o npm avisando que dois pacotes
+discordam sobre a versão de um terceiro. O caminho é procurar a versão da biblioteca que suporte o React
+19 ou conversar com quem mantém; <code>--force</code> e <code>--legacy-peer-deps</code> existem, mas
+escondem o problema em vez de resolvê-lo.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: permissão negada</h3>
+<p>Um tutorial mandou rodar <code>sudo npm install -g algo</code>, e a partir dali a pasta do projeto
+passou a pertencer ao root. O sintoma é <code>EACCES</code> em toda instalação seguinte. O conserto é
+nunca usar <code>sudo</code> com npm: reinstale o Node pelo site oficial ou por um gerenciador de
+versões, e, se a pasta já estiver com dono errado, corrija o dono. Instalação global também costuma ser
+desnecessária — quase tudo cabe em dependência de desenvolvimento.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que <code>npm install -D vitest</code> faz?</p>
+<label><input type="radio" name="q1"> instala o vitest globalmente, para todos os projetos</label>
+<label><input type="radio" name="q1"> instala o vitest como dependência de desenvolvimento</label>
+<label><input type="radio" name="q1"> baixa o vitest sem anotar no <code>package.json</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que o <code>^4.1.0</code> aceita?</p>
+<label><input type="radio" name="q2"> só a versão 4.1.0</label>
+<label><input type="radio" name="q2"> qualquer versão 4.x, inclusive 5.0.0</label>
+<label><input type="radio" name="q2"> de 4.1.0 até antes de 5.0.0</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Quando usar <code>npm ci</code>?</p>
+<label><input type="radio" name="q3"> no servidor de build e no CI, para instalar exatamente o lock</label>
+<label><input type="radio" name="q3"> para acrescentar um pacote novo ao projeto</label>
+<label><input type="radio" name="q3"> para atualizar as versões maiores com segurança</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a bandeira do desenvolvimento</h2>
+<p>Complete o comando que instala o <code>vitest</code> na lista de dependências de desenvolvimento:</p>
+<div class="ex-code">npm install <input aria-label="resposta 1" data-answer="-D|--save-dev" placeholder="..."> vitest</div>
+<p class="ex-dica">Dica: é a bandeira curta que o npm traduz para <code>--save-dev</code>. Sem ela, o
+pacote entra em <code>dependencies</code> e passa a ser instalado também em produção, onde não serve para
+nada.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O npm é o gerenciador de pacotes que vem com o Node. Ele consulta o registro, baixa o pacote, extrai
+em <code>node_modules</code>, anota a intenção no <code>package.json</code> e o resultado exato no
+<code>package-lock.json</code>. Instalar é <code>npm install nome</code>; instalar como ferramenta de
+trabalho é <code>npm install -D nome</code>; remover é <code>npm uninstall nome</code>. Os dois JSON vão
+para o Git, a pasta <code>node_modules</code> não.</p>
+
+<p>Versões seguem o semver: maior, menor, correção. O <code>^</code> aceita tudo abaixo da próxima
+maior; o <code>~</code> aceita tudo abaixo da próxima menor; sem símbolo, é exatamente aquela versão. O
+<code>npm outdated</code> mostra installed, wanted e latest, e é a partir dele que você decide o que
+atualizar. O <code>npm update</code> respeita as faixas; pular de maior é uma decisão consciente.</p>
+
+<p>E o <code>package-lock.json</code> é o que faz o projeto instalar igual em qualquer máquina — por
+isso o <code>npm ci</code> é o comando das automações. Com essas peças, a Ana instala a biblioteca de
+testes sem medo, sabe onde ela entrou e o que vai junto para produção. A próxima aula olha para o outro
+lado: o projeto que o Vite criou, arquivo por arquivo, e o que cada escolha do assistente significa.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>npm install nome</code> instala e anota em <code>dependencies</code>.</li>
+<li><code>npm install -D nome</code> instala como ferramenta, em <code>devDependencies</code>.</li>
+<li><code>^4.1.0</code> aceita de 4.1.0 até antes de 5.0.0; <code>~4.1.0</code> até antes de 4.2.0.</li>
+<li><code>npm outdated</code> mostra current, wanted e latest.</li>
+<li><code>npm update</code> sobe dentro das faixas; versão maior é decisão sua.</li>
+<li><code>package-lock.json</code> trava a árvore exata e vai para o Git.</li>
+<li><code>node_modules</code> é depósito: não edite, não versione, pode apagar e recriar.</li>
+<li><code>npm ci</code> instala exatamente o lock — o comando do CI.</li>
+<li><code>npx</code> roda uma ferramenta sem acrescentá-la ao projeto.</li>
+<li>404 é nome errado; ERESOLVE é conflito de versões; EACCES é permissão — e nunca se usa sudo.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

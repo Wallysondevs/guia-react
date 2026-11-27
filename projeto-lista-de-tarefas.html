@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lista de Tarefas | Guia React</title>
+<meta name="description" content="Projeto completo de uma lista de tarefas em React: o array de objetos no estado, map com key, adicionar com spread, concluir com map e os contadores derivados.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Lista de <span class="hl">Tarefas</span></h1>
+<p class="intro">A Ana mantém o caderno de tarefas da padaria aberto no balcão: abrir o forno, lembrar da
+encomenda da dona Marta, comprar farinha. O caderno funciona, mas some quando ela sai para entregar pão e
+volta com a página molhada. Neste projeto ela constrói a lista de tarefas no navegador, do zero ao
+acabamento: decide o formato dos dados, desenha a lista, aprende a adicionar sem estragar o estado,
+conclui e desfaz, conta o que falta e vê a mensagem certa quando não há nada. Cada caixa roda um pedaço
+do app de verdade.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como decidir a forma dos dados antes de escrever a tela.</li>
+  <li>Por que cada tarefa é um objeto com <code>id</code>, <code>texto</code> e <code>feita</code>.</li>
+  <li>Como desenhar a lista com <code>map</code> e <code>key</code>.</li>
+  <li>Como adicionar com <code>[...tarefas, nova]</code> em vez de <code>push</code>.</li>
+  <li>De onde vem um <code>id</code> que não muda quando a lista muda.</li>
+  <li>Como concluir e desfazer trocando um item por outro com <code>map</code>.</li>
+  <li>Quais números da tela são estado e quais são conta feita no render.</li>
+  <li>O que quebra em cada etapa — e por quê.</li>
+</ul>
+</div>
+
+<h2>1. A cena e o escopo do app</h2>
+
+<p>A padaria tem tarefas demais para a memória da Ana. Ela quer uma tela com o nome da padaria, um campo
+para escrever a tarefa, um botão para acrescentar, a lista do que existe e um jeito de marcar o que já foi
+feito. Também quer ver, de relance, quantas faltam. Nada de login, nada de servidor: a lista vive enquanto
+a página está aberta.</p>
+
+<p>Essa última frase é uma decisão de projeto, e decisões de projeto vêm antes do código. Se a lista vive
+na memória, recarregar a página apaga tudo — e isso é aceitável para a primeira versão. Guardar no
+<code>localStorage</code> é uma evolução, não um requisito. Escrever o escopo agora evita a armadilha de
+começar pelo banco de dados e nunca chegar à tela.</p>
+
+<p>O app tem quatro operações: listar, adicionar, concluir e desfazer. Tudo o mais — filtro por status,
+ordem alfabética, prazo — é acabamento. Neste projeto, o acabamento é o filtro e os contadores, no fim.
+Cada operação vai virar uma função pequena que recebe o que precisa e devolve uma lista nova para o
+estado.</p>
+
+<p>Antes de abrir o editor, vale desenhar a tela em três pedaços: o cabeçalho com o título e o contador, o
+formulário com o campo e o botão, e a lista. Cada pedaço vai virar um componente quando o arquivo crescer
+— mas não comece por aí. Primeiro faça funcionar num componente só; depois separe. A ordem de montagem
+deste projeto é essa, e é a mesma que funciona em qualquer app pequeno.</p>
+
+<h2>2. Os dados primeiro: a forma da tarefa</h2>
+
+<p>A pergunta inicial não é "como desenho a lista?", é "o que é uma tarefa?". Se você guardar só o texto,
+não tem como saber se ela foi feita nem como diferenciar duas tarefas iguais. Se guardar o texto e um
+número solto, o número não diz nada. A forma que resolve o app inteiro é um objeto com três campos: um
+identificador, o texto e um booleano.</p>
+
+<dl class="anatomy">
+<dt>tarefa</dt>
+<dd>Um objeto com os dados de uma linha da lista: <code>{ id: 1, texto: "Comprar farinha", feita:
+false }</code>.</dd>
+<dt><code>id</code></dt>
+<dd>Um valor único e estável que identifica a tarefa mesmo depois que o texto muda. É a <code>key</code>
+do <code>map</code> e o que o botão de concluir recebe.</dd>
+<dt><code>texto</code></dt>
+<dd>O que aparece na tela. Pode mudar sem que a identidade da tarefa mude.</dd>
+<dt><code>feita</code></dt>
+<dd>O booleano que diz se a tarefa foi concluída. É o que a caixa de marcar mostra e altera.</dd>
+<dt>lista de tarefas</dt>
+<dd>O array no estado: <code>useState(tarefasIniciais)</code>. Quem manda na tela é ele, não o
+caderno.</dd>
+</dl>
+
+<p>Com a forma definida, os dados iniciais ficam legíveis:</p>
+
+<pre class="file" data-file="App.jsx">const tarefasIniciais = [
+  { id: 1, texto: "Abrir o forno às 5h", feita: true },
+  { id: 2, texto: "Encomenda da dona Marta", feita: false },
+  { id: 3, texto: "Comprar farinha", feita: false },
+];</pre>
+
+<p>Três decisões aparecem nesse array, e todas têm consequência. A primeira é guardar objetos em vez de
+strings: o objeto carrega o estado da tarefa junto com o texto. A segunda é ter <code>id</code> desde o
+começo: sem ele, concluir uma tarefa específica vira uma comparação por texto, que quebra quando duas
+tarefas são iguais. A terceira é usar <code>feita: false</code> em vez de deixar o campo vazio: um booleano
+sempre tem valor, e a caixa de marcar espera <code>true</code> ou <code>false</code>, nunca
+<code>undefined</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Decisão</th><th>Se você escolher o caminho fácil</th><th>O que acontece depois</th></tr>
+<tr><td>guardar só o texto</td><td><code>["Comprar farinha"]</code></td><td>não dá para marcar como feita nem diferenciar duas iguais</td></tr>
+<tr><td>guardar objeto sem id</td><td><code>{ texto, feita }</code></td><td>a <code>key</code> vira o texto, e editar o texto embaralha a lista</td></tr>
+<tr><td>usar o índice como id</td><td><code>id: indice</code></td><td>remover uma tarefa muda o id de todas as seguintes</td></tr>
+<tr><td>objeto com id, texto e feita</td><td><code>{ id, texto, feita }</code></td><td>lista, conclusão e remoção funcionam sem gambiarra</td></tr>
+</table>
+</div>
+
+<p>O array inicial fica fora do componente porque é constante: ele não muda, o que muda é a cópia que o
+<code>useState</code> guarda. Isso também deixa claro o que é dado de partida e o que é estado vivo. Quando
+o app crescer, esse array vira a resposta de uma API — e o resto do componente não precisa saber a
+diferença.</p>
+
+<h2>3. A lista na tela</h2>
+
+<p>Com os dados prontos, a primeira tela é só a lista. A Ana começou escrevendo os <code>li</code> à mão,
+copiando o texto de cada tarefa. Funciona até a terceira, e aí ela esquece uma. O <code>map</code> resolve —
+a aula de <a href="listas-com-map.html">listas com map</a> mostra o passo a passo. Cada objeto vira um
+<code>li</code>, e a lista na tela passa a ser uma consequência do array.</p>
+
+<p>A caixa abaixo tem o array com três tarefas e uma lista escrita à mão com duas. Complete a lista com
+<code>map</code>, dando a cada <code>li</code> uma <code>key</code> igual ao <code>id</code>:</p>
+
+<div class="tryreact" data-goal="conta:li=3;;texto:Comprar farinha">
+  <p class="try-task">Os três itens estão no array, mas a lista só tem dois. Gere um <code>li</code> por
+  tarefa com <code>map</code> e <code>key={tarefa.id}</code>, mostrando <code>tarefa.texto</code>.</p>
+  <pre class="jsx">const tarefasIniciais = [
+  { id: 1, texto: "Abrir o forno às 5h", feita: true },
+  { id: 2, texto: "Encomenda da dona Marta", feita: false },
+  { id: 3, texto: "Comprar farinha", feita: false },
+];
+
+function App() {
+  const [tarefas, setTarefas] = useState(tarefasIniciais);
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Tarefas da padaria&lt;/h2&gt;
+      &lt;p&gt;{tarefas.length} tarefas&lt;/p&gt;
+      &lt;ul&gt;
+        &lt;li&gt;Abrir o forno às 5h&lt;/li&gt;
+        &lt;li&gt;Encomenda da dona Marta&lt;/li&gt;
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h2&gt;Tarefas da padaria&lt;/h2&gt;
+  &lt;p&gt;3 tarefas&lt;/p&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Abrir o forno às 5h&lt;/li&gt;
+    &lt;li&gt;Encomenda da dona Marta&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const tarefasIniciais = [
+  { id: 1, texto: "Abrir o forno às 5h", feita: true },
+  { id: 2, texto: "Encomenda da dona Marta", feita: false },
+  { id: 3, texto: "Comprar farinha", feita: false },
+];
+
+function App() {
+  const [tarefas, setTarefas] = useState(tarefasIniciais);
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Tarefas da padaria&lt;/h2&gt;
+      &lt;p&gt;{tarefas.length} tarefas&lt;/p&gt;
+      &lt;ul&gt;
+        {tarefas.map((tarefa) =&gt; (
+          &lt;li key={tarefa.id}&gt;{tarefa.texto}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No painel aparecem os três <code>li</code>, na ordem do array. Repare que a contagem já estava certa
+antes do conserto — o <code>{tarefas.length} tarefas</code> lê do array, não da lista desenhada à mão. É
+uma pista útil: quando o número e a lista discordam, um dos dois não está lendo o estado. Neste caso, o
+número estava certo e a lista era cópia.</p>
+
+<p>A <code>key</code> não aparece no HTML gerado. Ela é uma identidade para o React: quando a lista muda,
+ele compara as chaves para saber qual item saiu, entrou ou mudou de posição. Com o <code>id</code> estável,
+uma tarefa concluída continua sendo a mesma tarefa. Sem <code>key</code>, o console avisa em
+desenvolvimento e a ordem pode se confundir em listas que mudam — e essa lista muda a cada clique.</p>
+
+<p>Para conferir o que o estado guarda, um <code>console.log</code> antes do <code>return</code> mostra a
+lista inteira:</p>
+
+<pre class="term">tarefas.length: 3
+tarefas[2].texto: "Comprar farinha"
+tarefas[0].feita: true</pre>
+
+<p>Essas linhas são a fonte da verdade. Se a tela mostrar algo diferente, o problema está entre o estado e
+o JSX — <code>map</code> errado, <code>key</code> repetida, condição invertida —, não no array.</p>
+
+<h2>4. Adicionar sem estragar o estado</h2>
+
+<p>Agora a operação que mais ensina sobre React: adicionar. A tentação é usar <code>push</code>, que é o
+método que "acrescenta no fim". Só que <code>push</code> muda o array original e devolve o novo tamanho.
+Se você fizer <code>tarefas.push(nova)</code> e depois <code>setTarefas(tarefas)</code>, entrega ao React o
+<strong>mesmo</strong> array de antes — ele compara e conclui que nada mudou, então não redesenha. A tela
+fica velha com o estado novo.</p>
+
+<p>A caixa abaixo tem esse bug de propósito. Escreva uma tarefa, clique em Adicionar e veja que nada
+acontece. Depois construa uma lista nova com spread e faça o campo esvaziar:</p>
+
+<div class="tryreact" data-goal="digite:input=Encomenda do seu João;;clique:button;;texto:Encomenda do seu João;;conta:li=4">
+  <p class="try-task">O botão usa <code>push</code> e a lista não muda. Acrescente a tarefa construindo
+  uma lista nova (<code>[...tarefas, novaTarefa]</code>), ignore o texto vazio e limpe o campo depois de
+  adicionar.</p>
+  <pre class="jsx">const tarefasIniciais = [
+  { id: 1, texto: "Abrir o forno às 5h", feita: true },
+  { id: 2, texto: "Encomenda da dona Marta", feita: false },
+  { id: 3, texto: "Comprar farinha", feita: false },
+];
+
+function App() {
+  const [tarefas, setTarefas] = useState(tarefasIniciais);
+  const [nova, setNova] = useState("");
+
+  function adicionar() {
+    tarefas.push({ id: Date.now(), texto: nova, feita: false });
+    setTarefas(tarefas);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Tarefas da padaria&lt;/h2&gt;
+      &lt;input
+        value={nova}
+        onChange={(e) =&gt; setNova(e.target.value)}
+        placeholder="Nova tarefa"
+      /&gt;
+      &lt;button onClick={adicionar}&gt;Adicionar&lt;/button&gt;
+      &lt;p&gt;{tarefas.length} tarefas&lt;/p&gt;
+      &lt;ul&gt;
+        {tarefas.map((tarefa) =&gt; (
+          &lt;li key={tarefa.id}&gt;{tarefa.texto}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h2&gt;Tarefas da padaria&lt;/h2&gt;
+  &lt;input placeholder="Nova tarefa" value=""&gt;
+  &lt;button&gt;Adicionar&lt;/button&gt;
+  &lt;p&gt;3 tarefas&lt;/p&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Abrir o forno às 5h&lt;/li&gt;
+    &lt;li&gt;Encomenda da dona Marta&lt;/li&gt;
+    &lt;li&gt;Comprar farinha&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const tarefasIniciais = [
+  { id: 1, texto: "Abrir o forno às 5h", feita: true },
+  { id: 2, texto: "Encomenda da dona Marta", feita: false },
+  { id: 3, texto: "Comprar farinha", feita: false },
+];
+
+function App() {
+  const [tarefas, setTarefas] = useState(tarefasIniciais);
+  const [nova, setNova] = useState("");
+
+  function adicionar() {
+    const texto = nova.trim();
+    if (texto === "") return;
+    setTarefas([...tarefas, { id: Date.now(), texto: texto, feita: false }]);
+    setNova("");
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Tarefas da padaria&lt;/h2&gt;
+      &lt;input
+        value={nova}
+        onChange={(e) =&gt; setNova(e.target.value)}
+        placeholder="Nova tarefa"
+      /&gt;
+      &lt;button onClick={adicionar}&gt;Adicionar&lt;/button&gt;
+      &lt;p&gt;{tarefas.length} tarefas&lt;/p&gt;
+      &lt;ul&gt;
+        {tarefas.map((tarefa) =&gt; (
+          &lt;li key={tarefa.id}&gt;{tarefa.texto}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Três coisas acontecem na função consertada. O <code>trim()</code> transforma "   " em <code>""</code>, e
+o <code>if</code> impede a tarefa vazia. O spread copia os itens antigos para um array novo e coloca o item
+novo no fim. E <code>setNova("")</code> limpa o campo, porque o valor dele vem do estado.</p>
+
+<p>Depois do clique, o console mostra a lista com quatro itens e o campo vazio:</p>
+
+<pre class="term">tarefas.length: 4
+nova: ""
+typeof tarefas[3].id: number</pre>
+
+<p>O <code>Date.now()</code> resolve o id porque devolve os milissegundos atuais: dois cliques em momentos
+diferentes geram números diferentes. É suficiente para um app local. Num app com servidor, o id vem do
+servidor — e a aula de envio de dados mostra por quê.</p>
+
+<p>Um detalhe que engana: no código com <code>push</code>, o array do estado <em>cresceu</em> de verdade.
+O que não aconteceu foi o desenho da tela. Se você abrir o console, vê quatro itens; a página mostra três.
+É o sintoma clássico de mutação: o React não tem como perceber que o conteúdo mudou, porque a referência é
+a mesma.</p>
+
+<h2>5. O id que não muda quando a lista muda</h2>
+
+<p>O <code>id</code> é a peça mais subestimada do projeto — a aula da
+<a href="a-key.html">key</a> entra nos detalhes depois. Ele aparece em dois lugares: como
+<code>key</code> do <code>map</code> e como argumento das funções que concluem ou removem. Se ele muda
+quando a lista muda, os dois lugares quebram juntos. A tabela compara as fontes mais comuns:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Fonte do id</th><th>Como fica</th><th>Problema</th></tr>
+<tr><td>índice do <code>map</code></td><td><code>key={indice}</code></td><td>ao remover a primeira, todas as seguintes trocam de id</td></tr>
+<tr><td>texto da tarefa</td><td><code>key={tarefa.texto}</code></td><td>duas tarefas iguais colidem; editar o texto troca a identidade</td></tr>
+<tr><td><code>Date.now()</code></td><td><code>id: Date.now()</code></td><td>dois cliques no mesmo milissegundo repetem o id</td></tr>
+<tr><td>contador que só cresce</td><td><code>id: proximoId++</code></td><td>precisa de uma variável fora do componente; cresce para sempre</td></tr>
+</table>
+</div>
+
+<p>Para um app local, <code>Date.now()</code> é a escolha mais simples e funciona. O caso do clique duplo
+no mesmo milissegundo é raro em uso humano, mas aparece em teste automatizado — e é justamente o tipo de
+detalhe que separa um protótipo de um app. Se você quer blindar, combine com um contador:
+<code>id: Date.now() + contador</code>, ou guarde um número em <code>useRef</code>.</p>
+
+<p>O índice é o mais perigoso porque parece elegante. Ele funciona enquanto a lista só cresce. No dia em
+que a Ana remove uma tarefa do meio, as seguintes ganham um índice novo, o React acha que os itens
+mudaram e recria os elementos — perdendo foco, seleção de texto e animação. O texto tem o mesmo problema
+disfarçado: duas "Comprar farinha" na lista geram duas chaves iguais, e o React avisa no console.</p>
+
+<p>Uma consequência prática: o <code>id</code> nunca deve ser recalculado no render. Ele nasce quando a
+tarefa é criada e morre quando ela é removida. Se você escrever <code>id: indice</code> dentro do
+<code>map</code>, está criando um id novo a cada desenho — e a identidade que o React usa deixa de
+existir.</p>
+
+<h2>6. Concluir e desfazer</h2>
+
+<p>Concluir uma tarefa é trocar um item da lista por outro, com <code>feita</code> invertido. O
+<code>map</code> faz isso bem: ele percorre a lista e devolve uma lista nova, trocando só o item cujo
+<code>id</code> bate. O erro clássico é o atalho: achar o objeto e mudar a propriedade direto, como a Ana
+fez na primeira versão.</p>
+
+<p>Na caixa abaixo, o <code>alternar</code> muta o objeto e entrega o mesmo array ao <code>setTarefas</code>.
+Clique na caixa da segunda tarefa e nada muda no contador. Conserte com <code>map</code> e um objeto
+novo:</p>
+
+<div class="tryreact" data-goal="clique:li:nth-child(2) input;;texto:2 de 3 concluídas;;conta:li.feita=2">
+  <p class="try-task">O <code>alternar</code> muda o objeto no lugar e a tela não atualiza. Troque por um
+  <code>map</code> que devolve <code>{ ...tarefa, feita: !tarefa.feita }</code> para a tarefa certa e a
+  lista original para as outras.</p>
+  <pre class="jsx">const tarefasIniciais = [
+  { id: 1, texto: "Abrir o forno às 5h", feita: true },
+  { id: 2, texto: "Encomenda da dona Marta", feita: false },
+  { id: 3, texto: "Comprar farinha", feita: false },
+];
+
+function App() {
+  const [tarefas, setTarefas] = useState(tarefasIniciais);
+
+  function alternar(id) {
+    const tarefa = tarefas.find((t) =&gt; t.id === id);
+    tarefa.feita = !tarefa.feita;
+    setTarefas(tarefas);
+  }
+
+  const feitas = tarefas.filter((t) =&gt; t.feita).length;
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{feitas} de {tarefas.length} concluídas&lt;/p&gt;
+      &lt;ul&gt;
+        {tarefas.map((tarefa) =&gt; (
+          &lt;li key={tarefa.id} className={tarefa.feita ? "feita" : ""}&gt;
+            &lt;input
+              type="checkbox"
+              checked={tarefa.feita}
+              onChange={() =&gt; alternar(tarefa.id)}
+            /&gt;
+            {tarefa.texto}
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;1 de 3 concluídas&lt;/p&gt;
+  &lt;ul&gt;
+    &lt;li class="feita"&gt;
+      &lt;input type="checkbox" checked=""&gt;
+      Abrir o forno às 5h
+    &lt;/li&gt;
+    &lt;li class=""&gt;
+      &lt;input type="checkbox"&gt;
+      Encomenda da dona Marta
+    &lt;/li&gt;
+    &lt;li class=""&gt;
+      &lt;input type="checkbox"&gt;
+      Comprar farinha
+    &lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const tarefasIniciais = [
+  { id: 1, texto: "Abrir o forno às 5h", feita: true },
+  { id: 2, texto: "Encomenda da dona Marta", feita: false },
+  { id: 3, texto: "Comprar farinha", feita: false },
+];
+
+function App() {
+  const [tarefas, setTarefas] = useState(tarefasIniciais);
+
+  function alternar(id) {
+    setTarefas(
+      tarefas.map((tarefa) =&gt;
+        tarefa.id === id ? { ...tarefa, feita: !tarefa.feita } : tarefa
+      )
+    );
+  }
+
+  const feitas = tarefas.filter((t) =&gt; t.feita).length;
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{feitas} de {tarefas.length} concluídas&lt;/p&gt;
+      &lt;ul&gt;
+        {tarefas.map((tarefa) =&gt; (
+          &lt;li key={tarefa.id} className={tarefa.feita ? "feita" : ""}&gt;
+            &lt;input
+              type="checkbox"
+              checked={tarefa.feita}
+              onChange={() =&gt; alternar(tarefa.id)}
+            /&gt;
+            {tarefa.texto}
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois do conserto, clicar na segunda tarefa leva o contador de "1 de 3" para "2 de 3" e a classe
+<code>feita</code> aparece no segundo <code>li</code>. A conta <code>feitas</code> é refeita no render, a
+partir do array novo. Nada de estado extra.</p>
+
+<p>O console confirma o que a tela mostra, com o array já trocado:</p>
+
+<pre class="term">feitas: 2
+tarefas[1].feita: true
+tarefas[1].texto: "Encomenda da dona Marta"</pre>
+
+<p>Há duas armadilhas nesse padrão. A primeira é esquecer o <code>...</code> e devolver
+<code>{ feita: !tarefa.feita }</code>, perdendo o texto e o id; o item vira um objeto incompleto e a tela
+mostra vazio. A segunda é inverter a condição: <code>tarefa.id === id ? ... : ...</code> com os lados
+trocados faz o React trocar todas as outras e deixar a clicada intacta.</p>
+
+<p>Para remover, a lógica é a mesma, com <code>filter</code> em vez de <code>map</code>:</p>
+
+<pre class="file" data-file="App.jsx">function remover(id) {
+  setTarefas(tarefas.filter((tarefa) =&gt; tarefa.id !== id));
+}</pre>
+
+<p><code>filter</code> devolve uma lista nova só com quem passa no teste: "fique se o id for diferente do
+que eu quero remover". É o inverso do <code>map</code>, que devolve um item para cada item. Guarde as duas
+receitas: <code>map</code> troca, <code>filter</code> tira, e <code>[...lista, novo]</code> põe.</p>
+
+<h2>7. Contadores, filtro e o vazio</h2>
+
+<p>Com listar, adicionar e concluir funcionando, o app já serve. O acabamento são os números e o filtro.
+Aqui vale uma distinção que economiza metade dos bugs do projeto: nem tudo que aparece na tela é estado.
+O texto do campo é estado; a lista é estado; a aba escolhida no filtro é estado. O total de tarefas, o
+número de concluídas e a lista visível são <strong>contas</strong> feitas no render.</p>
+
+<dl class="anatomy">
+<dt>estado</dt>
+<dd>O que muda com o tempo e precisa ser lembrado entre um desenho e outro: a lista, o texto novo, o
+filtro escolhido.</dd>
+<dt>derivado</dt>
+<dd>O que é calculado a partir do estado no próprio render: <code>feitas</code>,
+<code>faltando</code>, <code>visiveis</code>.</dd>
+<dt>handler</dt>
+<dd>A função que recebe o evento ou um id e chama o <code>set...</code> com uma lista nova:
+<code>adicionar</code>, <code>alternar</code>, <code>remover</code>.</dd>
+<dt>item</dt>
+<dd>O componente ou o <code>li</code> que recebe uma tarefa e desenha uma linha. Recebe dados por props e
+avisa por função.</dd>
+<dt>vazio</dt>
+<dd>O estado legítimo de uma lista sem itens ou de um filtro sem resultado. Merece mensagem própria, não
+uma tela em branco.</dd>
+</dl>
+
+<p>O filtro é o único estado novo que o acabamento pede. Três valores possíveis — todas, abertas,
+concluídas — e uma conta que decide quem aparece:</p>
+
+<pre class="file" data-file="App.jsx">const [filtro, setFiltro] = useState("todas");
+
+const visiveis = tarefas.filter((tarefa) =&gt; {
+  if (filtro === "abertas") return !tarefa.feita;
+  if (filtro === "concluidas") return tarefa.feita;
+  return true;
+});</pre>
+
+<p>Repare que <code>visiveis</code> nasce do estado e não vira <code>useState</code>. Se você guardasse a
+lista filtrada, teria de atualizá-la em toda mudança de tarefa e de filtro — e uma hora esqueceria. A
+regra é simples: se dá para calcular a partir do que já existe, calcule no render.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que aparece na tela</th><th>Estado ou conta?</th><th>Por quê</th></tr>
+<tr><td>o texto do campo</td><td>estado</td><td>muda a cada tecla e precisa sobreviver ao render</td></tr>
+<tr><td>a lista de tarefas</td><td>estado</td><td>muda com adicionar, concluir e remover</td></tr>
+<tr><td>o filtro escolhido</td><td>estado</td><td>é uma escolha do usuário, não uma conta</td></tr>
+<tr><td>"2 de 3 concluídas"</td><td>conta</td><td>sai do <code>filter</code> sobre a lista</td></tr>
+<tr><td>as tarefas visíveis</td><td>conta</td><td>sai do filtro sobre a lista atual</td></tr>
+</table>
+</div>
+
+<p>O vazio aparece em dois momentos diferentes, e as mensagens não são a mesma. Na primeira vez, a lista
+está vazia porque nada foi criado: "Nenhuma tarefa ainda. Comece pela primeira." Depois de um filtro, a
+lista pode estar vazia com tarefas existindo: "Nenhuma tarefa concluída por aqui." A condição é
+parecida — <code>visiveis.length === 0</code> —, mas o texto muda conforme <code>tarefas.length</code> e o
+filtro. Uma tela em branco nunca é resposta.</p>
+
+<h2>8. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a lista some quando ela recarrega a página</h3>
+<p>A Ana cadastrou sete tarefas, apertou F5 e voltou ao zero. O estado vive na memória do componente: recarregar
+a página recria tudo. Para guardar entre visitas, o caminho é o
+<a href="localStorage.html"><code>localStorage</code></a> — gravar com
+<code>useEffect</code> e ler na função do <code>useState</code>. Isso é evolução, não requisito: a lista
+funciona sem persistência, e quem tenta guardar antes de a lista funcionar passa o dia depurando
+JSON.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: duas tarefas com a mesma key</h3>
+<p>Ela usou <code>key={tarefa.texto}</code> e cadastrou "Comprar farinha" duas vezes. O React avisou no
+console que havia chaves repetidas e, ao concluir uma, as duas mudaram de aparência. Chave é identidade:
+precisa ser única entre os irmãos. O <code>id</code> resolve porque é gerado uma vez por tarefa, mesmo
+quando o texto se repete.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o contador diz 3 e a lista mostra 2</h3>
+<p>O número vinha de <code>tarefas.length</code> e a lista de um <code>filter</code> antigo guardado num
+estado separado. Um dos dois ficou para trás. Quando número e lista discordam, quase sempre há um estado
+derivado guardado à mão. A cura é apagar o estado extra e calcular os dois a partir da mesma fonte.</p>
+</div>
+
+<h2>9. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Para que serve a <code>key</code> no <code>map</code> da lista?</p>
+<label><input type="radio" name="q1"> para ordenar os itens na tela</label>
+<label><input type="radio" name="q1"> para o React identificar cada item entre um desenho e outro</label>
+<label><input type="radio" name="q1"> para o item aparecer no HTML gerado</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que <code>tarefas.push(nova)</code> não atualiza a tela?</p>
+<label><input type="radio" name="q2"> porque <code>push</code> não existe em arrays do React</label>
+<label><input type="radio" name="q2"> porque o React proíbe mudar arrays</label>
+<label><input type="radio" name="q2"> porque o array é o mesmo objeto: o React não vê mudança e não redesenha</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que deve ficar no <code>useState</code>?</p>
+<label><input type="radio" name="q3"> a lista, o texto do campo e o filtro; os totais são contas</label>
+<label><input type="radio" name="q3"> a lista, o texto, o filtro, o total de feitas e a lista visível</label>
+<label><input type="radio" name="q3"> só a lista; o resto vai para variáveis globais</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: remover pelo id</h2>
+<p>Complete o handler que devolve a lista sem a tarefa clicada. Escreva só o método do array:</p>
+<div class="ex-code">function remover(id) {&#10;  setTarefas(tarefas.<input aria-label="resposta 1" data-answer="filter" placeholder="...">((tarefa) =&gt; tarefa.id !== id));&#10;}</div>
+<p class="ex-dica">Dica: é o método que devolve uma lista nova só com os itens que passam no teste. O
+<code>map</code> devolveria um item para cada item — inclusive o que você quer tirar.</p>
+</div>
+
+<h2>10. Resumo</h2>
+
+<p>O projeto começou pelos dados: cada tarefa é um objeto com <code>id</code>, <code>texto</code> e
+<code>feita</code>, e a lista mora no <code>useState</code>. A tela é um <code>map</code> com
+<code>key</code> estável. Adicionar é <code>[...tarefas, nova]</code>, com <code>trim</code> e limpeza do
+campo; concluir é <code>map</code> trocando o item certo por um objeto novo; remover é
+<code>filter</code>.</p>
+
+<p>Os números e a lista filtrada não são estado: são contas feitas no render. Guardar só o que muda por
+decisão do usuário — lista, texto e filtro — evita a maior parte dos bugs de sincronização. E o vazio tem
+mensagem própria, porque uma tela em branco não explica nada.</p>
+
+<p>O que fica de fora é a persistência: o estado some ao recarregar. O próximo passo natural é gravar a
+lista no <code>localStorage</code> e ler na criação do estado, com cuidado para o JSON quebrado. Antes
+disso, porém, vale separar o item num componente próprio: um <code>ItemTarefa</code> que recebe a tarefa e
+a função de alternar, e um <code>Contador</code> que recebe os números. O app continua o mesmo, dividido em
+peças menores — e é assim que ele sobrevive ao próximo recurso.</p>
+
+<p>Se quiser comparar com outro app que usa a mesma base, o
+<a href="projeto-carrinho.html">carrinho de compras</a> leva essas operações para uma lista de objetos com
+quantidade, e o <a href="estado-com-array.html">estado com array</a> tem as receitas de cada operação
+isoladas. O importante é que você já sabe o desenho: estado, handler, conta, lista e vazio.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Cada tarefa é <code>{ id, texto, feita }</code>; o array fica no <code>useState</code>.</li>
+<li><code>map</code> desenha; <code>key</code> estável identifica; <code>filter</code> remove.</li>
+<li>Adicionar: <code>setTarefas([...tarefas, nova])</code>. <code>push</code> não redesenha.</li>
+<li>Concluir: <code>map</code> com <code>{ ...tarefa, feita: !tarefa.feita }</code>.</li>
+<li><code>id</code> nasce na criação e não muda; índice e texto não servem.</li>
+<li><code>trim()</code> + <code>if (texto === "") return</code> evitam tarefa vazia.</li>
+<li>Total, feitas e visíveis são contas no render, não estados.</li>
+<li>O filtro escolhido é estado; a lista filtrada é derivada.</li>
+<li>A <code>className</code> condicional pinta o item concluído.</li>
+<li>Lista vazia merece mensagem — e a mensagem muda se há filtro.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

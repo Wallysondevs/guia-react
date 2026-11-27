@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Listas | Guia React</title>
+<meta name="description" content="Consulta sobre listas em React: map, key estável, filtro, ordenação, contagem, lista vazia, listas aninhadas e tabelas, com links para as aulas do guia.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Listas</span></h1>
+<p class="intro">Toda lista em React é a mesma conta: um array de dados entra, um array de elementos sai.
+O que muda de uma tela para outra são as decisões em volta — de onde vem a chave, o que fazer quando o
+filtro não deixa nada, como ordenar sem estragar o array original. A Ana chega aqui quando a vitrine da
+padaria passa de três pães para trezentos. Esta página é a consulta: cada seção responde uma pergunta e
+aponta para a aula que a destrincha.</p>
+
+<div class="note">
+<strong>Como usar esta página</strong>
+<ul>
+  <li>As oito seções estão na ordem em que os problemas aparecem: desenhar, identificar, filtrar, ordenar,
+  avisar, aninhar, escalar, consertar.</li>
+  <li>As tabelas são o resumo; o texto em volta explica o porquê e aponta a aula completa.</li>
+  <li>As duas caixas rodam com React 19 de verdade: edite, clique em Rodar e leia o painel.</li>
+  <li>Os trechos de arquivo mostram o código como ele fica no projeto, com <code>import</code> e
+  <code>export</code>.</li>
+</ul>
+</div>
+
+<h2>1. A conta que está por trás de toda lista</h2>
+
+<p>React não tem um componente de lista. O que existe é JavaScript: um array de dados, uma chamada de
+<code>.map</code> que transforma cada dado em JSX e um <code>key</code> que diz qual elemento é qual. O
+resultado é um array de elementos, e o React aceita arrays dentro do JSX — ele desenha cada item na
+ordem.</p>
+
+<pre class="file" data-file="Vitrine.jsx">export function Vitrine({ paes }) {
+  return (
+    &lt;ul&gt;
+      {paes.map((pao) =&gt; (
+        &lt;li key={pao.id}&gt;{pao.nome}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+
+<p>Três coisas acontecem nesse bloco, e vale separá-las porque cada erro de lista é um erro em uma delas.
+Primeiro, o array é percorrido pelo <code>map</code>, que devolve um array novo do mesmo tamanho. Segundo,
+cada item percorrido vira um elemento React com o seu <code>key</code>. Terceiro, o array de elementos é
+entregue ao <code>&lt;ul&gt;</code> como filho, e o React o desenha item por item.</p>
+
+<dl class="anatomy">
+<dt>lista</dt>
+<dd>Um array de dados (pães, pedidos, clientes) que o componente recebe ou monta. Não é estado por
+natureza: pode ser prop, constante ou resultado de um filtro.</dd>
+<dt>item</dt>
+<dd>Um elemento do array. Pode ser texto, número ou objeto — se for objeto, você escolhe quais campos
+aparecem na tela.</dd>
+<dt>map</dt>
+<dd>O método que percorre o array e devolve outro array, com um elemento React por item. É a ponte entre
+dado e tela.</dd>
+<dt>key</dt>
+<dd>A identidade do item para o React: uma string ou número único dentro da lista, estável entre desenhos.
+Não é prop e não chega ao componente.</dd>
+<dt>lista derivada</dt>
+<dd>O array que você calcula no desenho a partir do original: filtrado, ordenado, cortado, somado. Não vai
+para o estado.</dd>
+<dt>vazio</dt>
+<dd>O caso em que a lista não tem item nenhum. É uma tela legítima, com mensagem própria, e não um erro.</dd>
+</dl>
+
+<p>Se o array vier de uma API, o mesmo desenho vale — muda só a origem. O que o React precisa é que, a cada
+desenho, o array exista. Se ele ainda não chegou, você não tem uma lista vazia: você tem uma lista
+desconhecida, e isso é a seção 5. A aula <a href="listas-com-map.html">Listas com map</a> constrói esse
+primeiro exemplo linha por linha.</p>
+
+<h2>2. O map: três formas de escrever o mesmo</h2>
+
+<p>O <code>map</code> tem uma particularidade que pega todo mundo: a função passada para ele precisa
+<strong>devolver</strong> o JSX. Se você abre chaves para escrever um corpo, precisa de um
+<code>return</code> explícito. Se usa parênteses, o retorno é implícito. As duas formas são certas; misturar
+as duas é o erro.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Como fica</th><th>Quando usar</th></tr>
+<tr><td>parênteses (retorno implícito)</td><td><code>paes.map((p) =&gt; (&lt;li key={p.id}&gt;{p.nome}&lt;/li&gt;))</code></td><td>um elemento só, curto — o padrão do guia</td></tr>
+<tr><td>chaves com <code>return</code></td><td><code>paes.map((p) =&gt; { return &lt;li key={p.id}&gt;{p.nome}&lt;/li&gt;; })</code></td><td>quando há cálculo antes do JSX</td></tr>
+<tr><td>corpo de componente</td><td><code>function Item({ p }) { return &lt;li&gt;{p.nome}&lt;/li&gt;; }</code></td><td>quando o item tem estado ou lógica própria — <a href="regras-dos-hooks.html">As Regras dos Hooks</a></td></tr>
+</table>
+</div>
+
+<p>A terceira linha é a saída para itens que guardam estado — o “curtir” de cada pão, o campo de quantidade
+de cada pedido. Hook não pode ficar dentro do <code>map</code>; ele fica dentro do componente que o
+<code>map</code> desenha. É o mesmo motivo pelo qual a <code>key</code> vai no componente: quem tem ficha
+própria é o componente, não o item do array.</p>
+
+<div class="tryreact" data-goal="conta:li=3;;texto:Pão de queijo — R$ 3">
+  <p class="try-task">A lista tem três pães e o <code>&lt;li&gt;</code> está escrito à mão. Troque por
+  <code>paes.map((pao) =&gt; (...))</code> com <code>key={pao.id}</code>, mostrando nome e preço.</p>
+  <pre class="jsx">function App() {
+  const paes = [
+    { id: 1, nome: "Pão francês", preco: 1 },
+    { id: 2, nome: "Pão de queijo", preco: 3 },
+    { id: 3, nome: "Baguete", preco: 6 },
+  ];
+
+  return (
+    &lt;ul&gt;
+      &lt;li&gt;Pão francês — R$ 1&lt;/li&gt;
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul&gt;
+  &lt;li&gt;Pão francês — R$ 1&lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const paes = [
+    { id: 1, nome: "Pão francês", preco: 1 },
+    { id: 2, nome: "Pão de queijo", preco: 3 },
+    { id: 3, nome: "Baguete", preco: 6 },
+  ];
+
+  return (
+    &lt;ul&gt;
+      {paes.map((pao) =&gt; (
+        &lt;li key={pao.id}&gt;
+          {pao.nome} — R$ {pao.preco}
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p>Dois tropeços aparecem no painel com mensagens bem diferentes. Se você usar chaves sem
+<code>return</code>, a lista sai vazia e sem erro — a função devolve <code>undefined</code> para cada item.
+Se você esquecer de escolher o campo e desenhar o objeto inteiro, o React reclama com a mensagem da seção 8.
+Nos dois casos, o conserto está na forma, não no dado.</p>
+
+<p>Um detalhe de leitura: o <code>map</code> devolve um array, e o JSX aceita array. Você não precisa de
+<code>join</code>, não precisa transformar em string e não precisa de <code>dangerouslySetInnerHTML</code>.
+Se o resultado na tela estiver certo mas com vírgulas entre os itens, é porque alguém converteu o array em
+texto antes de entregar — sinal de que o <code>map</code> foi parar dentro de um molde de string.</p>
+
+<h2>3. A key: a identidade do item</h2>
+
+<p>O <code>key</code> não é enfeite para calar o console. Quando a lista muda — um item entra, outro sai,
+dois trocam de lugar —, o React compara a lista nova com a antiga e decide o que reaproveitar. A comparação
+é pelo <code>key</code>. Sem ele, o React usa a posição, e a posição não é identidade: o terceiro item de
+hoje pode ser o segundo de amanhã.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>De onde vem a key</th><th>Exemplo</th><th>Veredito</th></tr>
+<tr><td>id do dado</td><td><code>key={pao.id}</code></td><td>o certo, sempre que existir</td></tr>
+<tr><td>campo único do dado</td><td><code>key={pao.slug}</code></td><td>vale, se for único e estável</td></tr>
+<tr><td>combinação de campos</td><td><code>key={pedido.mesa + "-" + pedido.hora}</code></td><td>aceitável em lista sem id</td></tr>
+<tr><td>índice do map</td><td><code>key={indice}</code></td><td>só em lista fixa, que nunca reordena — <a href="chaves-estaveis.html">Chaves Estáveis</a></td></tr>
+<tr><td>sorteio</td><td><code>key={Math.random()}</code></td><td>nunca: remonta tudo a cada desenho — <a href="chaves-estaveis.html">Chaves Estáveis</a></td></tr>
+</table>
+</div>
+
+<p>A chave precisa ser única <em>entre irmãos</em> e estável <em>entre desenhos</em>. Única entre irmãos
+porque o React procura o par; estável porque é isso que permite reconhecer o mesmo item depois. Se a chave
+muda, o React entende que o item é outro: desmonta o antigo e monta o novo, perdendo estado, foco e o que
+estava digitado.</p>
+
+<p>O caso do índice merece uma frase própria. Ele funciona enquanto a lista não muda de ordem nem ganha
+itens no meio. No dia em que a Ana ordena por preço, o item que estava na posição 3 vira posição 1 — e o
+estado que morava na posição 3 vai junto para o item errado. A aula
+<a href="chaves-estaveis.html">Chaves Estáveis</a> mostra o bug acontecendo; a regra prática é: índice só
+para lista gerada, fixa e sem estado por item.</p>
+
+<p>Quem usa o <code>key</code> é o React, não o seu componente. Ele não chega por <code>props</code>: se
+você escrever <code>function Item(props)</code> e tentar <code>props.key</code>, recebe
+<code>undefined</code>. Para usar o id dentro do componente, passe-o como prop com outro nome:
+<code>&lt;Item key={p.id} id={p.id} /&gt;</code>.</p>
+
+<p>No modo de desenvolvimento, esquecer a chave produz um aviso no console do navegador. Ele não impede a
+página de rodar, e por isso é fácil ignorar:</p>
+
+<pre class="term">Warning: Each child in a list should have a unique "key" prop.</pre>
+
+<p>Esse aviso é um dos poucos que valem conserto imediato: o problema que ele aponta aparece depois, como
+estado no item errado ou campo que perde o foco ao digitar. A aula
+<a href="listas-aninhadas.html">Listas Aninhadas</a> cobre o caso de duas listas na mesma tela, em que cada
+nível precisa da sua própria chave.</p>
+
+<h2>4. Filtrar, ordenar e contar: derive antes de desenhar</h2>
+
+<p>A regra que resolve a maior parte das dúvidas de lista: o array que você desenha é uma
+<strong>conta</strong> feita no desenho, não um estado paralelo. Filtro, ordem, corte e contagem saem do
+array original mais os valores de estado que descrevem a escolha (o texto da busca, a categoria, a
+direção da ordenação).</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pergunta</th><th>Derivar no desenho</th><th>Guardar no estado</th></tr>
+<tr><td>quais itens aparecem?</td><td><code>paes.filter(...)</code> com o filtro que é estado</td><td>nunca: a lista filtrada envelhece — <a href="filtrar.html">Filtrar</a></td></tr>
+<tr><td>em que ordem?</td><td><code>[...paes].sort(...)</code> ou <code>paes.toSorted(...)</code></td><td>nunca: a ordem é conta — <a href="ordenar.html">Ordenar</a></td></tr>
+<tr><td>quantos são?</td><td><code>visiveis.length</code></td><td>nunca: é o tamanho da derivada</td></tr>
+<tr><td>qual é o total?</td><td><code>reduce</code> no desenho</td><td>nunca: refaça a conta — <a href="estado-derivado.html">Estado Derivado</a></td></tr>
+<tr><td>o que o usuário escolheu?</td><td>—</td><td>sim: texto, categoria, ordem, página</td></tr>
+</table>
+</div>
+
+<p>Guardar a lista filtrada em <code>useState</code> cria duas verdades: a original e a filtrada. Na primeira
+vez em que uma delas mudar sozinha — um item novo chega, um item é apagado —, elas discordam. O sintoma é
+“o item novo não aparece até eu recarregar”. A aula <a href="estado-derivado.html">Estado Derivado</a>
+trata exatamente desse desencontro.</p>
+
+<div class="tryreact" data-goal="clique:button.doces;;conta:li=1;;texto:Croissant;;texto:Visíveis: 1;;clique:button.sem-acucar;;conta:li=0;;texto:Nenhum pão com esse filtro">
+  <p class="try-task">Os botões mudam <code>filtro</code>, mas a lista ignora. Filtre com
+  <code>paes.filter((p) =&gt; filtro === "todos" || p.tipo === filtro)</code> e mostre a mensagem
+  <code>Nenhum pão com esse filtro</code> quando não sobrar nenhum.</p>
+  <pre class="jsx">function App() {
+  const [filtro, setFiltro] = useState("todos");
+  const paes = [
+    { id: 1, nome: "Pão francês", tipo: "salgado" },
+    { id: 2, nome: "Pão de queijo", tipo: "salgado" },
+    { id: 3, nome: "Croissant", tipo: "doce" },
+  ];
+  const visiveis = paes;
+
+  return (
+    &lt;div&gt;
+      &lt;button className="doces" onClick={() =&gt; setFiltro("doce")}&gt;Doces&lt;/button&gt;
+      &lt;button className="sem-acucar" onClick={() =&gt; setFiltro("sem-acucar")}&gt;Sem açúcar&lt;/button&gt;
+      &lt;p&gt;Visíveis: {visiveis.length}&lt;/p&gt;
+      &lt;ul&gt;
+        {visiveis.map((p) =&gt; (
+          &lt;li key={p.id}&gt;{p.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button class="doces"&gt;Doces&lt;/button&gt;
+  &lt;button class="sem-acucar"&gt;Sem açúcar&lt;/button&gt;
+  &lt;p&gt;Visíveis: 3&lt;/p&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Pão francês&lt;/li&gt;
+    &lt;li&gt;Pão de queijo&lt;/li&gt;
+    &lt;li&gt;Croissant&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [filtro, setFiltro] = useState("todos");
+  const paes = [
+    { id: 1, nome: "Pão francês", tipo: "salgado" },
+    { id: 2, nome: "Pão de queijo", tipo: "salgado" },
+    { id: 3, nome: "Croissant", tipo: "doce" },
+  ];
+  const visiveis = paes.filter(
+    (p) =&gt; filtro === "todos" || p.tipo === filtro
+  );
+
+  return (
+    &lt;div&gt;
+      &lt;button className="doces" onClick={() =&gt; setFiltro("doce")}&gt;Doces&lt;/button&gt;
+      &lt;button className="sem-acucar" onClick={() =&gt; setFiltro("sem-acucar")}&gt;Sem açúcar&lt;/button&gt;
+      &lt;p&gt;Visíveis: {visiveis.length}&lt;/p&gt;
+      {visiveis.length === 0 ? (
+        &lt;p&gt;Nenhum pão com esse filtro&lt;/p&gt;
+      ) : (
+        &lt;ul&gt;
+          {visiveis.map((p) =&gt; (
+            &lt;li key={p.id}&gt;{p.nome}&lt;/li&gt;
+          ))}
+        &lt;/ul&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Repare que a contagem (<code>visiveis.length</code>) sai da mesma derivada que a lista. Contar à parte é
+a origem do “aqui diz 12 e embaixo tem 11”. E note que o filtro é comparado com o valor do estado, nunca
+com o texto digitado direto no <code>value</code>: quem manda no desenho é o estado.</p>
+
+<p>A ordenação tem um cuidado próprio: <code>sort</code> altera o array original. Se o array veio de prop,
+alterar é efeito colateral fora do componente — o pai não sabe. Use <code>[...paes].sort(...)</code> ou
+<code>paes.toSorted(...)</code>, que devolve uma cópia. Para texto, compare com
+<code>localeCompare</code>; para número, subtraia. A aula <a href="ordenar.html">Ordenar</a> traz o
+comparador completo, com desempate e ordem crescente/decrescente; a aula <a href="filtrar.html">Filtrar</a>
+cobre o filtro que combina categoria e texto.</p>
+
+<h2>5. Lista vazia, primeira vez e carregando</h2>
+
+<p>São três telas diferentes, e misturá-las é o erro mais comum de uma lista que vem da rede. Lista
+<strong>vazia</strong>: o dado chegou e não tem nada — pode ser a loja sem promoção do dia ou o filtro sem
+resultado. <strong>Primeira vez</strong>: o dado ainda não chegou e ninguém pediu nada. E
+<strong>carregando</strong>: já pedimos, ainda não voltou. Cada uma pede uma mensagem diferente.</p>
+
+<p>O teste do vazio é <code>length === 0</code>, e não a lista “falsa”. Cuidado com o atalho que parece
+elegante e imprime um zero na tela: <code>{itens.length &amp;&amp; &lt;ul&gt;...&lt;/ul&gt;}</code> desenha o número
+<code>0</code> quando a lista está vazia, porque <code>0</code> é um valor que o React mostra. Compare com
+zero, e o problema desaparece.</p>
+
+<pre class="file" data-file="Vitrine.jsx">if (itens.length === 0) {
+  return &lt;p&gt;Hoje não tem pão de queijo. Volte às 15h.&lt;/p&gt;;
+}
+
+return &lt;ul&gt;{itens.map((p) =&gt; &lt;li key={p.id}&gt;{p.nome}&lt;/li&gt;)}&lt;/ul&gt;;</pre>
+
+<p>A frase da mensagem é parte do produto, não do código. “Nenhum resultado” diz o que aconteceu;
+“Nenhum pão com esse filtro. <em>Limpar filtro</em>” diz o que fazer. A aula
+<a href="estados-vazios.html">Estados Vazios</a> compara os tipos de vazio — primeira vez, filtro, erro — e
+a <a href="estados-de-carregamento.html">Estados de Carregamento</a> mostra o esqueleto que evita a tela
+piscando.</p>
+
+<p>Uma armadilha de condicional em lista: o <code>?</code> dentro do <code>map</code> é permitido, o
+<code>if</code> dentro do <code>map</code> também (dentro de um corpo com chaves), mas o
+<code>return</code> antecipado fora do <code>map</code> não pode ficar depois de um hook. Regra curta:
+condicional para decidir <em>o que</em> desenhar, nunca <em>se</em> um hook existe. A aula
+<a href="renderizacao-condicional.html">Renderização Condicional</a> cobre os três operadores com exemplos
+curtos.</p>
+
+<h2>6. Listas aninhadas e tabelas</h2>
+
+<p>Quando cada item tem a sua própria lista — pedido com itens, categoria com produtos —, o
+<code>map</code> aparece duas vezes. Cada nível precisa da sua chave, e a chave só precisa ser única entre
+os irmãos daquele nível. Duas listas diferentes podem usar <code>key={1}</code> sem conflito; dois itens da
+mesma lista, não.</p>
+
+<pre class="file" data-file="Pedidos.jsx">export function Pedidos({ pedidos }) {
+  return (
+    &lt;ul&gt;
+      {pedidos.map((pedido) =&gt; (
+        &lt;li key={pedido.id}&gt;
+          &lt;strong&gt;{pedido.cliente}&lt;/strong&gt;
+          &lt;ul&gt;
+            {pedido.itens.map((item) =&gt; (
+              &lt;li key={item.id}&gt;{item.nome}&lt;/li&gt;
+            ))}
+          &lt;/ul&gt;
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+
+<p>Se você se pegar com três <code>map</code> aninhados, provavelmente a tela quer ser uma lista só. Achatar
+antes de desenhar — transformar a árvore em uma lista de pares “cliente + item” — costuma dar um componente
+menos profundo e uma chave por linha. A aula <a href="listas-aninhadas.html">Listas Aninhadas</a> mostra as
+duas versões.</p>
+
+<p>Tabela é uma lista com roupa diferente: um <code>&lt;tr&gt;</code> por item, com o <code>key</code> na
+linha, nunca na célula. O cabeçalho fica fora do <code>map</code>, e o <code>scope="col"</code> ajuda o
+leitor de tela a anunciar a coluna. Para números, alinhe à direita; para texto, à esquerda. A aula
+<a href="tabela-de-dados.html">Tabela de Dados</a> traz o exemplo com ordenação pelo cabeçalho.</p>
+
+<h2>7. Quando a lista é grande</h2>
+
+<p>Lista grande não é um problema de <code>map</code>: é um problema de quantos elementos existem no DOM.
+Antes de otimizar, meça. As três saídas que resolvem quase tudo, em ordem de custo:</p>
+
+<p><strong>Desenhar menos.</strong> Paginação ou “carregar mais” corta o array antes do
+<code>map</code>. É a solução mais simples e a que o leitor entende — a aula
+<a href="paginacao.html">Paginação</a> faz a conta do corte. <strong>Desenhar por perto.</strong> Janela
+virtual: só os itens visíveis viram DOM, com um trilho do tamanho total para a barra de rolagem não mentir.
+A aula <a href="listas-grandes.html">Listas Grandes</a> implementa a janela. <strong>Desenhar sem
+recalcular.</strong> Se a lista é derivada de um cálculo caro, <code>useMemo</code> guarda o resultado entre
+desenhos; se cada item é um componente, <code>memo</code> evita redesenhar os que não mudaram — mas só
+funciona com chave estável, senão tudo remonta.</p>
+
+<p>O que não resolve: passar a lista por contexto, mudar de biblioteca ou adicionar
+<code>useDeferredValue</code> sem motivo. O custo está no número de nós e no trabalho de cada desenho, e as
+duas coisas se medem. A página <a href="ref-performance.html">Performance</a> reúne as técnicas com o
+critério de quando usar; a aula <a href="medindo-performance.html">Medindo Performance</a> mostra como ler o
+tempo antes de mexer no código.</p>
+
+<h2>8. Erros comuns e o que cada mensagem quer dizer</h2>
+
+<p>Quase todo defeito de lista aparece como uma destas cinco coisas. A tabela serve para ir do sintoma ao
+conserto sem reler a página inteira.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sintoma</th><th>Causa</th><th>Conserto</th></tr>
+<tr><td>nada aparece e não há erro</td><td>chaves no <code>map</code> sem <code>return</code></td><td>trocar por parênteses ou escrever o <code>return</code> — <a href="listas-com-map.html">Listas com map</a></td></tr>
+<tr><td>aviso de <code>key</code> no console</td><td>falta a chave em algum item</td><td><code>key={item.id}</code> no elemento raiz do item</td></tr>
+<tr><td>estado no item errado depois de reordenar</td><td><code>key</code> é o índice</td><td>usar o id do dado — <a href="chaves-estaveis.html">Chaves Estáveis</a></td></tr>
+<tr><td>o item novo não aparece</td><td>lista filtrada guardada em estado</td><td>derivar no desenho — <a href="estado-derivado.html">Estado Derivado</a></td></tr>
+<tr><td>o array original muda de ordem sozinho</td><td><code>sort</code> sem cópia</td><td><code>[...lista].sort(...)</code> — <a href="ordenar.html">Ordenar</a></td></tr>
+</table>
+</div>
+
+<p>A mensagem mais confusa é a do objeto desenhado sem escolher o campo. Ela não fala de lista, fala de
+“objeto”:</p>
+
+<pre class="term">Uncaught Error: Objects are not valid as a React child (found: object with keys {nome, preco}).</pre>
+
+<p>Traduzindo: “objetos não são filhos válidos do React”. Você entregou <code>{pao}</code> onde precisava
+de <code>{pao.nome}</code>. Para inspecionar um objeto na tela, use <code>JSON.stringify(pao)</code>; para
+mostrar o dado, escolha os campos. A aula <a href="erros-comuns.html">Erros Comuns</a> reúne essa e outras
+mensagens com a tradução e a aula <a href="depurando-no-navegador.html">Depurando no Navegador</a> mostra
+como chegar até a linha.</p>
+
+<p>Um último erro que não dá mensagem: desenhar a lista a partir de uma cópia feita uma vez só. Se você
+guarda <code>const [lista, setLista] = useState(paes)</code> e depois altera <code>paes</code> por fora, a
+tela não acompanha — o React não é avisado. Estado é dono do dado; se ele vem de fora, ou entra por prop e é
+desenhado direto, ou é copiado no momento em que algo acontece, nunca por referência compartilhada.</p>
+
+<h2>Resumo</h2>
+
+<p>Lista em React é <code>array.map(dado =&gt; JSX)</code> com um <code>key</code> que vem do dado. A
+chave é identidade, não posição: use <code>id</code> sempre que existir e o índice só em lista fixa. O que a
+tela mostra é uma derivada — filtro, ordem, corte — calculada no desenho a partir do array original mais os
+valores de estado que descrevem a escolha; a lista filtrada nunca vira estado.</p>
+
+<p>Lista vazia não é erro: é uma tela com mensagem própria, e o teste é <code>length === 0</code>. Lista
+aninhada pede uma chave por nível; tabela é lista de linhas, com a chave no <code>&lt;tr&gt;</code>. Quando
+a lista cresce, o caminho é desenhar menos (paginação), desenhar por perto (janela) ou desenhar sem
+recalcular (<code>useMemo</code> e <code>memo</code>) — nessa ordem, e só depois de medir.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>map</code> devolve array: com parênteses, retorno implícito; com chaves, <code>return</code>.</li>
+<li><code>key</code> vem do dado, é única entre irmãos e estável entre desenhos.</li>
+<li><code>key</code> não chega por <code>props</code>: repasse o id com outro nome se precisar.</li>
+<li>Filtro, ordem e contagem são contas do desenho — não estado.</li>
+<li><code>sort</code> altera o array: copie antes ou use <code>toSorted</code>.</li>
+<li>Vazio se testa com <code>length === 0</code>, nunca com <code>length &amp;&amp;</code>.</li>
+<li>Cada nível de lista pede a sua própria chave.</li>
+<li>Estado por item exige componente próprio — hook não mora no <code>map</code>.</li>
+<li>Lista grande: paginar, virtualizar, memoizar — nessa ordem.</li>
+<li>Objeto na tela precisa de campo escolhido, não do objeto inteiro.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

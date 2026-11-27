@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hooks | Guia React</title>
+<meta name="description" content="Consulta rápida dos hooks do React 19: lista completa, regras de uso, estado, efeitos, refs, memória, contexto e concorrência, com a aula de cada um.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Hooks</span></h1>
+<p class="intro">Hooks são as funções que dão ao componente acesso ao que o React guarda: estado, efeitos,
+referências, contexto, memória de cálculo. Todos começam com <code>use</code> e todos obedecem às mesmas
+duas regras de posição. Esta página é a consulta rápida: a lista completa com a função de cada um, as
+regras que o ESLint cobra, os pares que se confundem e onde está a aula de cada hook. A Ana já usou
+<code>useState</code>, <code>useEffect</code> e <code>useRef</code> no painel da padaria; aqui está o mapa
+do resto.</p>
+
+<div class="note">
+<strong>Como usar esta página</strong>
+<ul>
+  <li>A tabela da seção 1 é o índice: hook, para que serve e link para a aula.</li>
+  <li>As seções seguintes agrupam os hooks por assunto, com o critério de escolha de cada grupo.</li>
+  <li>As caixas rodam React 19 de verdade e mostram dois hooks em ação.</li>
+</ul>
+</div>
+
+<h2>1. O que é um hook e a lista completa</h2>
+
+<p>Hook é uma função do React que dá a um componente um recurso que ele não teria sozinho. O
+<code>useState</code> dá memória entre renders; o <code>useEffect</code> dá um lugar para sincronizar com
+fora; o <code>useRef</code> dá uma caixa que sobrevive sem redesenhar. Todos começam com <code>use</code>
+— e esse prefixo não é decoração: é como o ESLint e o próprio React reconhecem que ali existe um hook.</p>
+
+<pre class="file" data-file="Painel.jsx">function Painel() {
+  const [pedidos, setPedidos] = useState([]);      // estado
+  const [erro, setErro] = useState("");            // estado
+  const campoBusca = useRef(null);                 // referência
+
+  useEffect(() =&gt; {                                // efeito
+    console.log("montou o painel");
+    return () =&gt; console.log("saiu da tela");
+  }, []);
+
+  return &lt;div ref={campoBusca}&gt;{erro}&lt;/div&gt;;
+}</pre>
+
+<p>O React não guarda "o estado do primeiro <code>useState</code>" pelo nome: ele guarda pela
+<strong>ordem</strong> das chamadas. A primeira chamada de hook do componente ocupa o primeiro espaço, a
+segunda ocupa o segundo, e assim por diante. É por isso que a ordem não pode mudar entre um render e outro
+— o assunto da próxima seção e a causa dos erros mais confusos do React.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Hook</th><th>Para que serve</th><th>Quando usar</th><th>Aula</th></tr>
+<tr><td><code>useState</code></td><td>um valor que sobrevive e redesenha</td><td>o que a tela mostra e a pessoa altera</td><td><a href="useState.html">O useState</a></td></tr>
+<tr><td><code>useReducer</code></td><td>estado com transições nomeadas</td><td>vários campos que mudam juntos</td><td><a href="useReducer.html">O useReducer</a></td></tr>
+<tr><td><code>useEffect</code></td><td>sincronizar com fora do React</td><td>rede, timer, listener, título</td><td><a href="useEffect.html">O useEffect</a></td></tr>
+<tr><td><code>useLayoutEffect</code></td><td>efeito antes da pintura</td><td>medir o DOM sem piscar</td><td><a href="useLayoutEffect.html">O useLayoutEffect</a></td></tr>
+<tr><td><code>useRef</code></td><td>uma caixa que sobrevive sem redesenhar</td><td>DOM, id de timer, valor anterior</td><td><a href="useRef.html">O useRef</a></td></tr>
+<tr><td><code>useImperativeHandle</code></td><td>escolher o que o pai acessa na ref</td><td>expor <code>focus()</code>, <code>abrir()</code></td><td><a href="useImperativeHandle.html">O useImperativeHandle</a></td></tr>
+<tr><td><code>useMemo</code></td><td>guardar o resultado de um cálculo</td><td>conta caro ou identidade de objeto</td><td><a href="useMemo.html">O useMemo</a></td></tr>
+<tr><td><code>useCallback</code></td><td>guardar a própria função</td><td>prop de filho com <code>memo</code></td><td><a href="useCallback.html">O useCallback</a></td></tr>
+<tr><td><code>useContext</code></td><td>ler um valor da árvore</td><td>tema, idioma, usuário logado</td><td><a href="useContext.html">O useContext</a></td></tr>
+<tr><td><code>useId</code></td><td>gerar um id único e estável</td><td>ligar <code>label</code> e campo</td><td><a href="useId.html">O useId</a></td></tr>
+<tr><td><code>useTransition</code></td><td>marcar uma atualização como não urgente</td><td>filtro pesado sem travar a digitação</td><td><a href="useTransition.html">O useTransition</a></td></tr>
+<tr><td><code>useDeferredValue</code></td><td>atrasar um valor</td><td>lista grande que acompanha a busca</td><td><a href="useDeferredValue.html">O useDeferredValue</a></td></tr>
+</table>
+</div>
+
+<p>Fora dessa lista, mas no mesmo assunto, ficam três nomes que não são hooks: <code>createContext</code>
+cria o contexto, <code>memo</code> embrulha o componente e <code>Fragment</code> agrupa irmãos. Eles
+aparecem nas aulas de contexto e de <a href="memo.html">memo</a>. Saber a diferença evita a pergunta
+"posso chamar <code>memo</code> dentro de um <code>if</code>?" — <code>memo</code> não é hook, mas
+também não é chamado dentro de componente: ele embrulha a função na hora de declarar.</p>
+
+<h2>2. As regras dos hooks</h2>
+
+<p>São duas, e as duas existem por causa da ordem. Primeira: chame hooks só no topo do componente ou de
+outro hook, nunca dentro de <code>if</code>, <code>for</code>, <code>while</code> ou função interna.
+Segunda: chame sempre na mesma ordem em todo render — nada de hook condicional. O React depende da ordem
+para saber qual estado pertence a qual chamada.</p>
+
+<pre class="file" data-file="Errado.jsx">function Painel({ logado }) {
+  if (logado) {
+    const [nome, setNome] = useState("Ana");   // erro: hook condicional
+  }
+
+  useEffect(() =&gt; { ... }, []);                 // fora do if, mas depois
+  return &lt;p&gt;oi&lt;/p&gt;;
+}</pre>
+
+<p>No editor, o ESLint avisa antes de rodar; no navegador, o React reclama no console durante o
+desenvolvimento e, em produção, quebra quando a contagem de hooks muda entre renders. As duas mensagens
+abaixo são as que você vai encontrar.</p>
+
+<pre class="term">React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render.</pre>
+
+<p>A segunda aparece em produção, quando o número de hooks muda de um render para outro:</p>
+
+<pre class="term">Rendered more hooks than during the previous render.</pre>
+
+<dl class="anatomy">
+<dt>hook</dt>
+<dd>Função do React que começa com <code>use</code> e dá um recurso ao componente.</dd>
+<dt>ordem dos hooks</dt>
+<dd>A sequência de chamadas em cada render. É por ela que o React associa estado e efeitos.</dd>
+<dt>regra dos hooks</dt>
+<dd>Topo do componente ou de hook próprio, sempre na mesma ordem, nunca dentro de condição ou laço.</dd>
+<dt>dependências</dt>
+<dd>O array que diz ao React quando repetir o trabalho: efeito, cálculo ou função.</dd>
+<dt>hook próprio</dt>
+<dd>Uma função <code>useAlgo</code> que junta hooks e lógica para reaproveitar em vários componentes.</dd>
+</dl>
+
+<p>Para sair de cada aperto: se o hook está dentro de um <code>if</code>, mova a condição para dentro do
+hook (<code>useEffect(() =&gt; { if (!logado) return; ... })</code>) ou extraia um componente para o caso
+condicional. Se o componente tem um <code>return</code> antecipado, coloque todos os hooks antes dele. Se o
+hook está dentro de um <code>map</code>, extraia o item para um componente — o item é que pode ter
+hooks.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você fez</th><th>O que quebra</th><th>Como sair</th><th>Aula</th></tr>
+<tr><td>hook dentro de <code>if</code></td><td>a ordem muda entre renders; erro de hooks</td><td>mover a condição para dentro do hook</td><td><a href="regras-dos-hooks.html">As Regras dos Hooks</a></td></tr>
+<tr><td>hook depois de <code>return</code> antecipado</td><td>o return pula chamadas de hook</td><td>todos os hooks antes do primeiro <code>return</code></td><td><a href="regras-dos-hooks.html">As Regras dos Hooks</a></td></tr>
+<tr><td>hook dentro de <code>map</code></td><td>cada item cria hooks fora de ordem</td><td>extrair o item para um componente</td><td><a href="regras-dos-hooks.html">As Regras dos Hooks</a></td></tr>
+<tr><td>hook em função comum</td><td>"Invalid hook call"</td><td>transformar em hook próprio <code>useAlgo</code></td><td><a href="hooks-proprios.html">Hooks Próprios</a></td></tr>
+<tr><td>hook com nome sem <code>use</code></td><td>o ESLint não reconhece e não avisa</td><td>renomear para <code>useAlgo</code></td><td><a href="hooks-proprios.html">Hooks Próprios</a></td></tr>
+</table>
+</div>
+
+<h2>3. Estado: useState e useReducer</h2>
+
+<p>Os dois guardam valores entre renders. O <code>useState</code> é o padrão: um valor, um setter, uma
+linha. O <code>useReducer</code> entra quando o estado tem regras — vários campos que mudam juntos ou uma
+transição que depende da situação anterior.</p>
+
+<p>Com <code>useState</code>, atualize com a forma de função quando a conta depende do valor atual:
+<code>setTotal((t) =&gt; t + 1)</code>. Com objeto ou array, substitua em vez de mutar. Com
+<code>useReducer</code>, o componente recebe <code>dispatch</code> e manda ações nomeadas; quem decide o
+que cada ação faz é uma função pura, fora do componente.</p>
+
+<pre class="file" data-file="Pedido.jsx">function reducer(estado, acao) {
+  if (acao.type === "pagar") {
+    return { ...estado, pago: true, status: "pago" };
+  }
+  return estado;
+}
+
+function Pedido() {
+  const [pedido, dispatch] = useReducer(reducer, {
+    pago: false,
+    status: "novo",
+  });
+
+  return (
+    &lt;button onClick={() =&gt; dispatch({ type: "pagar" })}&gt;
+      Pagar
+    &lt;/button&gt;
+  );
+}</pre>
+
+<div class="tryreact" data-goal="clique:#pagar;;texto:pago: sim - status: pago">
+  <p class="try-task">O clique muda só o status e esquece o pagamento. Troque os dois
+  <code>useState</code> por um <code>useReducer</code> com a ação <code>pagar</code>, que devolve
+  <code>{ pago: true, status: "pago" }</code>.</p>
+  <pre class="jsx">function App() {
+  const [pago, setPago] = useState(false);
+  const [status, setStatus] = useState("novo");
+
+  function pagar() {
+    setStatus("pago");
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;pago: {pago ? "sim" : "não"} - status: {status}&lt;/p&gt;
+      &lt;button id="pagar" onClick={pagar}&gt;Pagar&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;pago: não - status: novo&lt;/p&gt;
+  &lt;button id="pagar"&gt;Pagar&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function reducer(estado, acao) {
+  if (acao.type === "pagar") {
+    return { pago: true, status: "pago" };
+  }
+  return estado;
+}
+
+function App() {
+  const [pedido, dispatch] = useReducer(reducer, {
+    pago: false,
+    status: "novo",
+  });
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;pago: {pedido.pago ? "sim" : "não"} - status: {pedido.status}&lt;/p&gt;
+      &lt;button id="pagar" onClick={() =&gt; dispatch({ type: "pagar" })}&gt;
+        Pagar
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No código inicial, o clique deixa "pago: não - status: pago": dois estados, uma transição pela metade.
+Na solução, a ação muda os dois campos de uma vez, porque quem decide é o reducer. O critério é sempre o
+mesmo: um valor simples, <code>useState</code>; um conjunto que precisa concordar,
+<code>useReducer</code>.</p>
+
+<h2>4. Efeitos: useEffect e useLayoutEffect</h2>
+
+<p>Efeito é para sincronizar o componente com algo fora do React: rede, timer, listener, título da aba,
+<code>localStorage</code>. O <code>useEffect</code> roda depois da pintura; o <code>useLayoutEffect</code>
+roda depois do DOM e antes da pintura, para medir ou ajustar algo sem a tela piscar. Na dúvida, use
+<code>useEffect</code>; o <code>useLayoutEffect</code> é para medição.</p>
+
+<pre class="file" data-file="Aviso.jsx">useEffect(() =&gt; {
+  const id = setInterval(() =&gt; setHora(new Date()), 1000);
+  return () =&gt; clearInterval(id);       // cleanup
+}, []);                                  // uma vez, na montagem</pre>
+
+<p>O array de dependências define quando o efeito roda: <code>[]</code> na montagem, <code>[busca]</code>
+quando a busca muda, sem array em todo render. A função de retorno é o <em>cleanup</em>: ela limpa o que o
+efeito criou, e roda antes da próxima execução e quando o componente sai da tela. Sem ela, timers e
+listeners se acumulam.</p>
+
+<p>Efeito não é lugar de calcular. Total, lista filtrada e mensagem de erro se calculam no render; efeito
+que só copia estado para estado é código que pode sair. A pergunta que resolve: "isso precisa acontecer
+depois que a tela apareceu?". Se a resposta for não, não é efeito.</p>
+
+<p>Buscar dados merece um cuidado: a resposta pode chegar depois que a busca mudou. Guarde uma flag ou use
+<code>AbortController</code> para descartar a resposta velha, e trate os três estados — carregando, dados e
+erro. A aula de <a href="buscando-dados.html">buscando dados</a> mostra o padrão completo.</p>
+
+<h2>5. Referências: useRef e useImperativeHandle</h2>
+
+<p><code>useRef</code> cria uma caixa com <code>.current</code> que dura entre renders e não provoca
+redesenho. Serve para falar com o DOM (<code>campo.current.focus()</code>) e para guardar o que é bastidor:
+id de timer, "já enviei", valor anterior. Não serve para o que a tela mostra — se o valor aparece no JSX,
+ele é estado.</p>
+
+<p><code>useImperativeHandle</code> entra quando o componente quer expor só alguns métodos para o pai em
+vez do elemento inteiro. Em vez de o pai receber o <code>input</code> e poder fazer qualquer coisa, recebe
+um objeto com <code>focus()</code> e <code>limpar()</code>. É uma API imperativa de propósito, para casos
+como foco, rolagem e animação — não para passar dados.</p>
+
+<pre class="file" data-file="Campo.jsx">const Campo = ({ ref }) =&gt; {
+  const interno = useRef(null);
+
+  useImperativeHandle(ref, () =&gt; ({
+    focus: () =&gt; interno.current.focus(),
+    limpar: () =&gt; {
+      interno.current.value = "";
+    },
+  }));
+
+  return &lt;input ref={interno} /&gt;;
+};</pre>
+
+<p>No React 19, <code>ref</code> chega como uma prop comum em componente de função — não é preciso
+<code>forwardRef</code>. O <code>useImperativeHandle</code> continua valendo para escolher o que essa ref
+entrega. Se você só precisa focar um campo do próprio componente, <code>useRef</code> basta.</p>
+
+<h2>6. Memória: useMemo, useCallback e memo</h2>
+
+<p>Os dois hooks guardam trabalho entre renders. <code>useMemo</code> guarda o resultado de um cálculo;
+<code>useCallback</code> guarda a função. O terceiro nome, <code>memo</code>, não é hook: embrulha o
+componente para ele não redesenhar quando as props não mudam.</p>
+
+<pre class="file" data-file="Lista.jsx">const itens = useMemo(
+  () =&gt; PAES.filter((p) =&gt; p.tipo === filtro),
+  [filtro]
+);
+
+const salvar = useCallback((id) =&gt; {
+  setPedidos((lista) =&gt; [...lista, id]);
+}, []);
+
+const Linha = memo(function Linha({ pao, aoSalvar }) { ... });</pre>
+
+<p>A regra prática: só memoize quando a conta é caro ou quando a identidade atravessa uma fronteira — prop
+de filho com <code>memo</code> ou dependência de efeito. Em cálculo barato, o custo do hook é maior que a
+economia, e o código fica mais difícil de ler. Com <code>useCallback</code>, o cuidado extra é o valor
+capturado: a função guardada enxerga os valores do render em que nasceu, então as dependências precisam
+estar completas.</p>
+
+<p>O React 19 traz o compilador, que memoiza automaticamente muitos casos. Isso não aposenta os hooks: eles
+continuam sendo a forma explícita de dizer "reaproveite", e aparecem em todo código escrito à mão. O que
+muda é a expectativa — você não precisa memoizar por precaução.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Par que confunde</th><th>Diferença em uma linha</th><th>Use o primeiro quando</th><th>Use o segundo quando</th></tr>
+<tr><td><code>useState</code> × <code>useReducer</code></td><td>um valor × uma máquina de transições</td><td>o estado é simples</td><td>vários campos mudam juntos</td></tr>
+<tr><td><code>useEffect</code> × <code>useLayoutEffect</code></td><td>depois da pintura × antes da pintura</td><td>rede, timer, listener</td><td>medir ou ajustar o DOM sem piscar</td></tr>
+<tr><td><code>useMemo</code> × <code>useCallback</code></td><td>guarda o valor × guarda a função</td><td>a conta é cara</td><td>a função é prop de filho com <code>memo</code></td></tr>
+<tr><td><code>memo</code> × <code>useMemo</code></td><td>o desenho do filho × um valor do pai</td><td>o filho é pesado e recebe poucas props</td><td>a identidade precisa ser estável</td></tr>
+<tr><td><code>useContext</code> × props</td><td>distância × vizinhança</td><td>o dado vale para a árvore toda</td><td>um ou dois níveis de distância</td></tr>
+</table>
+</div>
+
+<h2>7. Contexto e identidade: useContext e useId</h2>
+
+<p><code>createContext</code> cria o canal; <code>useContext</code> lê o valor mais próximo na árvore. É o
+jeito de evitar passar a mesma prop por cinco níveis: tema, idioma, usuário logado, carrinho. O valor do
+provider muda, e todos os componentes que leem aquele contexto redesenham — por isso o contexto é para
+dado estável e amplo, não para tudo.</p>
+
+<div class="tryreact" data-goal="texto:loja: padaria da Ana">
+  <p class="try-task">O <code>Endereco</code> tem o nome da loja escrito à mão, mas o valor certo está no
+  provider. Leia com <code>useContext(Loja)</code> em vez de usar a string fixa.</p>
+  <pre class="jsx">const Loja = createContext("padaria");
+
+function Endereco() {
+  const nome = "padaria";
+  return &lt;p&gt;loja: {nome}&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;Loja.Provider value="padaria da Ana"&gt;
+      &lt;Endereco /&gt;
+    &lt;/Loja.Provider&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;p&gt;loja: padaria&lt;/p&gt;
+</pre>
+  <pre class="solucao">const Loja = createContext("padaria");
+
+function Endereco() {
+  const nome = useContext(Loja);
+  return &lt;p&gt;loja: {nome}&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;Loja.Provider value="padaria da Ana"&gt;
+      &lt;Endereco /&gt;
+    &lt;/Loja.Provider&gt;
+  );
+}</pre>
+</div>
+
+<p>No inicial, o filho ignora o provider e mostra o valor padrão. Na solução, ele lê o valor mais próximo e
+acompanha qualquer troca. Repare que o componente do meio não precisou existir: o contexto é para
+distância, e a prop continua sendo melhor para um nível.</p>
+
+<p><code>useId</code> gera um identificador único e estável, útil para ligar <code>label</code> e campo
+quando há vários formulários iguais na página. Ele serve para atributos de acessibilidade, não para
+<code>key</code> de lista — a <code>key</code> vem do dado. O formato do id é opaco de propósito: use como
+string, sem tentar interpretar.</p>
+
+<p>Um detalhe do contexto que evita erro silencioso: <code>createContext(valorPadrão)</code> define o que
+o <code>useContext</code> devolve quando não há provider acima. Esse padrão serve para o componente
+funcionar sozinho em teste; em produção, se ele aparecer na tela, falta o provider em algum lugar. Se o
+padrão for <code>undefined</code>, o componente quebra ao acessar um campo — o que é melhor do que mostrar
+um valor errado sem avisar.</p>
+
+<h2>8. Concorrência e hooks próprios</h2>
+
+<p><code>useTransition</code> e <code>useDeferredValue</code> tratam de trabalho pesado sem travar a
+digitação. O primeiro envolve uma atualização e devolve <code>isPending</code>, para você mostrar que algo
+está em andamento; o segundo entrega uma versão atrasada do valor, para a lista grande acompanhar a busca
+com um passo de atraso em vez de a cada tecla. Nenhum dos dois substitui <code>useMemo</code>: eles mudam
+a prioridade do trabalho, não a quantidade.</p>
+
+<pre class="file" data-file="Busca.jsx">const [texto, setTexto] = useState("");
+const [isPending, startTransition] = useTransition();
+
+function mudou(e) {
+  setTexto(e.target.value);                       // urgente: o campo
+  startTransition(() =&gt; setFiltro(e.target.value)); // não urgente: a lista
+}</pre>
+
+<p>Hooks próprios são funções <code>useAlgo</code> que juntam hooks e lógica para reaproveitar. Um
+<code>usePedido()</code> pode guardar carregando, dados e erro e devolver os três; um
+<code>useLocalStorage(chave)</code> pode ler, gravar e sincronizar. As regras são as mesmas de um hook do
+React: topo do hook, ordem estável, nome com <code>use</code>. O que muda é o dono.</p>
+
+<p>Existem hooks do React 19 que ainda não têm aula neste guia, mas aparecem em código por aí:
+<code>useActionState</code>, <code>useOptimistic</code>, <code>useSyncExternalStore</code> e
+<code>useDebugValue</code>. Nas caixas do guia, eles não estão no escopo direto — use o prefixo
+<code>React</code> (<code>React.useOptimistic</code>) se precisar experimentar. São assuntos de formulário
+com actions e de estado otimista, cobertos nas aulas de <a href="formularios-com-actions.html">formulários
+com actions</a> e <a href="atualizacao-otimista.html">atualização otimista</a>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sintoma</th><th>Hook envolvido</th><th>Conserto</th><th>Aula</th></tr>
+<tr><td>"Rendered more hooks than during the previous render"</td><td>qualquer um, fora de ordem</td><td>tirar o hook de dentro da condição</td><td><a href="regras-dos-hooks.html">As Regras dos Hooks</a></td></tr>
+<tr><td>laço infinito de render</td><td><code>useState</code>, <code>useEffect</code></td><td>setter fora do render; dependências completas</td><td><a href="dependencias.html">As Dependências</a></td></tr>
+<tr><td>valor sempre velho dentro da função</td><td><code>useCallback</code>, <code>useEffect</code></td><td>listar o que a função lê</td><td><a href="dependencias.html">As Dependências</a></td></tr>
+<tr><td>lista grande travando a digitação</td><td><code>useTransition</code>, <code>useDeferredValue</code></td><td>marcar a atualização como não urgente</td><td><a href="useDeferredValue.html">O useDeferredValue</a></td></tr>
+<tr><td>id repetido no DOM</td><td><code>useId</code></td><td>gerar um id por instância</td><td><a href="useId.html">O useId</a></td></tr>
+</table>
+</div>
+
+<p>Nenhum desses sintomas se resolve trocando o hook por outro. Todos vêm de ordem, dependência ou
+identidade — os três assuntos que atravessam a lista inteira. Quando a mensagem falar de hooks, desconfie
+da posição antes de desconfiar do valor.</p>
+
+<h2>Resumo</h2>
+
+<p>Hooks dão recursos ao componente e são reconhecidos pela ordem das chamadas. Por isso valem as duas
+regras: só no topo do componente ou de um hook próprio, e sempre na mesma ordem — nada de hook dentro de
+<code>if</code>, laço ou função interna. O ESLint avisa no editor; o React quebra em produção quando a
+contagem muda.</p>
+
+<p>Para estado, <code>useState</code> e, quando há regras, <code>useReducer</code>. Para sincronizar,
+<code>useEffect</code> e, quando precisa medir antes da pintura, <code>useLayoutEffect</code>. Para falar
+com o DOM ou guardar bastidor, <code>useRef</code>; para expor uma API pequena ao pai,
+<code>useImperativeHandle</code>. Para economizar trabalho, <code>useMemo</code> e
+<code>useCallback</code>, com <code>memo</code> no filho. Para distância, <code>useContext</code>; para
+ids acessíveis, <code>useId</code>; para não travar a digitação, <code>useTransition</code> e
+<code>useDeferredValue</code>.</p>
+
+<p>Na dúvida, escolha o hook mais simples que resolve o problema e só troque quando a dor aparecer: estado
+demais vira reducer, efeito demais vira conta no render, memoização demais vira ruído. Hooks próprios
+existem para juntar o que se repete — e são a melhor forma de esconder complexidade sem esconder
+comportamento.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Hook começa com <code>use</code> e só roda no topo do componente ou de outro hook.</li>
+<li>A ordem das chamadas é a identidade do estado: nunca mude entre renders.</li>
+<li><code>useState</code> para valor simples; <code>useReducer</code> para transições.</li>
+<li><code>useEffect</code> para fora do React; <code>useLayoutEffect</code> para medir.</li>
+<li>Cleanup no retorno do efeito: timer, listener e requisição.</li>
+<li><code>useRef</code> para DOM e bastidor; não para o que aparece na tela.</li>
+<li><code>useMemo</code> guarda valor; <code>useCallback</code> guarda função; <code>memo</code> guarda o
+desenho.</li>
+<li><code>useContext</code> para distância; prop para um nível.</li>
+<li><code>useId</code> para acessibilidade, não para <code>key</code>.</li>
+<li>A mensagem "Rendered more hooks" é ordem de hooks, não estado errado.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

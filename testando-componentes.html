@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Testando Componentes | Guia React</title>
+<meta name="description" content="Como testar componentes React: função pura, render de verdade, clique simulado, asserções por papel e texto, Vitest e Testing Library sem teste frágil.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Testando Componentes</span></h1>
+<p class="intro">Toda entrega do site da padaria passa pelo mesmo ritual: a Ana abre a página, clica em
+tudo, digita nos campos, troca de aba e diz “acho que está bom”. Na semana passada ela esqueceu de abrir a
+lista vazia, e foi justamente a lista vazia que o cliente viu primeiro. Testar componentes é transformar
+esse ritual em código que roda sozinho, em segundos, e que não esquece o caso que você esqueceu.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um teste, uma asserção e um teste que confere comportamento.</li>
+  <li>Como testar uma função pura sem nenhuma biblioteca, com um runner de vinte linhas.</li>
+  <li>Como montar um componente de verdade, clicar nele e conferir o que apareceu.</li>
+  <li>O que o React faz no navegador quando você renderiza fora da tela e por que o teste precisa de
+  <code>flushSync</code>.</li>
+  <li>Quais testes escrever primeiro e quais casos costumam ficar de fora.</li>
+  <li>Como achar um elemento por papel e nome em vez de por classe CSS.</li>
+  <li>O que torna um teste frágil — e por que teste frágil é pior do que teste nenhum.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a lista vazia que ninguém testou</h2>
+
+<p>O site da Ana tem uma página de encomendas com uma lista de pães reservados. Quando havia pães, tudo
+funcionava. Quando não havia, aparecia um espaço branco do tamanho de uma caixa e nada mais — nem uma
+frase, nem um aviso. Quem abria a página pela primeira vez concluía que o site estava quebrado e ia embora.
+O erro estava lá desde o começo; ninguém tinha visto porque ninguém abre a lista vazia de propósito.</p>
+
+<p>A Ana já sabia conferir o que fazia. O problema não era falta de cuidado, era falta de repetição: cada
+conferência era feita uma vez, à mão, no dia da entrega, e nunca mais. Uma conferência que não se repete
+não protege nada. Na aula anterior você viu o Strict Mode denunciando efeito sem limpeza; agora o assunto é
+o outro tipo de rede de segurança, a que continua funcionando quando você muda o código seis meses depois.</p>
+
+<p>Testar componente é isso: escrever, em código, o que o usuário deve ver e fazer, e deixar a máquina
+conferir. O teste não substitui o olho humano, mas ele nunca esquece e nunca está com pressa. E o melhor:
+ele conta a história do componente para quem chegar depois — inclusive para você mesmo, daqui a um ano.</p>
+
+<h2>2. As peças de um teste</h2>
+
+<p>Três palavras resolvem quase tudo. O <strong>teste</strong> é um bloco com nome que prepara uma
+situação, executa uma ação e confere um resultado. A <strong>asserção</strong> é a linha que diz o que
+deveria ser verdade — é ela que falha quando algo muda. E o <strong>runner</strong> é o programa que
+encontra os testes, roda todos, conta quantos passaram e mostra o motivo de cada falha.</p>
+
+<dl class="anatomy">
+<dt>teste</dt>
+<dd>Um bloco com nome, do tipo “soma um a cada clique”. Prepara, age e confere. Roda isolado dos
+outros.</dd>
+<dt>asserção</dt>
+<dd>A comparação que precisa ser verdadeira: “o texto da tela é Pedidos: 1”. Se for falsa, o teste
+falha.</dd>
+<dt>runner</dt>
+<dd>Quem organiza e executa os testes. No ecossistema React, o mais comum hoje é o Vitest; o
+<code>npm test</code> do projeto chama ele.</dd>
+<dt>teste de componente</dt>
+<dd>Monta o componente num navegador simulado, interage como o usuário e confere o que aparece na
+tela.</dd>
+<dt>teste frágil</dt>
+<dd>Teste que quebra quando você muda algo que o usuário não vê: uma classe CSS, um nome de estado, a
+estrutura das <code>div</code>s.</dd>
+<dt>comportamento</dt>
+<dd>O que a tela mostra e o que acontece quando a pessoa age. É o que um bom teste confere — não os
+detalhes internos de como o componente chegou lá.</dd>
+</dl>
+
+<p>O resto é vocabulário de ferramenta. Você vai ver <code>describe</code> para agrupar, <code>it</code>
+ou <code>test</code> para declarar um caso, <code>expect</code> para a asserção e
+<code>beforeEach</code> para preparar algo antes de cada teste. São nomes diferentes para as mesmas três
+ideias. A que importa nesta aula é a asserção: um teste sem asserção de verdade passa sempre e não protege
+nada.</p>
+
+<p>Comece pelo mais simples. Uma função que formata preço não tem estado, não tem tela e não tem efeito:
+dado um número, devolve um texto. Se ela errar, o erro aparece em três lugares da padaria ao mesmo tempo.
+Testar essa função é escrever a entrada, escrever a saída esperada e comparar.</p>
+
+<h2>3. A caixa: testando uma função pura</h2>
+
+<p>A caixa abaixo traz um runner mínimo, do tipo que cabe numa tela: uma variável que conta os testes, uma
+função <code>teste</code> que roda o caso dentro de um <code>try</code> e uma função <code>conferir</code>
+que lança erro quando a condição é falsa. O componente testado é o formatador de preço da padaria. Rode e
+veja o resultado.</p>
+
+<div class="tryreact" data-goal="texto:1 de 1">
+  <p class="try-task">O formatador devolve <code>R$ 12</code> e o teste espera <code>R$ 12,00</code>.
+  Conserte a função para que o teste passe e o painel mostre “1 de 1”.</p>
+  <pre class="jsx">let passou = 0;
+let total = 0;
+
+function teste(nome, fn) {
+  total = total + 1;
+  try {
+    fn();
+    passou = passou + 1;
+  } catch (erro) {
+    // o teste falhou: no console apareceria o motivo
+  }
+}
+
+function conferir(condicao, mensagem) {
+  if (!condicao) throw new Error(mensagem);
+}
+
+function formatarPreco(valor) {
+  return "R$ " + valor;
+}
+
+teste("12 vira R$ 12,00", function () {
+  conferir(formatarPreco(12) === "R$ 12,00", "esperava R$ 12,00");
+});
+
+function App() {
+  return &lt;p&gt;{passou} de {total} testes passaram&lt;/p&gt;;
+}</pre>
+  <pre class="out">
+&lt;p&gt;0 de 1 testes passaram&lt;/p&gt;
+</pre>
+  <pre class="solucao">let passou = 0;
+let total = 0;
+
+function teste(nome, fn) {
+  total = total + 1;
+  try {
+    fn();
+    passou = passou + 1;
+  } catch (erro) {
+    // o teste falhou: no console apareceria o motivo
+  }
+}
+
+function conferir(condicao, mensagem) {
+  if (!condicao) throw new Error(mensagem);
+}
+
+function formatarPreco(valor) {
+  return "R$ " + valor.toFixed(2).replace(".", ",");
+}
+
+teste("12 vira R$ 12,00", function () {
+  conferir(formatarPreco(12) === "R$ 12,00", "esperava R$ 12,00");
+});
+
+function App() {
+  return &lt;p&gt;{passou} de {total} testes passaram&lt;/p&gt;;
+}</pre>
+</div>
+
+<p>O painel mostra “0 de 1” no código inicial e “1 de 1” depois da correção. Repare no desenho: o
+resultado do teste não aparece na tela por mágica — o <code>App</code> lê as variáveis
+<code>passou</code> e <code>total</code> depois que os testes já rodaram. Num projeto de verdade, quem lê
+esses números é o runner, que imprime uma lista no terminal e devolve um código de saída: zero quando tudo
+passa, um quando algo falha. É esse código que a esteira de integração contínua consulta antes de publicar.</p>
+
+<p>Duas escolhas do runner valem comentário. A primeira é o <code>try</code>: um teste que lança erro não
+derruba os outros, e o runner continua até o fim para te mostrar o quadro completo. A segunda é a mensagem:
+<code>conferir</code> recebe um texto que diz o que era esperado. Sem isso, a falha vira “false is not
+true” e você perde dez minutos descobrindo qual comparação quebrou.</p>
+
+<p>Uma função pura não precisa de navegador, de React nem de nada: é o teste mais barato que existe e o
+primeiro que você deve escrever. Formatação de preço, cálculo de frete, filtro de busca, validação de
+telefone, conversão de data — tudo isso vive fora do componente, em arquivos comuns, e pode ser testado em
+milissegundos.</p>
+
+<h2>4. A caixa: testando um componente de verdade</h2>
+
+<p>Agora o teste precisa de tela. A caixa monta o componente num <code>div</code> que nunca entra na
+página, procura o botão, dispara um clique e confere o texto. É o mesmo caminho que as bibliotecas fazem
+por baixo — só que escrito à mão, para você ver as peças.</p>
+
+<div class="tryreact" data-goal="texto:2 de 2">
+  <p class="try-task">O botão soma no estado errado: o teste do clique falha e o painel mostra “1 de 2”.
+  Conserte o <code>onClick</code> para que os dois testes passem.</p>
+  <pre class="jsx">let passou = 0;
+let total = 0;
+
+function teste(nome, fn) {
+  total = total + 1;
+  try {
+    fn();
+    passou = passou + 1;
+  } catch (erro) {
+    // falhou
+  }
+}
+
+function conferir(condicao, mensagem) {
+  if (!condicao) throw new Error(mensagem);
+}
+
+function montar(elemento) {
+  const caixa = document.createElement("div");
+  ReactDOM.flushSync(function () {
+    ReactDOM.createRoot(caixa).render(elemento);
+  });
+  return caixa;
+}
+
+function Botao() {
+  const [n, setN] = useState(0);
+  const [enviados, setEnviados] = useState(0);
+  return (
+    &lt;button onClick={function () { setEnviados(enviados + 1); }}&gt;Pedidos: {n}&lt;/button&gt;
+  );
+}
+
+teste("mostra zero no começo", function () {
+  const tela = montar(&lt;Botao /&gt;);
+  conferir(tela.textContent === "Pedidos: 0", "esperava Pedidos: 0");
+});
+
+teste("soma um a cada clique", function () {
+  const tela = montar(&lt;Botao /&gt;);
+  const botao = tela.querySelector("button");
+  ReactDOM.flushSync(function () {
+    botao.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+  conferir(tela.textContent === "Pedidos: 1", "esperava Pedidos: 1");
+});
+
+function App() {
+  return &lt;p&gt;{passou} de {total} testes passaram&lt;/p&gt;;
+}</pre>
+  <pre class="out">
+&lt;p&gt;1 de 2 testes passaram&lt;/p&gt;
+</pre>
+  <pre class="solucao">let passou = 0;
+let total = 0;
+
+function teste(nome, fn) {
+  total = total + 1;
+  try {
+    fn();
+    passou = passou + 1;
+  } catch (erro) {
+    // falhou
+  }
+}
+
+function conferir(condicao, mensagem) {
+  if (!condicao) throw new Error(mensagem);
+}
+
+function montar(elemento) {
+  const caixa = document.createElement("div");
+  ReactDOM.flushSync(function () {
+    ReactDOM.createRoot(caixa).render(elemento);
+  });
+  return caixa;
+}
+
+function Botao() {
+  const [n, setN] = useState(0);
+  return (
+    &lt;button onClick={function () { setN(n + 1); }}&gt;Pedidos: {n}&lt;/button&gt;
+  );
+}
+
+teste("mostra zero no começo", function () {
+  const tela = montar(&lt;Botao /&gt;);
+  conferir(tela.textContent === "Pedidos: 0", "esperava Pedidos: 0");
+});
+
+teste("soma um a cada clique", function () {
+  const tela = montar(&lt;Botao /&gt;);
+  const botao = tela.querySelector("button");
+  ReactDOM.flushSync(function () {
+    botao.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+  conferir(tela.textContent === "Pedidos: 1", "esperava Pedidos: 1");
+});
+
+function App() {
+  return &lt;p&gt;{passou} de {total} testes passaram&lt;/p&gt;;
+}</pre>
+</div>
+
+<p>O primeiro teste passa nos dois casos, porque o estado inicial já estava certo. O segundo falha, e falha
+pelo motivo certo: o botão atualiza <code>enviados</code>, um estado que ninguém mostra na tela, enquanto
+o texto lê <code>n</code>. A tela continua em “Pedidos: 0” depois do clique. O teste encontrou o bug em
+duas linhas — e sem abrir o navegador à mão.</p>
+
+<p>Sobre o <code>montar</code>: ele cria um <code>div</code> solto, chama <code>ReactDOM.createRoot</code>
+e renderiza. Esse <code>div</code> nunca é anexado ao documento, então nada aparece na página de verdade e
+o teste não interfere no que o leitor está vendo. Já o <code>ReactDOM.flushSync</code> é a peça que garante
+que o React terminou de desenhar antes da próxima linha. Sem ele, o React pode agendar o desenho para
+depois e a asserção roda com a tela vazia — o teste falha e você culpa o componente errado.</p>
+
+<p>Em projetos com Testing Library, esse trabalho está empacotado. O teste real fica assim:</p>
+
+<pre class="file" data-file="src/Botao.test.jsx">import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { expect, test } from "vitest";
+import Botao from "./Botao.jsx";
+
+test("mostra zero no começo", () =&gt; {
+  render(&lt;Botao /&gt;);
+  expect(screen.getByRole("button", { name: "Pedidos: 0" })).toBeInTheDocument();
+});
+
+test("soma um a cada clique", async () =&gt; {
+  render(&lt;Botao /&gt;);
+  await userEvent.click(screen.getByRole("button", { name: "Pedidos: 0" }));
+  expect(screen.getByRole("button", { name: "Pedidos: 1" })).toBeInTheDocument();
+});</pre>
+
+<p>Compare com a caixa. <code>render</code> é o <code>montar</code>; <code>screen</code> é o
+<code>div</code> que você procuraria; <code>getByRole</code> é o <code>querySelector</code> que procura
+por papel e nome acessível; <code>userEvent.click</code> é o clique com <code>flushSync</code> embutido; e
+<code>expect</code> é o <code>conferir</code>. As bibliotecas também embrulham cada interação em
+<code>act</code>, uma função do React que avisa “vou mexer no estado agora, termine de desenhar antes de eu
+conferir”. Você não precisa escrever isso à mão, mas precisa saber que existe: é o motivo pelo qual o teste
+espera o clique com <code>await</code>.</p>
+
+<p>O <code>data-modo</code> da caixa é automático: o motor desta página roda o código sem Testing Library,
+então <code>montar</code> faz o papel dela. O importante não é decorar a caixa; é reconhecer as quatro
+etapas em qualquer ferramenta — preparar, renderizar, agir, conferir.</p>
+
+<h2>5. A caixa: o teste que encontra o caso esquecido</h2>
+
+<p>O caso da lista vazia é o mais fácil de deixar de fora, porque ele não aparece enquanto você desenvolve
+com dados de exemplo. A caixa escreve três testes para a lista: um para o vazio, um para a quantidade e um
+para o nome. Rode.</p>
+
+<div class="tryreact" data-goal="texto:3 de 3">
+  <p class="try-task">A lista vazia não avisa nada, e o primeiro teste falha: “2 de 3”. Faça o componente
+  mostrar <code>Nenhum pão por aqui</code> quando não houver pães.</p>
+  <pre class="jsx">let passou = 0;
+let total = 0;
+
+function teste(nome, fn) {
+  total = total + 1;
+  try {
+    fn();
+    passou = passou + 1;
+  } catch (erro) {
+    // falhou
+  }
+}
+
+function conferir(condicao, mensagem) {
+  if (!condicao) throw new Error(mensagem);
+}
+
+function montar(elemento) {
+  const caixa = document.createElement("div");
+  ReactDOM.flushSync(function () {
+    ReactDOM.createRoot(caixa).render(elemento);
+  });
+  return caixa;
+}
+
+function Lista(props) {
+  return (
+    &lt;ul&gt;
+      {props.paes.map(function (pao) { return &lt;li key={pao}&gt;{pao}&lt;/li&gt;; })}
+    &lt;/ul&gt;
+  );
+}
+
+teste("avisa quando não há pão", function () {
+  const tela = montar(&lt;Lista paes={[]} /&gt;);
+  conferir(tela.textContent.includes("Nenhum pão"), "esperava o aviso");
+});
+
+teste("desenha um item por pão", function () {
+  const tela = montar(&lt;Lista paes={["Francês", "Doce"]} /&gt;);
+  conferir(tela.querySelectorAll("li").length === 2, "esperava 2 itens");
+});
+
+teste("mostra o nome de cada pão", function () {
+  const tela = montar(&lt;Lista paes={["Francês"]} /&gt;);
+  conferir(tela.textContent.indexOf("Francês") !== -1, "esperava o nome");
+});
+
+function App() {
+  return &lt;p&gt;{passou} de {total} testes passaram&lt;/p&gt;;
+}</pre>
+  <pre class="out">
+&lt;p&gt;2 de 3 testes passaram&lt;/p&gt;
+</pre>
+  <pre class="solucao">let passou = 0;
+let total = 0;
+
+function teste(nome, fn) {
+  total = total + 1;
+  try {
+    fn();
+    passou = passou + 1;
+  } catch (erro) {
+    // falhou
+  }
+}
+
+function conferir(condicao, mensagem) {
+  if (!condicao) throw new Error(mensagem);
+}
+
+function montar(elemento) {
+  const caixa = document.createElement("div");
+  ReactDOM.flushSync(function () {
+    ReactDOM.createRoot(caixa).render(elemento);
+  });
+  return caixa;
+}
+
+function Lista(props) {
+  if (props.paes.length === 0) {
+    return &lt;p&gt;Nenhum pão por aqui&lt;/p&gt;;
+  }
+  return (
+    &lt;ul&gt;
+      {props.paes.map(function (pao) { return &lt;li key={pao}&gt;{pao}&lt;/li&gt;; })}
+    &lt;/ul&gt;
+  );
+}
+
+teste("avisa quando não há pão", function () {
+  const tela = montar(&lt;Lista paes={[]} /&gt;);
+  conferir(tela.textContent.includes("Nenhum pão"), "esperava o aviso");
+});
+
+teste("desenha um item por pão", function () {
+  const tela = montar(&lt;Lista paes={["Francês", "Doce"]} /&gt;);
+  conferir(tela.querySelectorAll("li").length === 2, "esperava 2 itens");
+});
+
+teste("mostra o nome de cada pão", function () {
+  const tela = montar(&lt;Lista paes={["Francês"]} /&gt;);
+  conferir(tela.textContent.indexOf("Francês") !== -1, "esperava o nome");
+});
+
+function App() {
+  return &lt;p&gt;{passou} de {total} testes passaram&lt;/p&gt;;
+}</pre>
+</div>
+
+<p>Os dois últimos testes passam no código inicial: a lista com dois pães desenha dois itens e mostra o
+nome. Só o primeiro falha, e ele é o que o cliente encontrou. O valor do teste não está em provar que o
+componente funciona — está em provar que ele funciona no caso que você não ia lembrar de abrir.</p>
+
+<p>Repare também no tipo de asserção. Nenhum teste olha para o estado interno da <code>Lista</code>, para
+o nome da função ou para a classe CSS: eles olham para o texto e para a quantidade de itens. Isso importa
+porque o teste precisa continuar valendo quando você mudar a implementação. Se amanhã a lista passar a usar
+<code>useMemo</code> ou um componente <code>Item</code>, os testes continuam iguais; se amanhã ela parar de
+avisar o vazio, os testes quebram na hora.</p>
+
+<p>Escrever o teste antes do código — a tal de TDD — é opcional, mas escrever o teste <em>junto</em> com o
+caso que você acabou de consertar não é. Todo bug que chega na mão da Ana merece um teste que falharia se
+ele voltasse. É um investimento de dez minutos que impede a reincidência.</p>
+
+<h2>6. Que tipo de teste escrever</h2>
+
+<p>Existem camadas, e elas custam preços diferentes. O teste de função pura roda em milissegundos e não
+sabe nada de tela. O teste de componente monta o React, espera o desenho e interage. O teste de ponta a
+ponta abre um navegador de verdade, navega entre páginas e conversa com o servidor. Quanto mais alto o
+nível, mais confiança ele dá e mais lento e frágil ele fica.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>O que cobre</th><th>Velocidade</th><th>Quantos escrever</th></tr>
+<tr><td>função pura</td><td>formatação, cálculo, validação, filtro</td><td>milissegundos</td><td>todos os casos de borda</td></tr>
+<tr><td>componente</td><td>o que aparece na tela e o que o clique faz</td><td>dezenas de milissegundos</td><td>os fluxos de cada tela</td></tr>
+<tr><td>integração</td><td>duas ou três peças juntas: formulário e lista, por exemplo</td><td>centenas de milissegundos</td><td>os caminhos principais</td></tr>
+<tr><td>ponta a ponta</td><td>o site inteiro num navegador de verdade</td><td>segundos</td><td>poucos: login, encomenda, pagamento</td></tr>
+</table>
+</div>
+
+<p>A proporção saudável é uma pirâmide: muitos testes de função pura, uma boa camada de componentes, poucos
+de integração e um punhado de ponta a ponta. Se todo teste for de ponta a ponta, a suíte demora vinte
+minutos e ninguém roda antes de publicar. Se nenhum for, você descobre o bug da lista vazia na casa do
+cliente.</p>
+
+<p>Quando o projeto tem testes, o terminal passa a ser uma fonte de informação diária. A saída do
+<code>npm test</code>, com cinco testes espalhados em dois arquivos, é esta:</p>
+
+<pre class="term"> ✓ src/Preco.test.jsx (3 testes) 12ms
+ ✓ src/Lista.test.jsx (2 testes) 18ms
+
+ Testes  5 passaram (5)</pre>
+
+<p>O <code>✓</code> é o teste que passou, o número entre parênteses é a contagem do arquivo e a última
+linha é o resumo. Quando algo falha, o runner destaca o arquivo e o nome do caso, e mostra a comparação.
+Vale aprender a ler essa saída com calma: o nome do teste bem escrito já diz o que quebrou, e a comparação
+diz o que era esperado contra o que veio.</p>
+
+<h2>7. Conferir pelo que a pessoa vê</h2>
+
+<p>A decisão mais importante de um teste de componente é como achar o elemento. A tentação é usar classe
+CSS, porque é o que você tem à mão. O problema é que classe muda quando o visual muda, e aí o teste quebra
+sem que nada de errado tenha acontecido com o comportamento. A alternativa é procurar pelo que o usuário
+percebe: o papel do elemento e o nome dele.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Como procurar</th><th>Serve para</th><th>Acha mesmo quando</th></tr>
+<tr><td><code>getByRole("button", { name: "Encomendar" })</code></td><td>botões, links, campos, títulos</td><td>muda a classe, muda a cor, muda o texto ao redor</td></tr>
+<tr><td><code>getByLabelText("Cliente")</code></td><td>campo de formulário com rótulo</td><td>muda o <code>id</code>, muda a ordem</td></tr>
+<tr><td><code>getByText("Nenhum pão por aqui")</code></td><td>mensagens e textos soltos</td><td>muda a estrutura em volta</td></tr>
+<tr><td><code>getByPlaceholderText("Buscar pão")</code></td><td>campo sem rótulo visível</td><td>— (prefira rótulo)</td></tr>
+<tr><td><code>container.querySelector(".card")</code></td><td>nada que o usuário veja</td><td>quase nunca: quebra fácil</td></tr>
+</table>
+</div>
+
+<p>Procurar por papel também melhora o site. Se o teste não encontra um botão pelo papel, é porque o
+elemento não é um botão — provavelmente é uma <code>div</code> com <code>onClick</code>, que o teclado não
+alcança e o leitor de tela não anuncia. O teste vira uma conferência de acessibilidade de graça, como você
+viu em <a href="acessibilidade.html">Acessibilidade</a>. Um componente difícil de testar por papel
+costuma ser um componente difícil de usar.</p>
+
+<p>Duas convenções ajudam a manter a suíte legível. A primeira: um comportamento por teste, com nome que
+descreve a expectativa — “avisa quando não há pão” diz mais do que “teste da lista 2”. A segunda: prefira
+asserções que apontam para o resultado visível. Comparar o <code>textContent</code> inteiro é bom quando o
+texto é curto e estável; procurar um trecho é melhor quando há números ou datas no meio.</p>
+
+<p>E cuidado com o excesso de detalhe. Conferir que o componente chamou uma função três vezes, que o estado
+interno virou <code>true</code> ou que a <code>div</code> tem a classe <code>ativo</code> é testar a
+implementação, não o comportamento. No dia em que você trocar a implementação por uma melhor, os testes
+quebram e você perde a confiança neles. Teste o que o usuário vê; o resto é conversa interna do
+componente.</p>
+
+<h2>8. Quando o teste falha</h2>
+
+<p>Uma falha bem reportada é metade do valor de uma suíte. O runner diz onde, qual caso e qual era a
+expectativa. Um exemplo real, do botão que somava no estado errado:</p>
+
+<pre class="term"> FAIL  src/Botao.test.jsx > soma um a cada clique
+ AssertionError: esperava Pedidos: 1
+
+ - Pedidos: 0
+ + Pedidos: 1
+
+ Testes  1 falhou | 1 passou (2)</pre>
+
+<p>O sinal de menos é o que veio, o de mais é o que era esperado. Com essa informação você vai direto ao
+<code>onClick</code>. O que não se deve fazer é o contrário: mudar a asserção para <code>Pedidos: 0</code>
+só para o teste passar. Teste que é ajustado para aceitar o bug deixa de ser teste e vira decoração.</p>
+
+<p>A outra armadilha é o teste que passa sempre. Um caso com asserção fraca, do tipo “o container não é
+nulo”, passa com o componente completamente quebrado. Um teste só vale se ele pudesse falhar: escreva a
+asserção pensando no que estaria errado se o bug existisse, e desconfie de qualquer teste que nunca falhou
+na vida.</p>
+
+<p>Vale também saber o que <em>não</em> testar. Não escreva teste para biblioteca de terceiros, para o
+React, para o roteador. Não teste detalhe de CSS — se a cor está certa, isso é conversa de revisão visual.
+Não tente cobrir 100% das linhas: persiga os casos que doem, os que já quebraram e os que ninguém lembra de
+abrir, como a lista vazia, o campo em branco e o erro de rede.</p>
+
+<p>Por último, uma ligação com a aula anterior. O <a href="strict-mode.html">Strict Mode</a> chama seu
+componente duas vezes em desenvolvimento; se um teste falha só quando você o roda duas vezes, provavelmente
+há escrita no desenho ou efeito sem limpeza. Teste e modo estrito se completam: um procura o caso
+esquecido, o outro procura a escrita escondida.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o teste que quebrava a cada mudança de cor</h3>
+<p>A primeira suíte da Ana procurava tudo por classe: <code>.card-botao</code>,
+<code>.lista-ativa</code>. Bastou o designer renomear as classes para trinta testes falharem de uma vez,
+sem nenhum bug. A reescrita levou uma tarde e trocou tudo por papel e texto: botão por
+<code>getByRole</code>, campo por <code>getByLabelText</code>, mensagem por <code>getByText</code>. Depois
+disso, mudar a aparência parou de assustar.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o formulário que passava nos testes e falhava no site</h3>
+<p>O teste do formulário de encomenda conferia que o estado mudava ao digitar, e passava. No site, a
+encomenda não saía: o botão estava desabilitado por uma condição que o teste nunca exercitou. O conserto
+foi trocar a asserção de estado por uma asserção de comportamento — digitar, clicar, esperar o texto de
+confirmação — e o teste passou a olhar a mesma coisa que o cliente.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o bug que voltou três vezes</h3>
+<p>Um problema de arredondamento no preço voltava a cada mudança na tela de carrinho. Na terceira vez, a
+Ana escreveu um teste de função pura com os quatro casos que já tinham quebrado: 0,10 + 0,20, desconto de
+10% e frete grátis. Nunca mais voltou. O teste levou quinze minutos e economizou três atendimentos e duas
+tardes de investigação.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. O que um teste de componente deve conferir?</p>
+<label><input type="radio" name="q1"> o nome dos estados internos e a ordem dos hooks</label>
+<label><input type="radio" name="q1"> quantas vezes o componente foi desenhado</label>
+<label><input type="radio" name="q1"> o que a tela mostra e o que acontece quando a pessoa age</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. Por que evitar procurar elementos por classe CSS?</p>
+<label><input type="radio" name="q2"> porque a classe muda com o visual e o teste quebra sem bug</label>
+<label><input type="radio" name="q2"> porque o <code>querySelector</code> não funciona em testes</label>
+<label><input type="radio" name="q2"> porque classes são mais lentas que papéis</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. Quantos testes de ponta a ponta vale ter?</p>
+<label><input type="radio" name="q3"> um para cada componente da aplicação</label>
+<label><input type="radio" name="q3"> poucos, só nos fluxos que não podem falhar</label>
+<label><input type="radio" name="q3"> nenhum, porque são lentos</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: escreva a conferência</h2>
+<p>O teste abaixo garante que a lista vazia avisa em vez de mostrar uma caixa sem nada. Complete a
+comparação com o texto exato que o componente deve mostrar nesse caso.</p>
+<div class="ex-code">teste("lista vazia avisa", function () {
+  const tela = montar(&lt;Lista paes={[]} /&gt;);
+  conferir(tela.textContent === <input aria-label="resposta 1" data-answer="&quot;Nenhum pão por aqui&quot;|'Nenhum pão por aqui'">, "mensagem errada");
+});</div>
+<p class="ex-dica">Dica: é o texto que o componente devolve no caso vazio, entre aspas — do jeito que
+apareceria na tela.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Um teste é um bloco com nome que prepara, age e confere. A asserção é a parte que importa: se ela não
+puder falhar, o teste não protege nada. Comece pelas funções puras, que rodam em milissegundos, e suba para
+o componente quando o assunto for tela. Renderizar fora do documento, procurar o elemento, simular a
+interação e comparar o texto é o desenho que está por baixo de qualquer biblioteca.</p>
+
+<p>Confira pelo que a pessoa vê: papel, rótulo, texto. Classe CSS, estado interno e número de desenhos são
+detalhes de implementação — e teste preso a detalhe quebra sem bug, o que ensina o time a ignorar falha.
+Cubra os casos que doem: lista vazia, campo em branco, erro de rede, o bug que já voltou uma vez.</p>
+
+<p>Com isso você fechou o Nível 3. Você viu o React de verdade: build, rotas, desempenho, Suspense,
+Actions, acessibilidade, os erros que se repetem, o Strict Mode e agora os testes. O passo seguinte é
+juntar tudo em um projeto inteiro, começando por
+<a href="projeto-lista-de-tarefas.html">Lista de Tarefas</a>.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Teste = preparar, agir, conferir. Sem asserção forte, não é teste.</li>
+<li>Função pura primeiro: é o teste mais barato e o que mais pega bug de conta.</li>
+<li>Monte o componente num <code>div</code> solto e espere o desenho antes de conferir.</li>
+<li>Em projeto real, <code>render</code>, <code>screen</code>, <code>userEvent</code> e <code>act</code>
+fazem o trabalho da caixa.</li>
+<li>Procure por papel e nome acessível: o teste fica estável e ainda confere acessibilidade.</li>
+<li>Não confira classe, estado interno nem contagem de desenhos.</li>
+<li>Nunca ajuste a asserção para aceitar o bug.</li>
+<li>Todo bug que chega ao cliente merece um teste que falharia se ele voltasse.</li>
+<li>Poucos testes de ponta a ponta, nos fluxos que não podem falhar.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

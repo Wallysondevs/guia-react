@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Publicando | Guia React</title>
+<meta name="description" content="Publicar um site React: o que sobe do dist para o host, o base path certo, a regra de rewrite contra o 404, HTTPS, cache e a conferência final.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Publicando</span></h1>
+<p class="intro">O site da Ana funciona no notebook dela: <code>npm run dev</code>, a página abre em
+<code>localhost:5173</code> e tudo roda. O problema é que cliente não entra no notebook dela. Para mandar
+o link no grupo da padaria, o site precisa morar num computador que responda na internet. Nesta aula a
+Ana leva o <code>dist/</code> até um host de verdade, acerta o endereço, resolve os 404 de quem recarrega
+a página e confere tudo com calma antes de avisar a primeira cliente.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que exatamente sobe para o servidor — e o que nunca sobe.</li>
+  <li>As três opções de lugar para publicar e a diferença entre elas.</li>
+  <li>Por que o <code>base</code> quebra todas as imagens quando o site fica numa subpasta.</li>
+  <li>A regra de rewrite que evita o 404 ao recarregar uma rota.</li>
+  <li>O que é conteúdo misto e por que o navegador bloqueia.</li>
+  <li>Por que nada no bundle é segredo.</li>
+  <li>Cache, versões e como voltar atrás em um minuto.</li>
+  <li>O roteiro de conferência depois de cada publicação.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o site que só existe no notebook</h2>
+
+<p>Há um mês a Ana roda o projeto com <code>npm run dev</code>. O comando sobe um servidor de
+desenvolvimento que entrega a página, observa os arquivos e recarrega o navegador a cada alteração. É
+ótimo para trabalhar e péssimo para mostrar: aquele servidor só escuta o próprio computador, some quando
+ela fecha o terminal e não tem endereço público.</p>
+
+<p>Publicar é mudar de pergunta. Em vez de "como faço o site rodar na minha máquina?", passa a ser "como
+faço um computador na internet entregar estes arquivos para qualquer pessoa?". A resposta é mais simples
+do que parece: o site é um punhado de arquivos estáticos, e alguém precisa servi-los por HTTP.</p>
+
+<p>Na aula de <a href="build-de-producao.html">build de produção</a> a Ana gerou o <code>dist/</code>:
+um <code>index.html</code> pequeno, um JavaScript grande já minificado e otimizado, o CSS e as imagens.
+Nada daquilo precisa de Node para rodar — é HTML, CSS e JavaScript comuns. O que falta é um lugar para
+morar.</p>
+
+<h2>2. O que sobe: o conteúdo de dist</h2>
+
+<p>Sobe o conteúdo de <code>dist/</code>, não o projeto. O <code>src/</code> com os arquivos
+<code>.jsx</code>, o <code>package.json</code> e o <code>node_modules</code> ficam no notebook. O
+navegador não sabe o que é JSX: quem transforma o JSX em JavaScript é o build, e o resultado é o que o
+host serve.</p>
+
+<p>Como o site é só arquivos, o servidor pode ser bem bobo. Ele recebe um caminho
+(<code>/assets/index-9f2c.js</code>), procura o arquivo e devolve com o tipo certo. Não há banco de dados
+nem código de servidor envolvido — e é justamente por isso que publicar React é fácil e barato.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde publicar</th><th>Como o arquivo chega lá</th><th>O que você ganha</th><th>O que precisa saber</th></tr>
+<tr><td>Host estático (Netlify, Vercel, Cloudflare Pages)</td><td>arrastar a pasta <code>dist</code> ou ligar o repositório</td><td>HTTPS, domínio e rollback prontos</td><td>você configura o rewrite por um arquivo; o build costuma rodar lá</td></tr>
+<tr><td>Uma VPS com nginx</td><td><code>scp</code> dos arquivos para <code>/var/www</code></td><td>controle total e custo fixo</td><td>você cuida de HTTPS, rewrite e cache na mão</td></tr>
+<tr><td>GitHub Pages</td><td>um <em>push</em> para a branch de publicação</td><td>grátis e simples para site pequeno</td><td>a subpasta vira o <code>base</code>; rewrite não existe, só hash</td></tr>
+</table>
+</div>
+
+<p>As três opções servem para a padaria. A diferença está em quem cuida das três configurações que vêm a
+seguir — endereço, rewrite e HTTPS —, e é sobre elas que a aula trata. O lugar é o de menos; o que quebra
+o site é a configuração.</p>
+
+<dl class="anatomy">
+<dt>dist</dt>
+<dd>A pasta que o build gera: o site pronto para ser servido, com <code>index.html</code> e
+<code>assets/</code>.</dd>
+<dt>host estático</dt>
+<dd>Serviço que só entrega arquivos por HTTP, sem executar código no servidor. Não sabe o que é React —
+o que é uma vantagem.</dd>
+<dt>domínio</dt>
+<dd>O nome que as pessoas digitam (<code>loja.test</code>), apontado para o endereço do host por um
+registro DNS.</dd>
+<dt>base</dt>
+<dd>O prefixo do endereço em que o site vai morar. <code>/</code> para a raiz,
+<code>/padaria/</code> para uma subpasta. Entra na configuração do build.</dd>
+<dt>rewrite</dt>
+<dd>A regra do host que devolve o <code>index.html</code> para caminhos que não são arquivos. Sem ela,
+recarregar uma rota dá 404.</dd>
+<dt>HTTPS</dt>
+<dd>O HTTP com criptografia. Hoje é padrão: sem ele o navegador avisa "não seguro" e várias APIs se
+recusam a responder.</dd>
+</dl>
+
+<h2>3. O endereço do site e o base</h2>
+
+<p>O primeiro detalhe que pega todo mundo é onde o site fica. Na raiz do domínio
+(<code>https://loja.test/</code>) não há prefixo nenhum. Numa subpasta
+(<code>https://loja.test/padaria/</code>), todo arquivo precisa ser pedido com o prefixo:
+<code>/padaria/assets/index-9f2c.js</code>.</p>
+
+<p>Quem escreve esses caminhos é o build. No Vite, a configuração se chama <code>base</code> e vale
+<code>"/"</code> por padrão. Se você publica numa subpasta e esquece de mudar, o <code>index.html</code>
+pede <code>/assets/...</code>, o host não tem esse arquivo na raiz e o navegador recebe 404 em tudo. O
+sintoma é uma tela branca com o console cheio.</p>
+
+<div class="tryreact" data-goal="attr:a|href=/padaria/assets/cardapio.pdf">
+  <p class="try-task">O site vai morar em <code>https://loja.test/padaria/</code>, mas o
+  <code>base</code> ainda é a raiz. Ajuste o prefixo para que o link do cardápio aponte para
+  <code>/padaria/assets/cardapio.pdf</code>.</p>
+  <pre class="jsx">function App() {
+  const base = "/";
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Publicado em https://loja.test/padaria/&lt;/p&gt;
+      &lt;p&gt;
+        &lt;a href={base + "assets/cardapio.pdf"}&gt;Cardápio em PDF&lt;/a&gt;
+      &lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Publicado em https://loja.test/padaria/&lt;/p&gt;
+  &lt;p&gt;&lt;a href="/assets/cardapio.pdf"&gt;Cardápio em PDF&lt;/a&gt;&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const base = "/padaria/";
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Publicado em https://loja.test/padaria/&lt;/p&gt;
+      &lt;p&gt;
+        &lt;a href={base + "assets/cardapio.pdf"}&gt;Cardápio em PDF&lt;/a&gt;
+      &lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Uma barra no fim faz diferença: <code>"/padaria"</code> e <code>"/padaria/"</code> produzem caminhos
+diferentes quando grudados num nome de arquivo. A convenção é sempre terminar com barra. No projeto de
+verdade, isso não fica numa constante do componente: fica no <code>vite.config.js</code>, e o Vite
+reescreve os caminhos do <code>index.html</code> e das importações de CSS e imagem por você.</p>
+
+<pre class="term">GET https://loja.test/assets/index-9f2c.js 404 (Not Found)
+Failed to load module script: Expected a JavaScript module script but the server responded with a MIME type of "text/html".</pre>
+
+<p>A segunda linha confunde porque fala de tipo, não de arquivo ausente: quando o host não acha o
+JavaScript, ele devolve o <code>index.html</code> (a página de erro amigável), e o navegador recebe HTML
+onde esperava script. Sempre que você vir essa mensagem, desconfie do caminho — quase sempre é o
+<code>base</code>.</p>
+
+<h2>4. As rotas que o servidor não conhece</h2>
+
+<p>O segundo tropeço aparece na primeira vez que alguém recarrega uma página interna. O site construído
+tem <strong>um</strong> <code>index.html</code>; as "páginas" são desenhadas pelo React depois que o
+JavaScript roda. Para o host, <code>/pedido/3</code> é um caminho que não existe no disco.</p>
+
+<p>Resultado: a cliente clica em "Pedidos", navega sem problema, e no dia seguinte abre o link salvo e
+recebe 404. O servidor não sabe que aquele caminho é uma página do aplicativo. A solução é uma regra
+chamada rewrite (ou fallback): se o caminho não corresponde a um arquivo de verdade, entregue o
+<code>index.html</code> e deixe o React decidir o que desenhar.</p>
+
+<div class="tryreact" data-goal="texto:/pedido/3 → index.html;;texto:/assets/app.js → assets/app.js">
+  <p class="try-task">O host devolve 404 para <code>/pedido/3</code> ao recarregar, mas não pode devolver
+  <code>index.html</code> para o JavaScript. Escreva a regra: arquivo existente é servido; o resto cai no
+  <code>index.html</code>.</p>
+  <pre class="jsx">function servidor(caminho) {
+  if (caminho === "/" || caminho === "/index.html") return "index.html";
+  return "404.html";
+}
+
+function App() {
+  const caminhos = ["/", "/pedido/3", "/assets/app.js"];
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;O que o host devolve&lt;/h1&gt;
+      &lt;ul&gt;
+        {caminhos.map((c) =&gt; (
+          &lt;li key={c}&gt;{c + " → " + servidor(c)}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;O que o host devolve&lt;/h1&gt;
+  &lt;ul&gt;
+    &lt;li&gt;/ → index.html&lt;/li&gt;
+    &lt;li&gt;/pedido/3 → 404.html&lt;/li&gt;
+    &lt;li&gt;/assets/app.js → 404.html&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function servidor(caminho) {
+  if (caminho.startsWith("/assets/")) return caminho.slice(1);
+  return "index.html";
+}
+
+function App() {
+  const caminhos = ["/", "/pedido/3", "/assets/app.js"];
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;O que o host devolve&lt;/h1&gt;
+      &lt;ul&gt;
+        {caminhos.map((c) =&gt; (
+          &lt;li key={c}&gt;{c + " → " + servidor(c)}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A ordem das condições é a regra inteira: primeiro os arquivos (e as pastas de arquivos, como
+<code>/assets/</code>), depois o fallback. Quem inverte isso entrega HTML no lugar de JavaScript e cai
+justamente na mensagem de tipo da seção anterior.</p>
+
+<p>No nginx a regra se chama <code>try_files $uri $uri/ /index.html;</code>. No Netlify, uma linha no
+arquivo de configuração: <code>/*  /index.html  200</code>. No GitHub Pages não existe rewrite — e é por
+isso que ele combina com rotas por hash, em que o caminho depois do <code>#</code> nunca chega ao
+servidor. As duas soluções resolvem o mesmo problema; escolha conforme o host.</p>
+
+<h2>5. HTTPS e o conteúdo misto</h2>
+
+<p>Hoje o navegador trata HTTP sem criptografia como site suspeito: mostra "não seguro" na barra e, em
+alguns recursos, nem deixa funcionar. Câmera, microfone, área de transferência e service workers exigem um
+contexto seguro. Publicar sem HTTPS, em 2026, é publicar com um aviso vermelho no rosto do cliente.</p>
+
+<p>O problema clássico é a mistura: a página vem por HTTPS e um recurso vem por HTTP. O navegador bloqueia
+o recurso — e a página funciona pela metade. Acontece com uma imagem do cardápio hospedada em outro
+servidor, com a chamada de uma API antiga e com o script de um serviço de mapa.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Pão francês">
+  <p class="try-task">A página é servida por HTTPS, mas o cardápio é pedido por HTTP e o navegador
+  bloqueia. Troque o endereço do cardápio para HTTPS. A missão clica em Carregar e confere que os itens
+  aparecem.</p>
+  <pre class="jsx">function carregarCardapio(url) {
+  if (!url.startsWith("https://")) {
+    return Promise.reject(new Error("bloqueado: conteúdo misto"));
+  }
+  return Promise.resolve(["Pão francês", "Broa de milho"]);
+}
+
+function App() {
+  const [itens, setItens] = useState([]);
+  const [erro, setErro] = useState("");
+
+  function carregar() {
+    setErro("");
+    carregarCardapio("http://192.0.2.10/cardapio.json")
+      .then(setItens)
+      .catch((e) =&gt; setErro(e.message));
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={carregar}&gt;Carregar cardápio&lt;/button&gt;
+      {erro &amp;&amp; &lt;p&gt;Erro: {erro}&lt;/p&gt;}
+      &lt;ul&gt;
+        {itens.map((i) =&gt; (
+          &lt;li key={i}&gt;{i}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Carregar cardápio&lt;/button&gt;
+  &lt;ul&gt;&lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function carregarCardapio(url) {
+  if (!url.startsWith("https://")) {
+    return Promise.reject(new Error("bloqueado: conteúdo misto"));
+  }
+  return Promise.resolve(["Pão francês", "Broa de milho"]);
+}
+
+function App() {
+  const [itens, setItens] = useState([]);
+  const [erro, setErro] = useState("");
+
+  function carregar() {
+    setErro("");
+    carregarCardapio("https://192.0.2.10/cardapio.json")
+      .then(setItens)
+      .catch((e) =&gt; setErro(e.message));
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={carregar}&gt;Carregar cardápio&lt;/button&gt;
+      {erro &amp;&amp; &lt;p&gt;Erro: {erro}&lt;/p&gt;}
+      &lt;ul&gt;
+        {itens.map((i) =&gt; (
+          &lt;li key={i}&gt;{i}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A troca é de uma letra, e o erro que o navegador dá no console é bem explícito:</p>
+
+<pre class="term">Mixed Content: The page at 'https://loja.test/padaria/' was loaded over HTTPS, but requested an insecure
+resource 'http://192.0.2.10/cardapio.json'. This request has been blocked.</pre>
+
+<p>Se o outro servidor ainda não tem HTTPS, a saída não é voltar atrás: é usar o certificado gratuito
+(Let's Encrypt ou o do próprio host) ou passar por um intermediário que já fale HTTPS. Em último caso,
+hospede a imagem ou o JSON no mesmo domínio do site.</p>
+
+<h2>6. O que é público: segredos e configuração</h2>
+
+<p>Aqui vai o aviso mais importante da aula. <strong>Tudo</strong> que entra no bundle é público: o
+JavaScript vai para o navegador do cliente, e qualquer pessoa abre o DevTools e lê. Variáveis de ambiente
+do front não escondem nada — elas são substituídas por texto no momento do build.</p>
+
+<p>Então: chave de API paga, senha de banco, token de administração — nada disso pode estar no
+<code>src/</code>. O padrão é o inverso: o front chama uma API sua, e é a API que fala com o banco e
+guarda os segredos. Se o site precisa de uma função pequena no servidor, os hosts modernos oferecem
+funções serverless, e uma VPS já tem Node disponível.</p>
+
+<p>A configuração legítima é outra coisa: o endereço da API, o nome da padaria, um flag de
+homologação. Esses valores podem ser públicos, e o build os injeta com
+<code>import.meta.env</code> — a aula de <a href="variaveis-de-ambiente.html">variáveis de ambiente</a>
+mostra o arquivo e o prefixo que o Vite exige. A armadilha é acreditar que mudar o <code>.env</code> no
+servidor muda o site publicado: não muda. O valor foi assado no build; para trocar, build e publicação de
+novo.</p>
+
+<h2>7. Publicar de novo: cache, versões e rollback</h2>
+
+<p>Publicar não é um evento único. A Ana muda um preço, roda o build, envia os arquivos — e a cliente jura
+que o preço antigo continua na tela. É cache: o navegador guardou o JavaScript e não vai pedir de novo só
+porque você trocou o arquivo no servidor.</p>
+
+<p>O build resolve isso dando nomes novos a cada versão: <code>index-9f2c.js</code> vira
+<code>index-a41b.js</code> quando o conteúdo muda. O navegador nunca tem o arquivo novo guardado com o
+nome novo, então baixa. O <code>index.html</code>, por outro lado, precisa ser sempre revalidado — se ele
+ficar guardado por uma semana, o cliente continua pedindo o JavaScript antigo, porque é o nome antigo que
+está escrito nele.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Arquivo</th><th>O nome muda a cada build?</th><th>Como deve ser servido</th></tr>
+<tr><td><code>index.html</code></td><td>não</td><td>sem cache longo: <code>no-cache</code> ou poucos minutos</td></tr>
+<tr><td><code>assets/index-a41b.js</code>, <code>assets/app-b7d1.css</code></td><td>sim, com hash</td><td>cache longo, do tipo <code>immutable</code></td></tr>
+<tr><td>imagem que você mesmo copiou (<code>logo.png</code>)</td><td>não</td><td>troque o nome quando trocar a imagem</td></tr>
+<tr><td>JSON ou texto vindo de API</td><td>—</td><td>o servidor decide; aqui não há build</td></tr>
+</table>
+</div>
+
+<p>Duas práticas deixam o dia da Ana tranquilo. A primeira: subir os arquivos novos numa pasta separada e
+só então trocar o que o host aponta (ou usar o "deploy" do host estático, que já é atômico). Assim ninguém
+vê o site pela metade. A segunda: guardar a versão anterior. Se o preço sair errado, a volta é promover a
+publicação antiga — um clique no host estático, um <code>cp</code> na VPS — em vez de caçar o commit certo
+com a loja no ar.</p>
+
+<h2>8. A conferência depois de publicar</h2>
+
+<p>Abrir a home e dizer "funcionou" é a metade da conferência. O roteiro completo cabe em cinco minutos e
+evita o telefonema constrangedor:</p>
+
+<p><strong>1) Abra numa aba anônima.</strong> Sem cache e sem sessão, você vê o que o cliente novo vê.
+<strong>2) Confira o console.</strong> Erro vermelho na home publicada costuma ser caminho de arquivo ou
+chave faltando. <strong>3) Recarregue numa rota interna.</strong> É o teste do rewrite; se der 404, a
+regra não está lá. <strong>4) Digite um endereço errado.</strong> O 404 deve ser o seu, com o caminho de
+volta — a aula de <a href="rota-404.html">rota 404</a> cuida disso. <strong>5) Veja no celular.</strong>
+A tela pequena e a rede lenta revelam o que o notebook esconde.</p>
+
+<p>Para olhar de verdade, use a aba Network: os arquivos devem vir com 200, o JavaScript com
+<code>text/javascript</code>, o CSS com <code>text/css</code>. Um 200 com o tipo errado é o disfarce do
+404. E repare no tamanho: se o JavaScript passar de alguns megabytes, o build de produção não foi usado —
+provavelmente você publicou a pasta errada.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a home abre e a rota dá 404</h3>
+<p>A Ana publicou, abriu a home e navegou até um pedido: tudo certo. Mandou o link do pedido para a
+cliente e ela recebeu 404. O caminho existia dentro do app, mas não no disco do servidor. Faltava a regra
+de fallback — no nginx, <code>try_files</code>; no host estático, a linha de rewrite. Sem ela, só a home
+funciona em link direto.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a logo aparece no notebook e some no site</h3>
+<p>No dev, <code>src="/logo.png"</code> funcionava. Publicado na subpasta <code>/padaria/</code>, o
+navegador foi buscar <code>/logo.png</code> na raiz do domínio e achou outra coisa — ou nada. O caminho
+absoluto ignorou o <code>base</code>. A correção é deixar o build escrever o caminho, com a imagem dentro
+de <code>src/assets</code> e <code>import</code>, ou prefixar a constante de base.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: a chave apareceu no código-fonte</h3>
+<p>Para "resolver rápido", ela colou a chave do serviço de mapas numa constante. Uma semana depois veio a
+fatura: alguém copiou a chave do bundle e usou à vontade. No front, chave é texto público. A saída é
+restringir a chave por domínio no provedor, ou passar a chamada por uma função do servidor que guarda o
+segredo.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que você envia para o host?</p>
+<label><input type="radio" name="q1"> o projeto inteiro, com <code>src</code> e <code>node_modules</code></label>
+<label><input type="radio" name="q1"> o conteúdo de <code>dist/</code>: <code>index.html</code> e <code>assets/</code></label>
+<label><input type="radio" name="q1"> só o <code>App.jsx</code>, que o navegador compila</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que recarregar <code>/pedido/3</code> dá 404?</p>
+<label><input type="radio" name="q2"> porque o React apaga a rota ao atualizar a página</label>
+<label><input type="radio" name="q2"> porque falta o arquivo <code>pedido.js</code> na pasta</label>
+<label><input type="radio" name="q2"> porque o host procura um arquivo nesse caminho e só existe o <code>index.html</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que a regra de rewrite deve fazer?</p>
+<label><input type="radio" name="q3"> entregar arquivos existentes e mandar o resto para o <code>index.html</code></label>
+<label><input type="radio" name="q3"> mandar tudo para o <code>index.html</code>, inclusive o JavaScript</label>
+<label><input type="radio" name="q3"> redirecionar todo caminho desconhecido para a home com 301</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a configuração de quem publica</h2>
+<p>Complete as duas linhas: a opção do Vite que diz em que endereço o site mora e a regra do nginx que
+resolve o 404 das rotas.</p>
+<div class="ex-code">// vite.config.js
+export default defineConfig({
+  <input aria-label="resposta 1" data-answer="base" placeholder="...">: "/padaria/"
+});
+
+# nginx
+location / {
+  try_files $uri $uri/ <input aria-label="resposta 2" data-answer="/index.html" placeholder="...">;
+}</div>
+<p class="ex-dica">Dica: no Vite, a opção tem o mesmo nome do prefixo que aparece nos caminhos; no nginx, o
+último argumento é o arquivo que o React sabe abrir.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Publicar é copiar o conteúdo de <code>dist/</code> para um computador que responda na internet. O
+projeto com <code>src</code>, <code>package.json</code> e <code>node_modules</code> fica no seu
+computador: o navegador não roda JSX, e o build já fez esse trabalho. Qualquer host estático serve,
+porque o site é só arquivos.</p>
+
+<p>Três configurações decidem se o site vai funcionar: o <code>base</code>, que precisa bater com o
+endereço real (raiz ou subpasta); o rewrite, que devolve o <code>index.html</code> para os caminhos que
+não são arquivos, sem engolir o JavaScript; e o HTTPS, sem o qual o navegador avisa e o conteúdo misto é
+bloqueado. Nada no bundle é segredo, e configuração de ambiente é assada no build, não lida do servidor.
+Cache se resolve com nome com hash para os assets e <code>index.html</code> sem cache longo.</p>
+
+<p>No fim, a conferência: aba anônima, console limpo, uma rota interna recarregada, um 404 seu, uma olhada
+no celular. Cinco minutos que economizam o telefonema. Na próxima aula, a Ana aprende a fazer essa mesma
+investigação quando o problema aparece — as ferramentas do navegador, uma por uma.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Sobe o conteúdo de <code>dist/</code>; o código-fonte não vai para o host.</li>
+<li>Site estático não precisa de Node no servidor.</li>
+<li><code>base</code> = o endereço onde o site mora; subpasta errada derruba todos os arquivos.</li>
+<li>O 404 ao recarregar uma rota se resolve com rewrite para <code>index.html</code>.</li>
+<li>O rewrite não pode capturar <code>/assets/</code>: HTML no lugar de JS quebra o app.</li>
+<li>HTTPS é o padrão; conteúdo misto é bloqueado pelo navegador.</li>
+<li>Nada no bundle é segredo — chave no front é chave pública.</li>
+<li><code>import.meta.env</code> é assado no build; mudar no servidor não muda o site.</li>
+<li>Assets com hash podem ter cache longo; <code>index.html</code>, não.</li>
+<li>Guarde a versão anterior: rollback é um clique, não uma caça ao commit.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

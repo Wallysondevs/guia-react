@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Galeria de Fotos | Guia React</title>
+<meta name="description" content="Projeto de uma galeria de fotos em React: lista de objetos, grade com map, filtro por categoria, foto selecionada com detalhe e os três estados de um carregamento simulado.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Galeria de <span class="hl">Fotos</span></h1>
+<p class="intro">A Ana fotografa tudo o que sai do forno e quer um mural no site: os pães numa grade, os
+bolos em outra, e um clique para ver a foto grande com o nome. O problema é que as fotos ainda não estão
+prontas — a confeiteira prometeu para sexta. Neste projeto a Ana constrói a galeria inteira com dados de
+mentira: cada foto é um cartão colorido com o nome, e a estrutura já fica pronta para receber as imagens de
+verdade. No caminho ela aprende a filtrar uma lista de objetos, abrir um detalhe e simular o carregamento
+sem depender de rede.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como modelar uma foto com <code>id</code>, título e categoria.</li>
+  <li>Como montar a grade com <code>map</code> e uma <code>key</code> estável.</li>
+  <li>Como filtrar por categoria sem estragar a lista original.</li>
+  <li>Como guardar a foto selecionada e abrir o detalhe.</li>
+  <li>Como fechar o detalhe com um estado <code>null</code>.</li>
+  <li>Como simular um carregamento com <code>Promise</code> e <code>setTimeout</code>.</li>
+  <li>Como mostrar carregando, erro e vazio sem confundir os três.</li>
+  <li>O que trocar no dia em que as imagens de verdade chegarem.</li>
+</ul>
+</div>
+
+<h2>1. A cena e as decisões do projeto</h2>
+
+<p>A padaria tem quatro fotos para mostrar: dois pães e dois bolos. A Ana quer uma grade, um botão por
+categoria e um detalhe que abre ao clicar. Quer também que a tela não fique vazia enquanto as fotos
+carregam. São quatro decisões de projeto, e nenhuma delas é sobre CSS: onde os dados moram, como a grade
+lê os dados, como o filtro escolhe e como o detalhe aparece.</p>
+
+<p>A primeira decisão é ter uma lista de objetos em vez de quatro blocos escritos à mão. Com a lista, o
+mesmo código desenha quatro ou quarenta fotos, e o filtro passa a ser uma conta em vez de um
+<code>if</code> para cada cartão. A segunda é separar "todas as fotos" de "fotos visíveis": o filtro não
+apaga nada, só decide quem aparece.</p>
+
+<p>A terceira é guardar a foto escolhida como um <strong>id</strong>, e não como o objeto inteiro. Um id é
+um texto curto, fácil de comparar; o objeto pode ficar desatualizado se a lista mudar. A quarta é ter um
+estado para cada coisa que a tela mostra de jeitos diferentes: carregando, erro e pronto. São três
+estados, não um.</p>
+
+<p>O que fica de fora: upload de imagem, curtidas, comentários e ordenação. A galeria é para olhar, e o
+escopo é esse. Se você tentar entregar tudo de uma vez, não entrega nada — e o projeto perde a graça, que
+está em ver a tela crescer a cada etapa.</p>
+
+<h2>2. Os dados: a forma da foto</h2>
+
+<p>Antes da grade, a pergunta de sempre: o que é uma foto neste app? Precisa de um nome para o leitor, de
+uma categoria para o filtro e de um jeito de desenhar algo na tela enquanto a imagem real não existe.
+Neste projeto, o "jeito de desenhar" é uma cor de fundo; no dia da imagem, vira um endereço.</p>
+
+<dl class="anatomy">
+<dt>foto</dt>
+<dd>Um objeto com os dados de um cartão: <code>{ id, titulo, categoria, cor }</code>.</dd>
+<dt><code>id</code></dt>
+<dd>Um texto único e estável: <code>"pao-frances"</code>, <code>"bolo-cenoura"</code>. Serve de
+<code>key</code> e é o que o detalhe guarda.</dd>
+<dt><code>titulo</code></dt>
+<dd>O que o leitor vê: "Pão francês". Pode mudar sem quebrar nada, porque não é identidade.</dd>
+<dt><code>categoria</code></dt>
+<dd>O grupo da foto: <code>"paes"</code> ou <code>"bolos"</code>. É o que o filtro compara.</dd>
+<dt><code>cor</code></dt>
+<dd>O fundo do cartão enquanto a imagem não chega. No app final, este campo vira <code>url</code>.</dd>
+</dl>
+
+<p>Com a forma definida, a lista inicial fica assim:</p>
+
+<pre class="file" data-file="App.jsx">const fotosIniciais = [
+  { id: "pao-frances", titulo: "Pão francês", categoria: "paes", cor: "#e8c39e" },
+  { id: "pao-queijo", titulo: "Pão de queijo", categoria: "paes", cor: "#f2d59b" },
+  { id: "bolo-cenoura", titulo: "Bolo de cenoura", categoria: "bolos", cor: "#d98c4a" },
+  { id: "bolo-milho", titulo: "Bolo de milho", categoria: "bolos", cor: "#e0c060" },
+];</pre>
+
+<p>Repare que a categoria é um código curto, não o texto que aparece na tela. Isso permite traduzir o
+rótulo — "Pães" com acento e maiúscula — sem mexer nos dados. A tradução fica num objeto à parte, e o
+filtro compara códigos. É a mesma separação entre valor e rótulo que você viu no <code>select</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Decisão</th><th>Caminho fácil</th><th>O que custa depois</th></tr>
+<tr><td>guardar a foto como texto</td><td><code>"Pão francês"</code></td><td>não há categoria, não há id, o filtro vira adivinhação</td></tr>
+<tr><td>usar o título como id</td><td><code>id: titulo</code></td><td>renomear a foto quebra a seleção e a <code>key</code></td></tr>
+<tr><td>guardar o objeto selecionado</td><td><code>useState(fotos[0])</code></td><td>o detalhe mostra dados velhos quando a lista muda</td></tr>
+<tr><td>guardar o id selecionado</td><td><code>useState(null)</code></td><td>nada: o detalhe sempre lê a versão atual da lista</td></tr>
+</table>
+</div>
+
+<p>Uma observação sobre a cor: ela está ali só porque as imagens não chegaram. Quando chegarem, o campo
+passa a se chamar <code>url</code> e o cartão troca um <code>div</code> com fundo por um
+<code>img</code> com <code>src</code> e <code>alt</code>. O resto — lista, filtro, detalhe — não muda. É
+por isso que vale construir a estrutura antes do conteúdo: a estrutura é o que fica.</p>
+
+<h2>3. A grade de cartões</h2>
+
+<p>Com a lista pronta, a grade é um <code>map</code> — a mesma ideia da aula de
+<a href="listas-com-map.html">listas com map</a>. Cada objeto vira um botão com a miniatura, o título e
+uma <code>key</code> estável. Botão, e não <code>div</code>, porque o cartão é clicável: assim ele recebe
+foco pelo teclado e o leitor de tela anuncia que dá para ativar.</p>
+
+<p>Na caixa abaixo, a grade tem dois cartões escritos à mão e a lista tem quatro fotos. Gere um cartão por
+foto, com <code>key={foto.id}</code>, a miniatura colorida e o título:</p>
+
+<div class="tryreact" data-goal="conta:.cartao=4;;texto:Bolo de milho">
+  <p class="try-task">A grade mostra só duas fotos. Gere um <code>button.cartao</code> por item de
+  <code>fotosIniciais</code>, com <code>key={foto.id}</code>, uma <code>span.miniatura</code> com
+  <code>style={{ background: foto.cor }}</code> e o título.</p>
+  <pre class="jsx">const fotosIniciais = [
+  { id: "pao-frances", titulo: "Pão francês", categoria: "paes", cor: "#e8c39e" },
+  { id: "pao-queijo", titulo: "Pão de queijo", categoria: "paes", cor: "#f2d59b" },
+  { id: "bolo-cenoura", titulo: "Bolo de cenoura", categoria: "bolos", cor: "#d98c4a" },
+  { id: "bolo-milho", titulo: "Bolo de milho", categoria: "bolos", cor: "#e0c060" },
+];
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Fotos da padaria&lt;/h2&gt;
+      &lt;div className="grade"&gt;
+        &lt;button className="cartao"&gt;Pão francês&lt;/button&gt;
+        &lt;button className="cartao"&gt;Pão de queijo&lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h2&gt;Fotos da padaria&lt;/h2&gt;
+  &lt;div class="grade"&gt;
+    &lt;button class="cartao"&gt;Pão francês&lt;/button&gt;
+    &lt;button class="cartao"&gt;Pão de queijo&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const fotosIniciais = [
+  { id: "pao-frances", titulo: "Pão francês", categoria: "paes", cor: "#e8c39e" },
+  { id: "pao-queijo", titulo: "Pão de queijo", categoria: "paes", cor: "#f2d59b" },
+  { id: "bolo-cenoura", titulo: "Bolo de cenoura", categoria: "bolos", cor: "#d98c4a" },
+  { id: "bolo-milho", titulo: "Bolo de milho", categoria: "bolos", cor: "#e0c060" },
+];
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Fotos da padaria&lt;/h2&gt;
+      &lt;div className="grade"&gt;
+        {fotosIniciais.map((foto) =&gt; (
+          &lt;button key={foto.id} className="cartao"&gt;
+            &lt;span
+              className="miniatura"
+              role="img"
+              aria-label={foto.titulo}
+              style={{ background: foto.cor }}
+            &gt;&lt;/span&gt;
+            {foto.titulo}
+          &lt;/button&gt;
+        ))}
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra quatro botões, na ordem da lista. A miniatura aparece como um <code>span</code> com
+<code>style="background: #e8c39e"</code> — é o que dá a cor de cada cartão enquanto não há imagem. O
+<code>role="img"</code> com <code>aria-label</code> avisa o leitor de tela que aquilo representa uma
+imagem, e o nome vem do título. Quando a foto de verdade chegar, o <code>span</code> vira
+<code>&lt;img src={foto.url} alt={foto.titulo} /&gt;</code> e a acessibilidade continua resolvida.</p>
+
+<p>Repare na <code>key</code>: ela é o <code>id</code>, não o índice. Numa galeria que depois vai permitir
+remover fotos e reordenar, o índice muda quando a lista muda, e o React trataria cartões diferentes como se
+fossem o mesmo. O <code>id</code> é estável, então o cartão do "Bolo de milho" continua sendo ele mesmo em
+qualquer posição.</p>
+
+<p>Para ver o que a lista guarda, um <code>console.log</code> antes do <code>return</code> resolve a
+dúvida:</p>
+
+<pre class="term">fotos.length: 4
+fotos[2].titulo: "Bolo de cenoura"
+fotos[2].categoria: "bolos"</pre>
+
+<p>Se a grade mostrar menos cartões do que o número acima, o problema está no <code>map</code> — e não nos
+dados. Já aconteceu com quem colocou um <code>filter</code> escondido no meio do <code>map</code>.</p>
+
+<h2>4. O filtro por categoria</h2>
+
+<p>Filtrar é decidir quem aparece sem apagar ninguém. O estado guarda a categoria escolhida — "todas",
+"paes" ou "bolos" — e uma conta devolve a lista visível. O erro clássico é guardar a lista filtrada num
+estado separado: aí você tem duas fontes para a mesma informação e uma delas envelhece.</p>
+
+<p>Na caixa abaixo, os botões mudam o estado do filtro, mas a grade ignora o estado e mostra sempre as
+quatro fotos. Complete a conta de <code>visiveis</code>:</p>
+
+<div class="tryreact" data-goal="clique:button[data-cat=bolos];;conta:.cartao=2;;texto:Bolo de milho">
+  <p class="try-task">Os botões mudam <code>filtro</code>, mas a grade mostra sempre tudo. Calcule
+  <code>visiveis</code> a partir de <code>filtro</code> (deixe passar quando for "todas") e use essa lista
+  no <code>map</code>.</p>
+  <pre class="jsx">const fotosIniciais = [
+  { id: "pao-frances", titulo: "Pão francês", categoria: "paes", cor: "#e8c39e" },
+  { id: "pao-queijo", titulo: "Pão de queijo", categoria: "paes", cor: "#f2d59b" },
+  { id: "bolo-cenoura", titulo: "Bolo de cenoura", categoria: "bolos", cor: "#d98c4a" },
+  { id: "bolo-milho", titulo: "Bolo de milho", categoria: "bolos", cor: "#e0c060" },
+];
+
+function App() {
+  const [filtro, setFiltro] = useState("todas");
+  const visiveis = fotosIniciais;
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Fotos da padaria&lt;/h2&gt;
+      &lt;div&gt;
+        &lt;button data-cat="todas" onClick={() =&gt; setFiltro("todas")}&gt;Todas&lt;/button&gt;
+        &lt;button data-cat="paes" onClick={() =&gt; setFiltro("paes")}&gt;Pães&lt;/button&gt;
+        &lt;button data-cat="bolos" onClick={() =&gt; setFiltro("bolos")}&gt;Bolos&lt;/button&gt;
+      &lt;/div&gt;
+      &lt;div className="grade"&gt;
+        {visiveis.map((foto) =&gt; (
+          &lt;button key={foto.id} className="cartao"&gt;{foto.titulo}&lt;/button&gt;
+        ))}
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h2&gt;Fotos da padaria&lt;/h2&gt;
+  &lt;div&gt;
+    &lt;button data-cat="todas"&gt;Todas&lt;/button&gt;
+    &lt;button data-cat="paes"&gt;Pães&lt;/button&gt;
+    &lt;button data-cat="bolos"&gt;Bolos&lt;/button&gt;
+  &lt;/div&gt;
+  &lt;div class="grade"&gt;
+    &lt;button class="cartao"&gt;Pão francês&lt;/button&gt;
+    &lt;button class="cartao"&gt;Pão de queijo&lt;/button&gt;
+    &lt;button class="cartao"&gt;Bolo de cenoura&lt;/button&gt;
+    &lt;button class="cartao"&gt;Bolo de milho&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const fotosIniciais = [
+  { id: "pao-frances", titulo: "Pão francês", categoria: "paes", cor: "#e8c39e" },
+  { id: "pao-queijo", titulo: "Pão de queijo", categoria: "paes", cor: "#f2d59b" },
+  { id: "bolo-cenoura", titulo: "Bolo de cenoura", categoria: "bolos", cor: "#d98c4a" },
+  { id: "bolo-milho", titulo: "Bolo de milho", categoria: "bolos", cor: "#e0c060" },
+];
+
+function App() {
+  const [filtro, setFiltro] = useState("todas");
+  const visiveis =
+    filtro === "todas"
+      ? fotosIniciais
+      : fotosIniciais.filter((foto) =&gt; foto.categoria === filtro);
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Fotos da padaria&lt;/h2&gt;
+      &lt;div&gt;
+        &lt;button data-cat="todas" onClick={() =&gt; setFiltro("todas")}&gt;Todas&lt;/button&gt;
+        &lt;button data-cat="paes" onClick={() =&gt; setFiltro("paes")}&gt;Pães&lt;/button&gt;
+        &lt;button data-cat="bolos" onClick={() =&gt; setFiltro("bolos")}&gt;Bolos&lt;/button&gt;
+      &lt;/div&gt;
+      &lt;div className="grade"&gt;
+        {visiveis.map((foto) =&gt; (
+          &lt;button key={foto.id} className="cartao"&gt;{foto.titulo}&lt;/button&gt;
+        ))}
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em "Bolos" e sobram dois cartões; clique em "Pães" e aparecem os outros dois. O filtro não
+altera o array: <code>filter</code> devolve uma lista nova, e <code>fotosIniciais</code> continua com
+quatro. Isso importa porque a mesma lista alimenta a contagem e o detalhe. Se o filtro apagasse itens da
+lista original, voltar para "Todas" não traria nada de volta.</p>
+
+<p>Quando o filtro não encontra ninguém, a grade fica vazia — e vazio precisa de mensagem, como a aula de
+<a href="estados-vazios.html">estados vazios</a> explica. A condição é
+<code>visiveis.length === 0</code>, com um texto diferente para "ainda não há fotos" e "não há fotos nesta
+categoria". Só a segunda acontece neste app, mas a primeira vai acontecer quando a lista vier da rede e
+demorar.</p>
+
+<h2>5. A foto selecionada e o detalhe</h2>
+
+<p>Abrir uma foto é guardar qual foi escolhida. O estado natural é o <code>id</code>, começando em
+<code>null</code> — nada selecionado. O detalhe é uma conta: procure a foto pelo id e mostre só se achou.
+O erro comum é começar com a primeira foto selecionada e nunca deixar o detalhe fechar.</p>
+
+<p>Na caixa abaixo, o detalhe abre junto com a página e o botão Fechar volta para a primeira foto em vez
+de fechar. Conserte os dois:</p>
+
+<div class="tryreact" data-goal="conta:.detalhe=0;;clique:.cartao:nth-child(3);;conta:.detalhe=1;;texto:Categoria: Bolos;;clique:button.fechar;;conta:.detalhe=0">
+  <p class="try-task">O detalhe começa aberto e o Fechar não fecha. Comece com
+  <code>useState(null)</code>, mostre o bloco só quando <code>foto</code> existir e faça o Fechar voltar
+  para <code>null</code>.</p>
+  <pre class="jsx">const fotosIniciais = [
+  { id: "pao-frances", titulo: "Pão francês", categoria: "paes", cor: "#e8c39e" },
+  { id: "pao-queijo", titulo: "Pão de queijo", categoria: "paes", cor: "#f2d59b" },
+  { id: "bolo-cenoura", titulo: "Bolo de cenoura", categoria: "bolos", cor: "#d98c4a" },
+  { id: "bolo-milho", titulo: "Bolo de milho", categoria: "bolos", cor: "#e0c060" },
+];
+
+const rotulos = { paes: "Pães", bolos: "Bolos" };
+
+function App() {
+  const [selecionada, setSelecionada] = useState("pao-frances");
+  const foto = fotosIniciais.find((f) =&gt; f.id === selecionada);
+  return (
+    &lt;div&gt;
+      &lt;div className="grade"&gt;
+        {fotosIniciais.map((f) =&gt; (
+          &lt;button
+            key={f.id}
+            className="cartao"
+            onClick={() =&gt; setSelecionada(f.id)}
+          &gt;
+            {f.titulo}
+          &lt;/button&gt;
+        ))}
+      &lt;/div&gt;
+      &lt;div className="detalhe"&gt;
+        &lt;h3&gt;{foto.titulo}&lt;/h3&gt;
+        &lt;p&gt;Categoria: {rotulos[foto.categoria]}&lt;/p&gt;
+        &lt;button className="fechar" onClick={() =&gt; setSelecionada("pao-frances")}&gt;
+          Fechar
+        &lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;div class="grade"&gt;
+    &lt;button class="cartao"&gt;Pão francês&lt;/button&gt;
+    &lt;button class="cartao"&gt;Pão de queijo&lt;/button&gt;
+    &lt;button class="cartao"&gt;Bolo de cenoura&lt;/button&gt;
+    &lt;button class="cartao"&gt;Bolo de milho&lt;/button&gt;
+  &lt;/div&gt;
+  &lt;div class="detalhe"&gt;
+    &lt;h3&gt;Pão francês&lt;/h3&gt;
+    &lt;p&gt;Categoria: Pães&lt;/p&gt;
+    &lt;button class="fechar"&gt;Fechar&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const fotosIniciais = [
+  { id: "pao-frances", titulo: "Pão francês", categoria: "paes", cor: "#e8c39e" },
+  { id: "pao-queijo", titulo: "Pão de queijo", categoria: "paes", cor: "#f2d59b" },
+  { id: "bolo-cenoura", titulo: "Bolo de cenoura", categoria: "bolos", cor: "#d98c4a" },
+  { id: "bolo-milho", titulo: "Bolo de milho", categoria: "bolos", cor: "#e0c060" },
+];
+
+const rotulos = { paes: "Pães", bolos: "Bolos" };
+
+function App() {
+  const [selecionada, setSelecionada] = useState(null);
+  const foto = fotosIniciais.find((f) =&gt; f.id === selecionada);
+  return (
+    &lt;div&gt;
+      &lt;div className="grade"&gt;
+        {fotosIniciais.map((f) =&gt; (
+          &lt;button
+            key={f.id}
+            className="cartao"
+            onClick={() =&gt; setSelecionada(f.id)}
+          &gt;
+            {f.titulo}
+          &lt;/button&gt;
+        ))}
+      &lt;/div&gt;
+      {foto &amp;&amp; (
+        &lt;div className="detalhe"&gt;
+          &lt;h3&gt;{foto.titulo}&lt;/h3&gt;
+          &lt;p&gt;Categoria: {rotulos[foto.categoria]}&lt;/p&gt;
+          &lt;button className="fechar" onClick={() =&gt; setSelecionada(null)}&gt;
+            Fechar
+          &lt;/button&gt;
+        &lt;/div&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No começo, não há detalhe nenhum. Clique no terceiro cartão: o bloco aparece com "Bolo de cenoura" e
+"Categoria: Bolos". Clique em Fechar: o bloco sai do HTML — não fica escondido por CSS, some de verdade,
+porque <code>foto</code> virou <code>undefined</code> e o <code>&amp;&amp;</code> não desenha nada.</p>
+
+<dl class="anatomy">
+<dt><code>selecionada</code></dt>
+<dd>O id da foto aberta, ou <code>null</code>. É o único estado do detalhe.</dd>
+<dt><code>find</code></dt>
+<dd>A conta que transforma o id no objeto da foto: <code>fotos.find((f) =&gt; f.id === selecionada)</code>.</dd>
+<dt>detalhe</dt>
+<dd>O bloco que mostra a foto escolhida. Existe só quando <code>foto</code> é encontrada.</dd>
+<dt><code>null</code></dt>
+<dd>O estado de "nada selecionado". Melhor que <code>""</code> porque um id vazio jamais existiria na
+lista.</dd>
+<dt>fechar</dt>
+<dd>O botão que devolve o estado para <code>null</code>. Deve estar dentro do bloco, não fora.</dd>
+</dl>
+
+<p>A escolha do <code>null</code> não é preciosismo. Com <code>""</code>, o <code>find</code> devolveria
+<code>undefined</code> do mesmo jeito, mas qualquer comparação distraída com <code>!selecionada</code>
+funcionaria por acidente — e um id vazio passaria a ser um valor válido na cabeça de quem lê. O
+<code>null</code> diz "não há nada aqui" sem ambiguidade.</p>
+
+<p>O console mostra o estado e a conta lado a lado:</p>
+
+<pre class="term">selecionada: "bolo-cenoura"
+foto.titulo: "Bolo de cenoura"
+selecionada: null</pre>
+
+<p>A última linha é o depois do Fechar. Se o seu detalhe continuar aparecendo com
+<code>selecionada: null</code>, o problema está na condição: procure um <code>{foto.titulo}</code> fora do
+<code>&amp;&amp;</code>, que quebra o componente antes mesmo de esconder o bloco.</p>
+
+<h2>6. Carregando, erro e pronto</h2>
+
+<p>No app de verdade, as fotos vêm de um servidor — e o servidor demora. A aula de
+<a href="carregando-e-erro.html">carregando e erro</a> conta a mesma história com
+<code>fetch</code>. Aqui não há rede no quadro da
+caixa, então a busca é simulada com uma <code>Promise</code> que resolve depois de um
+<code>setTimeout</code>. A estrutura é a mesma de um <code>fetch</code>: uma função que devolve promessa,
+um efeito que chama, e três estados para a tela.</p>
+
+<pre class="file" data-file="App.jsx">function buscarFotos() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok(fotosIniciais), 600);
+  });
+}
+
+function App() {
+  const [fotos, setFotos] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(null);
+
+  useEffect(() =&gt; {
+    let vivo = true;
+    buscarFotos()
+      .then((lista) =&gt; {
+        if (!vivo) return;
+        setFotos(lista);
+        setErro(null);
+      })
+      .catch(() =&gt; {
+        if (vivo) setErro("Não foi possível carregar as fotos");
+      })
+      .finally(() =&gt; {
+        if (vivo) setCarregando(false);
+      });
+    return () =&gt; {
+      vivo = false;
+    };
+  }, []);
+
+  if (carregando) return &lt;p&gt;Carregando fotos…&lt;/p&gt;;
+  if (erro) return &lt;p role="alert"&gt;{erro}&lt;/p&gt;;
+  return &lt;div className="grade"&gt;{/* os cartões */}&lt;/div&gt;;
+}</pre>
+
+<p>Três detalhes fazem esse código funcionar. O primeiro é o array de dependências vazio: o efeito roda uma
+vez, na montagem, e não a cada render. O segundo é a variável <code>vivo</code>, que impede o
+<code>set</code> depois que o componente saiu da tela — sem ela, uma resposta atrasada pode mexer num
+estado que já não interessa, e o erro fica silencioso. O terceiro é o <code>finally</code>, que desliga o carregando nos dois caminhos,
+certo e errado.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Estado</th><th>O que a tela mostra</th><th>Como saber que está certo</th></tr>
+<tr><td>carregando</td><td>"Carregando fotos…"</td><td>aparece antes dos dados e some no <code>finally</code></td></tr>
+<tr><td>erro</td><td>uma mensagem com <code>role="alert"</code></td><td>só aparece quando a promessa rejeita</td></tr>
+<tr><td>pronto</td><td>a grade de cartões</td><td>só aparece com a lista preenchida</td></tr>
+<tr><td>vazio</td><td>"Nenhuma foto ainda"</td><td>pronto, com lista de tamanho zero</td></tr>
+</table>
+</div>
+
+<p>O console ajuda a ver a ordem em que as coisas acontecem. Na montagem, <code>carregando</code> é
+verdadeiro e a lista está vazia; depois do tempo, a lista chega e o carregando desliga:</p>
+
+<pre class="term">carregando: true
+fotos: []
+carregando: false
+fotos: 4</pre>
+
+<p>Não confunda os quatro estados da tabela. "Carregando" não é "vazio": um mostra que a resposta ainda
+vem, o outro que ela veio e não tinha nada. "Erro" não é "vazio" também: um pede tentar de novo, o outro
+pede outra categoria ou outra foto. Quando a Ana juntou carregando e vazio no mesmo <code>if</code>, a tela
+dizia "Nenhuma foto ainda" enquanto os dados estavam a caminho — e ela achou que a lista tinha se
+perdido.</p>
+
+<h2>7. O que quebra na galeria</h2>
+
+<p>Os tropeços deste projeto são poucos e repetem em quase toda lista com detalhe. A tabela serve de
+diagnóstico rápido quando a tela não faz o que você espera:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sintoma</th><th>Causa provável</th><th>Conserto</th></tr>
+<tr><td>a grade mostra menos cartões que a lista</td><td><code>map</code> lendo a lista errada ou com <code>filter</code> escondido</td><td>conferir a variável do <code>map</code> e o <code>console.log</code></td></tr>
+<tr><td>o detalhe mostra a foto errada</td><td><code>find</code> comparando com o objeto em vez do id</td><td>guardar o id e comparar <code>f.id === selecionada</code></td></tr>
+<tr><td>o detalhe não fecha</td><td>estado inicial com a primeira foto e Fechar voltando para ela</td><td><code>useState(null)</code> e <code>setSelecionada(null)</code></td></tr>
+<tr><td>a foto escolhida "volta" ao filtrar</td><td>id fora da lista visível</td><td>limpar a seleção ao trocar o filtro, ou deixar o detalhe aberto mesmo assim</td></tr>
+<tr><td>resposta atrasada mexendo em tela que já saiu</td><td><code>set</code> depois da saída, sem guarda</td><td>a variável <code>vivo</code> no efeito</td></tr>
+</table>
+</div>
+
+<p>A quarta linha merece um comentário, porque é uma decisão de produto. Se a Ana abre o "Bolo de cenoura"
+e depois clica em "Pães", o detalhe continua aberto com uma foto que não está mais na grade. Isso pode ser
+desejado — a pessoa está vendo a foto, o filtro é da grade — ou confuso. Se for confuso, o
+<code>onClick</code> do filtro também faz <code>setSelecionada(null)</code>. Não existe resposta certa
+universal; existe a que faz sentido para a sua tela.</p>
+
+<p>A quinta linha é o aviso mais comum de quem começa com efeito e promessa. A guarda não precisa ser
+sofisticada: uma variável no escopo do efeito, marcada como falsa na função de limpeza, resolve. O
+<code>cleanup</code> tem aula própria, e vale ler antes de colocar um <code>setTimeout</code> em produção —
+o padrão é o mesmo.</p>
+
+<p>Por fim, um cuidado com imagens de verdade: <code>alt</code> não é opcional. Uma foto sem
+<code>alt</code> é invisível para quem usa leitor de tela, e um <code>alt</code> genérico ("foto") não
+ajuda. O título da foto é um bom começo: <code>alt={foto.titulo}</code> diz o que está na imagem sem
+descrever cada pixel.</p>
+
+<h2>8. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: os cartões piscam e trocam de lugar ao filtrar</h3>
+<p>A Ana usou <code>key={indice}</code> e, ao trocar de categoria, o React reaproveitou os cartões na mesma
+posição: a cor da miniatura ficou de uma foto e o título de outra. Com <code>key={foto.id}</code>, cada
+cartão mantém a identidade e a troca de filtro vira remoção e criação limpas. Índice serve para lista que
+nunca muda de ordem; não é o caso aqui.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o detalhe abre vazio depois do carregamento</h3>
+<p>Ela guardou o objeto da foto no estado, e o detalhe abria com título certo mas categoria vazia. O objeto
+guardado era de antes de a lista ser recarregada, e os dados novos estavam no array. Guardando só o id, o
+<code>find</code> sempre busca a versão atual. A regra vale para qualquer detalhe que dependa de uma lista:
+guarde a chave, não a cópia.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: a tela diz "nenhuma foto" enquanto carrega</h3>
+<p>O código testava <code>fotos.length === 0</code> antes de testar <code>carregando</code>, e a mensagem
+de vazio aparecia no primeiro segundo. A ordem dos <code>if</code> resolve: carregando primeiro, erro
+depois, vazio por último. Quando a lista chega, os três já foram resolvidos e a grade aparece. Ordem de
+condição é parte do design, não detalhe de implementação.</p>
+</div>
+
+<h2>9. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que a grade deve percorrer com <code>map</code>?</p>
+<label><input type="radio" name="q1"> a lista completa, sempre</label>
+<label><input type="radio" name="q1"> a lista visível, calculada a partir do filtro</label>
+<label><input type="radio" name="q1"> o estado do filtro, que já é um array</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que guardar o <strong>id</strong> da foto selecionada em vez do objeto?</p>
+<label><input type="radio" name="q2"> porque objeto não cabe no <code>useState</code></label>
+<label><input type="radio" name="q2"> porque o id ocupa menos espaço na memória</label>
+<label><input type="radio" name="q2"> porque o id continua válido quando a lista é atualizada; o objeto pode ficar velho</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Qual é a ordem certa das condições na tela?</p>
+<label><input type="radio" name="q3"> carregando, erro, vazio, pronto</label>
+<label><input type="radio" name="q3"> vazio, pronto, erro, carregando</label>
+<label><input type="radio" name="q3"> pronto, carregando, vazio, erro</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a conta do filtro</h2>
+<p>Complete a linha que devolve só as fotos da categoria escolhida. Escreva apenas o método do array:</p>
+<div class="ex-code">const visiveis = filtro === "todas"&#10;  ? fotosIniciais&#10;  : fotosIniciais.<input aria-label="resposta 1" data-answer="filter" placeholder="...">((foto) =&gt; foto.categoria === filtro);</div>
+<p class="ex-dica">Dica: é o método que devolve uma lista nova com os itens que passam no teste. O
+<code>map</code> devolveria um item para cada foto, inclusive as de outra categoria.</p>
+</div>
+
+<h2>10. Resumo</h2>
+
+<p>A galeria começa pelos dados: cada foto é <code>{ id, titulo, categoria, cor }</code>, e a lista fica
+fora do componente porque é o dado de partida. A grade é um <code>map</code> com <code>key={foto.id}</code>,
+e cada cartão é um botão — clicável, focável e anunciado pelo leitor de tela. O detalhe guarda o
+<strong>id</strong> selecionado, começa em <code>null</code> e só aparece quando o <code>find</code>
+encontra a foto.</p>
+
+<p>O filtro é estado; a lista visível é conta. O carregamento tem três estados separados — carregando, erro
+e pronto —, e o vazio é um quarto caso, com mensagem própria. A simulação com <code>Promise</code> e
+<code>setTimeout</code> é a mesma estrutura de um <code>fetch</code>: a diferença é só de onde a resposta
+vem.</p>
+
+<p>Quando as imagens de verdade chegarem, o campo <code>cor</code> vira <code>url</code> e a
+<code>span.miniatura</code> vira <code>img</code> com <code>alt</code>. Lista, filtro, seleção e estados
+continuam iguais — e é por isso que valeu construir a estrutura antes. O próximo projeto leva a mesma base
+para o <a href="projeto-carrinho.html">carrinho de compras</a>, onde os objetos têm preço e quantidade, e
+as contas passam a envolver dinheiro.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Foto é <code>{ id, titulo, categoria, cor }</code>; a lista fica fora do componente.</li>
+<li>Grade é <code>map</code> com <code>key={foto.id}</code>; cartão é <code>button</code>.</li>
+<li>Filtro é estado; lista visível é conta feita com <code>filter</code>.</li>
+<li>Detalhe guarda o <strong>id</strong>, começa em <code>null</code> e usa <code>find</code>.</li>
+<li><code>{foto &amp;&amp; (...)}</code> mostra o detalhe só quando existe foto.</li>
+<li>Fechar é <code>setSelecionada(null)</code>.</li>
+<li>Carregando, erro e pronto são estados separados; vazio é outro caso.</li>
+<li><code>Promise</code> + <code>setTimeout</code> simulam a rede; o <code>finally</code> desliga o carregando.</li>
+<li>A guarda <code>vivo</code> evita <code>set</code> depois de desmontar.</li>
+<li>Imagem de verdade pede <code>src</code> e <code>alt</code>.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
