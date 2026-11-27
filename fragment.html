@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O Fragment | Guia React</title>
+<meta name="description" content="O Fragment no React: devolver vários irmãos sem criar div, a sintaxe curta, o Fragment com key em listas, as tabelas onde a div é proibida e quando a div é a escolha certa.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O <span class="hl">Fragment</span></h1>
+<p class="intro">O topo do site da Ana precisa mostrar o nome da padaria e o horário lado a lado, e o CSS
+já está pronto para isso — mas o componente devolve uma <code>div</code> no meio, e ela atrapalha o
+alinhamento. Nesta aula a Ana conhece o <code>Fragment</code>: a casca invisível que deixa um componente
+devolver vários irmãos sem criar elemento nenhum na página. E descobre os dois lugares em que ele não é
+só conveniência — é obrigação.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que um componente devolve um elemento só, e como contornar isso sem criar nó.</li>
+  <li>A diferença entre <code>&lt;&gt;…&lt;/&gt;</code> e <code>&lt;Fragment&gt;…&lt;/Fragment&gt;</code>.</li>
+  <li>Onde a <code>div</code> extra quebra o layout e onde ela é HTML inválido.</li>
+  <li>Como dar <code>key</code> a um fragmento em uma lista.</li>
+  <li>O que o fragmento não aceita — e por que ele não aparece no DevTools.</li>
+  <li>Quando a <code>div</code> é a resposta certa.</li>
+</ul>
+</div>
+
+<h2>1. A cena: dois irmãos e uma div no meio</h2>
+
+<p>A Ana quer o topo do site com o nome da padaria e o horário na mesma linha. O CSS dela tem uma regra
+simples: o container usa <code>display: flex</code> e <code>gap: 12px</code>; os filhos diretos ficam
+lado a lado, com doze pixels entre eles. Para isso funcionar, o <code>h1</code> e o <code>p</code>
+precisam ser <strong>irmãos</strong> — filhos diretos do mesmo container.</p>
+
+<p>O componente dela devolve uma <code>div</code> embrulhando os dois. O resultado na tela é o esperado,
+mas o CSS não pega: os filhos diretos do container passaram a ser uma <code>div</code> só, e o
+<code>gap</code> não tem entre o que espaçar. O <code>h1</code> e o <code>p</code> ficaram empilhados
+dentro de uma caixa que ninguém pediu. O React não tem culpa: foi ela quem pediu a caixa.</p>
+
+<p>Esse é o problema que o <code>Fragment</code> resolve. Ele é um componente especial que agrupa
+elementos <em>para o React</em> sem criar nada <em>para o navegador</em>. O componente devolve um
+fragmento com dois filhos, o React desenha os dois irmãos direto no HTML, e o CSS encontra exatamente a
+estrutura que esperava. Nem uma <code>div</code> a mais, nem um <code>span</code> disfarçado.</p>
+
+<p>E há casos em que a <code>div</code> não é só inconveniente: é inválida. Dentro de uma tabela, só
+entram <code>thead</code>, <code>tbody</code>, <code>tr</code> e seus parentes; uma <code>div</code> no
+meio é HTML que o navegador não sabe interpretar. O mesmo vale para <code>dl</code>,
+<code>dt</code>/<code>dd</code>, <code>ul</code>/<code>li</code> e <code>select</code>. Nesses
+lugares, o fragmento não é estilo: é a única forma de um componente devolver vários itens válidos.</p>
+
+<h2>2. Por que um componente devolve um elemento só</h2>
+
+<p>Vale entender a raiz da regra, porque ela explica tudo o que vem depois. O JSX não é HTML: cada tag
+vira uma chamada de função que cria <strong>um</strong> elemento. <code>&lt;div&gt;oi&lt;/div&gt;</code>
+vira uma chamada com o nome da tag, os atributos e os filhos. Quando você escreve três tags lado a lado,
+o compilador vê três chamadas soltas e não sabe o que devolver — uma função devolve uma coisa. Daí o
+erro clássico, que aparece no painel assim que você tenta:</p>
+
+<pre class="term">Erro: não compilou: /App.jsx: Adjacent JSX elements must be wrapped in an enclosing tag. Did you want a JSX fragment &lt;&gt;...&lt;/&gt;? (4:4)
+
+  2 |   return (
+  3 |     &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+&gt; 4 |     &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    |     ^</pre>
+
+<p>A mensagem já sugere a solução: um fragmento. Em vez de inventar uma caixa, você diz "estes elementos
+andam juntos" — e o React trata o conjunto como um pai invisível, que existe na árvore do React e não
+existe no DOM.</p>
+
+<dl class="anatomy">
+<dt>fragmento</dt>
+<dd>Um agrupador sem elemento. O React usa para devolver vários irmãos e não escreve nada no HTML.</dd>
+<dt>sintaxe curta</dt>
+<dd><code>&lt;&gt;…&lt;/&gt;</code>: o fragmento sem nome. Não aceita atributo nenhum, nem
+<code>key</code>.</dd>
+<dt>elemento pai</dt>
+<dd>O que o componente devolve como raiz. Pode ser um elemento de verdade ou um fragmento.</dd>
+<dt>nó do DOM</dt>
+<dd>Um elemento que existe na página, com tag e atributos. O fragmento não cria nenhum.</dd>
+<dt>key</dt>
+<dd>A identidade de um item em uma lista. Em fragmento, só funciona na forma
+<code>&lt;Fragment key={…}&gt;</code>.</dd>
+</dl>
+
+<p>Uma comparação ajuda a fixar. Se o componente devolve <code>&lt;div&gt;&lt;h1&gt;…&lt;/h1&gt;&lt;/div&gt;</code>,
+a página tem um <code>div</code> e, dentro, o <code>h1</code>. Se devolve
+<code>&lt;&gt;&lt;h1&gt;…&lt;/h1&gt;&lt;/&gt;</code>, a página tem só o <code>h1</code>, e ele é filho
+direto de quem chamou o componente. Essa diferença de parentesco é o que decide se o CSS do pai alcança
+o elemento — e é por isso que ela aparece tanto em layout flexível.</p>
+
+<h2>3. A div que sobra</h2>
+
+<p>Primeiro exemplo, o mais comum. O componente do topo devolve uma <code>div</code> com o título e o
+horário. A missão troca a <code>div</code> por um fragmento e prova a diferença contando os elementos:
+o painel tem de mostrar o <code>h1</code> e o <code>p</code> como irmãos, sem nenhuma
+<code>div</code> no HTML gerado.</p>
+
+<div class="tryreact" data-goal="conta:h1=1;;conta:p=1;;conta:main div=0">
+  <p class="try-task">O <code>Topo</code> devolve uma <code>div</code> em volta dos dois elementos, e ela
+  atrapalha o CSS do pai. Troque a <code>div</code> por um fragmento <code>&lt;&gt;…&lt;/&gt;</code>, sem
+  criar nenhum elemento a mais.</p>
+  <pre class="jsx">function Topo() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;main&gt;
+      &lt;Topo /&gt;
+    &lt;/main&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;main&gt;
+  &lt;div&gt;
+    &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+    &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/main&gt;
+</pre>
+  <pre class="solucao">function Topo() {
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    &lt;/&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;main&gt;
+      &lt;Topo /&gt;
+    &lt;/main&gt;
+  );
+}</pre>
+</div>
+
+<p>Antes, o painel mostrava <code>main &gt; div &gt; h1</code>. Depois, mostra <code>main &gt; h1</code> e
+<code>main &gt; p</code>: o fragmento desapareceu, e os dois elementos subiram um nível. Nenhuma classe,
+nenhum estilo, nenhuma linha de CSS mudou — mudou o parentesco. É a diferença entre uma caixa e um
+elástico: o elástico mantém as coisas juntas na hora de entregar e não ocupa espaço na tela.</p>
+
+<p>Repare que o fragmento vazio tem duas metades e nenhum nome: <code>&lt;&gt;</code> abre e
+<code>&lt;/&gt;</code> fecha. Não existe nome no meio, não existe tag de verdade. É por isso que ele não
+aceita atributos: não há elemento onde pendurá-los. E é por isso que o React precisa do Babel para
+entendê-lo — o JSX comum não teria como representar essa marca.</p>
+
+<h2>4. A sintaxe curta e a longa</h2>
+
+<p>O mesmo componente pode ser escrito de duas formas. A curta é a que você viu:
+<code>&lt;&gt;…&lt;/&gt;</code>. A longa usa o nome <code>Fragment</code>, que vem do próprio React, e
+parece um componente comum. As duas produzem exatamente o mesmo HTML — a diferença está no que você
+consegue escrever dentro da tag de abertura.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th> </th><th><code>&lt;&gt;…&lt;/&gt;</code></th><th><code>&lt;Fragment&gt;…&lt;/Fragment&gt;</code></th></tr>
+<tr><td>cria nó no DOM</td><td>não</td><td>não</td></tr>
+<tr><td>aceita <code>key</code></td><td>não</td><td>sim</td></tr>
+<tr><td>aceita <code>className</code>, <code>style</code>, <code>id</code></td><td>não</td><td>não</td></tr>
+<tr><td>precisa importar</td><td>não</td><td>sim, no projeto: <code>import { Fragment } from "react"</code></td></tr>
+<tr><td>quando usar</td><td>o caso comum, sem lista</td><td>dentro de <code>map</code>, quando precisa de <code>key</code></td></tr>
+</table>
+</div>
+
+<p>Nas caixas deste guia, <code>Fragment</code> já está no escopo, como <code>useState</code> e
+<code>useEffect</code> — não é preciso importar. No projeto de verdade, o <code>import</code> aparece no
+topo do arquivo, e as linhas de import são removidas pelo motor antes de rodar. Se você esquecer o
+import, o erro é "Fragment is not defined", e o conserto é uma linha.</p>
+
+<p>A escolha do dia a dia é fácil: use <code>&lt;&gt;…&lt;/&gt;</code> sempre que não precisar de
+atributo. Ela é mais curta, não exige import e deixa o JSX mais limpo. A forma longa existe por um
+motivo específico — o <code>key</code> em listas — e é sobre isso que a seção 6 trata. Também vale
+lembrar que <code>Fragment</code> é um nome comum em código antigo: você pode encontrar
+<code>&lt;React.Fragment&gt;</code> em arquivos que não desestruturaram o import. É a mesma coisa.</p>
+
+<h2>5. Onde a div é proibida</h2>
+
+<p>Agora o caso em que o fragmento deixa de ser conveniência. Um componente que devolve as células de
+uma linha de tabela não pode devolver uma <code>div</code>: dentro de <code>tr</code> só entram
+<code>td</code> e <code>th</code>. O React não valida isso — ele cria o que você mandar —, e o navegador
+aceita a estrutura na árvore, mas o HTML deixa de ser válido e o CSS da tabela se perde.</p>
+
+<div class="tryreact" data-goal="conta:tr=2;;conta:td=4;;conta:table div=0">
+  <p class="try-task">O componente <code>Celulas</code> devolve uma <code>div</code> dentro do
+  <code>tr</code>, o que é HTML inválido. Troque a <code>div</code> por um fragmento para as duas
+  células ficarem soltas dentro da linha.</p>
+  <pre class="jsx">function Celulas({ nome, preco }) {
+  return (
+    &lt;div&gt;
+      &lt;td&gt;{nome}&lt;/td&gt;
+      &lt;td&gt;{"R$ " + preco + ",00"}&lt;/td&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;table&gt;
+      &lt;tbody&gt;
+        &lt;tr&gt;&lt;Celulas nome="Pão francês" preco={12} /&gt;&lt;/tr&gt;
+        &lt;tr&gt;&lt;Celulas nome="Croissant" preco={14} /&gt;&lt;/tr&gt;
+      &lt;/tbody&gt;
+    &lt;/table&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;table&gt;
+  &lt;tbody&gt;
+    &lt;tr&gt;
+      &lt;div&gt;
+        &lt;td&gt;Pão francês&lt;/td&gt;
+        &lt;td&gt;R$ 12,00&lt;/td&gt;
+      &lt;/div&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;div&gt;
+        &lt;td&gt;Croissant&lt;/td&gt;
+        &lt;td&gt;R$ 14,00&lt;/td&gt;
+      &lt;/div&gt;
+    &lt;/tr&gt;
+  &lt;/tbody&gt;
+&lt;/table&gt;
+</pre>
+  <pre class="solucao">function Celulas({ nome, preco }) {
+  return (
+    &lt;&gt;
+      &lt;td&gt;{nome}&lt;/td&gt;
+      &lt;td&gt;{"R$ " + preco + ",00"}&lt;/td&gt;
+    &lt;/&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;table&gt;
+      &lt;tbody&gt;
+        &lt;tr&gt;&lt;Celulas nome="Pão francês" preco={12} /&gt;&lt;/tr&gt;
+        &lt;tr&gt;&lt;Celulas nome="Croissant" preco={14} /&gt;&lt;/tr&gt;
+      &lt;/tbody&gt;
+    &lt;/table&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel do código inicial mostra a prova do crime: um <code>div</code> entre <code>tr</code> e
+<code>td</code>. Você não veria isso no navegador sem abrir o inspetor, porque o desenho da tabela
+continua parecido — mas o HTML está errado, os leitores de tela se perdem e qualquer estilo que dependa
+de <code>tr &gt; td</code> para de funcionar. Com o fragmento, o painel mostra
+<code>tr</code> com dois <code>td</code> diretos, quatro células no total, nenhuma <code>div</code>
+dentro da tabela.</p>
+
+<p>O mesmo raciocínio vale para outros agrupadores com filhos obrigatórios: <code>dl</code> aceita
+<code>dt</code> e <code>dd</code>; <code>ul</code> e <code>ol</code> aceitam <code>li</code>;
+<code>select</code> aceita <code>option</code> e <code>optgroup</code>; <code>tr</code> aceita
+<code>td</code> e <code>th</code>. Em todos, se um componente precisa devolver vários filhos desse tipo,
+o fragmento é a ferramenta — e não há alternativa sem ele, a não ser repetir o componente para cada
+item.</p>
+
+<h2>6. Fragmento em lista precisa de key</h2>
+
+<p>Quando o fragmento aparece dentro de um <code>map</code>, ele vira um item de lista e precisa de
+identidade — a mesma <code>key</code> que você já usa em <code>li</code> e <code>tr</code>. E aqui
+aparece o único motivo real para usar a forma longa: a sintaxe curta, <code>&lt;&gt;</code>, não aceita
+atributo nenhum, então não dá para escrever <code>key</code> nela. É
+<code>&lt;Fragment key={item}&gt;</code> ou nada.</p>
+
+<div class="tryreact" data-goal="conta:dl dt=3;;conta:dl dd=3;;conta:dl div=0">
+  <p class="try-task">Cada item da lista precisa de um <code>dt</code> e um <code>dd</code> irmãos, e a
+  <code>div</code> no meio do <code>dl</code> é inválida. Use <code>&lt;Fragment key={item}&gt;</code>
+  para agrupar os dois.</p>
+  <pre class="jsx">const itens = ["Pão", "Bolo", "Café"];
+
+function App() {
+  return (
+    &lt;dl&gt;
+      {itens.map((item) =&gt; (
+        &lt;div&gt;
+          &lt;dt&gt;{item}&lt;/dt&gt;
+          &lt;dd&gt;Disponível hoje&lt;/dd&gt;
+        &lt;/div&gt;
+      ))}
+    &lt;/dl&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;dl&gt;
+  &lt;div&gt;
+    &lt;dt&gt;Pão&lt;/dt&gt;
+    &lt;dd&gt;Disponível hoje&lt;/dd&gt;
+  &lt;/div&gt;
+  &lt;div&gt;
+    &lt;dt&gt;Bolo&lt;/dt&gt;
+    &lt;dd&gt;Disponível hoje&lt;/dd&gt;
+  &lt;/div&gt;
+  &lt;div&gt;
+    &lt;dt&gt;Café&lt;/dt&gt;
+    &lt;dd&gt;Disponível hoje&lt;/dd&gt;
+  &lt;/div&gt;
+&lt;/dl&gt;
+</pre>
+  <pre class="solucao">const itens = ["Pão", "Bolo", "Café"];
+
+function App() {
+  return (
+    &lt;dl&gt;
+      {itens.map((item) =&gt; (
+        &lt;Fragment key={item}&gt;
+          &lt;dt&gt;{item}&lt;/dt&gt;
+          &lt;dd&gt;Disponível hoje&lt;/dd&gt;
+        &lt;/Fragment&gt;
+      ))}
+    &lt;/dl&gt;
+  );
+}</pre>
+</div>
+
+<p>Na solução, o painel mostra seis elementos dentro do <code>dl</code>, em pares, sem nenhum
+<code>div</code>. A <code>key</code> não aparece no HTML — ela é informação para o React, não para o
+navegador. É por isso que ela precisa estar no elemento mais externo do item, e no fragmento ela só pode
+entrar na forma longa.</p>
+
+<p>E vale a prova de que o fragmento não cria nó: se você medir os filhos do container no navegador, o
+número é o de elementos de verdade. Um componente que devolve um fragmento com dois filhos acrescenta
+dois filhos, não três:</p>
+
+<pre class="term">console: filhos de #raiz: 2</pre>
+
+<p>Duas linhas de código produzem esse número. A medição é feita dentro de um
+<code>useEffect</code>, porque é depois da renderização que o DOM existe: antes disso, não há o que
+contar. E o resultado confirma o que o painel já mostrava — o fragmento é invisível para o navegador e
+visível para o React.</p>
+
+<h2>7. O que o fragmento não aceita</h2>
+
+<p>Como o fragmento não é um elemento, ele não tem atributos de elemento. <code>className</code>,
+<code>style</code>, <code>id</code>, <code>onClick</code>: nada disso existe nele. Se você tentar, o
+React reclama — e a mensagem é curta porque a lista de props permitidas tem só duas:
+<code>children</code> e <code>key</code>.</p>
+
+<p>Essa limitação é a própria definição da ferramenta, não um defeito. Querer uma classe no fragmento é
+querer uma caixa; se você precisa de classe, precisa de <code>div</code>. O fragmento serve exatamente
+para quando <strong>não</strong> há nada a aplicar — nem classe, nem estilo, nem evento, só a
+necessidade de devolver vários irmãos.</p>
+
+<p>Outra consequência prática: o fragmento não aparece no DevTools. Abra o inspetor e você vê
+<code>main</code> com <code>h1</code> e <code>p</code> dentro, sem nenhum nó intermediário. Isso confunde
+na primeira vez, porque o código-fonte mostra o fragmento e a árvore do navegador não. Lembre-se: a
+árvore do navegador mostra o DOM; o fragmento existe só na árvore do React.</p>
+
+<p>Existe ainda uma pegadinha de leitura. Como <code>&lt;&gt;</code> não tem nome, ferramentas antigas e
+mensagens de erro às vezes se referem a ele como "fragmento anônimo" ou mostram a posição no arquivo em
+vez do nome. Quando o erro fala em <code>Fragment</code> e você jura que não escreveu nenhum, procure por
+<code>&lt;&gt;</code> no arquivo — é o mesmo componente, escrito de forma curta.</p>
+
+<h2>8. Quando a div é a resposta certa</h2>
+
+<p>Depois de aprender o fragmento, é comum querer usá-lo em tudo. Mas a <code>div</code> não é vilã: ela
+é o elemento genérico de bloco, e existe justamente para agrupar com estilo. A pergunta certa não é "div
+ou fragmento?", é "<strong>preciso de uma caixa aqui?</strong>". Se a resposta for sim, use
+<code>div</code> — com classe, com estilo, com o que a caixa precisa fazer.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você precisa</th><th>Use</th><th>Por quê</th></tr>
+<tr><td>agrupar dois irmãos sem estilo próprio</td><td>fragmento</td><td>o CSS do pai alcança os filhos diretos</td></tr>
+<tr><td>dar classe, espaçamento ou borda ao grupo</td><td><code>div</code></td><td>o fragmento não aceita atributos</td></tr>
+<tr><td>devolver vários <code>td</code>, <code>dt</code> ou <code>li</code></td><td>fragmento</td><td>a <code>div</code> seria HTML inválido ali</td></tr>
+<tr><td>identificar itens de uma lista</td><td><code>Fragment key</code> ou a tag do item</td><td><code>&lt;&gt;</code> não aceita <code>key</code></td></tr>
+<tr><td>envolver um filho só</td><td>nada</td><td>um filho já é um elemento; o fragmento seria decoração</td></tr>
+</table>
+</div>
+
+<p>A última linha economiza código e confusão. Se o componente devolve <code>&lt;&gt;&lt;p&gt;oi&lt;/p&gt;&lt;/&gt;</code>,
+o fragmento não está fazendo nada: o <code>p</code> já é um elemento só e podia ser devolvido direto.
+Fragmento com um filho é sinal de que alguém apagou metade do conteúdo e esqueceu a casca.</p>
+
+<p>Também cuidado com o excesso no sentido oposto: fragmentos dentro de fragmentos, cada um envolvendo
+dois elementos que poderiam ser irmãos do nível de cima. O JSX fica com uma escada de
+<code>&lt;&gt;</code> que não agrupa nada e só atrapalha a leitura. Agrupe quando houver motivo — um
+componente que precisa devolver vários irmãos, um item de lista que precisa de <code>key</code> — e
+deixe o resto plano.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o gap do flex que não aparece</h3>
+<p>A Ana aplicou <code>display: flex</code> e <code>gap: 12px</code> no container e o espaço não apareceu.
+O componente filho devolvia uma <code>div</code> com dois elementos dentro, então o container tinha um
+filho só. Trocado por um fragmento, os dois elementos viraram filhos diretos e o <code>gap</code>
+funcionou. O sintoma é sempre esse: o CSS parece certo, mas o parentesco no HTML é outro.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a tabela que ficou torta no celular</h3>
+<p>O componente de células devolvia <code>div</code>, e a tabela continuou bonita no desktop — até a Ana
+ver no celular, onde as colunas se desalinharam. O HTML inválido costuma perdoar no computador e cobrar
+no celular e nos leitores de tela. Com o fragmento, o <code>td</code> volta a ser filho do
+<code>tr</code>, e a tabela inteira se comporta como tabela.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o aviso de key que não fazia sentido</h3>
+<p>Ela usou <code>&lt;&gt;…&lt;/&gt;</code> dentro de um <code>map</code> e o console reclamou que faltava
+<code>key</code>. Tentou escrever <code>key</code> na sintaxe curta e o código nem compilou. A saída é a
+forma longa: <code>&lt;Fragment key={item}&gt;</code>. Vale sempre lembrar que a <code>key</code> fica no
+elemento mais externo do item que o <code>map</code> devolve — fragmento, <code>div</code> ou
+<code>li</code>.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que o fragmento cria na página?</p>
+<label><input type="radio" name="q1"> uma <code>div</code> sem classe</label>
+<label><input type="radio" name="q1"> nada: ele só agrupa para o React</label>
+<label><input type="radio" name="q1"> um <code>span</code> invisível</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. Por que <code>&lt;Fragment key={item}&gt;</code> e não <code>&lt;&gt;</code> dentro de um <code>map</code>?</p>
+<label><input type="radio" name="q2"> porque a sintaxe curta não aceita atributos, e a <code>key</code> é um deles</label>
+<label><input type="radio" name="q2"> porque a sintaxe curta cria um nó a mais no DOM</label>
+<label><input type="radio" name="q2"> porque <code>Fragment</code> é mais rápido que <code>&lt;&gt;</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">3. Quando a <code>div</code> é a escolha certa?</p>
+<label><input type="radio" name="q3"> sempre que você precisar devolver dois irmãos</label>
+<label><input type="radio" name="q3"> dentro de <code>tr</code> e de <code>dl</code>, para separar os itens</label>
+<label><input type="radio" name="q3"> quando o grupo precisa de classe, estilo ou evento</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o fragmento com nome</h2>
+<p>Complete as duas lacunas. Na primeira, o nome do componente que permite a <code>key</code> em um
+fragmento; na segunda, o nome do que o fragmento <strong>não</strong> cria — o que explica ele ser
+invisível no inspetor do navegador:</p>
+<div class="ex-code">{itens.map((item) =&gt; (
+  &lt;<input aria-label="resposta 1" data-answer="Fragment" placeholder="..."> key={item}&gt;
+    &lt;dt&gt;{item}&lt;/dt&gt;
+    &lt;dd&gt;Disponível hoje&lt;/dd&gt;
+  &lt;/Fragment&gt;
+))}
+// o fragmento não cria nenhum <input aria-label="resposta 2" data-answer="DOM|nó|no" placeholder="..."> na página</div>
+<p class="ex-dica">Dica: a primeira é o nome que o React exporta e que você importa com
+<code>import { … } from "react"</code>. A segunda é a sigla de três letras do modelo de elementos do
+navegador — a árvore onde os nós de verdade aparecem.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Um componente devolve um elemento só, porque o JSX vira uma chamada de função que cria um elemento.
+Quando você precisa devolver vários irmãos, o <code>Fragment</code> agrupa sem criar nó: o HTML final sai
+com os irmãos soltos, no nível de cima. A forma curta, <code>&lt;&gt;…&lt;/&gt;</code>, serve para quase
+tudo; a forma <code>&lt;Fragment&gt;</code> existe para quando é preciso passar <code>key</code>, e só
+isso.</p>
+
+<p>Dois lugares em que o fragmento é obrigação: quando o CSS do pai precisa alcançar os filhos diretos
+(layout flexível, grid, <code>gap</code>) e quando a estrutura HTML não permite <code>div</code> —
+<code>tr</code> com <code>td</code>, <code>dl</code> com <code>dt</code> e <code>dd</code>,
+<code>ul</code> com <code>li</code>, <code>select</code> com <code>option</code>. Nesses casos, a
+<code>div</code> não é feia, é inválida, e o preço aparece no celular e nos leitores de tela.</p>
+
+<p>E a regra que evita os dois excessos: fragmento quando não há caixa a desenhar, <code>div</code>
+quando há. Fragmento não aceita <code>className</code>, <code>style</code> nem evento, porque não existe
+elemento onde pendurar — se você quer estilo no grupo, quer uma <code>div</code>. Se o grupo tem um filho
+só, não quer nada. Na dúvida, olhe o painel: ele mostra o parentesco real, que é o que o CSS vê.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Componente devolve um elemento só; o fragmento é o pai invisível para vários irmãos.</li>
+<li><code>&lt;&gt;…&lt;/&gt;</code> não cria nó e não aceita atributo nenhum.</li>
+<li><code>&lt;Fragment key={item}&gt;</code> é a forma longa: aceita <code>key</code> e mais nada.</li>
+<li>Em <code>map</code>, use a forma longa: a curta não aceita <code>key</code>.</li>
+<li>Dentro de <code>tr</code>, <code>dl</code>, <code>ul</code> e <code>select</code>, a <code>div</code> é HTML inválido.</li>
+<li>Fragmento não tem classe, estilo nem evento: quer caixa, use <code>div</code>.</li>
+<li>Um filho só não precisa de fragmento.</li>
+<li>O fragmento não aparece no DevTools: existe na árvore do React, não no DOM.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

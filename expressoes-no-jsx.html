@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Expressões no JSX | Guia React</title>
+<meta name="description" content="O que cabe dentro das chaves do JSX: variáveis, contas, texto, ternário, &amp;&amp; e chamadas de função. Mais o que o React não desenha e o que fazer com objetos.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Expressões no <span class="hl">JSX</span></h1>
+
+<p class="intro">A Ana descobriu ontem que dá para escrever código dentro do JSX: as chaves. Hoje ela
+quer usar isso para parar de fazer conta na cabeça — o preço de dois pacotes de pão de queijo, o estado da
+padaria, o nome do pão que está dentro de um objeto. Aos poucos vai aparecer o padrão: chaves são uma
+porta para o JavaScript, e do outro lado sai um valor que o React coloca na tela. Saber o que pode e o
+que não pode entrar por essa porta é o que separa "funcionou de primeira" de "a tela ficou em branco e eu
+não sei por quê".</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma expressão e por que só ela entra nas chaves.</li>
+  <li>Mostrar variáveis, contas e texto montado.</li>
+  <li>Escolher entre duas opções com o ternário.</li>
+  <li>Mostrar ou esconder um pedaço com <code>&amp;&amp;</code>.</li>
+  <li>Por que objeto e função não aparecem na tela.</li>
+  <li>Como o painel mostra número, texto e o que é "invisível".</li>
+</ul>
+</div>
+
+<h2>1. A cena: a conta feita na cabeça</h2>
+
+<p>O cardápio da Ana tinha duas linhas de preço. A primeira, o pacote de pão de queijo: seis reais. A
+segunda, dois pacotes: doze reais. Ela fez a conta na cabeça e digitou o doze. Funcionou por três dias —
+até o dia em que o preço subiu para sete reais e a segunda linha continuou dizendo doze.</p>
+
+<p>O problema é o mesmo do cabeçalho repetido: um número que deveria ser consequência virou texto
+digitado. Se o doze fosse calculado a partir do seis, ele mudaria junto. É exatamente para isso que
+existem as chaves no JSX: elas permitem que a tela seja <em>calculada</em> em vez de digitada.</p>
+
+<p>Antes de ver a solução, vale entender o que pode entrar por essa porta. É o resto da aula.</p>
+
+<h2>2. Expressão é o que vale um valor</h2>
+
+<p>Em JavaScript, as coisas se dividem em dois grupos: as que <strong>valem</strong> alguma coisa e as
+que <strong>mandam fazer</strong> alguma coisa. Uma conta vale um número. Uma variável vale o que está
+dentro dela. Já um <code>if</code> não vale nada: ele manda escolher um caminho. O JSX aceita o primeiro
+grupo e recusa o segundo, porque ele precisa de um valor para colocar no lugar das chaves.</p>
+
+<p>Por isso <code>{2 + 3}</code> funciona e <code>{if (x) ...}</code> não. Não é implicância: o JSX vira
+uma chamada de função, e o miolo das chaves é um argumento dessa chamada. Argumento é valor. Quando você
+precisa decidir, decide com uma expressão que devolve a escolha — e as duas mais usadas são o ternário e
+o <code>&amp;&amp;</code>.</p>
+
+<dl class="anatomy">
+<dt>expressão</dt>
+<dd>Qualquer coisa que produz um valor: <code>2 + 3</code>, <code>preco</code>,
+<code>aberto ? "sim" : "não"</code>.</dd>
+<dt>chaves</dt>
+<dd>O par <code>{ }</code> que abre a porta para o JavaScript dentro do JSX. Sem elas, o texto é
+literal.</dd>
+<dt>ternário</dt>
+<dd>A escolha entre dois valores: <code>condição ? seVerdadeiro : seFalso</code>. Substitui o
+<code>if</code> dentro do JSX.</dd>
+<dt>curto-circuito</dt>
+<dd>O <code>&amp;&amp;</code> que mostra algo só quando a condição é verdadeira. Cuidado com o valor
+zero.</dd>
+<dt>renderizar</dt>
+<dd>Transformar o que a expressão devolveu em conteúdo na tela. Nem todo valor vira conteúdo.</dd>
+</dl>
+
+<p>Uma distinção que parece detalhe e não é: o texto fora das chaves é <em>literal</em> — o React copia
+como está. O conteúdo das chaves é <em>calculado</em> — o React avalia e usa o resultado. Isso permite
+misturar os dois no mesmo parágrafo, e é o que faz "Preço:" ser fixo e o número ser variável.</p>
+
+<h2>3. Variáveis e contas</h2>
+
+<p>O caso mais comum é este: uma variável guarda um dado e a tela mostra o valor. Se a variável muda, a
+tela acompanha — sem você tocar no texto. E, como dentro das chaves é JavaScript, você pode fazer contas
+ali mesmo em vez de guardar o resultado em outra variável.</p>
+
+<div class="tryreact" data-goal="texto:Dois pacotes: 12 reais">
+  <p class="try-task">O segundo parágrafo foi digitado à mão e mostra o mesmo preço do primeiro. Troque
+  o valor por uma conta dentro das chaves: <code>{preco * 2}</code>.</p>
+  <pre class="jsx">function App() {
+  const preco = 6;
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Pão de queijo&lt;/h1&gt;
+      &lt;p&gt;Um pacote: {preco} reais&lt;/p&gt;
+      &lt;p&gt;Dois pacotes: {preco} reais&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Pão de queijo&lt;/h1&gt;
+  &lt;p&gt;Um pacote: 6 reais&lt;/p&gt;
+  &lt;p&gt;Dois pacotes: 6 reais&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const preco = 6;
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Pão de queijo&lt;/h1&gt;
+      &lt;p&gt;Um pacote: {preco} reais&lt;/p&gt;
+      &lt;p&gt;Dois pacotes: {preco * 2} reais&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois de rodar, o segundo parágrafo mostra doze. Mude o <code>preco</code> para sete e rode de novo: as
+duas linhas mudam juntas, porque as duas vêm do mesmo lugar. Essa é a diferença entre uma tela calculada e
+uma tela digitada — e é o mesmo raciocínio do componente reaproveitado, só que aplicado a números.</p>
+
+<p>Dentro das chaves cabem as quatro operações, o resto da divisão, parênteses para agrupar e chamadas de
+função. <code>{2 + 3 * 4}</code> dá 14, porque a multiplicação vem antes — o JavaScript de sempre, sem
+nenhuma regra nova. E cabem funções suas: <code>{dobro(preco)}</code> funciona, desde que
+<code>dobro</code> esteja definida antes do <code>return</code>.</p>
+
+<p>Se quiser conferir uma conta antes de colocar na tela, o console do navegador é o lugar. Digite a
+mesma expressão e ele responde com o valor, sem mexer em nada da página:</p>
+
+<pre class="term">&gt; const preco = 6;
+undefined
+&gt; preco * 2
+12
+&gt; 2 + 3 * 4
+14</pre>
+
+<p>A linha <code>undefined</code> não é erro: no console, toda declaração de variável responde com
+<code>undefined</code> porque ela não "vale" nada — só guarda. As duas linhas seguintes são o valor das
+expressões. Esse é o mesmo resultado que o React vai colocar na tela quando a expressão estiver entre
+chaves, o que faz do console um bom lugar para testar a conta antes de escrever o JSX.</p>
+
+<p>Uma observação sobre o painel, que vale para toda a aula. Ele mostra o HTML gerado e, para ficar
+legível, separa os pedaços de texto com um espaço. Quando você escreve <code>R$ {preco * 2},00</code>, o
+painel pode exibir <code>R$ 12 ,00</code>, com um espaço antes da vírgula, enquanto na página de verdade o
+texto sai colado. Não é erro seu nem do React: é a forma de exibir do painel. Quando o texto colado
+importar, monte a string inteira em uma expressão só.</p>
+
+<h2>4. Número, texto e o que é invisível</h2>
+
+<p>Nem todo valor vira conteúdo. O React tem uma tabela mental simples: texto e número aparecem;
+<code>true</code>, <code>false</code>, <code>null</code> e <code>undefined</code> não aparecem — eles
+existem só para o componente decidir coisas. Quem vem do HTML estranha no começo, porque
+<code>{false}</code> literalmente não desenha nada, e isso é usado de propósito o tempo todo.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Dentro das chaves</th><th>O que aparece</th><th>Exemplo</th></tr>
+<tr><td>texto (string)</td><td>o texto, sem as aspas</td><td><code>{"Pão quentinho"}</code></td></tr>
+<tr><td>número</td><td>o número como texto</td><td><code>{3.5}</code>, <code>{2 + 3 * 4}</code></td></tr>
+<tr><td><code>true</code> e <code>false</code></td><td>nada</td><td><code>{false}</code></td></tr>
+<tr><td><code>null</code> e <code>undefined</code></td><td>nada</td><td><code>{null}</code></td></tr>
+<tr><td>objeto</td><td>nada, e o componente quebra</td><td><code>{pao}</code></td></tr>
+<tr><td>função</td><td>nada, e o componente quebra</td><td><code>{dobro}</code></td></tr>
+<tr><td>elemento JSX</td><td>o elemento desenhado</td><td><code>{&lt;p&gt;oi&lt;/p&gt;}</code></td></tr>
+</table>
+</div>
+
+<p>Repare na diferença entre as duas últimas linhas do "nada": <code>false</code> e <code>null</code> são
+aceitos e simplesmente não desenham nada; objeto e função são recusados e derrubam o componente. É uma
+diferença importante, porque o sintoma na tela é parecido — não aparece nada — e a causa é oposta.</p>
+
+<p>Quando o valor é <code>undefined</code> por acidente, o efeito é o mesmo: nada na tela. É o caso do nome
+digitado errado — a variável existe, mas o JavaScript procura por outro nome e não acha. O bloco some e o
+navegador reclama no console. Por isso, quando um pedaço do parágrafo desaparece, o primeiro lugar para
+olhar é o nome do que está entre chaves.</p>
+
+<h2>5. Escolher entre duas coisas: o ternário</h2>
+
+<p>A padaria abre e fecha, e o site precisa dizer qual dos dois. Dentro do JSX não cabe
+<code>if</code>, então usa-se o operador que escolhe entre dois valores em uma linha:
+<code>condição ? valorSeVerdadeiro : valorSeFalso</code>. O nome esquisito — ternário — vem de ele ter
+três partes.</p>
+
+<div class="tryreact" data-goal="texto:Aberto agora">
+  <p class="try-task">A variável <code>aberto</code> vale <code>true</code>, mas o parágrafo diz
+  "Fechado" porque o texto foi digitado. Use um ternário para escolher entre
+  <code>"Aberto agora"</code> e <code>"Fechado"</code>.</p>
+  <pre class="jsx">function App() {
+  const aberto = true;
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Estado: Fechado&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Estado: Fechado&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const aberto = true;
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Estado: {aberto ? "Aberto agora" : "Fechado"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra "Estado: Aberto agora". Troque o <code>true</code> para <code>false</code> e o mesmo
+parágrafo passa a dizer "Fechado" — a tela segue o dado. É a primeira vez no guia que você vê a lógica
+mudando o conteúdo, e é o alicerce do que vem depois: quando o dado vier de um clique, a tela vai mudar
+sozinha.</p>
+
+<p>As aspas dentro do ternário são necessárias porque os dois lados são textos. Se fossem números, não
+precisariam: <code>{quantidade ? quantidade : "esgotado"}</code> é válido, e mistura número e texto sem
+problema. E se os dois lados forem elementos JSX, também vale — o ternário escolhe <em>qual</em> pedaço
+de tela entra.</p>
+
+<p>O ternário é legível com duas opções; com três, vira um ninho difícil de ler. Nesse caso, calcule
+antes do <code>return</code> com um <code>if</code> normal e mostre uma variável só. O JSX não precisa
+saber da decisão, só do resultado.</p>
+
+<h2>6. Mostrar ou não: o <code>&amp;&amp;</code></h2>
+
+<p>Quando uma das duas opções é "nada", o ternário fica desequilibrado: <code>temPao ? &lt;p&gt;...&lt;/p&gt; : null</code>.
+Para esse caso existe um atalho. O <code>&amp;&amp;</code> devolve o valor da direita se o da esquerda for
+verdadeiro, e devolve o da esquerda se ele for falso. Como falso não desenha nada, o resultado é "mostre o
+elemento só quando a condição for verdadeira".</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const temPao = true;
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      {temPao &amp;&amp; &lt;p&gt;Pão quentinho saindo do forno&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Com <code>temPao</code> valendo <code>true</code>, o parágrafo aparece; valendo <code>false</code>, ele
+não existe no HTML gerado — nem como comentário, nem como espaço. É a forma mais comum de esconder um
+aviso, uma promoção ou uma mensagem de erro em React.</p>
+
+<p>Tem uma armadilha famosa aqui, e ela vale o parágrafo. O <code>&amp;&amp;</code> não devolve
+<code>false</code> quando o lado esquerdo é falso: devolve <em>o próprio valor da esquerda</em>. Se esse
+valor for <code>0</code>, o React desenha o zero. Então <code>{quantidade &amp;&amp; &lt;p&gt;Restam&lt;/p&gt;}</code>
+mostra um "0" solto na tela quando a quantidade é zero. A correção é usar uma comparação explícita —
+<code>quantidade &gt; 0 &amp;&amp; ...</code> — que devolve <code>true</code> ou <code>false</code>, e
+falso não desenha nada.</p>
+
+<h2>7. Objetos, listas e funções</h2>
+
+<p>Objeto é o tipo que mais aparece no React — props são um objeto, estado com vários campos é um
+objeto — e é justamente o que o React se recusa a desenhar. A razão é que não existe uma forma óbvia de
+transformar <code>{ nome: "Pão francês", preco: 6 }</code> em texto. Se o React escolhesse uma, ela
+estaria errada em algum caso.</p>
+
+<div class="tryreact" data-goal="texto:Pão francês;;texto:6 reais;;conta:p=2">
+  <p class="try-task">O parágrafo tenta mostrar o objeto <code>pao</code> inteiro, e nada aparece. Mostre
+  o nome em um parágrafo e o preço em outro: <code>{pao.nome}</code> e <code>{pao.preco} reais</code>.</p>
+  <pre class="jsx">function App() {
+  const pao = { nome: "Pão francês", preco: 6 };
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Cardápio&lt;/h1&gt;
+      &lt;p&gt;{pao}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+(o React não desenhou nada: o componente devolveu null?)
+</pre>
+  <pre class="solucao">function App() {
+  const pao = { nome: "Pão francês", preco: 6 };
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Cardápio&lt;/h1&gt;
+      &lt;p&gt;{pao.nome}&lt;/p&gt;
+      &lt;p&gt;{pao.preco} reais&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No projeto de verdade, o navegador diz exatamente o que aconteceu. A mensagem aparece no console,
+em vermelho, e vale a leitura porque ela aponta o tipo do problema:</p>
+
+<pre class="term">Objects are not valid as a React child (found: object with keys {nome, preco}).
+If you meant to render a collection of children, use an array instead.</pre>
+
+<p>Traduzindo: "objetos não são um filho válido do React; encontrei um objeto com as chaves nome e
+preco". Repare que a mensagem já entrega a solução pela metade — ela lista as propriedades que existem
+dentro do objeto, que é justamente o que você precisa escrever depois do ponto. Para ver os valores, o
+caminho é o console:</p>
+
+<pre class="term">&gt; pao
+{nome: 'Pão de queijo', preco: 6}
+&gt; pao.nome
+'Pão de queijo'</pre>
+
+<p>Antes de rodar, o painel avisa que nada foi desenhado. É o sintoma de objeto dentro das chaves: o
+componente nem chega a terminar. Depois, com as propriedades, aparecem as duas linhas. A regra prática é
+simples: <strong>entre chaves, mostre texto ou número; para chegar a um deles a partir de um objeto, use
+a propriedade</strong>.</p>
+
+<p>Listas têm um tratamento próprio: um array de elementos JSX é desenhado item por item, e essa é a base
+das listas com <code>map</code>, que tem aula própria. Array de números ou textos também é desenhado, mas
+sem separador — os itens saem colados, o que quase nunca é o que você quer. Função, por outro lado, não
+desenha nada e derruba o componente igual ao objeto.</p>
+
+<p>E há as funções que você <em>chama</em> dentro das chaves: <code>{formatarPreco(preco)}</code> funciona,
+porque o que entra no JSX é o resultado da chamada, e o resultado é texto. Função como valor (sem
+parênteses) é o problema; função executada é solução. Guarde essa diferença, porque ela volta em eventos e
+em listas.</p>
+
+<h2>8. Pondo tudo junto em um cartão</h2>
+
+<p>Um cartão de produto usa três ou quatro expressões ao mesmo tempo, e é onde se vê por que as chaves são
+o coração do JSX. O código abaixo é o mesmo raciocínio da aula inteira em um bloco só:</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const pao = { nome: "Pão de queijo", preco: 6 };
+  const quantidade = 2;
+  const temEstoque = quantidade &gt; 0;
+
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;{pao.nome}&lt;/h2&gt;
+      &lt;p&gt;{quantidade} unidades&lt;/p&gt;
+      &lt;p&gt;Total: {pao.preco * quantidade} reais&lt;/p&gt;
+      {temEstoque ? &lt;p&gt;Pronto para retirar&lt;/p&gt; : &lt;p&gt;Esgotado&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Leia de cima para baixo. O objeto guarda os dados do pão. A quantidade é um número. O total é uma conta
+que usa os dois. E o último parágrafo é uma escolha entre dois elementos inteiros — não entre dois textos,
+entre dois pedaços de tela. Se você mudar a quantidade para zero, o total vira zero e o aviso troca
+sozinho.</p>
+
+<p>Esse é o padrão que você vai repetir em todo componente: <strong>calcule antes, mostre depois</strong>.
+As contas e decisões ficam no topo da função, em JavaScript puro, onde são fáceis de ler e de testar. O
+<code>return</code> fica curto, com as chaves só buscando valores já prontos. Quem começa tende a fazer o
+contrário — contas gigantes dentro do JSX — e depois não consegue ler o próprio código.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operador</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>+ - * / %</code></td><td><code>{preco * 2}</code></td><td>a conta feita</td></tr>
+<tr><td><code>?</code> e <code>:</code></td><td><code>{aberto ? "Aberto" : "Fechado"}</code></td><td>um dos dois valores</td></tr>
+<tr><td><code>&amp;&amp;</code></td><td><code>{temPao &amp;&amp; &lt;p&gt;Tem pão&lt;/p&gt;}</code></td><td>o elemento ou nada</td></tr>
+<tr><td><code>||</code></td><td><code>{nome || "sem nome"}</code></td><td>o segundo, se o primeiro for vazio</td></tr>
+<tr><td><code>??</code></td><td><code>{preco ?? "sem preço"}</code></td><td>o segundo, só se o primeiro for nulo</td></tr>
+<tr><td>crase</td><td><code>{`Oi, ${nome}`}</code></td><td>um texto montado</td></tr>
+</table>
+</div>
+
+<p>A diferença entre <code>||</code> e <code>??</code> aparece quando o valor é zero. Com
+<code>preco = 0</code>, <code>{preco || "sem preço"}</code> mostra "sem preço", porque zero é considerado
+falso; já <code>{preco ?? "sem preço"}</code> mostra "0", porque o <code>??</code> só troca quando o valor é
+<code>null</code> ou <code>undefined</code>. Em preço, a diferença é a diferença entre um pão de graça e um
+pão sem preço.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o texto sumiu no meio do parágrafo</h3>
+<p>A Ana escreveu <code>Preço: {preco}</code>, mudou o nome da variável para <code>valor</code> e esqueceu
+de trocar no JSX. O resultado foi "Preço:" e nada depois. Erro de referência dentro do JSX derruba o
+componente, e o painel mostra o aviso de que nada foi desenhado. O conserto é conferir o nome — e o hábito
+que evita o problema é justamente o do fim da aula: calcular antes, com nomes claros, e usar no
+<code>return</code> só o que já existe.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o zero que aparece sozinho</h3>
+<p>Ela usou <code>{quantidade &amp;&amp; &lt;p&gt;Restam unidades&lt;/p&gt;}</code> e, quando o estoque
+zerou, apareceu um "0" na tela. É o comportamento do <code>&amp;&amp;</code>, que devolve o valor da
+esquerda quando ele é falso. A correção é comparar explicitamente:
+<code>{quantidade &gt; 0 &amp;&amp; ...}</code>. O mesmo cuidado vale para <code>||</code> com preço zero,
+que desaparece como se não existisse.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: objeto entre chaves e a tela em branco</h3>
+<p>Tentar mostrar <code>{pao}</code> derruba o componente, e a tela fica vazia sem uma mensagem clara no
+painel. A causa é sempre a mesma: objeto não é conteúdo. A saída é escolher o que mostrar — o nome, o
+preço, os dois em parágrafos separados — e para inspecionar o objeto inteiro existe o console:
+<code>console.log(pao)</code> mostra tudo, e é assim que se descobre o nome exato de cada propriedade.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que pode entrar dentro das chaves do JSX?</p>
+<label><input type="radio" name="q1"> qualquer comando, inclusive <code>if</code> e <code>for</code></label>
+<label><input type="radio" name="q1"> uma expressão, que produz um valor</label>
+<label><input type="radio" name="q1"> só texto entre aspas</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Como escolher entre "Aberto" e "Fechado" dentro do
+JSX?</p>
+<label><input type="radio" name="q2"> com <code>if</code> dentro das chaves</label>
+<label><input type="radio" name="q2"> escrevendo os dois textos na tela e escondendo um com CSS</label>
+<label><input type="radio" name="q2"> com <code>{aberto ? "Aberto" : "Fechado"}</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que aparece na tela com <code>{false}</code>?</p>
+<label><input type="radio" name="q3"> nada: falso e nulo não desenham nada</label>
+<label><input type="radio" name="q3"> a palavra "false"</label>
+<label><input type="radio" name="q3"> um erro que quebra o componente</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o total do pedido</h2>
+<p>O <code>preco</code> vale 6 e a <code>quantidade</code> vale 3. Complete a expressão que mostra o total
+em reais:</p>
+<div class="ex-code">&lt;p&gt;Total: {<input aria-label="resposta 1" data-answer="preco * quantidade" placeholder="...">} reais&lt;/p&gt;</div>
+<p class="ex-dica">Dica: é uma multiplicação entre as duas variáveis, com espaço em volta do asterisco.
+Você pode escrever com ou sem espaços; o resultado é 18.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>As chaves do JSX são uma porta para o JavaScript, e por ela só passa <strong>expressão</strong> — algo
+que vale um valor. Variáveis, contas, textos, chamadas de função e escolhas com ternário entram; comandos
+como <code>if</code> e <code>for</code> ficam do lado de fora. O resultado é colocado no lugar das chaves,
+como se fosse texto.</p>
+
+<p>Nem todo valor vira conteúdo: texto e número aparecem; <code>true</code>, <code>false</code>,
+<code>null</code> e <code>undefined</code> não desenham nada de propósito; objeto e função derrubam o
+componente. Para mostrar dados de um objeto, use a propriedade — <code>{pao.nome}</code>. Para escolher
+entre duas opções, ternário. Para mostrar ou esconder, <code>&amp;&amp;</code>, tomando cuidado com o zero
+que ele devolve.</p>
+
+<p>E o hábito que organiza tudo: calcule antes do <code>return</code>, mostre depois. As contas e decisões
+ficam em JavaScript puro, com nomes claros; o JSX só busca valores prontos. Quem faz o contrário escreve
+uma tela que funciona e um código que ninguém consegue reler.</p>
+
+<p>Na próxima aula o assunto é o outro lado dos atributos: os nomes que mudam em relação ao HTML, o
+<code>className</code> e os valores que precisam de chaves para funcionar.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Chaves aceitam expressão, não comando.</li>
+<li><code>{preco * 2}</code> calcula; mude o dado e a tela acompanha.</li>
+<li>Ternário escolhe entre dois valores: <code>{cond ? "a" : "b"}</code>.</li>
+<li><code>&amp;&amp;</code> mostra ou esconde; com zero ele desenha o zero.</li>
+<li><code>false</code>, <code>null</code> e <code>undefined</code> não desenham nada.</li>
+<li>Objeto e função entre chaves quebram o componente.</li>
+<li>Use a propriedade: <code>{pao.nome}</code>, <code>{pao.preco}</code>.</li>
+<li>Calcule antes do <code>return</code> e mantenha o JSX curto.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

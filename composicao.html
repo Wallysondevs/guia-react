@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Composição | Guia React</title>
+<meta name="description" content="Composição em React: montar telas encaixando componentes pequenos, passar o miolo por children e por props e fugir dos componentes cheios de configuração.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Composição</span></h1>
+<p class="intro">A Ana já sabe escrever componentes: um cabeçalho, uma lista, um rodapé, um cartão. O
+problema agora é o contrário. A tela de encomendas do site dela tem o mesmo cartão repetido em três
+lugares, cada um com um conteúdo diferente por dentro, e cada mudança na moldura custa três edições.
+Nesta aula ela aprende a <strong>composição</strong>: montar uma tela encaixando peças, e deixar que
+cada peça receba o miolo que só quem chama conhece.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é composição: um componente feito de outros componentes.</li>
+  <li>Por que compor é diferente de configurar com um monte de props.</li>
+  <li>Como o miolo entra no componente por <code>children</code>.</li>
+  <li>Como passar um componente inteiro por uma prop, para reservar um lugar da moldura.</li>
+  <li>As três formas de compor e quando cada uma resolve.</li>
+  <li>Os tropeços clássicos: esquecer o <code>{children}</code> e passar a função em vez do elemento.</li>
+  <li>Como ler no painel a árvore que a composição produziu.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o mesmo cartão três vezes</h2>
+
+<p>A tela de encomendas da padaria tem três blocos que são a mesma caixa: uma borda, um espaço interno,
+um título pequeno. Por dentro, cada um mostra uma coisa diferente. O primeiro tem o nome do pão e o
+horário em que fica pronto; o segundo tem o nome e o preço; o terceiro tem o preço e um botão de
+encomendar. Como o conteúdo muda, a Ana copiou a caixa três vezes no arquivo:</p>
+
+<pre class="file" data-file="Encomendas.jsx">function Encomendas() {
+  return (
+    &lt;div&gt;
+      &lt;div className="cartao"&gt;
+        &lt;h2&gt;Pão natural&lt;/h2&gt;
+        &lt;p&gt;Pronto às 7h&lt;/p&gt;
+      &lt;/div&gt;
+      &lt;div className="cartao"&gt;
+        &lt;h2&gt;Pão de queijo&lt;/h2&gt;
+        &lt;p&gt;R$ 3,00&lt;/p&gt;
+      &lt;/div&gt;
+      &lt;div className="cartao"&gt;
+        &lt;h2&gt;Baguete&lt;/h2&gt;
+        &lt;p&gt;R$ 9,00&lt;/p&gt;
+        &lt;button&gt;Encomendar&lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Funciona. O problema não é o código de hoje, é a manutenção de amanhã. Na semana passada ela mudou o
+espaçamento interno do cartão e editou dois dos três — o terceiro ficou com o texto colado na borda. E
+quando chegar o cartão de promoção, com preço antigo riscado e um selo, ela vai copiar mais uma vez. Em
+uma tela com trinta cartões, ninguém acha mais nada.</p>
+
+<p>A reação natural de quem já conhece props é criar um <code>Cartao</code> que sabe de tudo. Ele
+receberia o título, o preço, o horário, e mais uma pilha de liga-e-desliga:
+<code>mostrarFoto</code>, <code>mostrarPreco</code>, <code>mostrarBotao</code>,
+<code>destaque</code>, <code>pequeno</code>. Cada variação nova vira mais uma prop. Daqui a pouco o
+componente tem doze props, e ninguém lembra o que acontece quando <code>mostrarPreco</code> é falso e
+<code>destaque</code> é verdadeiro ao mesmo tempo. Isso não é composição: é configuração.</p>
+
+<p>Composição é o caminho oposto. Em vez de o <code>Cartao</code> saber todas as combinações possíveis,
+ele cuida só da moldura — e quem chama decide o que entra dentro. A moldura é escrita uma vez; o miolo
+muda em cada uso, sem prop nenhuma.</p>
+
+<h2>2. Compor é encaixar, não herdar</h2>
+
+<p>Em outras linguagens, quando você quer um cartão especial, você cria uma classe que herda da classe
+cartão. React não funciona assim: componente não herda de componente. O que existe é encaixe. Um
+componente usa outro dentro do seu JSX, como uma peça de Lego em cima da outra. A peça de baixo não
+sabe o que está em cima; a de cima decide onde a de baixo fica.</p>
+
+<dl class="anatomy">
+<dt>composição</dt>
+<dd>Montar um componente usando outros componentes dentro do JSX dele. <code>Pagina</code> é feita de
+<code>Cabecalho</code>, <code>ListaDePaes</code> e <code>Rodape</code>.</dd>
+<dt>peça</dt>
+<dd>Um componente pequeno, com um assunto só: mostrar o topo, mostrar uma linha de preço, embrulhar
+conteúdo numa moldura.</dd>
+<dt>children</dt>
+<dd>O que você escreve entre a abertura e o fechamento de um componente. Chega para ele como
+<code>props.children</code>, e o componente decide onde mostrar.</dd>
+<dt>slot</dt>
+<dd>Uma prop que recebe um pedaço de tela em vez de um dado: <code>acoes={&lt;Botao /&gt;}</code>. É
+um lugar reservado na moldura, com nome.</dd>
+<dt>especialização</dt>
+<dd>Um componente que já chama outro com um conteúdo fixo, para um caso só:
+<code>CartaoDePromocao</code> usa <code>Cartao</code> e acrescenta o selo.</dd>
+</dl>
+
+<p>Uma consequência prática dessa escolha: o componente que recebe o miolo não precisa saber nada sobre
+ele. O <code>Cartao</code> não conhece preço, foto nem botão. Ele conhece a borda, o espaço interno e o
+fundo. É por isso que ele aguenta trinta variações diferentes sem ganhar uma prop nova.</p>
+
+<h2>3. A página é a soma das peças</h2>
+
+<p>Vamos começar pelo caso mais simples de composição: um componente que só junta outros, na ordem em
+que eles aparecem na tela. A caixa abaixo tem um <code>Cabecalho</code>, uma <code>ListaDePaes</code> e
+um <code>Rodape</code> prontos. O <code>Pagina</code> já usa dois deles — e esqueceu o terceiro, então
+o rodapé não aparece.</p>
+
+<div class="tryreact" data-goal="conta:footer=1;;texto:desde 1998">
+  <p class="try-task">O componente <code>Rodape</code> existe, mas o <code>Pagina</code> não o chama.
+  Chame <code>&lt;Rodape /&gt;</code> depois da lista e clique em Rodar.</p>
+  <pre class="jsx">function Cabecalho() {
+  return (
+    &lt;header&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    &lt;/header&gt;
+  );
+}
+
+function ListaDePaes() {
+  return (
+    &lt;ul&gt;
+      &lt;li&gt;Pão francês&lt;/li&gt;
+      &lt;li&gt;Pão de queijo&lt;/li&gt;
+    &lt;/ul&gt;
+  );
+}
+
+function Rodape() {
+  return &lt;footer&gt;Padaria da Ana — desde 1998&lt;/footer&gt;;
+}
+
+function Pagina() {
+  return (
+    &lt;div&gt;
+      &lt;Cabecalho /&gt;
+      &lt;ListaDePaes /&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return &lt;Pagina /&gt;;
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;header&gt;
+    &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+    &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+  &lt;/header&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Pão francês&lt;/li&gt;
+    &lt;li&gt;Pão de queijo&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Cabecalho() {
+  return (
+    &lt;header&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    &lt;/header&gt;
+  );
+}
+
+function ListaDePaes() {
+  return (
+    &lt;ul&gt;
+      &lt;li&gt;Pão francês&lt;/li&gt;
+      &lt;li&gt;Pão de queijo&lt;/li&gt;
+    &lt;/ul&gt;
+  );
+}
+
+function Rodape() {
+  return &lt;footer&gt;Padaria da Ana — desde 1998&lt;/footer&gt;;
+}
+
+function Pagina() {
+  return (
+    &lt;div&gt;
+      &lt;Cabecalho /&gt;
+      &lt;ListaDePaes /&gt;
+      &lt;Rodape /&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return &lt;Pagina /&gt;;
+}</pre>
+</div>
+
+<p>Leia o painel de baixo para cima, se quiser: há um <code>div</code>, e dentro dele um
+<code>header</code>, um <code>ul</code> e um <code>footer</code>. É exatamente o que o JSX do
+<code>Pagina</code> desenhou. Cada componente devolveu um pedaço, e o React encaixou os pedaços como
+um quebra-cabeça — porque o <code>Pagina</code> escreveu as peças na ordem em que elas devem aparecer.</p>
+
+<p>O <code>App</code> no fim do editor é só a porta de entrada: ele não desenha nada por conta própria,
+chama o <code>Pagina</code> e sai de cena. É assim que o motor desta página funciona — ele procura a
+função <code>App</code> e a coloca na tela. No site da Ana é a mesma divisão: o <code>App</code> escolhe
+qual tela mostrar, e cada tela monta as suas peças.</p>
+
+<p>Repare no que o <code>Pagina</code> não faz: ele não calcula preço, não formata horário, não sabe
+quantos pães existem. Ele só monta. Essa divisão é o que deixa cada peça fácil de ler. Quando um
+problema aparece no rodapé, você abre o <code>Rodape</code> e pronto: não precisa procurar no arquivo
+inteiro.</p>
+
+<h2>4. O miolo que entra pelo meio: children</h2>
+
+<p>Agora o encaixe útil. A Ana quer a moldura do cartão uma vez só, e o conteúdo escolhido em cada uso.
+O React tem um canal pronto para isso: tudo o que você escreve entre
+<code>&lt;Cartao&gt;</code> e <code>&lt;/Cartao&gt;</code> chega ao componente como
+<code>children</code>. Ele decide onde mostrar esse conteúdo.</p>
+
+<div class="tryreact" data-goal="conta:.cartao=2;;texto:R$ 3,00">
+  <p class="try-task">O <code>Cartao</code> já embrulha o primeiro pão, mas o segundo ficou solto na
+  página. Coloque o título e o preço do pão de queijo dentro de outro <code>&lt;Cartao&gt;</code>.</p>
+  <pre class="jsx">function Cartao({ children }) {
+  return &lt;div className="cartao"&gt;{children}&lt;/div&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Cartao&gt;
+        &lt;h2&gt;Pão francês&lt;/h2&gt;
+        &lt;p&gt;R$ 1,20&lt;/p&gt;
+      &lt;/Cartao&gt;
+      &lt;h2&gt;Pão de queijo&lt;/h2&gt;
+      &lt;p&gt;R$ 3,00&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;div class="cartao"&gt;
+    &lt;h2&gt;Pão francês&lt;/h2&gt;
+    &lt;p&gt;R$ 1,20&lt;/p&gt;
+  &lt;/div&gt;
+  &lt;h2&gt;Pão de queijo&lt;/h2&gt;
+  &lt;p&gt;R$ 3,00&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Cartao({ children }) {
+  return &lt;div className="cartao"&gt;{children}&lt;/div&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Cartao&gt;
+        &lt;h2&gt;Pão francês&lt;/h2&gt;
+        &lt;p&gt;R$ 1,20&lt;/p&gt;
+      &lt;/Cartao&gt;
+      &lt;Cartao&gt;
+        &lt;h2&gt;Pão de queijo&lt;/h2&gt;
+        &lt;p&gt;R$ 3,00&lt;/p&gt;
+      &lt;/Cartao&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O <code>Cartao</code> tem três linhas e nenhuma prop de conteúdo. Ele não sabe que existe pão de
+queijo no mundo. Mesmo assim funciona para os dois pães — e funcionaria para um bolo, para uma
+encomenda, para um aviso. Quem decide o que aparece é quem chama. A moldura fica num lugar só.</p>
+
+<p>Compare com a alternativa configurável: um <code>Cartao</code> com props <code>titulo</code>,
+<code>preco</code>, <code>mostrarBotao</code> e afins precisaria mudar toda vez que aparecesse um
+conteúdo novo. Com <code>children</code>, o conteúdo é livre: pode ser um título e um preço, pode ser
+uma imagem, pode ser um formulário inteiro. O componente não precisa prever nada disso.</p>
+
+<p>O <code>children</code> não é exclusivo de um conteúdo por vez. Se você escrever dois parágrafos
+entre as tags, os dois chegam — o React entrega os filhos como uma lista, e cada um aparece na ordem
+escrita. É a mesma ideia da aula de <a href="children.html">children</a>, agora usada para montar
+telas.</p>
+
+<h2>5. O que o console mostra quando a peça é chamada</h2>
+
+<p>Uma dúvida comum: o React chama o componente uma vez ou uma vez por uso? A resposta importa para
+entender composição, então vale medir. Este é o <code>Cartao</code> com uma linha de
+<code>console.log</code>:</p>
+
+<pre class="file" data-file="Cartao.jsx">function Cartao({ nome, children }) {
+  console.log("montando o cartão: " + nome);
+  return &lt;div className="cartao"&gt;{children}&lt;/div&gt;;
+}</pre>
+
+<p>Com dois cartões na tela, o console do navegador mostra duas linhas, na ordem em que eles aparecem
+na árvore:</p>
+
+<pre class="term">montando o cartão: Pão francês
+montando o cartão: Pão de queijo</pre>
+
+<p>Duas chamadas, dois cartões. Se o <code>App</code> renderizar de novo (porque um estado mudou, por
+exemplo), as duas linhas aparecem outra vez: componente é função, e função roda quando é chamada. Isso
+explica por que colocar código pesado no corpo do componente é má ideia — ele roda a cada desenho. E
+explica também por que a composição é barata: encaixar dez peças é chamar dez funções pequenas, não
+uma função gigante que pensa em tudo.</p>
+
+<h2>6. Um lugar reservado: componente por prop</h2>
+
+<p>Nem todo encaixe é no meio. Às vezes a moldura tem dois lugares diferentes: um à esquerda, outro à
+direita; um no topo, outro no pé. Aí <code>children</code> não basta, porque ele é um canal só. A saída
+é reservar cada lugar com uma prop que recebe um pedaço de tela — o que muita gente chama de
+<em>slot</em>.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Pães no carrinho: 3">
+  <p class="try-task">O <code>Painel</code> reserva um lugar para botões (a prop <code>acoes</code>),
+  mas ninguém passou nada. Passe <code>&lt;BotaoAdicionar aoClicar={() =&gt; setQuantos(quantos + 1)} /&gt;</code>
+  como <code>acoes</code>, clique no botão e veja o contador ir para 3.</p>
+  <pre class="jsx">function BotaoAdicionar({ aoClicar }) {
+  return &lt;button onClick={aoClicar}&gt;Adicionar pão&lt;/button&gt;;
+}
+
+function Painel({ titulo, acoes, children }) {
+  return (
+    &lt;section className="painel"&gt;
+      &lt;h2&gt;{titulo}&lt;/h2&gt;
+      &lt;div className="acoes"&gt;{acoes}&lt;/div&gt;
+      {children}
+    &lt;/section&gt;
+  );
+}
+
+function App() {
+  const [quantos, setQuantos] = useState(2);
+
+  return (
+    &lt;div&gt;
+      &lt;Painel titulo="Carrinho"&gt;
+        &lt;p&gt;Pães no carrinho: {quantos}&lt;/p&gt;
+      &lt;/Painel&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;section class="painel"&gt;
+    &lt;h2&gt;Carrinho&lt;/h2&gt;
+    &lt;div class="acoes"&gt;&lt;/div&gt;
+    &lt;p&gt;Pães no carrinho: 2&lt;/p&gt;
+  &lt;/section&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function BotaoAdicionar({ aoClicar }) {
+  return &lt;button onClick={aoClicar}&gt;Adicionar pão&lt;/button&gt;;
+}
+
+function Painel({ titulo, acoes, children }) {
+  return (
+    &lt;section className="painel"&gt;
+      &lt;h2&gt;{titulo}&lt;/h2&gt;
+      &lt;div className="acoes"&gt;{acoes}&lt;/div&gt;
+      {children}
+    &lt;/section&gt;
+  );
+}
+
+function App() {
+  const [quantos, setQuantos] = useState(2);
+
+  return (
+    &lt;div&gt;
+      &lt;Painel
+        titulo="Carrinho"
+        acoes={&lt;BotaoAdicionar aoClicar={() =&gt; setQuantos(quantos + 1)} /&gt;}
+      &gt;
+        &lt;p&gt;Pães no carrinho: {quantos}&lt;/p&gt;
+      &lt;/Painel&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Três coisas aconteceram de uma vez. Primeiro, o <code>Painel</code> ficou com dois canais: a prop
+<code>acoes</code> para o botão e <code>children</code> para o texto. Segundo, o botão continua
+funcionando: ele foi criado no <code>App</code>, com o <code>aoClicar</code> ligado no
+<code>setQuantos</code>, e o <code>Painel</code> só o colocou no lugar. Terceiro, o estado não mudou de
+dono — quem guarda o número de pães é o <code>App</code>, e o botão só avisa que alguém clicou.</p>
+
+<p>Essa última parte é a mais importante e a mais esquecida. Compor não significa esconder o
+comportamento dentro da moldura. O <code>Painel</code> não sabe somar pães; ele só oferece o espaço. Se
+você precisar de outro botão no mesmo lugar, é só passar outro — o painel não muda uma linha.</p>
+
+<h2>7. As três formas de compor</h2>
+
+<p>Com o que você já viu, dá para resumir a composição em três formas. Elas não competem: cada uma
+resolve um tipo de encaixe, e a maioria das telas usa as três ao mesmo tempo.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Como fica no código</th><th>Quando usar</th></tr>
+<tr><td>chamar dentro</td><td><code>&lt;Cabecalho /&gt;</code> fixo no JSX do pai</td><td>a peça é sempre a mesma, naquele lugar</td></tr>
+<tr><td>children</td><td><code>&lt;Cartao&gt;…&lt;/Cartao&gt;</code></td><td>a moldura é fixa e o miolo muda em cada uso</td></tr>
+<tr><td>prop de conteúdo</td><td><code>acoes={&lt;Botao /&gt;}</code></td><td>a moldura tem dois ou mais lugares reservados</td></tr>
+</table>
+</div>
+
+<p>Repare que a diferença entre <code>children</code> e prop de conteúdo é só de endereço. Os dois
+recebem JSX. <code>children</code> é o encaixe sem nome, o que fica entre as tags; a prop é o encaixe
+com nome, que você escreve como atributo. Quando há um lugar só, <code>children</code> lê melhor.
+Quando há dois, as props dão nome a cada um e ninguém precisa adivinhar qual é qual.</p>
+
+<p>Vale um aviso para não exagerar na dose. Compor não é quebrar tudo em pedacinhos minúsculos: um
+componente que só embrulha uma <code>div</code> e repassa três props não deixa o código mais claro,
+deixa mais longo. O critério é sempre o mesmo — a peça existe porque tem um nome e um assunto que fazem
+sentido sozinhos. Quando quebrar e quando parar é assunto de
+<a href="quando-quebrar-em-componentes.html">Quando Quebrar em Componentes</a>; por ora, guarde a ideia
+de que composição é uma ferramenta, não uma obrigação.</p>
+
+<p>Há ainda uma quarta variação, que é combinar as anteriores: um componente que já vem com o conteúdo
+montado. A Ana poderia ter um <code>CartaoDePromocao</code> que chama <code>Cartao</code> por dentro e
+acrescenta o selo de desconto. Quem usa não precisa lembrar de passar o selo; quem mantém o selo sabe
+que ele mora ali. Isso se chama especialização, e é o jeito certo de criar uma variação fixa sem
+inventar props booleanas.</p>
+
+<h2>8. O que dá errado quando a peça não aparece</h2>
+
+<p>Quase todo problema de composição cai em um dos quatro casos abaixo. O sintoma é sempre parecido — a
+tela mostra menos do que você escreveu —, então vale reconhecer pelo código.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você escreveu</th><th>O que acontece</th><th>O conserto</th></tr>
+<tr><td><code>return &lt;div className="cartao"&gt;&lt;/div&gt;</code></td><td>o miolo escrito entre as tags desaparece</td><td>mostrar <code>{children}</code> dentro da div</td></tr>
+<tr><td><code>acoes={BotaoAdicionar}</code></td><td>aviso no console; nada é desenhado no lugar</td><td><code>acoes={&lt;BotaoAdicionar /&gt;}</code></td></tr>
+<tr><td>dez props para cobrir variações</td><td>combinações impossíveis e bug difícil de achar</td><td>compor com <code>children</code> ou slots</td></tr>
+<tr><td>tudo dentro de um componente só</td><td>arquivo ilegível, mudança com efeito colateral</td><td>quebrar em peças com um assunto cada</td></tr>
+</table>
+</div>
+
+<p>O segundo caso merece atenção porque a diferença é de dois caracteres. <code>BotaoAdicionar</code> é
+a função; <code>&lt;BotaoAdicionar /&gt;</code> é o elemento que o React sabe desenhar. Passar a função
+é passar a receita em vez do bolo, e o React reclama no console com uma mensagem curta:</p>
+
+<pre class="term">Warning: Functions are not valid as a React child.</pre>
+
+<p>“Funções não são válidas como filho do React” — traduzindo: no lugar onde você quer um pedaço de
+tela, chegou uma função. O conserto é envolver em JSX. Vale reparar que é um <strong>aviso</strong>:
+a página continua de pé, só aquele lugar fica vazio. Erro impede, aviso reclama.</p>
+
+<p>Um detalhe estrutural que aparece em quase toda composição: a moldura acrescenta um elemento. O
+<code>Cartao</code> cria uma <code>div</code> em volta do conteúdo, e essa div aparece no painel e no
+HTML final. Quase sempre é o que você quer, porque é ela que carrega a borda e o espaço interno. Quando
+a moldura não tem estilo nenhum e você só precisa agrupar, o <code>Fragment</code> — o
+<code>&lt;&gt;…&lt;/&gt;</code> da aula de <a href="fragment.html">O Fragment</a> — faz o mesmo sem
+criar nó.</p>
+
+<p>O primeiro caso é o mais traiçoeiro, e não gera aviso nenhum. Você escreveu o conteúdo, o componente
+existe, a moldura aparece — só o miolo não. Na dúvida, procure <code>{children}</code> no componente da
+moldura. Se não estiver lá, o conteúdo foi recebido e jogado fora.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: três cartões com borda diferente</h3>
+<p>A Ana copiou o cartão três vezes e mudou o CSS em dois. Resultado: um cartão com borda, dois sem.
+Com um <code>Cartao</code> que recebe <code>children</code>, o CSS fica escrito uma vez e os três usos
+herdam a mesma moldura. Mudar a borda passa a ser mudar uma linha — e o painel mostra os três com a
+mesma cara.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o painel que recebeu a receita em vez do bolo</h3>
+<p>Ela escreveu <code>acoes={BotaoAdicionar}</code> e o lugar do botão ficou vazio. O console avisou que
+função não é filho válido. O conserto foi <code>acoes={&lt;BotaoAdicionar aoClicar={…} /&gt;}</code>.
+Parece detalhe de sintaxe, mas é a diferença entre mandar a peça e mandar a fábrica.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o componente que virou um painel de controle</h3>
+<p>O <code>Cartao</code> chegou a doze props: <code>mostrarFoto</code>, <code>mostrarPreco</code>,
+<code>pequeno</code>, <code>destaque</code>. Cada pedido novo de layout exigia uma prop nova e um
+<code>if</code> a mais. A solução foi voltar atrás: o cartão ficou com a moldura e um
+<code>{children}</code>; as variações passaram a ser conteúdos diferentes, não configurações. O
+componente encolheu para quatro linhas.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que é composição em React?</p>
+<label><input type="radio" name="q1"> uma classe que herda de outra classe</label>
+<label><input type="radio" name="q1"> montar um componente usando outros componentes dentro dele</label>
+<label><input type="radio" name="q1"> juntar todo o CSS da página num arquivo só</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Para que serve o <code>{children}</code> dentro de um componente?</p>
+<label><input type="radio" name="q2"> para contar quantos filhos o componente tem</label>
+<label><input type="radio" name="q2"> para guardar o estado do componente</label>
+<label><input type="radio" name="q2"> para mostrar o que foi escrito entre a abertura e o fechamento dele</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Quando vale reservar um lugar com uma prop em vez de usar <code>children</code>?</p>
+<label><input type="radio" name="q3"> quando a moldura tem dois ou mais lugares de conteúdo, cada um com seu papel</label>
+<label><input type="radio" name="q3"> quando o conteúdo é sempre o mesmo em todos os usos</label>
+<label><input type="radio" name="q3"> quando o componente não tem estado</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: complete a moldura</h2>
+<p>O <code>Cartao</code> abaixo é a moldura da padaria. Complete o que falta para que ele mostre o
+conteúdo recebido entre as tags.</p>
+<div class="ex-code">function Cartao(props) { return &lt;div className="cartao"&gt;{<input aria-label="resposta 1" data-answer="props.children|children" placeholder="...">}&lt;/div&gt;; }</div>
+<p class="ex-dica">Dica: <code>children</code> é uma propriedade do objeto <code>props</code>, como
+<code>titulo</code> ou <code>preco</code>. Sem ela no JSX, o conteúdo é recebido e jogado fora.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Composição é montar telas encaixando componentes. Um componente pode chamar outro direto no JSX, pode
+receber o miolo por <code>children</code> e pode reservar lugares com nome por props de conteúdo. Nos
+três casos, a peça pequena cuida de um assunto só e a peça maior decide a ordem e o lugar.</p>
+
+<p>O ganho aparece na manutenção. A moldura é escrita uma vez, então mudar a borda de trinta cartões é
+mudar uma linha. O miolo é decidido por quem chama, então um conteúdo novo não exige prop nova. E cada
+peça pode ser lida sozinha, o que é a diferença entre achar um bug em cinco minutos e perdê-lo numa
+tela de quatrocentas linhas.</p>
+
+<p>A composição é a base das próximas aulas. O layout de uma página inteira nada mais é do que um
+componente com <code>children</code> no lugar do miolo e props para o menu e o rodapé — o assunto de
+<a href="componentes-de-layout.html">Componentes de Layout</a>. E quando a moldura está funda e o dado
+precisa atravessar cinco níveis para chegar ao miolo, o problema deixa de ser composição e vira
+<a href="props-drilling.html">props drilling</a>, que é a próxima parada.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Composição: um componente feito de outros componentes no seu JSX.</li>
+<li>React compõe, não herda: peça dentro de peça, não classe que estende classe.</li>
+<li><code>{children}</code> mostra o que veio entre as tags; sem ele, o conteúdo some.</li>
+<li>Prop de conteúdo recebe JSX: <code>acoes={&lt;Botao /&gt;}</code>, nunca a função solta.</li>
+<li>Um lugar de conteúdo: <code>children</code>. Dois ou mais: props com nome.</li>
+<li>Variação fixa se faz com especialização, não com mais uma prop booleana.</li>
+<li>A moldura não guarda comportamento: o clique continua morando em quem tem o estado.</li>
+<li>Componente é função: cada uso na tela é uma chamada, e o console prova.</li>
+<li>Se o miolo não aparece, procure <code>{children}</code> na moldura.</li>
+<li>Doze props para cobrir variações é sinal de que o corte está no lugar errado.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

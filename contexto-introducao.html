@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Introdução ao Contexto | Guia React</title>
+<meta name="description" content="Introdução ao contexto do React: createContext, Provider e useContext para levar um dado da tela inteira sem passar a mesma prop por todos os níveis da árvore.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Introdução ao <span class="hl">Contexto</span></h1>
+<p class="intro">O nome do cliente virou assunto de cinco cantos da tela da Ana: o cabeçalho cumprimenta,
+o carrinho assina, o rodapé avisa o atendimento, o selo marca quem é cadastrado e a nota fiscal imprime.
+Passar a prop <code>cliente</code> por todos esses caminhos faria o site dela virar um mapa de canos.
+Nesta aula ela conhece o contexto: um canal que fica no alto da árvore e que qualquer componente abaixo
+pode abrir, sem pedir licença para os níveis do meio.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é contexto, em uma frase que você pode repetir.</li>
+  <li>Como criar um canal com <code>createContext</code> e o que é o valor padrão.</li>
+  <li>Como o <code>Provider</code> abastece o canal para uma região da árvore.</li>
+  <li>Como um componente lê o valor com <code>useContext</code>.</li>
+  <li>Por que o provider não aparece no HTML gerado.</li>
+  <li>Como o valor vem do estado, e o que acontece quando ele muda.</li>
+  <li>Quando o contexto é a resposta errada e a prop continua sendo melhor.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o cliente em cinco lugares</h2>
+
+<p>Na aula anterior, a Ana resolveu o desconto montando o preço pronto lá em cima e entregando a peça
+pelo <code>children</code>. Funcionou para um cartão. Agora o nome do cliente aparece em cinco pontos
+distantes da tela, e alguns deles estão dentro de componentes que ela não controla — o rodapé, por
+exemplo, é usado em três telas diferentes.</p>
+
+<p>Continuar com props significaria passar <code>cliente</code> para o <code>Rodape</code>, para o
+<code>Cabecalho</code>, para o <code>Carrinho</code>, para o <code>Selo</code> e para a
+<code>NotaFiscal</code>, e também para todos os pais deles. São nove assinaturas para um dado que só
+muda num lugar. Pior: no dia em que o cliente sair, cada um desses nove pontos precisa saber que o valor
+virou nulo.</p>
+
+<p>O contexto resolve isso com uma ideia simples: em vez de entregar o dado de mão em mão, alguém
+abastece um canal no alto da árvore, e qualquer componente abaixo dele abre a torneira quando quiser. O
+canal tem nome, o valor tem dono, e os componentes do meio não ficam sabendo de nada.</p>
+
+<h2>2. Um canal, uma torneira</h2>
+
+<p>Contexto em React é isso: um canal nomeado que carrega um valor para uma região da árvore. Três
+peças o montam — a criação do canal, o fornecimento do valor e a leitura dentro do componente. As três
+têm nomes próprios, e vale decorar porque você vai digitá-los muitas vezes.</p>
+
+<dl class="anatomy">
+<dt>contexto</dt>
+<dd>Um canal nomeado que leva um valor para todos os componentes abaixo dele. <code>ClienteContexto</code>,
+<code>TemaContexto</code>.</dd>
+<dt>createContext</dt>
+<dd>Cria o canal e recebe um valor padrão: <code>createContext("visitante")</code>. Fica fora do
+componente, no topo do arquivo.</dd>
+<dt>Provider</dt>
+<dd>O componente que abastece o canal para os seus descendentes:
+<code>&lt;ClienteContexto.Provider value={cliente}&gt;</code>.</dd>
+<dt>value</dt>
+<dd>O valor que o provider coloca no canal. Pode ser texto, número, objeto ou função — e normalmente
+vem de um estado.</dd>
+<dt>useContext</dt>
+<dd>A leitura: <code>const cliente = useContext(ClienteContexto)</code> devolve o valor do provider mais
+próximo acima.</dd>
+<dt>valor padrão</dt>
+<dd>O que o consumidor recebe quando não existe nenhum provider acima dele. Não é “carregando”: é “não
+tem provedor”.</dd>
+</dl>
+
+<p>Esse último termo confunde muita gente. O valor padrão não é um plano B para quando o dado ainda não
+chegou; é o valor de quem está fora da área abastecida. Se o seu selo aparece como “visitante” mesmo
+depois de você passar o cliente, o problema quase sempre é o provider estar no lugar errado — fora do
+ramo da árvore onde o selo mora.</p>
+
+<p>Uma nota de versão: no React 19 dá para usar o próprio canal como provider, sem o
+<code>.Provider</code>: <code>&lt;ClienteContexto value={cliente}&gt;</code>. As duas formas funcionam e
+fazem a mesma coisa. Vou usar a forma clássica, com <code>.Provider</code>, porque é a que você encontra
+na maioria dos exemplos e a que funciona também em versões anteriores.</p>
+
+<h2>3. A caixa: criar, abastecer, ler</h2>
+
+<p>Vamos montar o canal do cliente. O <code>ClienteContexto</code> já existe, com o valor padrão
+“visitante”. O selo lá embaixo já lê o canal. O que falta é o provider: ninguém abasteceu o canal, então
+o selo recebe o padrão e mostra “Cliente: visitante” para uma cliente de cinco anos.</p>
+
+<div class="tryreact" data-goal="texto:Cliente: Ana">
+  <p class="try-task">Envolva o <code>&lt;Cartao /&gt;</code> com
+  <code>&lt;ClienteContexto.Provider value={cliente}&gt;</code> e
+  <code>&lt;/ClienteContexto.Provider&gt;</code>, e clique em Rodar.</p>
+  <pre class="jsx">const ClienteContexto = createContext("visitante");
+
+function SeloDoCliente() {
+  const cliente = useContext(ClienteContexto);
+  return &lt;p&gt;Cliente: {cliente}&lt;/p&gt;;
+}
+
+function Cartao() {
+  return (
+    &lt;article className="cartao"&gt;
+      &lt;h2&gt;Baguete&lt;/h2&gt;
+      &lt;SeloDoCliente /&gt;
+    &lt;/article&gt;
+  );
+}
+
+function App() {
+  const cliente = "Ana";
+  return &lt;Cartao /&gt;;
+}</pre>
+  <pre class="out">
+&lt;article class="cartao"&gt;
+  &lt;h2&gt;Baguete&lt;/h2&gt;
+  &lt;p&gt;Cliente: visitante&lt;/p&gt;
+&lt;/article&gt;
+</pre>
+  <pre class="solucao">const ClienteContexto = createContext("visitante");
+
+function SeloDoCliente() {
+  const cliente = useContext(ClienteContexto);
+  return &lt;p&gt;Cliente: {cliente}&lt;/p&gt;;
+}
+
+function Cartao() {
+  return (
+    &lt;article className="cartao"&gt;
+      &lt;h2&gt;Baguete&lt;/h2&gt;
+      &lt;SeloDoCliente /&gt;
+    &lt;/article&gt;
+  );
+}
+
+function App() {
+  const cliente = "Ana";
+  return (
+    &lt;ClienteContexto.Provider value={cliente}&gt;
+      &lt;Cartao /&gt;
+    &lt;/ClienteContexto.Provider&gt;
+  );
+}</pre>
+</div>
+
+<p>Repare no painel: ele mostra o <code>article</code> e nada mais. O provider não vira elemento nenhum
+no HTML — ele é uma peça invisível que só serve para colocar um valor à disposição. Isso é diferente de
+uma <code>div</code> de moldura, que aparece no HTML e ocupa espaço na tela. O provider não ocupa nada:
+ele só muda o que os filhos conseguem ler.</p>
+
+<p>Repare também no que <em>não</em> mudou. O <code>Cartao</code> continua igual, sem nenhuma prop nova.
+O <code>SeloDoCliente</code> continua lendo o canal do mesmo jeito. Toda a mudança aconteceu no
+<code>App</code>, que é quem tem o valor. É esse o ganho: quando o dado é do canal, os componentes do
+meio não precisam existir para carregá-lo.</p>
+
+<p>Onde criar o canal, num projeto de verdade? O lugar natural é um arquivo próprio, como
+<code>src/ClienteContexto.js</code>, com uma linha: <code>export const ClienteContexto =
+createContext(null)</code>. Quem precisa ler importa o canal; quem abastece também. Assim o canal tem um
+endereço só, e ninguém corre o risco de criar um segundo por engano. Aqui na caixa tudo fica no mesmo
+lugar só para você ver as três peças juntas, na ordem em que elas conversam.</p>
+
+<h2>4. O provider delimita uma região</h2>
+
+<p>O provider não abastece a página inteira: ele abastece o que está dentro dele. Isso parece detalhe e
+é a origem de quase todo bug de contexto. Abaixo, um dos cartões está dentro do provider e o outro
+ficou fora. O de dentro mostra a cliente; o de fora mostra o valor padrão, porque para ele não existe
+canal abastecido.</p>
+
+<div class="tryreact" data-goal="conta:.logado=2;;conta:.visitante=0">
+  <p class="try-task">O segundo cartão ficou fora do provider e mostra “visitante”. Coloque os dois
+  cartões dentro do mesmo <code>Provider</code>.</p>
+  <pre class="jsx">const ClienteContexto = createContext(null);
+
+function Selo() {
+  const cliente = useContext(ClienteContexto);
+  if (!cliente) return &lt;span className="selo visitante"&gt;visitante&lt;/span&gt;;
+  return &lt;span className="selo logado"&gt;cliente {cliente}&lt;/span&gt;;
+}
+
+function Cartao({ titulo }) {
+  return (
+    &lt;article className="cartao"&gt;
+      &lt;h2&gt;{titulo}&lt;/h2&gt;
+      &lt;Selo /&gt;
+    &lt;/article&gt;
+  );
+}
+
+function App() {
+  const cliente = "Ana";
+
+  return (
+    &lt;div&gt;
+      &lt;ClienteContexto.Provider value={cliente}&gt;
+        &lt;Cartao titulo="Baguete" /&gt;
+      &lt;/ClienteContexto.Provider&gt;
+      &lt;Cartao titulo="Pão de queijo" /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;article class="cartao"&gt;
+    &lt;h2&gt;Baguete&lt;/h2&gt;
+    &lt;span class="selo logado"&gt;cliente Ana&lt;/span&gt;
+  &lt;/article&gt;
+  &lt;article class="cartao"&gt;
+    &lt;h2&gt;Pão de queijo&lt;/h2&gt;
+    &lt;span class="selo visitante"&gt;visitante&lt;/span&gt;
+  &lt;/article&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const ClienteContexto = createContext(null);
+
+function Selo() {
+  const cliente = useContext(ClienteContexto);
+  if (!cliente) return &lt;span className="selo visitante"&gt;visitante&lt;/span&gt;;
+  return &lt;span className="selo logado"&gt;cliente {cliente}&lt;/span&gt;;
+}
+
+function Cartao({ titulo }) {
+  return (
+    &lt;article className="cartao"&gt;
+      &lt;h2&gt;{titulo}&lt;/h2&gt;
+      &lt;Selo /&gt;
+    &lt;/article&gt;
+  );
+}
+
+function App() {
+  const cliente = "Ana";
+
+  return (
+    &lt;div&gt;
+      &lt;ClienteContexto.Provider value={cliente}&gt;
+        &lt;Cartao titulo="Baguete" /&gt;
+        &lt;Cartao titulo="Pão de queijo" /&gt;
+      &lt;/ClienteContexto.Provider&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Duas coisas ficam claras nesse exercício. Primeiro, um provider pode abastecer quantos consumidores
+você quiser: todos os <code>Selo</code> dentro dele leem o mesmo valor, sem nenhuma prop. Segundo, dois
+providers diferentes podem conviver na mesma tela com valores diferentes — é o que permite ter um
+cabeçalho “da loja” e um “do painel” no mesmo aplicativo.</p>
+
+<p>O valor padrão do <code>createContext</code> aparece só nesse caso de ausência. Por isso é comum
+criá-lo com um valor neutro e reconhecível, como <code>null</code>, em vez de um valor de negócio: se
+algo mostrar “null” na tela, você sabe na hora que faltou provider. Se o padrão for “visitante”, o bug se
+disfarça de funcionalidade.</p>
+
+<h2>5. O que o console mostra quando o valor é lido</h2>
+
+<p>Um jeito de ver o canal funcionando é logar dentro do consumidor. Cada componente que lê o contexto
+imprime o valor que recebeu, e a ordem das linhas conta a história da renderização:</p>
+
+<pre class="file" data-file="Selo.jsx">function Selo() {
+  const cliente = useContext(ClienteContexto);
+  console.log("Selo leu: " + cliente);
+  return &lt;span className="selo"&gt;{cliente}&lt;/span&gt;;
+}</pre>
+
+<p>Com o provider no lugar certo e dois cartões dentro dele, o console mostra duas linhas iguais. Sem o
+provider, mostra o valor padrão:</p>
+
+<pre class="term">Selo leu: visitante
+Selo leu: Ana
+Selo leu: Ana</pre>
+
+<p>A primeira linha é a versão antiga, sem provider; as duas seguintes são a versão consertada, com os
+dois cartões dentro. Duas leituras, dois cartões: cada consumidor lê por conta própria, no momento em que
+é desenhado. Não existe “valor guardado no componente” — existe leitura do que o provider oferece agora.</p>
+
+<p>Isso tem uma consequência prática que vale guardar: o contexto não substitui o estado. Ele é um
+transporte. Quem guarda o valor é o <code>useState</code> de alguém; o provider só publica esse valor
+para baixo. Se ninguém tem estado, o contexto carrega uma constante — útil para configuração, inútil para
+interação.</p>
+
+<p>Existe um detalhe de desempenho que vale saber desde já, mesmo sem medir nada: o contexto não tem
+seletor. Quem chama <code>useContext</code> recebe o valor inteiro e é redesenhado sempre que esse valor
+muda de identidade. Se o canal carrega um objeto com cinco campos e só um deles mudou, todos os
+consumidores são desenhados de novo. Por isso a recomendação é separar por assunto — um canal para o
+cliente, outro para o tema — em vez de um canal único com o “estado do mundo”.</p>
+
+<h2>6. O valor vem do estado, e todos acompanham</h2>
+
+<p>O caso real quase sempre tem interação: o cliente entra, sai, troca de conta. Como o valor do provider
+é só uma expressão, ele pode ser o estado do <code>App</code>. Quando esse estado muda, todos os
+consumidores abaixo são desenhados de novo com o valor novo.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Olá, Ana;;texto:Carrinho de Ana">
+  <p class="try-task">O botão muda o estado, mas o provider está com o texto fixo
+  <code>value="visitante"</code> e nada acontece na tela. Troque por <code>value={cliente}</code> e
+  clique em “Entrar como Ana”.</p>
+  <pre class="jsx">const ClienteContexto = createContext("visitante");
+
+function Cabecalho() {
+  const cliente = useContext(ClienteContexto);
+  return (
+    &lt;header&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Olá, {cliente}&lt;/p&gt;
+    &lt;/header&gt;
+  );
+}
+
+function Carrinho() {
+  const cliente = useContext(ClienteContexto);
+  return &lt;p&gt;Carrinho de {cliente}&lt;/p&gt;;
+}
+
+function App() {
+  const [cliente, setCliente] = useState("visitante");
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={() =&gt; setCliente("Ana")}&gt;Entrar como Ana&lt;/button&gt;
+      &lt;ClienteContexto.Provider value="visitante"&gt;
+        &lt;Cabecalho /&gt;
+        &lt;Carrinho /&gt;
+      &lt;/ClienteContexto.Provider&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Entrar como Ana&lt;/button&gt;
+  &lt;header&gt;
+    &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+    &lt;p&gt;Olá, visitante&lt;/p&gt;
+  &lt;/header&gt;
+  &lt;p&gt;Carrinho de visitante&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const ClienteContexto = createContext("visitante");
+
+function Cabecalho() {
+  const cliente = useContext(ClienteContexto);
+  return (
+    &lt;header&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Olá, {cliente}&lt;/p&gt;
+    &lt;/header&gt;
+  );
+}
+
+function Carrinho() {
+  const cliente = useContext(ClienteContexto);
+  return &lt;p&gt;Carrinho de {cliente}&lt;/p&gt;;
+}
+
+function App() {
+  const [cliente, setCliente] = useState("visitante");
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={() =&gt; setCliente("Ana")}&gt;Entrar como Ana&lt;/button&gt;
+      &lt;ClienteContexto.Provider value={cliente}&gt;
+        &lt;Cabecalho /&gt;
+        &lt;Carrinho /&gt;
+      &lt;/ClienteContexto.Provider&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Um clique mudou dois componentes que não têm relação nenhuma entre si. O <code>Cabecalho</code> não
+sabe que o <code>Carrinho</code> existe, e vice-versa; os dois só sabem que existe um canal chamado
+<code>ClienteContexto</code>. Essa independência é o que torna o contexto útil em telas grandes.</p>
+
+<p>E aqui está a armadilha que a caixa mostra antes do conserto: o provider com valor fixo. O estado
+mudava, o botão funcionava, e a tela ficava parada — porque o valor publicado no canal era o texto
+“visitante”, não a variável. Quando um clique não muda nada, olhe o <code>value</code> do provider antes
+de suspeitar do consumidor.</p>
+
+<p>Uma dúvida que aparece no dia seguinte: será que o <code>setCliente</code> também deveria ir pelo
+contexto? Pode, e às vezes é o certo — mas comece simples. Enquanto o botão que troca o cliente está na
+mesma tela do provider, passar a função por prop é mais direto e deixa claro quem muda o quê. Colocar
+tudo no canal de uma vez é como mudar de casa levando a geladeira ligada: funciona, mas ninguém sabe
+onde está o plugue.</p>
+
+<h2>7. Prop ou contexto?</h2>
+
+<p>As duas coisas continuam existindo, e a escolha não é ideológica. A pergunta é de quem é o dado. Se
+ele pertence a uma peça e a poucos vizinhos, é prop. Se ele pertence à tela inteira e é lido em pontos
+distantes, é contexto.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pergunta</th><th>Prop</th><th>Contexto</th></tr>
+<tr><td>quem usa o dado?</td><td>um filho direto</td><td>vários, em pontos distantes</td></tr>
+<tr><td>como o componente declara a dependência?</td><td>na assinatura, à vista</td><td>dentro do corpo, com <code>useContext</code></td></tr>
+<tr><td>quem consegue trocar o valor?</td><td>o pai, passando outra coisa</td><td>o provider, mudando o <code>value</code></td></tr>
+<tr><td>o que quebra se o dado sumir?</td><td>a prop vira <code>undefined</code>, e você vê</td><td>o consumidor recebe o padrão, em silêncio</td></tr>
+</table>
+</div>
+
+<p>Promover um dado a contexto é uma decisão de arquitetura, não um ajuste de sintaxe. O sinal de
+que chegou a hora costuma ser duplo: você já repassou a mesma prop por dois ou três componentes que não
+a usam, e os pontos que precisam do valor não compartilham um pai próximo. Faltando qualquer um dos dois,
+props resolvem — e resolvem com menos mistério.</p>
+
+<p>Repare na última linha: o contexto é mais confortável e mais invisível. Um componente que lê contexto
+não revela a dependência para quem o usa — ele parece independente e não é. Por isso a recomendação é
+começar por props e só promover um dado a contexto quando o desconforto do drilling for real. Dado que
+muda de tela para tela não é contexto; dado que a tela inteira compartilha, sim.</p>
+
+<h2>8. As armadilhas do contexto</h2>
+
+<p>Quatro erros concentram quase todos os problemas. Vale ler com atenção, porque nenhum deles dá erro
+no console — todos aparecem como tela estranha.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que aconteceu</th><th>Por quê</th><th>Conserto</th></tr>
+<tr><td>o consumidor mostra o valor padrão</td><td>ele está fora do provider</td><td>subir o provider até envolver o ramo</td></tr>
+<tr><td>o valor nunca muda</td><td><code>value</code> é um texto fixo</td><td>passar a variável de estado</td></tr>
+<tr><td>todos os consumidores redesenham sem motivo</td><td>o <code>value</code> é um objeto novo a cada render</td><td>criar o objeto uma vez ou fora do JSX</td></tr>
+<tr><td>o canal “some” quando o componente redesenha</td><td><code>createContext</code> foi chamado dentro do componente</td><td>criar no topo do arquivo</td></tr>
+</table>
+</div>
+
+<p>O último caso é o mais sutil. Se o <code>createContext</code> fica dentro da função do componente,
+cada desenho cria um canal novo; os consumidores passam a olhar para um canal diferente do que o provider
+abasteceu e caem no valor padrão. A regra é simples: canal se cria uma vez, no topo do arquivo, do lado
+de fora — igualzinho ao que a caixa mostra.</p>
+
+<p>Vale também resistir à tentação de transformar tudo em contexto. Um valor que nunca muda — a
+versão do site, o nome da padaria, a lista de estados brasileiros — não precisa de canal: é constante
+importada, e o componente lê direto. Contexto serve para distribuir um valor que muda e que muita gente
+precisa acompanhar; para o resto, ele só acrescenta uma camada para o leitor atravessar.</p>
+
+<p>E o primeiro caso, no mundo real, costuma vir com um erro de escopo. <code>createContext</code> não é uma função
+que existe por acaso no navegador; ela vem do React. Nas caixas deste guia ela já está no escopo, mas num
+projeto de verdade você precisa importar:</p>
+
+<pre class="term">Uncaught ReferenceError: createContext is not defined</pre>
+
+<p>Essa mensagem quer dizer que o nome não foi importado. No projeto, a primeira linha do arquivo é
+<code>import { createContext, useContext } from "react"</code>; veja
+<a href="criar-projeto.html">Criar o Projeto</a> para o arquivo completo, com os imports no topo.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o selo que dizia “visitante”</h3>
+<p>A Ana criou o canal, passou o valor, e o selo continuou mostrando “visitante”. O provider estava
+dentro do <code>Cartao</code>, envolvendo só o preço, e o selo morava no rodapé, fora dele. Subir o
+provider dois níveis resolveu. Nenhum aviso no console — só o valor padrão aparecendo no lugar do dado.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a loja e o painel na mesma tela</h3>
+<p>O site dela tem uma prévia da loja dentro do painel de administração. Dois providers do mesmo canal,
+um com o cliente logado e outro com “visitante”, deixam a prévia mostrar a experiência de quem não entrou
+sem duplicar componente nenhum. É o uso legítimo de dois valores ao mesmo tempo.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o canal para o preço de um pão</h3>
+<p>Empolgada, ela criou um contexto para o preço da baguete. Funcionou, e depois ficou impossível saber
+de onde vinha o preço na hora de ler o código. Voltou para prop: um dado que só um cartão usa não merece
+canal. Contexto é para o que a tela inteira compartilha, não para fugir de uma prop chata.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. O que o <code>useContext</code> faz?</p>
+<label><input type="radio" name="q1"> cria um canal novo a cada render</label>
+<label><input type="radio" name="q1"> guarda o valor dentro do componente que lê</label>
+<label><input type="radio" name="q1"> lê o valor que o provider mais próximo colocou no canal</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. Um consumidor sem nenhum provider acima recebe o quê?</p>
+<label><input type="radio" name="q2"> o valor padrão passado para <code>createContext</code></label>
+<label><input type="radio" name="q2"> um erro que impede a página de rodar</label>
+<label><input type="radio" name="q2"> <code>undefined</code> sempre</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. Onde o <code>createContext</code> deve ser chamado?</p>
+<label><input type="radio" name="q3"> dentro do componente que vai ler o valor</label>
+<label><input type="radio" name="q3"> no topo do arquivo, fora dos componentes</label>
+<label><input type="radio" name="q3"> dentro do <code>useEffect</code>, para rodar uma vez só</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: abra a torneira</h2>
+<p>O componente precisa ler o canal <code>ClienteContexto</code>. Complete a linha que faz a leitura.</p>
+<div class="ex-code">function Selo() { const cliente = <input aria-label="resposta 1" data-answer="useContext(ClienteContexto)">; return &lt;p&gt;{cliente}&lt;/p&gt;; }</div>
+<p class="ex-dica">Dica: a função recebe o canal como argumento e devolve o valor. Sem provider acima,
+o que ela devolve é o valor padrão do canal.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Contexto é um canal nomeado que leva um valor para uma região da árvore. Você cria o canal com
+<code>createContext</code>, abastece com um <code>Provider</code> e lê com <code>useContext</code>. Quem
+está abaixo do provider recebe o valor; quem está fora recebe o padrão. O provider não desenha nada no
+HTML — ele só muda o que os filhos conseguem ler.</p>
+
+<p>O valor pode vir de um estado, e é aí que o contexto fica interessante: um clique no topo redesenha
+todos os consumidores, mesmo os que estão em galhos distantes e não têm relação entre si. O preço disso é
+que a dependência fica escondida — quem lê o componente não vê, na assinatura, de onde vem o valor.</p>
+
+<p>Por isso a ordem prática continua a mesma da aula anterior: prop primeiro, composição quando o dado
+precisa de um lugar só, contexto quando o dado é da tela inteira. O contexto é uma ferramenta de
+distribuição, não um atalho para evitar props chatas. Na próxima aula o assunto muda de dados para
+organização: onde cada componente mora no projeto, em <a href="pastas-e-arquivos.html">Pastas e
+Arquivos</a>.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Contexto: canal nomeado que leva um valor para uma região da árvore.</li>
+<li><code>createContext(padrão)</code> cria o canal; fica fora do componente, no topo do arquivo.</li>
+<li><code>Provider value={...}</code> abastece; sem ele, o consumidor recebe o padrão.</li>
+<li>O provider delimita a região: filho fora dele não vê o valor.</li>
+<li><code>useContext(Canal)</code> lê o valor do provider mais próximo.</li>
+<li>O provider não vira elemento no HTML: o painel mostra só os filhos.</li>
+<li>O valor pode ser estado; quando muda, todos os consumidores redesenham.</li>
+<li>Valor fixo no <code>value</code> congela a tela, mesmo com o estado mudando.</li>
+<li>Contexto não guarda dado: ele transporta. O estado continua sendo do <code>useState</code>.</li>
+<li>Se o dado muda de tela para tela, ainda é prop — não é contexto.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

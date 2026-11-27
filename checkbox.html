@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Checkbox | Guia React</title>
+<meta name="description" content="O checkbox controlado no React: checked e e.target.checked, o booleano no estado, vários checkboxes com contagem e o campo que só aparece quando a caixa é marcada.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Checkbox</span></h1>
+<p class="intro">A padaria da Ana quer avisar o cliente quando o pão quentinho sai do forno, e quer
+perguntar se a encomenda vai embrulhada para presente. São perguntas de sim ou não — e a resposta certa
+para elas não é um texto, é um booleano. Nesta aula a Ana liga uma caixinha de marcar ao estado, aprende
+que o valor não vem em <code>e.target.value</code> e sim em <code>e.target.checked</code>, conta quantas
+caixas foram marcadas e faz um campo aparecer só quando o presente é escolhido.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que um <code>checkbox</code> guarda: verdadeiro ou falso, não texto.</li>
+  <li>A diferença entre <code>checked</code> e <code>value</code>.</li>
+  <li>Como ler a marcação com <code>e.target.checked</code>.</li>
+  <li>Como ligar a caixa ao estado e mostrar o resultado na tela.</li>
+  <li>Como trabalhar com várias caixas ao mesmo tempo.</li>
+  <li>Como transformar booleano em número para contar extras.</li>
+  <li>Como mostrar um campo extra só quando a caixa está marcada.</li>
+</ul>
+</div>
+
+<h2>1. A cena: perguntas de sim ou não</h2>
+
+<p>No formulário da padaria, nem toda pergunta quer um texto. "Aceita receber o aviso de pão quentinho?"
+tem duas respostas possíveis, e nenhuma delas é uma frase: ou aceita, ou não. "Embrulhar para presente?"
+é a mesma coisa. Para esses casos existe o <code>checkbox</code>, a caixinha que marca e desmarca. No
+estado, ela não guarda "sim" nem "não", guarda <code>true</code> e <code>false</code> — os dois valores
+booleanos do JavaScript.</p>
+
+<p>A Ana começou guardando a resposta como texto, numa caixa de seleção com "sim" e "não". Funcionava,
+mas era mais clicque do que o necessário e mais difícil de validar: qualquer dia alguém escreveria "Sim"
+com maiúscula e a comparação quebrava. O <code>checkbox</code> resolve com um valor só, e o código fica
+com uma pergunta simples: está marcado ou não?</p>
+
+<p>A diferença em relação ao <code>input</code> de texto aparece no evento. Num campo de texto, você lê
+<code>e.target.value</code>; numa caixa de marcar, o valor de <code>value</code> é fixo (por padrão, o
+texto <code>"on"</code>) e quem diz se está marcada é a propriedade <code>checked</code>. É o primeiro
+lugar do guia em que o dado do campo não vem em <code>e.target.value</code>. Guarde isso, porque é a causa do
+clássico "o estado recebe on".</p>
+
+<h2>2. A caixa guarda verdadeiro ou falso</h2>
+
+<p>Um <code>checkbox</code> tem dois estados e uma propriedade que os representa: <code>checked</code>.
+Marcada, <code>true</code>; desmarcada, <code>false</code>. No JSX controlado, você passa
+<code>checked={aviso}</code> para a caixa mostrar o estado, e no <code>onChange</code> você lê
+<code>e.target.checked</code> para guardar o novo valor. Não existe conversão de texto no meio: é booleano
+entrando e booleano saindo.</p>
+
+<dl class="anatomy">
+<dt><code>checked</code></dt>
+<dd>A propriedade que diz se a caixa está marcada. No JSX controlado, recebe o booleano do estado:
+<code>checked={aviso}</code>.</dd>
+<dt><code>onChange</code></dt>
+<dd>A função chamada a cada marcação e desmarcação. É onde você atualiza o estado.</dd>
+<dt><code>e.target.checked</code></dt>
+<dd>O booleano novo: <code>true</code> se a caixa acabou de ser marcada, <code>false</code> se foi
+desmarcada.</dd>
+<dt><code>e.target.value</code></dt>
+<dd>O atributo <code>value</code> da caixa, que por padrão é <code>"on"</code>. Não serve para saber se
+está marcada.</dd>
+<dt><code>label</code> envolvendo</dt>
+<dd>Quando o <code>input</code> fica dentro do <code>label</code>, clicar no texto também marca a caixa —
+e o leitor de tela anuncia os dois juntos.</dd>
+</dl>
+
+<p>A última peça é a que mais melhora a vida de quem usa o site. Uma caixinha sozinha é pequena; o texto
+ao lado é o alvo grande. Envolver o <code>input</code> com o <code>label</code> faz o texto inteiro ser
+clicável. A outra forma é dar um <code>id</code> à caixa e apontar o <code>label</code> com
+<code>htmlFor</code> — as duas funcionam, e a primeira é mais curta quando o texto é só uma frase.</p>
+
+<h2>3. O primeiro checkbox controlado</h2>
+
+<p>A missão é pequena e mostra o mecanismo inteiro: a caixa começa desmarcada, o parágrafo diz
+"desligado", e ao marcar o parágrafo passa a dizer "ligado". Repare que o estado é
+<code>useState(false)</code> — o valor inicial é booleano, não string vazia:</p>
+
+<div class="tryreact" data-goal="clique:input[type=checkbox];;texto:Aviso: ligado">
+  <p class="try-task">A caixa não está ligada a nada. Crie o estado <code>aviso</code> começando em
+  <code>false</code>, passe <code>checked={aviso}</code>, atualize com <code>e.target.checked</code> e
+  mostre <code>Aviso: ligado</code> quando estiver marcada.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;div&gt;
+      &lt;label&gt;
+        &lt;input type="checkbox" /&gt; Aceito receber o aviso de pão quentinho
+      &lt;/label&gt;
+      &lt;p&gt;Aviso: desligado&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label&gt;
+    &lt;input type="checkbox"&gt;
+    Aceito receber o aviso de pão quentinho
+  &lt;/label&gt;
+  &lt;p&gt;Aviso: desligado&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [aviso, setAviso] = useState(false);
+  return (
+    &lt;div&gt;
+      &lt;label&gt;
+        &lt;input
+          type="checkbox"
+          checked={aviso}
+          onChange={(e) =&gt; setAviso(e.target.checked)}
+        /&gt; Aceito receber o aviso de pão quentinho
+      &lt;/label&gt;
+      &lt;p&gt;Aviso: {aviso ? "ligado" : "desligado"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique na caixa ou no texto: os dois marcam, porque o <code>input</code> está dentro do
+<code>label</code>. O parágrafo muda para "Aviso: ligado" e volta ao desmarcar. No painel, a caixa
+aparece como <code>&lt;input type="checkbox"&gt;</code>, sem atributo <code>checked</code>: a marcação é
+propriedade viva, como o valor de um campo de texto. Quem quiser conferir o que o React desenhou olha o
+parágrafo; quem quiser conferir o estado olha o texto.</p>
+
+<p>Note também que o parágrafo usa uma expressão condicional com <code>?</code> e <code>:</code>. Ela
+poderia ser um <code>&amp;&amp;</code> se o texto falso não importasse, mas aqui os dois casos têm texto
+próprio, então a condicional é mais honesta. Não existe regra de estilo: escolha a forma que deixa a
+intenção mais clara para quem ler depois.</p>
+
+<h2>4. checked, value e defaultChecked</h2>
+
+<p>Três atributos parecidos, três papéis diferentes. Quem vem do HTML costuma usar <code>value</code>
+para tudo e depois não entende por que o estado recebe <code>"on"</code>. A tabela separa os casos:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você escreveu</th><th>O que acontece</th><th>Conserto</th></tr>
+<tr><td><code>value={aviso}</code></td><td>a caixa ignora esse valor para saber se está marcada; <code>e.target.value</code> devolve o texto do atributo</td><td>usar <code>checked={aviso}</code> e ler <code>e.target.checked</code></td></tr>
+<tr><td><code>checked</code> sem <code>onChange</code></td><td>a caixa não marca: o React mantém o valor que você mandou</td><td>acrescentar <code>onChange</code> que atualiza o estado</td></tr>
+<tr><td><code>checked={true}</code></td><td>marcada para sempre, sem desmarcar</td><td>usar um estado que começa em <code>true</code></td></tr>
+<tr><td><code>defaultChecked</code></td><td>começa marcada e o navegador cuida do resto (não controlado)</td><td>use só quando não precisa acompanhar a marcação</td></tr>
+</table>
+</div>
+
+<p>Uma confusão comum é achar que <code>value</code> e <code>checked</code> podem ser usados juntos como
+sinônimos. Não são: <code>value</code> é o dado que a caixa representa (útil quando várias caixas
+compartilham o mesmo <code>name</code> num formulário), e <code>checked</code> é o "está marcada?". Num
+formulário de extras, cada caixa tem um <code>value</code> — "geleia", "manteiga" — para o envio saber o
+que foi marcado; no estado controlado, quem manda é <code>checked</code>.</p>
+
+<p>Para ver a diferença no console, marque uma caixa e observe os dois valores. O <code>value</code>
+continua o mesmo; o <code>checked</code> troca:</p>
+
+<pre class="term">e.target.checked: true
+e.target.value: "on"</pre>
+
+<p>É por isso que a leitura certa é sempre <code>checked</code>. Se você guardar <code>value</code> no
+estado, ele nunca muda, e a caixa parece "não funcionar" mesmo com o <code>onChange</code> no lugar.</p>
+
+<h2>5. Várias caixas, uma contagem</h2>
+
+<p>A encomenda da padaria tem extras: geleia, manteiga e queijo, cada um numa caixa. O cliente pode marcar
+quantas quiser, e a Ana quer mostrar no resumo quantos extras foram escolhidos. Como cada caixa tem o seu
+próprio sim ou não, o caminho mais direto é um estado booleano para cada uma e uma conta que soma os
+verdadeiros.</p>
+
+<p>O truque da conta é que <code>Number(true)</code> é <code>1</code> e <code>Number(false)</code> é
+<code>0</code>. Somar os três booleanos convertidos dá o total de marcados sem nenhum <code>if</code>:</p>
+
+<pre class="term">Number(true): 1
+Number(false): 0
+Number(true) + Number(false) + Number(true): 2</pre>
+
+<div class="tryreact" data-goal="clique:input#geleia;;clique:input#manteiga;;texto:2 extras">
+  <p class="try-task">As três caixas estão soltas e o resumo diz "0 extras". Ligue cada caixa ao seu
+  estado (<code>geleia</code>, <code>manteiga</code>, <code>queijo</code>), some os marcados e mostre
+  <code>{total} extras</code>.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Extras para a encomenda:&lt;/p&gt;
+      &lt;label&gt;&lt;input type="checkbox" id="geleia" /&gt; Geleia&lt;/label&gt;
+      &lt;label&gt;&lt;input type="checkbox" id="manteiga" /&gt; Manteiga&lt;/label&gt;
+      &lt;label&gt;&lt;input type="checkbox" id="queijo" /&gt; Queijo&lt;/label&gt;
+      &lt;p&gt;0 extras&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Extras para a encomenda:&lt;/p&gt;
+  &lt;label&gt;
+    &lt;input id="geleia" type="checkbox"&gt;
+    Geleia
+  &lt;/label&gt;
+  &lt;label&gt;
+    &lt;input id="manteiga" type="checkbox"&gt;
+    Manteiga
+  &lt;/label&gt;
+  &lt;label&gt;
+    &lt;input id="queijo" type="checkbox"&gt;
+    Queijo
+  &lt;/label&gt;
+  &lt;p&gt;0 extras&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [geleia, setGeleia] = useState(false);
+  const [manteiga, setManteiga] = useState(false);
+  const [queijo, setQueijo] = useState(false);
+  const total = Number(geleia) + Number(manteiga) + Number(queijo);
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Extras para a encomenda:&lt;/p&gt;
+      &lt;label&gt;
+        &lt;input
+          type="checkbox"
+          id="geleia"
+          checked={geleia}
+          onChange={(e) =&gt; setGeleia(e.target.checked)}
+        /&gt; Geleia
+      &lt;/label&gt;
+      &lt;label&gt;
+        &lt;input
+          type="checkbox"
+          id="manteiga"
+          checked={manteiga}
+          onChange={(e) =&gt; setManteiga(e.target.checked)}
+        /&gt; Manteiga
+      &lt;/label&gt;
+      &lt;label&gt;
+        &lt;input
+          type="checkbox"
+          id="queijo"
+          checked={queijo}
+          onChange={(e) =&gt; setQueijo(e.target.checked)}
+        /&gt; Queijo
+      &lt;/label&gt;
+      &lt;p&gt;{total} extras&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Marque geleia e manteiga e o resumo mostra "2 extras". Desmarque uma e o total cai. O
+<code>total</code> é uma conta feita no desenho, não um quarto estado: se fosse um
+<code>useState</code>, você teria de atualizá-lo em cada um dos três <code>onChange</code> e um dia
+esqueceria um deles.</p>
+
+<p>Três estados separados são ótimos para três caixas fixas. Quando a lista cresce ou vem de um array, dá
+para guardar um objeto (<code>{ geleia: true, manteiga: false }</code>) ou um array com os nomes marcados.
+A aula de estado com objeto e a de estado com array mostram os dois caminhos; a regra continua a mesma:
+cada caixa lê do estado e escreve no estado, e o resumo é derivado.</p>
+
+<p>Vale um comentário sobre o <code>id</code> em cada caixa. Aqui os <code>labels</code> envolvem os
+inputs, então o <code>id</code> não é obrigatório para o clique funcionar — mas ele ajuda na hora de
+testar e de estilizar uma caixa específica, e é o que permite um <code>label</code> separado quando o
+layout exige. Escolha um nome estável e use o mesmo no CSS.</p>
+
+<h2>6. A caixa que libera um campo</h2>
+
+<p>Um uso muito comum do <code>checkbox</code> é ligar e desligar um pedaço da tela. "Embrulhar para
+presente" é o exemplo perfeito: enquanto a caixa não está marcada, não faz sentido pedir o nome que vai no
+cartão. Marcou, o campo aparece; desmarcou, some. É a renderização condicional com um booleano no
+comando.</p>
+
+<div class="tryreact" data-goal="conta:input=1;;clique:input#presente;;conta:input=2;;texto:Nome no cartão">
+  <p class="try-task">O campo do cartão aparece sempre. Mostre-o só quando <code>presente</code> for
+  verdadeiro — no começo deve existir <strong>um</strong> <code>input</code> só, e depois do clique,
+  dois.</p>
+  <pre class="jsx">function App() {
+  const [presente, setPresente] = useState(false);
+  const [cartao, setCartao] = useState("");
+  return (
+    &lt;div&gt;
+      &lt;label&gt;
+        &lt;input
+          type="checkbox"
+          id="presente"
+          checked={presente}
+          onChange={(e) =&gt; setPresente(e.target.checked)}
+        /&gt; Embrulhar para presente
+      &lt;/label&gt;
+      &lt;label htmlFor="cartao"&gt;Nome no cartão&lt;/label&gt;
+      &lt;input
+        id="cartao"
+        type="text"
+        value={cartao}
+        onChange={(e) =&gt; setCartao(e.target.value)}
+      /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label&gt;
+    &lt;input id="presente" type="checkbox"&gt;
+    Embrulhar para presente
+  &lt;/label&gt;
+  &lt;label for="cartao"&gt;Nome no cartão&lt;/label&gt;
+  &lt;input id="cartao" type="text" value=""&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [presente, setPresente] = useState(false);
+  const [cartao, setCartao] = useState("");
+  return (
+    &lt;div&gt;
+      &lt;label&gt;
+        &lt;input
+          type="checkbox"
+          id="presente"
+          checked={presente}
+          onChange={(e) =&gt; setPresente(e.target.checked)}
+        /&gt; Embrulhar para presente
+      &lt;/label&gt;
+      {presente &amp;&amp; (
+        &lt;div&gt;
+          &lt;label htmlFor="cartao"&gt;Nome no cartão&lt;/label&gt;
+          &lt;input
+            id="cartao"
+            type="text"
+            value={cartao}
+            onChange={(e) =&gt; setCartao(e.target.value)}
+          /&gt;
+        &lt;/div&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O <code>&amp;&amp;</code> lê assim: se <code>presente</code> for verdadeiro, desenhe o que vem depois;
+se for falso, não desenhe nada. Os parênteses em volta do <code>div</code> existem porque o bloco ocupa
+várias linhas — é a mesma convenção do <code>return (</code> que você já viu. Sem eles, o JSX quebra na
+primeira linha.</p>
+
+<p>Repare no <code>conta:input=1</code> da missão: quando a caixa está desmarcada, o único input da tela é
+a própria caixa. Depois do clique, aparece o campo de texto e a conta vai para dois. Esse tipo de
+conferência é útil quando você quer provar que um elemento não está escondido por CSS, e sim ausente do
+HTML.</p>
+
+<p>Um cuidado com o estado do campo que aparece e desaparece: quando o <code>div</code> sai da tela, o
+input é destruído, mas o estado <code>cartao</code> continua no componente. Se a pessoa desmarcar e marcar
+de novo, o texto volta. Isso pode ser bom (não perde o que foi digitado) ou ruim (o cliente desmarcou e o
+nome antigo vai junto no pedido). Se for ruim, limpe o estado ao desmarcar:
+<code>setCartao("")</code> dentro do <code>onChange</code> da caixa, quando
+<code>e.target.checked</code> for <code>false</code>.</p>
+
+<h2>7. Caixas que se parecem com escolhas únicas</h2>
+
+<p>Existe uma armadilha de interpretação: um grupo de <code>checkbox</code> com o mesmo
+<code>name</code> parece um grupo de escolha única, mas não é. O <code>name</code> só agrupa os valores no
+envio do formulário; marcar uma caixa não desmarca as outras. Quem faz escolha única é o
+<code>radio</code>, assunto da próxima aula, ou o <code>select</code>, que você já viu.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>A pergunta na tela</th><th>Elemento</th><th>O que o estado guarda</th></tr>
+<tr><td>sim ou não, uma caixa só</td><td><code>checkbox</code></td><td>um booleano</td></tr>
+<tr><td>vários extras, pode marcar quantos quiser</td><td>um <code>checkbox</code> por item</td><td>um booleano por item</td></tr>
+<tr><td>uma escolha entre poucas, todas visíveis</td><td><code>radio</code></td><td>o <code>value</code> da escolhida, como texto</td></tr>
+<tr><td>uma escolha entre muitas, em lista fechada</td><td><a href="select.html"><code>select</code></a></td><td>o <code>value</code> da opção escolhida</td></tr>
+</table>
+</div>
+
+<p>Então, quando usar cada um? Um teste rápido: a resposta pode ter mais de um "sim" ao mesmo tempo? Se
+sim, <code>checkbox</code>. Se só um pode valer — forma de pagamento, tamanho da camiseta, período de
+entrega —, use <code>radio</code> ou <code>select</code>. Errar essa escolha não quebra o código, mas
+confunde o cliente, que marca duas formas de pagamento e não entende por que o pedido não fecha.</p>
+
+<p>Outro detalhe é o visual. Uma caixa marcada aparece com um sinal dentro; desmarcada, vazia. Em alguns
+navegadores, o estado "indeterminado" (aquele traço no lugar do sinal) existe para representar "alguns
+itens de um grupo estão marcados", mas ele não se define pelo JSX controlado: precisa de
+<code>ref</code> e de uma atribuição direta na propriedade. É um caso avançado, para uma lista com "marcar
+todos"; a aula de <code>useRef</code> é o lugar certo para ele.</p>
+
+<h2>8. O label e o alvo de clique</h2>
+
+<p>Uma caixa de marcar mede uns 16 pixels. Em celular, isso é um alvo pequeno e fácil de errar. O
+<code>label</code> resolve: envolver o <code>input</code> faz o texto inteiro ser clicável, e o navegador
+cuida de marcar a caixa quando o clique cai no texto. É acessibilidade de graça, sem uma linha de
+JavaScript.</p>
+
+<p>As duas formas funcionam. A primeira é envolver:</p>
+
+<pre class="file" data-file="Extras.jsx">&lt;label&gt;
+  &lt;input type="checkbox" checked={geleia} onChange={(e) =&gt; setGeleia(e.target.checked)} /&gt;
+  Geleia
+&lt;/label&gt;</pre>
+
+<p>A segunda é apontar com <code>htmlFor</code>, que é útil quando o texto precisa ficar longe da caixa,
+em outra coluna do layout:</p>
+
+<pre class="file" data-file="Extras.jsx">&lt;input id="geleia" type="checkbox" checked={geleia} onChange={(e) =&gt; setGeleia(e.target.checked)} /&gt;
+&lt;label htmlFor="geleia"&gt;Geleia&lt;/label&gt;</pre>
+
+<p>As duas exigem que o <code>id</code> seja único na página quando você usa <code>htmlFor</code>. Dois
+inputs com o mesmo <code>id</code> fazem o rótulo apontar para o primeiro, e o segundo fica sem nome
+acessível. Se o componente é reaproveitado várias vezes, isso acontece sem você perceber — e é um dos
+motivos pelos quais existe o hook <code>useId</code>, que gera identificadores únicos.</p>
+
+<p>Por fim, um detalhe de teclado: com a caixa em foco, a barra de espaço marca e desmarca. O Tab leva até
+ela como leva a qualquer campo. Nada disso precisa de código; é comportamento nativo que você ganha por
+usar o elemento certo, e é mais um argumento para não substituir a caixa por um <code>div</code> com
+estilo de caixa.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o estado recebe "on"</h3>
+<p>A Ana guardou <code>value</code> no estado e recebeu <code>"on"</code> a cada clique, com a caixa nunca
+marcando. O <code>value</code> de um checkbox é fixo; quem muda é <code>checked</code>. A correção é passar
+<code>checked={aviso}</code> e ler <code>e.target.checked</code> no <code>onChange</code>. Se o valor
+"on" aparecer num estado seu, é sinal de que a leitura foi feita no lugar errado.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a caixa marca e desmarca sozinha</h3>
+<p>Ela passou <code>checked={aviso}</code> mas esqueceu o <code>onChange</code>. O React redesenha a caixa
+com o valor do estado a cada render, então o clique parece não pegar. O sintoma é uma caixa que pisca e
+volta, ou que simplesmente não marca. Sempre que um campo controlado "não obedece", procure o
+<code>onChange</code> antes de qualquer outra coisa.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o nome do cartão vai junto com um pedido sem presente</h3>
+<p>O cliente marcou presente, digitou o nome, desmarcou e fez o pedido. O campo sumiu da tela, mas o
+estado <code>cartao</code> continuou com o texto, e o resumo mostrou um cartão para um pedido sem
+embrulho. A correção foi limpar o estado ao desmarcar, ou só montar o resumo quando
+<code>presente</code> for verdadeiro. Esconder não é o mesmo que apagar.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que o estado de um <code>checkbox</code> guarda?</p>
+<label><input type="radio" name="q1"> o texto do rótulo ao lado da caixa</label>
+<label><input type="radio" name="q1"> um booleano: marcado (<code>true</code>) ou desmarcado (<code>false</code>)</label>
+<label><input type="radio" name="q1"> o atributo <code>value</code>, que muda a cada clique</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. De onde vem o valor novo quando a caixa é marcada?</p>
+<label><input type="radio" name="q2"> de <code>e.target.value</code></label>
+<label><input type="radio" name="q2"> de <code>e.target.text</code></label>
+<label><input type="radio" name="q2"> de <code>e.target.checked</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Para que serve envolver o <code>input</code> com um <code>label</code>?</p>
+<label><input type="radio" name="q3"> para clicar no texto e marcar a caixa, com o leitor de tela anunciando os dois juntos</label>
+<label><input type="radio" name="q3"> para o React conseguir ler o <code>checked</code></label>
+<label><input type="radio" name="q3"> para transformar a caixa em escolha única</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: ler a marcação</h2>
+<p>Complete a função que guarda o novo valor da caixa no estado <code>aviso</code>. Escreva só a
+propriedade que falta, sem <code>e.target.</code>:</p>
+<div class="ex-code">&lt;input type="checkbox" checked={aviso} onChange={(e) =&gt; setAviso(e.target.<input aria-label="resposta 1" data-answer="checked" placeholder="...">)} /&gt;</div>
+<p class="ex-dica">Dica: é a mesma palavra que aparece no <code>checked={aviso}</code>, do lado esquerdo do
+sinal de igual. Se você escrever <code>value</code>, o estado recebe <code>"on"</code> e a caixa para de
+funcionar.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O <code>checkbox</code> guarda um booleano. No JSX controlado, <code>checked</code> mostra o estado e
+<code>onChange</code> lê <code>e.target.checked</code> para atualizá-lo. <code>value</code> não serve para
+saber se a caixa está marcada: ele é o dado que a caixa representa no envio, e por padrão vale
+<code>"on"</code>. Envolver o <code>input</code> com o <code>label</code> aumenta o alvo de clique e
+melhora a leitura por leitores de tela.</p>
+
+<p>Várias caixas pedem vários booleanos — ou um objeto, ou um array, quando a lista é grande. A contagem
+de marcados sai de <code>Number(booleano)</code> somado, uma conta feita no desenho. E o mesmo booleano
+pode ligar um pedaço da tela: <code>{presente &amp;&amp; (...)}</code> mostra o campo do cartão só quando
+faz sentido. Lembre que esconder um campo não apaga o estado dele; se o dado não vale mais, limpe o estado
+também.</p>
+
+<p>Com isso, o formulário já sabe pedir texto curto, texto longo, uma escolha em lista e um sim ou não. Na
+próxima aula, a caixa vira escolha única — o <a href="radio.html"><code>radio</code></a> —, e a diferença
+vai estar num atributo que agrupa as opções e num valor que é texto, não booleano. Se você entendeu por que o checkbox usa
+<code>checked</code> e o input usa <code>value</code>, a próxima aula vai parecer uma mistura dos dois, e
+é exatamente isso que ela é.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Checkbox guarda <code>true</code> ou <code>false</code>; o estado começa em <code>false</code>.</li>
+<li>Mostrar: <code>checked={aviso}</code>. Ler: <code>e.target.checked</code>.</li>
+<li><code>e.target.value</code> de um checkbox é <code>"on"</code> por padrão.</li>
+<li><code>checked</code> sem <code>onChange</code> deixa a caixa travada.</li>
+<li><code>defaultChecked</code> é para campo não controlado.</li>
+<li>Várias caixas: um estado por caixa, ou um objeto/array para listas.</li>
+<li>Contar marcados: <code>Number(a) + Number(b)</code>.</li>
+<li><code>{condicao &amp;&amp; (&lt;div&gt;...&lt;/div&gt;)}</code> mostra um bloco só quando a caixa está marcada.</li>
+<li>Esconder o campo não limpa o estado dele.</li>
+<li><code>label</code> envolvendo o input deixa o texto clicável.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

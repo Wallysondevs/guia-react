@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A key | Guia React</title>
+<meta name="description" content="O que é a key de uma lista em React: onde ela se escreve, por que o índice é uma escolha arriscada e como manter a identidade de cada item quando a lista muda.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>A <span class="hl">key</span></h1>
+<p class="intro">A Ana já monta a lista de pães com <code>map</code>: um array entra, uma lista de
+elementos sai. Só que, no dia em que ela tira um pão do meio da lista, a observação que estava escrita
+no pão errado muda de lugar — e o console do projeto começa a reclamar de uma tal de <em>key</em>.
+Nesta aula ela entende o que essa palavra significa, por que o React insiste nela e como escolher o
+valor certo para cada item.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que o React faz com uma lista quando ela muda de um desenho para o outro.</li>
+  <li>O que é a <code>key</code> e em qual elemento ela se escreve.</li>
+  <li>O que a <code>key</code> não é: não vai para o HTML, não chega como prop, não é o <code>id</code>.</li>
+  <li>Como escolher uma key única e estável, vinda dos dados.</li>
+  <li>Por que o índice da lista costuma ser uma escolha ruim.</li>
+  <li>Como usar key com <code>Fragment</code> e com componentes.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a lista que se embaralha</h2>
+
+<p>A página de pães da Ana tem uma linha para cada pão do dia, e cada linha tem um campinho de
+observação, daqueles que ela digita à mão: "sem sal", "assar mais", "guardar dois". Num sábado, ela
+escreve "sem sal" na linha da broa e vai atender o balcão. Quando volta, o pão francês acabou e ela
+tira esse pão do começo da lista.</p>
+
+<p>A lista se atualiza: agora são broa, croissant e bolo de fubá. Só que a observação "sem sal" pulou
+para a linha do croissant. Ninguém mexeu no croissant. A Ana não apagou texto nenhum. O texto estava
+no segundo campinho da lista e continuou no segundo campinho — quem mudou de lugar foi o pão. E, no
+console do projeto, apareceu um aviso que ela nunca tinha lido com atenção:</p>
+
+<pre class="term">Each child in a list should have a unique "key" prop.
+
+Check the render method of `ListaDePaes`.</pre>
+
+<p>Esse aviso é a versão de desenvolvimento do React falando. Ele não impede a página de rodar, e é
+justamente por isso que tanta gente ignora: o sintoma aparece longe do aviso, como um texto que pula
+de linha ou uma caixa marcada no produto errado. Aqui na caixa do guia esse aviso não aparece, porque
+a caixa usa a versão de produção do React — a versão que vai para o site e que é calada. No seu
+projeto, com o servidor de desenvolvimento ligado, ele aparece. Vale aprender a ler os dois.</p>
+
+<p>Repare no que o aviso pede: uma key <strong>única</strong> para cada filho de uma lista. Não é uma
+sugestão de estilo, não é um enfeite para o código ficar bonito. É a informação que falta para o React
+saber qual linha é qual quando a lista muda. Sem ela, ele chuta pela posição — e o chute erra.</p>
+
+<h2>2. Por que o React precisa de uma key</h2>
+
+<p>Quando o componente roda de novo, o React não joga a página fora e desenha tudo do zero. Ele
+compara o que estava na tela com o que o componente acabou de devolver e mexe só no que mudou. Essa
+comparação se chama reconciliação, e para um elemento sozinho ela é fácil: era um <code>p</code> com
+"0", virou um <code>p</code> com "1", troca o texto e pronto.</p>
+
+<p>Numa lista, a comparação tem um problema a mais: o React precisa decidir qual elemento antigo
+corresponde a qual elemento novo. Sem nenhuma informação extra, ele usa a posição: o primeiro vira o
+primeiro, o segundo vira o segundo, e assim por diante. Se a lista só cresce no fim, isso funciona
+bem. Se um item do meio desaparece, todos os seguintes sobem uma posição — e o React, sem saber
+disso, reaproveita o nó da posição 1 para o item que agora está na posição 1, mudando só o texto.</p>
+
+<p>É como a etiqueta de bagagem da padaria. Se a Ana guarda as sacolas por ordem de chegada e não
+anota o nome de ninguém, a terceira sacola da prateleira passa a ser "a terceira pessoa da fila" — e,
+quando alguém desiste, a sacola é entregue para o cliente errado. Com uma senha presa na sacola, ela
+acha a dona em qualquer posição. A key é essa senha.</p>
+
+<dl class="anatomy">
+<dt>lista</dt>
+<dd>Um array de elementos que o JSX recebe dentro de chaves: <code>{paes.map(...)}</code>. Cada item
+precisa ser identificável.</dd>
+<dt>reconciliação</dt>
+<dd>A comparação que o React faz entre o desenho anterior e o novo, para reaproveitar nós em vez de
+recriar a página inteira.</dd>
+<dt>key</dt>
+<dd>Um valor especial que marca a identidade de um item: <code>key={p.id}</code>. O React usa e
+descarta; ela não chega ao HTML.</dd>
+<dt>identidade</dt>
+<dd>A resposta para "este item é o mesmo de antes?". Com key, é o valor dela; sem key, é a
+posição.</dd>
+</dl>
+
+<p>Há uma consequência prática que explica todos os bugs de key: um nó do navegador carrega estado
+que não está no seu JSX. O texto digitado num campo, o cursor piscando, a caixa marcada, a posição da
+rolagem, uma animação no meio do caminho. Se o React reaproveita o nó errado, esse estado fica no
+lugar errado — e parece mágica, porque o seu código não tem nada de errado.</p>
+
+<h2>3. A key na prática</h2>
+
+<p>A regra é curta: todo elemento que nasce dentro de um <code>map</code> precisa de uma key, e a key
+vai no elemento mais externo que a função do map devolve. Um <code>&lt;li&gt;</code> que embrulha
+nome e preço recebe a key uma vez, na abertura. Os filhos não recebem nada.</p>
+
+<pre class="file" data-file="ListaDePaes.jsx">function ListaDePaes() {
+  const paes = [
+    { id: 1, nome: "Pão francês", preco: "R$ 0,90" },
+    { id: 2, nome: "Broa de milho", preco: "R$ 3,50" },
+    { id: 3, nome: "Croissant", preco: "R$ 6,00" }
+  ];
+
+  return (
+    &lt;ul&gt;
+      {paes.map((p) =&gt; (
+        &lt;li key={p.id}&gt;
+          {p.nome} — {p.preco}
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+
+<p>O valor de uma key é sempre uma string ou um número. Pode ser o id que veio do banco, o código do
+produto, o CPF do cliente, o slug da receita — qualquer coisa que seja única dentro daquela lista e que
+não mude de um desenho para o outro. O nome da variável não importa: <code>p.id</code>,
+<code>item.codigo</code>, <code>encomenda.numero</code>; o que importa é o valor.</p>
+
+<div class="tryreact" data-goal="conta:li=3;;attr:li:nth-child(2)|data-id=2;;texto:Broa de milho — R$ 3,50">
+  <p class="try-task">A lista abaixo não tem key nenhuma. Dê a cada <code>&lt;li&gt;</code> a
+  <code>key={p.id}</code> e escreva também <code>data-id={p.id}</code> — é só para o painel mostrar
+  qual item é qual, já que a key não aparece no HTML.</p>
+  <pre class="jsx">function App() {
+  const paes = [
+    { id: 1, nome: "Pão francês", preco: "R$ 0,90" },
+    { id: 2, nome: "Broa de milho", preco: "R$ 3,50" },
+    { id: 3, nome: "Croissant", preco: "R$ 6,00" }
+  ];
+
+  console.log("montando a lista com " + paes.length + " pães");
+
+  return (
+    &lt;ul&gt;
+      {paes.map((p) =&gt; (
+        &lt;li&gt;{p.nome} — {p.preco}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul&gt;
+  &lt;li&gt;Pão francês — R$ 0,90&lt;/li&gt;
+  &lt;li&gt;Broa de milho — R$ 3,50&lt;/li&gt;
+  &lt;li&gt;Croissant — R$ 6,00&lt;/li&gt;
+&lt;/ul&gt;
+console: montando a lista com 3 pães
+</pre>
+  <pre class="solucao">function App() {
+  const paes = [
+    { id: 1, nome: "Pão francês", preco: "R$ 0,90" },
+    { id: 2, nome: "Broa de milho", preco: "R$ 3,50" },
+    { id: 3, nome: "Croissant", preco: "R$ 6,00" }
+  ];
+
+  console.log("montando a lista com " + paes.length + " pães");
+
+  return (
+    &lt;ul&gt;
+      {paes.map((p) =&gt; (
+        &lt;li key={p.id} data-id={p.id}&gt;{p.nome} — {p.preco}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p>Rode as duas versões e compare o painel: o HTML sai igualzinho. A key não vira atributo, não vira
+texto, não aparece em lugar nenhum. Ela é uma informação que o React guarda na memória para a próxima
+comparação. Já o <code>data-id</code> é um atributo comum, daqueles que qualquer pessoa vê no
+inspetor — ele não tem nada a ver com a key, está ali só para você conseguir enxergar a identidade no
+painel desta aula.</p>
+
+<p>O painel também mostra a linha de console, porque o código escreve nela:</p>
+
+<pre class="term">montando a lista com 3 pães</pre>
+
+<p>Essa linha aparece uma vez por desenho do componente. É um jeito barato de descobrir quantas vezes
+o React chamou a sua função — e, mais adiante, de ver a diferença entre "o componente rodou de novo" e
+"a tela mudou".</p>
+
+<h2>4. O que a key não é</h2>
+
+<p>Quatro confusões aparecem no primeiro dia, e todas têm o mesmo efeito: o aviso continua no console
+mesmo com o código "parecendo certo".</p>
+
+<p>A key <strong>não é um atributo HTML</strong>. Você não vai encontrá-la no inspetor nem no painel, e
+não adianta tentar estilizá-la com CSS. A key <strong>não é uma prop</strong>: o componente que
+recebe <code>&lt;Pedido key={p.id} /&gt;</code> não consegue ler <code>props.key</code> — o React
+consome a key antes de chamar a função. Se você precisa do id lá dentro, passe também
+<code>id={p.id}</code>. A key <strong>não é o <code>id</code></strong> do HTML: são coisas diferentes,
+com propósitos diferentes, e uma não substitui a outra. E a key <strong>não é para você</strong>: é
+para o React. O nome "chave" engana um pouco, porque parece coisa de segurança; é mais uma etiqueta de
+identidade.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você escreveu</th><th>Vai para o HTML?</th><th>Quem usa</th><th>Para quê</th></tr>
+<tr><td><code>key={p.id}</code></td><td>não</td><td>o React</td><td>reconhecer o item entre um desenho e outro</td></tr>
+<tr><td><code>id="pao-1"</code></td><td>sim</td><td>o navegador e o CSS</td><td>âncora, <code>getElementById</code>, estilo</td></tr>
+<tr><td><code>data-id={p.id}</code></td><td>sim</td><td>você e o JavaScript</td><td>carregar um dado junto do elemento</td></tr>
+<tr><td><code>className="pao"</code></td><td>sim</td><td>o CSS</td><td>aparência</td></tr>
+</table>
+</div>
+
+<p>Uma frase para guardar: a key é sobre <em>identidade</em>; o id é sobre <em>endereço</em>; o
+className é sobre <em>aparência</em>. São três perguntas diferentes sobre o mesmo elemento, e misturar
+as três é o que produz código que funciona por acidente.</p>
+
+<h2>5. De onde vem uma boa key</h2>
+
+<p>Uma key boa cumpre três condições. Primeira: é <strong>única entre os irmãos</strong> — dois itens
+com a mesma key fazem o React tratar um como o outro. Segunda: é <strong>estável</strong> — o mesmo
+item tem a mesma key no desenho de hoje e no de amanhã. Terceira: vem <strong>do dado</strong>, não da
+posição nem do acaso. Um id de banco é o exemplo perfeito: nasce único, não muda quando a lista é
+filtrada ou ordenada, e já está no objeto que você está mapeando.</p>
+
+<p>O índice que o <code>map</code> oferece (<code>paes.map((p, i) =&gt; ...)</code>) é a tentação
+número um, porque está ali de graça. Ele não é proibido, e há casos em que funciona: uma lista fixa,
+que nunca ganha nem perde item, nunca é reordenada e nunca é filtrada. No momento em que a lista muda,
+o índice deixa de ser identidade e passa a ser posição — exatamente o que o React já faria sozinho. É
+por isso que se diz que "usar índice como key é o mesmo que não usar key".</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Valor da key</th><th>Serve?</th><th>Por quê</th></tr>
+<tr><td><code>p.id</code> (do banco)</td><td>sim, é o padrão</td><td>único e estável; sobrevive a filtro, ordem e recarga</td></tr>
+<tr><td>índice do map</td><td>só em lista fixa</td><td>muda quando o item muda de posição; deixa de identificar</td></tr>
+<tr><td><code>p.nome</code></td><td>arriscado</td><td>dois pães podem ter o mesmo nome; o React acusa key repetida</td></tr>
+<tr><td><code>Math.random()</code></td><td>nunca</td><td>muda a cada desenho: o React recria todos os nós e perde o estado deles</td></tr>
+<tr><td><code>Date.now()</code></td><td>nunca</td><td>mesmo problema, com cara de solução</td></tr>
+</table>
+</div>
+
+<p>Se o dado não tem id — uma lista de strings, por exemplo —, o caminho honesto é criar um id quando
+o item nasce (no cadastro, no formulário) ou aceitar que aquela lista é estável e usar o índice com
+consciência. O que não vale é fingir: colocar o índice e esquecer o assunto é a origem da maioria dos
+bugs de lista que aparecem depois, quando alguém adiciona um filtro.</p>
+
+<h2>6. O que dá errado com a key errada</h2>
+
+<p>Vamos seguir o sábado da Ana com o código que ela tinha. Repare que o índice é a key e que cada
+linha tem um campo sem controle do React, com o texto que ela digita:</p>
+
+<pre class="file" data-file="ListaDePaes.jsx">function ListaDePaes({ paes }) {
+  return (
+    &lt;ul&gt;
+      {paes.map((p, i) =&gt; (
+        &lt;li key={i}&gt;
+          {p.nome}
+          &lt;input placeholder="observação" /&gt;
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+
+<p>Com a lista completa, cada linha ocupa uma posição e tudo parece certo. Quando o pão francês sai, a
+lista fica com dois itens: broa na posição 0 e croissant na posição 1. O React compara: "a posição 0
+era um <code>li</code> com key 0, continua sendo um <code>li</code> com key 0 — então é o mesmo
+elemento, só troco o texto". O nó do navegador é reaproveitado, e com ele o texto que estava digitado
+ali dentro. Resultado: a observação da broa aparece no croissant.</p>
+
+<p>O mesmo mecanismo explica os outros sintomas. Uma caixa de seleção marcada na linha 2 continua
+marcada na linha 2, agora de outro produto. O cursor que estava no terceiro campo passa a piscar no
+campo errado. A animação de entrada reinicia no item que não mudou. A rolagem de uma lista longa
+"pula" quando um item é removido do topo. Em todos os casos, o culpado é o mesmo: o React tratou
+posições como se fossem identidades.</p>
+
+<p>Com <code>key={p.id}</code>, o React vê que a key 1 desapareceu e que as keys 2 e 3 continuam. Ele
+remove o nó do pão 1 e move os outros dois, com o estado que estava dentro deles. O texto digitado na
+broa continua na broa. É uma diferença de uma palavra no código e de comportamento em toda a tela.</p>
+
+<p>Um detalhe importante: com a versão de produção do React — a que roda na caixa deste guia —, o
+aviso não aparece e nada quebra. O bug fica só no comportamento, calado. É por isso que a key é uma
+daquelas coisas que se aprende antes de precisar: o erro não grita.</p>
+
+<h2>7. Key em Fragment e em componentes</h2>
+
+<p>Nem toda lista devolve um elemento só por item. Às vezes cada item são dois irmãos, como o nome e o
+horário de uma encomenda. Aí entra o <code>Fragment</code>, a casca invisível que agrupa irmãos sem
+criar nó no HTML. E aqui aparece uma pegadinha: a forma curta <code>&lt;&gt;...&lt;/&gt;</code> não
+aceita atributos, então não dá para escrever key nela. Nesse caso, use a forma completa,
+<code>&lt;Fragment key={...}&gt;</code>.</p>
+
+<div class="tryreact" data-goal="conta:dl &gt; div=0;;conta:dt=3;;conta:dd=3;;texto:14h30">
+  <p class="try-task">Cada encomenda virou uma <code>div</code> dentro do <code>dl</code>, o que
+  estraga a estrutura. Troque a <code>div</code> por <code>&lt;Fragment key={p.id}&gt;</code> e deixe
+  só o <code>dt</code> e o <code>dd</code> como filhos do <code>dl</code>.</p>
+  <pre class="jsx">function App() {
+  const pedidos = [
+    { id: 1, nome: "Pão francês", hora: "7h" },
+    { id: 2, nome: "Broa", hora: "9h" },
+    { id: 3, nome: "Bolo de fubá", hora: "14h30" }
+  ];
+
+  return (
+    &lt;dl className="pedidos"&gt;
+      {pedidos.map((p) =&gt; (
+        &lt;div key={p.id} className="pedido"&gt;
+          &lt;dt&gt;{p.nome}&lt;/dt&gt;
+          &lt;dd&gt;{p.hora}&lt;/dd&gt;
+        &lt;/div&gt;
+      ))}
+    &lt;/dl&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;dl class="pedidos"&gt;
+  &lt;div class="pedido"&gt;
+    &lt;dt&gt;Pão francês&lt;/dt&gt;
+    &lt;dd&gt;7h&lt;/dd&gt;
+  &lt;/div&gt;
+  &lt;div class="pedido"&gt;
+    &lt;dt&gt;Broa&lt;/dt&gt;
+    &lt;dd&gt;9h&lt;/dd&gt;
+  &lt;/div&gt;
+  &lt;div class="pedido"&gt;
+    &lt;dt&gt;Bolo de fubá&lt;/dt&gt;
+    &lt;dd&gt;14h30&lt;/dd&gt;
+  &lt;/div&gt;
+&lt;/dl&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const pedidos = [
+    { id: 1, nome: "Pão francês", hora: "7h" },
+    { id: 2, nome: "Broa", hora: "9h" },
+    { id: 3, nome: "Bolo de fubá", hora: "14h30" }
+  ];
+
+  return (
+    &lt;dl className="pedidos"&gt;
+      {pedidos.map((p) =&gt; (
+        &lt;Fragment key={p.id}&gt;
+          &lt;dt&gt;{p.nome}&lt;/dt&gt;
+          &lt;dd&gt;{p.hora}&lt;/dd&gt;
+        &lt;/Fragment&gt;
+      ))}
+    &lt;/dl&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel depois da troca mostra três <code>dt</code> e três <code>dd</code> como filhos diretos do
+<code>dl</code>, sem <code>div</code> nenhuma no meio. E a key continua fazendo o trabalho dela: o
+<code>Fragment</code> é o elemento que o map devolve, então é nele que a key mora.</p>
+
+<p>Com componentes a regra é a mesma, só muda o lugar: a key vai no componente, dentro da lista, e não
+dentro do componente. <code>&lt;Pedido key={p.id} nome={p.nome} /&gt;</code> está certo;
+<code>&lt;Pedido nome={p.nome} /&gt;</code> dentro de um <code>map</code> está errado, mesmo que o
+componente internamente tenha uma <code>div</code> bem identificada. Quem está na lista é o
+componente, então é ele que precisa da etiqueta.</p>
+
+<h2>8. Praticando com a lista de encomendas</h2>
+
+<p>A Ana agora anota as encomendas num array de objetos, cada uma com um número, o nome de quem pediu
+e a hora da retirada. O número da encomenda é único e nunca muda — é a key natural. Falta montar a
+lista.</p>
+
+<div class="tryreact" data-goal="conta:li=3;;attr:li:nth-child(3)|data-id=3;;texto:Dona Cida — 14h30">
+  <p class="try-task">Monte a lista: um <code>&lt;li&gt;</code> por encomenda, com
+  <code>key={e.id}</code>, <code>data-id={e.id}</code> e o texto "cliente — hora". O painel precisa
+  mostrar as três encomendas.</p>
+  <pre class="jsx">function App() {
+  const encomendas = [
+    { id: 1, cliente: "Dona Marli", hora: "8h" },
+    { id: 2, cliente: "Seu Paulo", hora: "9h30" },
+    { id: 3, cliente: "Dona Cida", hora: "14h30" }
+  ];
+
+  return (
+    &lt;ul&gt;
+      &lt;li&gt;Em breve&lt;/li&gt;
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul&gt;
+  &lt;li&gt;Em breve&lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const encomendas = [
+    { id: 1, cliente: "Dona Marli", hora: "8h" },
+    { id: 2, cliente: "Seu Paulo", hora: "9h30" },
+    { id: 3, cliente: "Dona Cida", hora: "14h30" }
+  ];
+
+  return (
+    &lt;ul&gt;
+      {encomendas.map((e) =&gt; (
+        &lt;li key={e.id} data-id={e.id}&gt;{e.cliente} — {e.hora}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p>Duas coisas para conferir no resultado. Primeiro, a ordem: o React desenha na ordem do array, e a
+key não muda isso — key não é ordenação. Segundo, o texto: cada linha tem os dois campos, e o
+separador está fora das chaves, como texto comum do JSX. Se você escrever
+<code>{e.cliente} {e.hora}</code> sem o traço, o painel mostra "Dona Cida 14h30" — o JSX não inventa
+separador nenhum.</p>
+
+<p>Quando a lista estiver certa, troque a ordem do array no editor e rode de novo: as linhas mudam de
+posição e o React move os nós, sem recriar. É a mesma tela, com a identidade preservada — e é
+exatamente isso que vai fazer diferença quando cada linha tiver um campo de texto, uma caixa de
+seleção ou um botão com estado próprio.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a lista que só cresce</h3>
+<p>A lista de avisos do site da Ana só ganha item no fim e nunca perde nenhum. Nesse caso, o índice
+funciona: a posição de cada aviso nunca muda, então a key é estável por acidente. O problema aparece
+no dia em que ela resolve apagar um aviso antigo — e aí a lista inteira muda de posição de uma vez. Se
+o dado tem id, use o id desde o começo; não vale a pena apostar que a lista nunca vai mudar.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a key com nome repetido</h3>
+<p>Ela usou <code>key={p.nome}</code> porque era mais curto. Deu certo até o dia em que a padaria
+passou a vender dois tipos de pão francês, um tradicional e um integral, com o mesmo nome no
+cadastro. Duas keys iguais na mesma lista fazem o React tratar um item como o outro, e o aviso de key
+repetida aparece no console. O nome é um dado do produto, não um identificador; o id é.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: a key no lugar errado</h3>
+<p>Ela colocou <code>key={p.id}</code> no <code>&lt;span&gt;</code> que fica dentro do
+<code>&lt;li&gt;</code>, e o aviso continuou. O motivo é simples: o elemento que o map devolve é o
+<code>li</code>, e é ele que está na lista aos olhos do React. A key no filho não vale nada. Na
+dúvida, olhe a primeira tag depois do <code>=&gt;</code> — é ali que a key mora.</p>
+</div>
+
+<p>Os três cenários têm o mesmo conserto: descobrir qual elemento o map devolve, escolher um valor
+único e estável vindo do dado, e escrever a key nele. Nenhum deles precisa de biblioteca, de
+configuração ou de hook: é uma linha.</p>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Para que serve a key em uma lista?</p>
+<label><input type="radio" name="q1"> para ordenar os itens na tela</label>
+<label><input type="radio" name="q1"> para o React reconhecer cada item quando a lista muda</label>
+<label><input type="radio" name="q1"> para o CSS achar o item certo</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Onde a key se escreve?</p>
+<label><input type="radio" name="q2"> no <code>map</code>, como segundo argumento</label>
+<label><input type="radio" name="q2"> no elemento pai da lista, junto do <code>className</code></label>
+<label><input type="radio" name="q2"> no elemento mais externo que a função do map devolve</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que aparece no HTML gerado quando um item tem key?</p>
+<label><input type="radio" name="q3"> nada: a key é consumida pelo React</label>
+<label><input type="radio" name="q3"> um atributo <code>key="1"</code> na tag</label>
+<label><input type="radio" name="q3"> um comentário com o valor da key</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: complete a linha da lista</h2>
+<p>A lista de pães precisa de uma key estável, vinda do id de cada pão. Complete o atributo que falta
+na linha abaixo:</p>
+<div class="ex-code">&lt;li <input aria-label="resposta 1" data-answer="key" placeholder="...">={p.id}&gt;{p.nome}&lt;/li&gt;</div>
+<p class="ex-dica">Dica: é a palavra que o React usa para identidade em listas — a mesma que aparece no
+aviso do console. Não é <code>id</code>, e não é <code>data-key</code>: é o atributo especial que o
+React consome antes de montar o HTML.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Uma lista em React é um array de elementos, e o React precisa saber qual elemento de hoje é o mesmo
+de ontem. Sem key, ele compara por posição; com key, compara por identidade. A key se escreve no
+elemento mais externo que o <code>map</code> devolve, tem de ser única entre os irmãos e estável entre
+um desenho e outro — e o valor natural é o id do dado. Ela não vira atributo no HTML, não chega como
+prop e não serve para CSS.</p>
+
+<p>O índice do <code>map</code> é a escolha que parece grátis e cobra caro: assim que a lista é
+filtrada, ordenada ou perde um item do meio, posição deixa de ser identidade e o estado que mora no nó
+— texto digitado, cursor, caixa marcada, animação — fica no item errado. Como a versão de produção do
+React não avisa, o sintoma chega como "a tela está maluca", sem mensagem nenhuma. A key é o que
+transforma esse mistério em uma linha de código.</p>
+
+<p>Vale notar o que a key <em>não</em> resolve: ela não ordena a lista, não filtra, não deixa o
+desenho mais rápido por si só e não substitui o id. Ela só responde "quem é quem". A ordenação e o
+filtro são trabalho do seu código, no array, antes do <code>map</code> — e é por isso que a próxima
+aula, a de renderização condicional, combina tão bem com esta: primeiro você decide o que entra na
+lista, depois dá identidade a cada item que ficou.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Toda lista feita com <code>map</code> precisa de key em cada item.</li>
+<li>A key vai no elemento mais externo que o map devolve.</li>
+<li>Key boa: única entre os irmãos, estável e vinda do dado (<code>p.id</code>).</li>
+<li>Índice como key só em lista que nunca muda de ordem, tamanho ou filtro.</li>
+<li><code>Math.random()</code> e <code>Date.now()</code> como key recriam tudo a cada desenho.</li>
+<li>A key não aparece no HTML e não chega ao componente como prop.</li>
+<li>Precisa do id dentro do componente? Passe também <code>id={p.id}</code>.</li>
+<li>Vários irmãos por item: <code>&lt;Fragment key={...}&gt;</code>, nunca <code>&lt;&gt;</code>.</li>
+<li>Key em componente: <code>&lt;Pedido key={p.id} /&gt;</code> na lista.</li>
+<li>Sem key, o React reaproveita o nó pela posição e o estado dele fica no item errado.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

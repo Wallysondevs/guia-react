@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>As Dependências | Guia React</title>
+<meta name="description" content="O array de dependências do useEffect na prática: sem array, com [], com valores, o que entra na lista, objetos e funções que mudam de identidade e o laço infinito.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>As <span class="hl">Dependências</span></h1>
+<p class="intro">A Ana acertou o efeito: ele roda, calcula o total da encomenda e mostra na tela. Só que
+agora ela aumentou o preço do pão e o total continuou o mesmo. A tela está desatualizada, e o culpado é
+o segundo argumento do <code>useEffect</code> — o array que ela copiou de um exemplo sem entender. Nesta
+aula ela descobre que esse array não é enfeite: é a lista de tudo o que o efeito lê, e é ele que decide
+quando o efeito roda de novo.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que o array de dependências significa, em palavras simples.</li>
+  <li>O comportamento de cada formato: sem array, <code>[]</code> e <code>[valor]</code>.</li>
+  <li>Por que o valor "velho" aparece na tela quando falta uma dependência.</li>
+  <li>Que o array lista <strong>tudo</strong> o que o efeito lê: estado, props e variáveis de fora.</li>
+  <li>Por que objeto, array e função recriados a cada render bagunçam a conta.</li>
+  <li>Como reconhecer um laço infinito pelo erro do React.</li>
+  <li>O que o aviso <code>exhaustive-deps</code> está tentando dizer.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o total que não acompanha o preço</h2>
+
+<p>A padaria vende encomendas de três pães. O componente tem dois estados: o preço de cada pão e o total
+da encomenda. O total é calculado por um efeito, porque na cabeça da Ana aquilo era "uma conta que
+acontece depois". Ela copiou o <code>[]</code> de um exemplo da internet, rodou, viu o total certinho e
+foi tomar café.</p>
+
+<p>No dia seguinte o preço do pão subiu. Ela mudou o preço, olhou a tela e o total continuou o mesmo.
+Conferiu a conta no papel: estava certa. O problema não era a multiplicação — era o array. Com
+<code>[]</code>, o efeito roda <strong>uma vez</strong>, na montagem do componente, e nunca mais. Ele
+calculou o total com o preço que existia naquele instante e nunca ficou sabendo que o preço mudou.</p>
+
+<p>Esse é o mal-entendido central desta aula: o array de dependências não é uma formalidade para o React
+parar de reclamar. Ele é a resposta para a pergunta "quando este efeito precisa rodar de novo?". Errar a
+resposta dá dois sintomas opostos: efeito que roda de menos (tela com valor velho) e efeito que roda
+demais (laço, pedidos repetidos, contas dobradas). Os dois nascem do mesmo lugar.</p>
+
+<h2>2. O que o array quer dizer</h2>
+
+<p>O segundo argumento do <code>useEffect</code> é um array de valores que o React observa. Antes de
+rodar o efeito, o React compara os valores do array com os do render anterior, um por um, usando
+comparação de igualdade (<code>===</code>). Se todos forem iguais aos de antes, ele pula o efeito. Se
+algum for diferente, ele roda o efeito de novo, depois de desenhar a tela.</p>
+
+<p>A leitura correta do array é: <strong>"estes são os valores de fora que este efeito usa"</strong>. O
+React não tem como descobrir isso sozinho, porque o JavaScript não deixa ninguém olhar dentro de uma
+função para ver quais variáveis ela usa. Quem informa é você. É por isso que o array é uma
+responsabilidade do programador — e por isso que esquecer um item é o erro mais comum de todos.</p>
+
+<dl class="anatomy">
+<dt>dependência</dt>
+<dd>Cada valor dentro do array. Se o efeito lê <code>preco</code>, então <code>preco</code> é uma
+dependência dele.</dd>
+<dt>array de dependências</dt>
+<dd>O segundo argumento do <code>useEffect</code>: <code>[]</code>, <code>[preco]</code>,
+<code>[preco, quantidade]</code>.</dd>
+<dt>valor velho</dt>
+<dd>O que acontece quando o efeito não roda e a tela continua mostrando o resultado de uma conta
+antiga.</dd>
+<dt>laço infinito</dt>
+<dd>Efeito que muda estado, que pede render, que roda o efeito de novo — até o React parar com
+"Maximum update depth exceeded".</dd>
+<dt>identidade</dt>
+<dd>O "mesmo" objeto. Um objeto novo, ainda que com o mesmo conteúdo, tem outra identidade e conta
+como mudança para o React.</dd>
+</dl>
+
+<p>Antes dos formatos, uma imagem que a Ana usou para entender: o array é a lista de assuntos sobre os
+quais o efeito quer ser avisado. <code>[]</code> é "não me avise de nada, faça uma vez e pronto".
+<code>[preco]</code> é "me avise quando o preço mudar". E não ter array é "me avise de tudo, sempre" —
+o que raramente é o que se quer.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Formato</th><th>Quantas vezes roda</th><th>Frase que resume</th></tr>
+<tr><td><code>useEffect(f)</code></td><td>uma vez por render</td><td>"me chame sempre, eu decido o que fazer"</td></tr>
+<tr><td><code>useEffect(f, [])</code></td><td>uma vez, na montagem</td><td>"não dependo de nada que mude"</td></tr>
+<tr><td><code>useEffect(f, [a])</code></td><td>na montagem e quando <code>a</code> mudar</td><td>"me avise quando <code>a</code> mudar"</td></tr>
+<tr><td><code>useEffect(f, [a, b])</code></td><td>na montagem e quando <code>a</code> ou <code>b</code> mudar</td><td>"me avise quando qualquer um dos dois mudar"</td></tr>
+</table>
+</div>
+
+<h2>3. Sem array: depois de todo render</h2>
+
+<p>Quando você chama <code>useEffect(funcao)</code> sem o segundo argumento, o efeito roda depois de
+todo render — o primeiro e todos os seguintes. Isso é útil para acompanhar mudanças, e perigoso se o
+efeito mexer no estado, porque cada execução cria um novo render. O exemplo a seguir é o laço clássico;
+não precisa rodar, ele trava a caixa:</p>
+
+<pre class="file" data-file="App.jsx">useEffect(() =&gt; {
+  setTotal(total + 1);   // muda o estado a cada execução
+});                      // sem array: roda em todo render</pre>
+
+<p>O React percebe depois de algumas dezenas de tentativas e interrompe com uma mensagem que você vai
+ver cedo ou tarde. Ela não fala de array; fala de profundidade de atualização, o que soa assustador e
+significa apenas "tem coisa se atualizando em círculo aqui":</p>
+
+<pre class="term">Maximum update depth exceeded. This can happen when a component
+repeatedly calls setState inside useEffect, but useEffect either
+doesn't have a dependency array, or one of the dependencies changes
+on every render.</pre>
+
+<p>A mensagem lista as duas causas possíveis, e as duas são desta aula. A primeira é o efeito sem array
+que muda estado. A segunda é uma dependência que muda a cada render — um objeto, um array ou uma função
+criada dentro do componente, que ganha identidade nova sempre. Voltamos a ela na seção 7.</p>
+
+<p>Existe um uso legítimo para o efeito sem array: acompanhar algo que muda a cada render sem mexer no
+estado. Um <code>console.log</code> de depuração, por exemplo. Mas, como você já sabe, o console do
+navegador no modo de desenvolvimento mostra tudo em dobro — e aí a leitura fica confusa. Na prática, o
+efeito sem array é raro e quase sempre é sinal de que faltou pensar.</p>
+
+<h2>4. Com <code>[]</code>: uma vez, na montagem</h2>
+
+<p>O array vazio diz "este efeito não depende de nada que mude". Ele roda uma vez, quando o componente
+entra na tela, e não roda mais — nem quando o estado muda, nem quando uma prop muda. É o formato certo
+para carregar dados uma vez, registrar um aviso de entrada ou preparar algo global. E é o formato errado
+para qualquer efeito que precise acompanhar um valor.</p>
+
+<p>Na caixa a seguir, o efeito calcula o total com <code>[]</code>. Rode o código inicial e clique em
+Rodar: o total é 6, porque a encomenda é de três pães a 2 reais. Agora clique em
+<strong>Aumentar o preço</strong> dentro da prévia: o preço vai para 3 e o total continua 6. A missão é
+fazer o total acompanhar.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Total da encomenda: 9 reais">
+  <p class="try-task">A encomenda é sempre de três pães e o total é calculado por um efeito. Clique em
+  Aumentar o preço e veja que o total não muda. Acrescente <code>preco</code> ao array de dependências
+  para o total acompanhar.</p>
+  <pre class="jsx">function App() {
+  const [preco, setPreco] = useState(2);
+  const [total, setTotal] = useState(0);
+
+  useEffect(() =&gt; {
+    setTotal(preco * 3);
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Preço do pão: {preco} reais&lt;/p&gt;
+      &lt;p&gt;Total da encomenda: {total} reais&lt;/p&gt;
+      &lt;button onClick={() =&gt; setPreco(preco + 1)}&gt;Aumentar o preço&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Preço do pão: 2 reais&lt;/p&gt;
+  &lt;p&gt;Total da encomenda: 6 reais&lt;/p&gt;
+  &lt;button&gt;Aumentar o preço&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [preco, setPreco] = useState(2);
+  const [total, setTotal] = useState(0);
+
+  useEffect(() =&gt; {
+    setTotal(preco * 3);
+  }, [preco]);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Preço do pão: {preco} reais&lt;/p&gt;
+      &lt;p&gt;Total da encomenda: {total} reais&lt;/p&gt;
+      &lt;button onClick={() =&gt; setPreco(preco + 1)}&gt;Aumentar o preço&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Com <code>[preco]</code>, o efeito roda na montagem e roda de novo depois do render em que o preço
+mudou. O React não "chama o efeito quando você clica": ele desenha a tela com o preço novo e, no fim
+desse render, compara o array. Como <code>preco</code> era 2 e agora é 3, o efeito roda, calcula 9 e
+chama <code>setTotal</code>. Um terceiro render acontece com o total novo, e o painel mostra o resultado
+final.</p>
+
+<p>Repare que o painel da caixa já mostra o estado depois do clique — é o mesmo mecanismo de prova que
+você viu na aula de estado. E repare também que o efeito <em>não</em> roda de novo só porque
+<code>total</code> mudou: <code>total</code> não está no array. Se estivesse, e se o efeito também
+lesse <code>total</code> para calcular, aí sim teríamos um laço.</p>
+
+<h2>5. Com valores: quando algum deles muda</h2>
+
+<p>Um array pode ter várias dependências, e cada uma delas é um gatilho. O erro comum aqui é lembrar de
+uma e esquecer a outra — e o sintoma é sempre o mesmo: a tela mostra uma conta que não fecha, feita com
+um dos valores antigos.</p>
+
+<div class="tryreact" data-goal="clique:#mais-pao;;texto:Total: 4 reais">
+  <p class="try-task">O total depende do preço <strong>e</strong> da quantidade, mas o array só lista o
+  preço. Clique em Mais um pão e veja o total parado. Acrescente a quantidade ao array.</p>
+  <pre class="jsx">function App() {
+  const [preco, setPreco] = useState(2);
+  const [quantidade, setQuantidade] = useState(1);
+  const [total, setTotal] = useState(2);
+
+  useEffect(() =&gt; {
+    setTotal(preco * quantidade);
+  }, [preco]);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Total: {total} reais&lt;/p&gt;
+      &lt;button id="mais-pao" onClick={() =&gt; setQuantidade(quantidade + 1)}&gt;
+        Mais um pão
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Total: 2 reais&lt;/p&gt;
+  &lt;button id="mais-pao"&gt;Mais um pão&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [preco, setPreco] = useState(2);
+  const [quantidade, setQuantidade] = useState(1);
+  const [total, setTotal] = useState(2);
+
+  useEffect(() =&gt; {
+    setTotal(preco * quantidade);
+  }, [preco, quantidade]);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Total: {total} reais&lt;/p&gt;
+      &lt;button id="mais-pao" onClick={() =&gt; setQuantidade(quantidade + 1)}&gt;
+        Mais um pão
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A regra que fecha essa seção é curta: <strong>o array lista tudo o que o efeito lê</strong>. Não é
+"tudo o que eu quero que dispare o efeito", é tudo o que aparece dentro da função do efeito e vem de
+fora dela. Se você lê <code>preco</code> e <code>quantidade</code>, os dois entram. Se lê uma prop
+chamada <code>bairro</code>, ela entra. Se lê uma constante global que nunca muda, ela pode ficar de
+fora — o React só precisa das coisas que podem mudar.</p>
+
+<p>Há um caso especial que vale conhecer: mudar o <strong>tamanho</strong> do array entre um render e
+outro. Se em um render o array é <code>[]</code> e no seguinte é <code>[preco]</code>, o React avisa que
+não sabe se deve rodar o efeito e não tem como comparar. Na prática, o array precisa ter sempre o mesmo
+número de itens, na mesma ordem.</p>
+
+<h2>6. De onde vêm as dependências: as props também contam</h2>
+
+<p>Até agora as dependências vieram do <code>useState</code>. Mas um componente também recebe dados por
+props, e o efeito que lê uma prop tem a mesma obrigação de listá-la. Este é o caso que mais escapa,
+porque a prop não foi escrita naquele arquivo: alguém de fora manda, e o efeito calcula com base naquilo.</p>
+
+<p>Na caixa, a padaria cobra uma taxa de entrega que depende do bairro. O bairro chega por prop, o
+efeito da taxa tem <code>[]</code>, e o resultado é a taxa antiga grudada na tela enquanto o bairro
+muda.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Bairro: Vila Nova;;texto:Taxa de entrega: 12 reais">
+  <p class="try-task">A taxa de entrega é calculada por um efeito que lê a prop <code>bairro</code>, mas
+  o array está vazio. Clique em Mudar de bairro e veja a taxa não acompanhar. Acrescente
+  <code>bairro</code> ao array.</p>
+  <pre class="jsx">function Entrega({ bairro }) {
+  const [taxa, setTaxa] = useState(0);
+
+  useEffect(() =&gt; {
+    setTaxa(bairro === "Centro" ? 5 : 12);
+  }, []);
+
+  return (
+    &lt;p&gt;Taxa de entrega: {taxa} reais&lt;/p&gt;
+  );
+}
+
+function App() {
+  const [bairro, setBairro] = useState("Centro");
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Bairro: {bairro}&lt;/p&gt;
+      &lt;Entrega bairro={bairro} /&gt;
+      &lt;button onClick={() =&gt; setBairro("Vila Nova")}&gt;Mudar de bairro&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Bairro: Centro&lt;/p&gt;
+  &lt;p&gt;Taxa de entrega: 5 reais&lt;/p&gt;
+  &lt;button&gt;Mudar de bairro&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Entrega({ bairro }) {
+  const [taxa, setTaxa] = useState(0);
+
+  useEffect(() =&gt; {
+    setTaxa(bairro === "Centro" ? 5 : 12);
+  }, [bairro]);
+
+  return (
+    &lt;p&gt;Taxa de entrega: {taxa} reais&lt;/p&gt;
+  );
+}
+
+function App() {
+  const [bairro, setBairro] = useState("Centro");
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Bairro: {bairro}&lt;/p&gt;
+      &lt;Entrega bairro={bairro} /&gt;
+      &lt;button onClick={() =&gt; setBairro("Vila Nova")}&gt;Mudar de bairro&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Duas coisas para levar daqui. A primeira: dependência é valor lido, venha ele de estado ou de prop.
+A segunda: quando a prop muda, o componente <code>Entrega</code> é chamado de novo pelo pai, com o
+bairro novo, e o efeito compara <code>bairro</code> com o do render anterior. A comparação é do React,
+não sua — você só informa o que observar.</p>
+
+<p>Se a confusão é sobre como as props chegam, vale reler a aula de props antes de seguir; o mecanismo
+do efeito em cima delas é exatamente o mesmo do estado. A diferença é que quem muda a prop é o
+componente de cima, e quem precisa avisar o efeito é o array do componente de baixo.</p>
+
+<h2>7. As armadilhas: objeto novo, função nova, laço infinito</h2>
+
+<p>A comparação do React é de identidade, não de conteúdo. Dois objetos com os mesmos campos são
+objetos diferentes. Isso importa porque, dentro de um componente, um objeto ou um array criado no corpo
+da função é <strong>recriado a cada render</strong>. Se ele for para o array de dependências, o React
+olha os dois e diz "mudou" — e o efeito roda sempre.</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const [paes, setPaes] = useState(["francês"]);
+
+  // objeto novo a cada render: nunca é igual ao anterior
+  const filtro = { tipo: "pão" };
+
+  useEffect(() =&gt; {
+    console.log("filtrei por " + filtro.tipo);
+  }, [filtro]);   // roda em todo render, mesmo que o conteúdo seja o mesmo
+}</pre>
+
+<p>O mesmo vale para funções. Uma função declarada dentro do componente é uma função nova a cada render.
+Se o efeito depende dela, ele roda sempre. A solução para os dois casos é não colocar dentro do array
+um valor que você mesmo recriou — ou criar o objeto e a função dentro do efeito (o que quase sempre dá
+certo, porque o efeito já roda quando precisa) — ou, no caso de funções que vêm do pai, envolver a
+função em <code>useCallback</code>, um assunto do Nível 2.</p>
+
+<p>E aqui está o laço infinito mais chato de achar: um efeito que lê um objeto recriado a cada render e
+muda um estado na mesma execução. Cada render cria o objeto, o efeito vê "mudou", roda, muda o estado,
+o que provoca outro render, que cria outro objeto — e o React para com a mesma mensagem de profundidade
+máxima da seção 3. O erro não está no objeto em si, está em usá-lo como dependência e como gatilho de
+estado ao mesmo tempo.</p>
+
+<p>Números, textos e booleanos não têm esse problema: <code>2</code> é igual a <code>2</code>, e
+<code>"Centro"</code> é igual a <code>"Centro"</code>. Por isso as dependências mais tranquilas são
+justamente as mais comuns: preço, quantidade, bairro, termo de busca, se está aberto ou fechado. Quando
+você se pegar colocando um objeto inteiro no array, pergunte se não dá para listar os campos que o
+efeito realmente lê.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que vai no array</th><th>É recriado a cada render?</th><th>Cuidado</th></tr>
+<tr><td>número, texto, booleano</td><td>não: o valor é comparado pelo conteúdo</td><td>nenhum; é o caso tranquilo</td></tr>
+<tr><td>objeto ou array criado no componente</td><td>sim</td><td>o efeito roda em todo render</td></tr>
+<tr><td>função declarada no componente</td><td>sim</td><td>o efeito roda em todo render</td></tr>
+<tr><td>função que vem do pai por prop</td><td>depende do pai</td><td>se o pai recriar, o efeito roda de novo</td></tr>
+<tr><td>valor vindo de <code>useState</code></td><td>não, até você chamar o <code>set</code></td><td>nenhum; é o caso mais comum</td></tr>
+</table>
+</div>
+
+<h2>8. O aviso do ESLint e como ler</h2>
+
+<p>O projeto criado pelo Vite vem com o ESLint configurado para o React, e uma das regras dele olha
+exatamente para o array de dependências. O nome da regra é <code>react-hooks/exhaustive-deps</code>, e o
+aviso aparece no editor, sublinhado em amarelo, antes de você rodar qualquer coisa:</p>
+
+<pre class="term">React Hook useEffect has a missing dependency: 'preco'.
+Either include it or remove the dependency array.
+  react-hooks/exhaustive-deps</pre>
+
+<p>A tradução é direta: "o seu efeito usa <code>preco</code> e o array não lista <code>preco</code>".
+Note que o aviso oferece duas saídas — incluir a dependência <em>ou</em> remover o array. As duas são
+legítimas, e a escolha depende do que o efeito faz. Se ele deve acompanhar o preço, inclua. Se ele
+deveria rodar uma vez só e o preço entrou ali por acidente, o conserto é outro: tire o preço de dentro
+do efeito, não o array.</p>
+
+<p>Há uma terceira saída que o aviso nem menciona, e que é a melhor na maioria das vezes: perceber que
+aquilo não precisava de efeito. Um total que é <code>preco * quantidade</code> pode ser calculado direto
+no corpo do componente, sem estado e sem efeito — nada para o array observar. A aula
+<a href="quando-nao-usar-efeito.html">Quando Não Usar Efeito</a> é sobre esse instinto, mas ele já vale
+aqui: antes de brigar com o array, confira se o efeito devia existir.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a tela mostra o valor antigo por um instante</h3>
+<p>Com duas fontes de verdade — o preço no estado e o total calculado por um efeito —, existe sempre um
+render em que o preço é novo e o total ainda é velho. O olho atento vê um piscar. Quando a conta é
+derivada, calcule no render; quando o valor vem de fora, aí sim o efeito é a ferramenta certa e o
+"instante desatualizado" é inevitável.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o efeito roda duas vezes e faz dois pedidos</h3>
+<p>No modo de desenvolvimento, o <code>StrictMode</code> monta o componente duas vezes, então o efeito
+com <code>[]</code> roda duas vezes e dois pedidos saem. Não é o array errado: é o React testando se o
+seu efeito sabe se limpar. A resposta certa é a aula de cleanup, que vem depois de buscando dados —
+e a solução prática é cancelar o pedido anterior na função de limpeza.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o array com um item que nunca muda</h3>
+<p>A Ana colocou <code>[3]</code> no array, achando que era "o número de pães". O efeito rodou uma vez e
+nunca mais, porque o número dentro do array é sempre o mesmo — não é uma variável, é um valor escrito
+ali. Dependência tem de ser algo que possa mudar entre um render e outro: uma variável de estado, uma
+prop, um cálculo a partir delas. Constante não é dependência.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. O que o array de dependências lista?</p>
+<label><input type="radio" name="q1"> os valores que queremos que o efeito ignore</label>
+<label><input type="radio" name="q1"> as funções que o efeito chama</label>
+<label><input type="radio" name="q1"> tudo o que o efeito lê de fora da própria função</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. O efeito tem <code>[]</code> e a tela mostra um valor velho. Qual é a causa provável?</p>
+<label><input type="radio" name="q2"> falta no array o valor que o efeito lê</label>
+<label><input type="radio" name="q2"> o React está com defeito</label>
+<label><input type="radio" name="q2"> o efeito precisa de <code>async</code></label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. Por que um objeto criado no corpo do componente atrapalha o array?</p>
+<label><input type="radio" name="q3"> porque o React não aceita objetos em arrays</label>
+<label><input type="radio" name="q3"> porque ele é recriado a cada render e nunca é igual ao anterior</label>
+<label><input type="radio" name="q3"> porque objeto ocupa mais memória que número</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o total que acompanha os dois valores</h2>
+<p>O efeito calcula <code>preco * quantidade</code> e já lista o preço. Complete o array com o que falta
+para o efeito rodar quando a quantidade mudar.</p>
+<div class="ex-code">useEffect(() =&gt; { setTotal(preco * quantidade); }, [preco, <input aria-label="resposta 1" data-answer="quantidade" placeholder="...">]);</div>
+<p class="ex-dica">Dica: é o outro valor que o efeito lê. Sem ele, o total fica parado quando a
+quantidade muda.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O array de dependências é a lista de tudo o que o efeito lê de fora da própria função. Sem array, o
+efeito roda depois de todo render; com <code>[]</code>, roda uma vez na montagem; com valores dentro,
+roda na montagem e de novo sempre que algum deles mudar. O React compara os valores com os do render
+anterior usando igualdade, e roda o efeito só quando a comparação falha.</p>
+
+<p>Esquecer uma dependência produz o valor velho na tela: o efeito não roda, a conta não é refeita, e o
+número antigo fica convivendo com o dado novo. Incluir demais produz efeito demais: pedidos repetidos,
+contas dobradas e, se houver mudança de estado dentro do efeito, o laço que o React interrompe com
+"Maximum update depth exceeded".</p>
+
+<p>A regra de ouro é listar o que se lê, e a pergunta de ouro vem antes: este efeito precisa existir?
+Se o valor pode ser calculado no render, não há array para acertar. As próximas aulas usam essa base
+para o caso em que o efeito é realmente necessário — buscar dados fora do componente — e para o caso em
+que ele precisa desfazer o que fez.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Sem array: roda depois de todo render. Com <code>[]</code>: só na montagem.</li>
+<li>Com <code>[a, b]</code>: roda na montagem e quando <code>a</code> ou <code>b</code> mudar.</li>
+<li>O array lista tudo o que o efeito <strong>lê</strong>: estado, props e variáveis de fora.</li>
+<li>O React compara por identidade: objeto, array e função recriados contam como mudança.</li>
+<li>Dependência que nunca muda (um número escrito no array) não faz nada.</li>
+<li>Faltando dependência, o sintoma é valor velho na tela.</li>
+<li>Sobrando efeito, o sintoma é laço: "Maximum update depth exceeded".</li>
+<li>O aviso <code>react-hooks/exhaustive-deps</code> aponta a dependência que falta.</li>
+<li>Antes de acertar o array, pergunte se o efeito devia existir.</li>
+<li>Valor derivado de estado se calcula no render; efeito é para o que vem de fora.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

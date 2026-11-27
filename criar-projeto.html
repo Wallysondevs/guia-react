@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Criar o Projeto | Guia React</title>
+<meta name="description" content="Do zero ao servidor rodando: instalar Node e npm, criar o projeto com Vite, entender main.jsx e App.jsx, rodar npm run dev e gerar a versão final com npm run build.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Criar o <span class="hl">Projeto</span></h1>
+
+<p class="intro">Até aqui, todo o código da Ana rodou dentro das caixas deste guia: ela escreve, clica em
+Rodar e vê o resultado. Isso serve para aprender, mas não é um site. Para o cardápio da padaria existir
+de verdade, ele precisa de uma pasta no computador dela, de um servidor que abra a página e de um comando
+que gere a versão final para publicar. Nesta aula ela cria esse projeto do zero, com Node, npm e Vite, e
+entende o papel de cada arquivo que aparece — inclusive os dois que fazem a ponte entre o HTML e o React.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que são Node, npm e Vite, e por que você precisa dos três.</li>
+  <li>Criar o projeto com <code>npm create vite@latest</code>.</li>
+  <li>Instalar as dependências e entender a pasta <code>node_modules</code>.</li>
+  <li>Rodar com <code>npm run dev</code> e ver a página recarregar sozinha.</li>
+  <li>O papel de <code>index.html</code>, <code>main.jsx</code> e <code>App.jsx</code>.</li>
+  <li>Gerar a versão final com <code>npm run build</code>.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o site precisa sair do guia</h2>
+
+<p>O cardápio da Ana já tem componentes, props e expressões. Enquanto ele mora em uma caixa do guia, três
+coisas são verdade: o código vive só naquele quadro, ninguém consegue abrir a página num endereço e o
+navegador precisa do guia para compilar o JSX. Para virar site, o projeto precisa de um lugar fixo —
+uma pasta — e de ferramentas que transformem aquele código em arquivos que qualquer navegador entende.</p>
+
+<p>É isso que a aula faz: monta o projeto de verdade. O caminho é o mesmo que qualquer pessoa percorre ao
+começar um site em React hoje: instalar o Node, criar o projeto com um modelo pronto, instalar as
+dependências, subir o servidor de desenvolvimento e, no fim, gerar a versão de produção. São cinco
+comandos e quatro arquivos que importam. O resto é paisagem.</p>
+
+<p>Uma promessa honesta antes de começar: nada aqui é decorado. Você vai precisar lembrar de dois
+comandos — <code>npm install</code> e <code>npm run dev</code> — e do papel de um arquivo,
+<code>App.jsx</code>. O resto está na tabela desta aula e no <code>README.md</code> que o próprio Vite
+escreve na pasta do projeto.</p>
+
+<h2>2. Node e npm: o chão onde tudo roda</h2>
+
+<p>O React é uma biblioteca JavaScript, e JavaScript nasceu para rodar dentro do navegador. Só que as
+ferramentas que preparam o código — compilar JSX, juntar arquivos, recarregar a página — precisam rodar
+<em>fora</em> do navegador. Quem dá esse chão é o <strong>Node.js</strong>: um programa que executa
+JavaScript no computador, como se fosse um navegador sem tela.</p>
+
+<p>Junto com o Node vem o <strong>npm</strong>, o gerenciador de pacotes. Ele baixa bibliotecas de um
+catálogo público, guarda na pasta do projeto e anota o que baixou. É por meio dele que o React chega ao
+seu computador — e não por um <code>&lt;script&gt;</code> no HTML, como era em 2015.</p>
+
+<p>Confira se os dois estão instalados abrindo o terminal e pedindo a versão:</p>
+
+<pre class="term">$ node -v
+v22.14.0
+$ npm -v
+10.9.2</pre>
+
+<p>Duas linhas com número significam que está tudo pronto. Se aparecer "command not found" ou
+"não é reconhecido como um comando interno", o Node não está instalado: baixe a versão LTS no site
+oficial, instale e feche e abra o terminal de novo. A versão importa pouco para começar — qualquer Node
+20 ou mais novo serve —, mas instalar pelo site oficial é mais simples do que tentar gerenciar versões
+antes de saber o que é uma versão.</p>
+
+<dl class="anatomy">
+<dt>Node.js</dt>
+<dd>O programa que executa JavaScript fora do navegador. É o que roda as ferramentas do projeto.</dd>
+<dt>npm</dt>
+<dd>O gerenciador de pacotes que vem com o Node: baixa bibliotecas, guarda e anota.</dd>
+<dt>Vite</dt>
+<dd>A ferramenta que cria o projeto a partir de um modelo e serve a página durante o desenvolvimento.</dd>
+<dt>dependência</dt>
+<dd>Uma biblioteca que o seu projeto usa. Fica listada no <code>package.json</code>.</dd>
+<dt>servidor de desenvolvimento</dt>
+<dd>Um programa local que abre a página em um endereço e a atualiza quando o arquivo muda.</dd>
+<dt>build</dt>
+<dd>A versão final, otimizada, gerada em arquivos que você publica em qualquer hospedagem.</dd>
+</dl>
+
+<h2>3. Criando o projeto com Vite</h2>
+
+<p>O Vite é a ferramenta que a comunidade React usa para começar um projeto. Ele faz duas coisas bem
+diferentes: um assistente que monta a pasta com os arquivos de partida, e um servidor que serve essa
+pasta enquanto você trabalha. A primeira é usada uma vez; a segunda, todo dia.</p>
+
+<p>Abra o terminal, entre na pasta onde você guarda seus estudos e rode o comando, trocando
+<code>padaria</code> pelo nome que você quiser dar ao projeto:</p>
+
+<pre class="term">$ npm create vite@latest padaria
+&gt; Select a framework:  › React
+&gt; Select a variant:    › JavaScript
+
+Scaffolding project in /home/ana/estudos/padaria...
+
+Done. Now run:
+
+  cd padaria
+  npm install
+  npm run dev</pre>
+
+<p>As perguntas mudam um pouco de versão para versão — algumas trazem a opção de TypeScript, outras
+perguntam se você quer instalar e subir o servidor na hora. O que não muda são as duas escolhas:
+<strong>React</strong> como framework e <strong>JavaScript</strong> como variante. TypeScript é uma
+camada a mais que você não precisa agora; escolher "React + TypeScript" no começo significa conviver com
+erros de tipo antes de saber escrever um componente.</p>
+
+<p>A última linha da resposta é um resumo do que fazer em seguida, e é literalmente a receita:
+entrar na pasta, instalar e rodar. Guarde esses três comandos — eles aparecem em todo projeto Vite do
+mundo, e o próprio Vite imprime isso para você não precisar lembrar.</p>
+
+<p>Se o comando reclamar de permissão ou de rede, o problema é do npm, não do React: confira a conexão e,
+em último caso, rode <code>npm config get registry</code> para ver de onde ele está baixando. Nunca é
+necessário usar <code>sudo</code> — se algum tutorial mandar, desconfie.</p>
+
+<h2>4. <code>npm install</code>: baixando as dependências</h2>
+
+<p>O modelo que o Vite criou não traz as bibliotecas: ele traz a <em>lista</em> delas, no
+<code>package.json</code>. Instalar é o trabalho de baixar essa lista para dentro do projeto:</p>
+
+<pre class="term">$ cd padaria
+$ npm install
+
+added 154 packages, and audited 155 packages in 12s
+
+found 0 vulnerabilities</pre>
+
+<p>Em alguns segundos aparece uma pasta chamada <code>node_modules</code>, com centenas de pastas dentro.
+Não abra, não edite, não apague arquivo de lá: é depósito, não código seu. O React está lá dentro, junto
+com o Vite e mais um pacote para cada coisa que eles precisam. O tamanho assusta na primeira vez e é
+normal — quando o projeto é copiado para outro computador, essa pasta não vai junto; ela é refeita com
+<code>npm install</code>.</p>
+
+<p>O <code>package.json</code> é a parte que importa e que você pode ler: ele lista as dependências e os
+scripts, que são atalhos de comando. Os scripts do modelo são sempre os mesmos quatro:
+<code>dev</code>, <code>build</code>, <code>preview</code> e <code>lint</code>. Cada um é uma linha de
+comando guardada com nome curto, e é por isso que se escreve <code>npm run dev</code> em vez de decorar
+a chamada comprida do Vite.</p>
+
+<p>Junto com o <code>package.json</code> nasce o <code>package-lock.json</code>, que trava as versões
+exatas de tudo o que foi baixado. Ele existe para que outro computador instale exatamente as mesmas
+versões — se você instalar amanhã e a biblioteca tiver sido atualizada, o resultado é o mesmo. Os dois
+arquivos vão para o controle de versão; a pasta <code>node_modules</code>, não.</p>
+
+<h2>5. <code>npm run dev</code>: o servidor que recarrega</h2>
+
+<p>Com as dependências instaladas, o projeto pode rodar. O comando abaixo sobe o servidor de
+desenvolvimento:</p>
+
+<pre class="term">$ npm run dev
+
+  VITE v7.1.0  ready in 312 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+  ➜  press h + enter to show help</pre>
+
+<p>O endereço é o que você cola no navegador. <code>localhost</code> significa "este computador", e
+<code>5173</code> é a porta onde o servidor está escutando. Enquanto o terminal estiver com essa mensagem,
+o servidor está de pé: feche o terminal ou aperte <code>Ctrl</code> + <code>C</code> e a página para de
+responder. Abrir o arquivo HTML com dois cliques não substitui isso, porque o navegador não sabe compilar
+JSX sozinho.</p>
+
+<p>O ganho grande é a recarga automática. Salve o <code>App.jsx</code> com um texto novo e, em menos de um
+segundo, o navegador já mostra a mudança — sem apertar F5. Essa troca cirúrgica se chama HMR
+(<em>hot module replacement</em>), e é o que torna o ciclo de trabalho rápido: você digita, salva, olha.
+No começo, esse ritmo dá a sensação de que o código está vivo; depois, vira hábito.</p>
+
+<p>Se a porta estiver ocupada por outro projeto, o Vite avisa e escolhe a próxima livre — 5174, 5175 —,
+e o endereço mostrado é o que vale. E se a página abrir com uma sobreposição preta cheia de texto, é o
+erro do Vite: ele mostra a mensagem e a linha, o que costuma ser mais útil que o console do navegador.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Comando</th><th>O que faz</th><th>Quando rodar</th></tr>
+<tr><td><code>npm create vite@latest</code></td><td>cria a pasta do projeto a partir do modelo</td><td>uma vez, no começo</td></tr>
+<tr><td><code>npm install</code></td><td>baixa as dependências para <code>node_modules</code></td><td>uma vez, e ao copiar o projeto</td></tr>
+<tr><td><code>npm run dev</code></td><td>sobe o servidor com recarga automática</td><td>sempre que for trabalhar</td></tr>
+<tr><td><code>npm run build</code></td><td>gera a versão final em <code>dist/</code></td><td>ao publicar</td></tr>
+<tr><td><code>npm run preview</code></td><td>serve o <code>dist/</code> para conferir</td><td>antes de publicar</td></tr>
+<tr><td><code>Ctrl</code> + <code>C</code></td><td>derruba o servidor</td><td>ao terminar</td></tr>
+</table>
+</div>
+
+<h2>6. Os arquivos que importam</h2>
+
+<p>Dentro da pasta do projeto, a maior parte do que existe é configuração. Quatro arquivos merecem sua
+atenção, e três deles ficam em <code>src/</code>. A pasta criada fica assim:</p>
+
+<pre class="term">padaria/
+├── index.html
+├── package.json
+├── vite.config.js
+└── src/
+    ├── main.jsx
+    ├── App.jsx
+    ├── App.css
+    └── index.css</pre>
+
+<p>O <code>index.html</code> fica na raiz, fora de <code>src/</code>: ele é a porta de entrada. O
+<code>src/main.jsx</code> é o primeiro código que roda; ele encontra o elemento certo do HTML e monta o
+React ali dentro. O <code>src/App.jsx</code> é o componente principal — é nele que você vai escrever.
+E o <code>src/index.css</code> guarda os estilos globais, que valem para a página inteira.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Arquivo</th><th>O que é</th><th>Você mexe?</th></tr>
+<tr><td><code>index.html</code></td><td>a página; tem o <code>&lt;div id="root"&gt;</code> e o script que carrega o <code>main.jsx</code></td><td>raramente</td></tr>
+<tr><td><code>src/main.jsx</code></td><td>monta o <code>App</code> dentro do <code>#root</code></td><td>quase nunca</td></tr>
+<tr><td><code>src/App.jsx</code></td><td>o componente principal, o que aparece na tela</td><td>o tempo todo</td></tr>
+<tr><td><code>src/index.css</code></td><td>estilos globais da página</td><td>quando quiser</td></tr>
+<tr><td><code>package.json</code></td><td>dependências e scripts do projeto</td><td>pelos comandos do npm</td></tr>
+<tr><td><code>vite.config.js</code></td><td>configuração do Vite</td><td>raramente</td></tr>
+</table>
+</div>
+
+<p>Nada de <code>index.html</code> com tags de componente, nada de <code>&lt;App /&gt;</code> dentro do
+HTML. O React não vive no HTML: ele vive no JavaScript, e o HTML só entrega um espaço vazio com um
+<code>id</code> para ele ocupar. Quem faz a ligação são as duas linhas do <code>main.jsx</code>, e é
+justamente aí que começa a confusão de quem está começando.</p>
+
+<h2>7. O id que liga <code>index.html</code> e <code>main.jsx</code></h2>
+
+<p>O <code>index.html</code> do modelo tem um <code>div</code> vazio com <code>id="root"</code> e um
+script que carrega o <code>main.jsx</code>. O <code>main.jsx</code>, por sua vez, procura esse mesmo id
+para saber onde desenhar. Se os dois nomes não baterem, o React não acha o lugar e nada aparece.</p>
+
+<p>Na caixa abaixo o código foi escrito como se o id fosse <code>root</code>, mas aqui a prévia monta o
+ponto de entrada com <code>id="raiz"</code> — é o mesmo mecanismo do seu projeto, com outro nome. A missão
+é acertar o nome, e o erro que aparece é justamente o de "container".</p>
+
+<div class="tryreact" data-modo="manual" data-goal="conta:#raiz>h1=1">
+  <p class="try-task">O código procura <code>#root</code>, e nesta prévia o elemento se chama
+  <code>raiz</code>. Troque o nome no <code>getElementById</code> para que o título apareça.</p>
+  <pre class="jsx">function App() {
+  return &lt;h1&gt;Padaria da Ana&lt;/h1&gt;;
+}
+
+const raiz = document.getElementById("root");
+const root = ReactDOM.createRoot(raiz);
+root.render(&lt;App /&gt;);</pre>
+  <pre class="out">
+Erro: Minified React error #299; visit https://react.dev/errors/299 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+</pre>
+  <pre class="solucao">function App() {
+  return &lt;h1&gt;Padaria da Ana&lt;/h1&gt;;
+}
+
+const raiz = document.getElementById("raiz");
+const root = ReactDOM.createRoot(raiz);
+root.render(&lt;App /&gt;);</pre>
+</div>
+
+<p>No seu projeto o id é <code>root</code>, e é assim que o Vite escreve — não mude o HTML para
+<code>raiz</code> só porque a caixa do guia usa esse nome. A regra é a que vale sempre: <strong>o nome
+escrito no <code>getElementById</code> tem de ser idêntico ao <code>id</code> do HTML</strong>. Minúscula
+e maiúscula contam, e um hífen a mais derruba tudo.</p>
+
+<p>Sobre a mensagem de erro: o painel desta prévia roda a versão de produção do React, que troca o texto
+por um número. É por isso que ele mostra "Minified React error #299" em vez de explicar o problema. Na
+versão de desenvolvimento — a que o Vite usa no seu computador —, a mesma falha aparece escrita assim:</p>
+
+<pre class="term">Target container is not a DOM element.</pre>
+
+<p>Ou seja: "o alvo não é um elemento do DOM", porque o resultado de procurar um id que não existe é
+<code>null</code>. Guarde o número 299 e a tradução; quando aparecer um erro minificado, o endereço que
+vem na mensagem (<code>react.dev/errors/299</code>) leva à explicação completa. É o mesmo erro, em duas
+línguas.</p>
+
+<h2>8. <code>App.jsx</code> e as duas linhas da montagem</h2>
+
+<p>O <code>main.jsx</code> faz três coisas, sempre na mesma ordem: pega o elemento do HTML, cria a raiz do
+React nele e manda desenhar o componente. O <code>App.jsx</code> é o componente em si, e o modelo já traz
+um com contador, imagem e link — conteúdo de exemplo para provar que funciona. A primeira coisa que você
+faz num projeto novo é apagar esse conteúdo e escrever o seu.</p>
+
+<p>Duas confusões são tão comuns que aparecem em qualquer fórum: passar a <em>função</em> em vez do
+elemento, e usar o comando antigo de montagem. As duas caixas abaixo mostram cada uma.</p>
+
+<div class="tryreact" data-modo="manual" data-goal="texto:Padaria da Ana;;conta:#raiz>h1=1">
+  <p class="try-task">O <code>render</code> recebeu <code>App</code>, a função, em vez de
+  <code>&lt;App /&gt;</code>, o elemento. Corrija para que o título apareça.</p>
+  <pre class="jsx">function App() {
+  return &lt;h1&gt;Padaria da Ana&lt;/h1&gt;;
+}
+
+const raiz = document.getElementById("raiz");
+const root = ReactDOM.createRoot(raiz);
+root.render(App);</pre>
+  <pre class="out">
+(o React não desenhou nada: o componente devolveu null?)
+</pre>
+  <pre class="solucao">function App() {
+  return &lt;h1&gt;Padaria da Ana&lt;/h1&gt;;
+}
+
+const raiz = document.getElementById("raiz");
+const root = ReactDOM.createRoot(raiz);
+root.render(&lt;App /&gt;);</pre>
+</div>
+
+<p>Como o painel roda a build de produção, ele só mostra que nada foi desenhado — o React de produção é
+silencioso para esse tipo de erro. No modo de desenvolvimento, o console do navegador diz:</p>
+
+<pre class="term">Functions are not valid as a React child. This may happen if you return
+a Component instead of &lt;Component /&gt;. Or maybe you meant to call
+this function rather than return it.</pre>
+
+<p>A frase final é a dica: "talvez você quisesse chamar a função em vez de devolvê-la". Passar
+<code>App</code> entrega a função para o React desenhar, e função não é conteúdo. Passar
+<code>&lt;App /&gt;</code> entrega o elemento — o resultado de chamar a função —, e aí o React sabe o que
+fazer. A diferença é de duas teclas, <code>&lt;</code> e <code>/&gt;</code>, e vale a tela inteira.</p>
+
+<div class="tryreact" data-modo="manual" data-goal="conta:#raiz>div=1;;texto:Pão quentinho">
+  <p class="try-task">Este código veio de um tutorial antigo: <code>ReactDOM.render</code> não existe mais
+  no React 19. Troque pela montagem atual, com <code>createRoot</code> e <code>root.render</code>.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pão quentinho&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+const raiz = document.getElementById("raiz");
+ReactDOM.render(&lt;App /&gt;, raiz);</pre>
+  <pre class="out">
+Erro: ReactDOM.render is not a function
+</pre>
+  <pre class="solucao">function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pão quentinho&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+const raiz = document.getElementById("raiz");
+const root = ReactDOM.createRoot(raiz);
+root.render(&lt;App /&gt;);</pre>
+</div>
+
+<p>A mensagem aqui é direta: <code>ReactDOM.render is not a function</code> — não é uma função porque foi
+removida. Tutoriais de 2019 usam essa forma, e é por isso que copiar código antigo sem conferir a versão
+custa caro em React: a biblioteca muda, e o que era padrão vira erro. Sempre que encontrar
+<code>ReactDOM.render</code> em um exemplo, traduza para <code>createRoot</code> mais
+<code>root.render</code>, que é o jeito atual.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: "vite: command not found"</h3>
+<p>A Ana clonou o projeto em outro computador, entrou na pasta e rodou <code>npm run dev</code>. O terminal
+respondeu que não achava o comando. Motivo: sem <code>node_modules</code>, não existe Vite instalado para
+rodar, e o <code>package.json</code> só tem a lista. O conserto é um <code>npm install</code> e, depois,
+o <code>dev</code> de novo. É o primeiro passo em qualquer máquina nova — inclusive na sua, se você
+apagar a pasta sem querer.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a página ficou preta com uma mensagem</h3>
+<p>Ela apagou o <code>App.css</code> para limpar o visual do exemplo e esqueceu de tirar o
+<code>import "./App.css"</code> do topo do <code>App.jsx</code>. Ao salvar, o Vite mostrou uma sobreposição
+escura com "Failed to resolve import". O erro não é do React: é da ferramenta avisando que o arquivo
+importado não existe. As duas saídas são apagar a linha do import ou recriar o arquivo — e vale ler a
+mensagem inteira, porque ela diz exatamente qual caminho não foi encontrado.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o site pronto não abre com dois cliques</h3>
+<p>Depois do <code>npm run build</code>, ela abriu <code>dist/index.html</code> direto no navegador e a
+página ficou em branco. O motivo é que os arquivos gerados usam caminhos absolutos, que só funcionam quando
+existe um servidor servindo a pasta. Para conferir a versão final, o caminho é <code>npm run preview</code>,
+que sobe um servidor local em cima do <code>dist/</code>. Para publicar, o conteúdo de <code>dist/</code>
+vai inteiro para a hospedagem — nunca só o HTML.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Qual comando sobe o servidor de desenvolvimento?</p>
+<label><input type="radio" name="q1"> <code>npm install</code></label>
+<label><input type="radio" name="q1"> <code>npm run dev</code></label>
+<label><input type="radio" name="q1"> <code>npm run build</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Onde o React é montado na página?</p>
+<label><input type="radio" name="q2"> no <code>index.html</code>, com tags de componente</label>
+<label><input type="radio" name="q2"> na pasta <code>node_modules</code></label>
+<label><input type="radio" name="q2"> no <code>main.jsx</code>, dentro do elemento com id <code>root</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Para que serve o <code>npm run build</code>?</p>
+<label><input type="radio" name="q3"> gerar a versão final, otimizada, em <code>dist/</code></label>
+<label><input type="radio" name="q3"> baixar as dependências do projeto</label>
+<label><input type="radio" name="q3"> abrir a página no navegador durante o desenvolvimento</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o comando do dia a dia</h2>
+<p>Depois de instalar as dependências, o comando que sobe o servidor e recarrega a página a cada
+alteração é:</p>
+<div class="ex-code">npm run <input aria-label="resposta 1" data-answer="dev" placeholder="..."></div>
+<p class="ex-dica">Dica: são três letras, o nome do script que o Vite escreve no <code>package.json</code>.
+O comando completo é <code>npm run dev</code>; para derrubar o servidor depois, <code>Ctrl</code> +
+<code>C</code>.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Criar um projeto React hoje é instalar o Node, rodar <code>npm create vite@latest</code>, escolher
+React e JavaScript, entrar na pasta, rodar <code>npm install</code> e depois <code>npm run dev</code>. O
+servidor abre em <code>http://localhost:5173/</code> e recarrega a página a cada arquivo salvo. Enquanto o
+terminal estiver aberto, o site está de pé; <code>Ctrl</code> + <code>C</code> derruba.</p>
+
+<p>Dos arquivos, três importam. O <code>index.html</code> tem o <code>div</code> vazio com
+<code>id="root"</code>. O <code>src/main.jsx</code> procura esse id e monta o React com
+<code>createRoot</code> e <code>root.render(&lt;App /&gt;)</code>. O <code>src/App.jsx</code> é o
+componente que você vai escrever — apague o exemplo do modelo e comece o seu. Os nomes do id precisam
+bater, e o elemento vai entre <code>&lt;</code> e <code>/&gt;</code>, nunca a função solta.</p>
+
+<p>Para publicar, <code>npm run build</code> gera a pasta <code>dist/</code>, que é o site pronto:
+arquivos comuns, que rodam em qualquer hospedagem. Antes de subir, <code>npm run preview</code> confere o
+resultado. E o hábito que evita a maior parte dos problemas: quando algo não funcionar, leia a mensagem do
+terminal ou da sobreposição do Vite antes de mexer no código — ela costuma dizer o arquivo e a linha.</p>
+
+<p>Na próxima aula o projeto já está rodando, e o assunto volta para o React: as props, o mecanismo que
+permite configurar um componente com dados diferentes a cada uso.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Node executa JavaScript fora do navegador; npm baixa as bibliotecas.</li>
+<li><code>npm create vite@latest</code> cria; escolha React e JavaScript.</li>
+<li><code>npm install</code> baixa para <code>node_modules</code>; não edite essa pasta.</li>
+<li><code>npm run dev</code> sobe o servidor e recarrega sozinho.</li>
+<li><code>index.html</code> tem o <code>#root</code>; <code>main.jsx</code> monta o React nele.</li>
+<li>Escreva <code>root.render(&lt;App /&gt;)</code>, não <code>root.render(App)</code>.</li>
+<li><code>ReactDOM.render</code> não existe no React 19: use <code>createRoot</code>.</li>
+<li><code>npm run build</code> gera <code>dist/</code>; <code>npm run preview</code> confere.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

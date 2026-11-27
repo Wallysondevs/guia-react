@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pastas e Arquivos | Guia React</title>
+<meta name="description" content="Pastas e arquivos de um projeto React: um componente por arquivo, components e pages, import e export, caminhos relativos e o main.jsx que monta o App na página.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Pastas e <span class="hl">Arquivos</span></h1>
+<p class="intro">O projeto da Ana já roda: ela criou a pasta, o <code>npm install</code> passou e a página
+abre no navegador. Agora vem a pergunta que não é sobre React, mas decide se o projeto vai envelhecer bem:
+onde cada arquivo mora? Hoje o <code>App.jsx</code> dela tem seiscentas linhas, quatro componentes e uma
+foto do pão importada do lugar errado. Nesta aula ela organiza a casa — sem instalar nada e sem tocar no
+que já funciona.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O mapa de um projeto React: o que é <code>index.html</code>, <code>src/</code> e <code>public/</code>.</li>
+  <li>O papel de cada arquivo: <code>main.jsx</code>, <code>App.jsx</code> e os componentes.</li>
+  <li>A regra de um componente por arquivo, com nome em maiúscula.</li>
+  <li>Como <code>export</code> e <code>import</code> ligam os arquivos.</li>
+  <li>Caminhos com <code>./</code> e <code>../</code>, e o erro que aparece quando o caminho está errado.</li>
+  <li>A diferença entre <code>components/</code> e <code>pages/</code>.</li>
+  <li>Por que o <code>main.jsx</code> existe e o que ele faz.</li>
+</ul>
+</div>
+
+<h2>1. A cena: seiscentas linhas num arquivo só</h2>
+
+<p>O projeto da Ana nasceu do jeito mais comum: ela criou com o Vite, apagou o conteúdo de exemplo e
+começou a escrever. Cabeçalho, lista de pães, rodapé, formulário de encomenda, tudo no
+<code>App.jsx</code>. Funcionava. Até o dia em que ela quis mudar a borda do cartão e passou quarenta
+minutos rolando o arquivo para achar a linha certa.</p>
+
+<p>O sintoma não é de React, é de casa bagunçada. Um arquivo de seiscentas linhas tem vinte assuntos
+dentro; para mexer em um, você atravessa os outros dezenove. A solução é a mesma de uma oficina: cada
+ferramenta na sua gaveta, e a gaveta com nome. A diferença é que, no React, a gaveta é uma pasta e a
+ferramenta é um arquivo com um componente.</p>
+
+<p>Antes de abrir a primeira gaveta, um aviso: organizar não é criar vinte pastas. Um projeto pequeno
+com duas pastas bem usadas é melhor do que um projeto com quinze pastas quase vazias. O critério é sempre
+“onde eu procuraria isso daqui a três meses”.</p>
+
+<h2>2. O mapa da casa</h2>
+
+<p>Um projeto criado com Vite tem poucos arquivos no começo, e cada um tem um papel claro. Vale conhecer
+os cinco que você vai abrir todo dia.</p>
+
+<dl class="anatomy">
+<dt>index.html</dt>
+<dd>A única página HTML do projeto. Não tem componente dentro; tem a <code>div</code> onde o React vai
+montar tudo — no Vite, <code>&lt;div id="root"&gt;&lt;/div&gt;</code>.</dd>
+<dt>src/main.jsx</dt>
+<dd>A porta de entrada. Importa o <code>App</code>, pega a div raiz e monta o componente com
+<code>createRoot</code>. É o único arquivo que fala com o HTML.</dd>
+<dt>src/App.jsx</dt>
+<dd>A raiz dos componentes: o que aparece na tela nasce aqui. É o arquivo que você abre para decidir
+quais telas e peças a página usa.</dd>
+<dt>src/components/</dt>
+<dd>As peças reaproveitáveis: <code>Cabecalho.jsx</code>, <code>Cartao.jsx</code>,
+<code>Botao.jsx</code>. Usadas por mais de uma tela ou por mais de um lugar.</dd>
+<dt>src/pages/</dt>
+<dd>As telas: <code>Inicial.jsx</code>, <code>Paes.jsx</code>, <code>Contato.jsx</code>. Cada uma monta
+as peças para um assunto da navegação.</dd>
+<dt>public/</dt>
+<dd>Arquivos servidos como estão, sem passar pelo build: favicon, foto grande, PDF de cardápio. O
+caminho começa na raiz do site.</dd>
+</dl>
+
+<p>Repare no que não está nessa lista: não existe pasta “utils” no dia um, nem “hooks”, nem “services”.
+Essas pastas nascem quando o projeto pede — quando há três funções de data para guardar, quando há um
+hook próprio, quando há chamadas de rede. Criar pasta vazia por simetria só atrapalha a busca.</p>
+
+<p>Existe mais de uma escola de organização. A que este guia segue separa por tipo — componentes de
+um lado, telas do outro. A outra separa por assunto: uma pasta <code>encomendas/</code> com a tela, os
+componentes e o CSS daquele assunto juntos. A segunda funciona melhor em projeto grande, com muitos
+times; a primeira é mais fácil de aprender e de navegar no começo. Escolha uma e seja consistente: o pior
+cenário é metade do projeto em cada estilo.</p>
+
+<p>Uma diferença que confunde no começo: no projeto do Vite a div raiz se chama <code>root</code>; nas
+caixas deste guia ela se chama <code>raiz</code>. É só o id escolhido no HTML. O que importa é que exista
+uma, e que o <code>main.jsx</code> pegue exatamente essa.</p>
+
+<h2>3. O App chama o que mora em components/</h2>
+
+<p>Na caixa abaixo, os três componentes estão juntos no mesmo editor — é assim que você vê a ligação
+entre eles. Num projeto de verdade, cada um mora em <code>src/components/</code>, com o nome do
+componente no nome do arquivo. O <code>App</code> só usa o cabeçalho; a lista e o rodapé ficaram de
+fora.</p>
+
+<div class="tryreact" data-goal="conta:ul=1;;conta:footer=1;;texto:desde 1998">
+  <p class="try-task">Chame <code>&lt;ListaDePaes /&gt;</code> e <code>&lt;Rodape /&gt;</code> dentro do
+  <code>App</code>, depois do cabeçalho, e clique em Rodar.</p>
+  <pre class="jsx">function Cabecalho() {
+  return (
+    &lt;header&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    &lt;/header&gt;
+  );
+}
+
+function ListaDePaes() {
+  return (
+    &lt;ul&gt;
+      &lt;li&gt;Pão francês&lt;/li&gt;
+      &lt;li&gt;Pão de queijo&lt;/li&gt;
+    &lt;/ul&gt;
+  );
+}
+
+function Rodape() {
+  return &lt;footer&gt;Padaria da Ana — desde 1998&lt;/footer&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Cabecalho /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;header&gt;
+    &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+    &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+  &lt;/header&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Cabecalho() {
+  return (
+    &lt;header&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    &lt;/header&gt;
+  );
+}
+
+function ListaDePaes() {
+  return (
+    &lt;ul&gt;
+      &lt;li&gt;Pão francês&lt;/li&gt;
+      &lt;li&gt;Pão de queijo&lt;/li&gt;
+    &lt;/ul&gt;
+  );
+}
+
+function Rodape() {
+  return &lt;footer&gt;Padaria da Ana — desde 1998&lt;/footer&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Cabecalho /&gt;
+      &lt;ListaDePaes /&gt;
+      &lt;Rodape /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No projeto, esse mesmo <code>App.jsx</code> começa com três importações. Elas não mudam o que aparece
+na tela: só dizem de qual arquivo cada nome vem.</p>
+
+<pre class="file" data-file="src/App.jsx">import Cabecalho from "./components/Cabecalho";
+import ListaDePaes from "./components/ListaDePaes";
+import Rodape from "./components/Rodape";
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Cabecalho /&gt;
+      &lt;ListaDePaes /&gt;
+      &lt;Rodape /&gt;
+    &lt;/div&gt;
+  );
+}
+
+export default App;</pre>
+
+<p>O <code>export default App</code> na última linha é a outra metade do contrato: o arquivo oferece o
+componente para fora. Sem ele, o <code>App.jsx</code> existe, mas ninguém consegue importá-lo. As caixas
+deste guia apagam <code>import</code> e <code>export default</code> do seu código justamente porque tudo
+está no mesmo lugar — no projeto, eles são obrigatórios.</p>
+
+<h2>4. Um arquivo, um componente</h2>
+
+<p>A convenção é simples e vale a pena seguir sem invenção: cada arquivo exporta um componente, e o nome
+do arquivo é o nome do componente, com a primeira letra maiúscula. <code>Cartao.jsx</code> exporta
+<code>Cartao</code>. <code>ListaDePaes.jsx</code> exporta <code>ListaDePaes</code>.</p>
+
+<pre class="file" data-file="src/components/Cartao.jsx">function Cartao({ children }) {
+  return &lt;div className="cartao"&gt;{children}&lt;/div&gt;;
+}
+
+export default Cartao;</pre>
+
+<p>O nome do arquivo não é o nome do componente para o React — o React só conhece o nome que você
+importa. Mas manter os dois iguais evita a caçada: quando o erro aponta <code>Cartao.jsx</code>, você
+sabe qual função abrir. E a maiúscula no arquivo acompanha a regra do JSX: o nome que você usa como
+componente começa com maiúscula; com minúscula, o React trataria como tag.</p>
+
+<p>Duas escolhas que causam dúvida. A primeira: <code>.jsx</code> ou <code>.js</code>? Se o arquivo tem
+JSX dentro — e componente tem —, use <code>.jsx</code>. O Vite aceita as duas extensões, mas a extensão
+certa avisa ao editor que ali dentro tem marcação. A segunda: e quando o arquivo tem dois componentes
+pequenos que só existem juntos? Pode ficar num arquivo só, desde que um deles seja o exportado e o outro
+seja detalhe interno. Se o segundo começar a ser importado por outra tela, ele ganha o próprio
+arquivo.</p>
+
+<p>Um hábito que economiza muito tempo: deixar o CSS do componente ao lado dele. Se
+<code>Cartao.jsx</code> tem uma classe <code>.cartao</code>, o arquivo <code>Cartao.css</code> mora na
+mesma pasta e é importado no topo do componente. Assim, apagar o componente é apagar a pasta dele, sem
+deixar estilo órfão no <code>style.css</code> global. O mesmo vale para o teste, quando existir:
+<code>Cartao.test.jsx</code> ao lado de <code>Cartao.jsx</code>. Quem abre a pasta vê tudo o que pertence
+àquela peça.</p>
+
+<h2>5. Duas telas, um cabeçalho</h2>
+
+<p>Agora a decisão que separa <code>components/</code> de <code>pages/</code>. A tela inicial e a tela de
+pães precisam do mesmo cabeçalho. Se o cabeçalho mora dentro de uma das telas, a outra vai copiar — e a
+cópia envelhece. Ele é uma peça, então mora em <code>components/</code> e as duas telas importam.</p>
+
+<div class="tryreact" data-goal="conta:header=2;;texto:Aberto das 6h às 18h">
+  <p class="try-task">A segunda tela copiou o cabeçalho e ficou com outro horário. Troque as duas linhas
+  por <code>&lt;Cabecalho /&gt;</code> para as duas telas usarem a mesma peça.</p>
+  <pre class="jsx">function Cabecalho() {
+  return (
+    &lt;header&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    &lt;/header&gt;
+  );
+}
+
+function PaginaInicial() {
+  return (
+    &lt;div&gt;
+      &lt;Cabecalho /&gt;
+      &lt;p&gt;Bem-vindo! Pão quentinho a partir das 6h.&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function PaginaDePaes() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 8h às 12h&lt;/p&gt;
+      &lt;p&gt;Pão francês e pão de queijo.&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;PaginaInicial /&gt;
+      &lt;PaginaDePaes /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;div&gt;
+    &lt;header&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    &lt;/header&gt;
+    &lt;p&gt;Bem-vindo! Pão quentinho a partir das 6h.&lt;/p&gt;
+  &lt;/div&gt;
+  &lt;div&gt;
+    &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+    &lt;p&gt;Aberto das 8h às 12h&lt;/p&gt;
+    &lt;p&gt;Pão francês e pão de queijo.&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Cabecalho() {
+  return (
+    &lt;header&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    &lt;/header&gt;
+  );
+}
+
+function PaginaInicial() {
+  return (
+    &lt;div&gt;
+      &lt;Cabecalho /&gt;
+      &lt;p&gt;Bem-vindo! Pão quentinho a partir das 6h.&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function PaginaDePaes() {
+  return (
+    &lt;div&gt;
+      &lt;Cabecalho /&gt;
+      &lt;p&gt;Pão francês e pão de queijo.&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;PaginaInicial /&gt;
+      &lt;PaginaDePaes /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel agora mostra dois <code>header</code> iguais — e é isso que você quer: a peça aparece duas
+vezes, definida uma. Se amanhã o horário mudar, muda em <code>components/Cabecalho.jsx</code> e as duas
+telas acompanham. E a página de pães ficou menor, porque perdeu o cabeçalho copiado.</p>
+
+<p>No projeto, as duas telas moram em <code>src/pages/</code> e o cabeçalho em
+<code>src/components/</code>. O <code>App.jsx</code> importa as telas de <code>./pages/</code>, e cada
+tela importa o cabeçalho de <code>../components/Cabecalho</code> — com dois pontos, porque de dentro de
+<code>pages/</code> é preciso subir um nível para chegar em <code>components/</code>.</p>
+
+<h2>6. Imports e caminhos</h2>
+
+<p>Todo <code>import</code> precisa de um caminho que exista. Existem três formas, e elas cobrem quase
+tudo:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você escreve</th><th>Quer dizer</th><th>Exemplo</th></tr>
+<tr><td><code>./Cartao</code></td><td>mesma pasta</td><td><code>App.jsx</code> importando de <code>src/</code></td></tr>
+<tr><td><code>../Cartao</code></td><td>uma pasta acima</td><td><code>pages/Paes.jsx</code> importando de <code>components/</code></td></tr>
+<tr><td><code>./components/Cartao</code></td><td>uma subpasta</td><td><code>App.jsx</code> importando a peça</td></tr>
+</table>
+</div>
+
+<p>A extensão é opcional: <code>./components/Cartao</code> e <code>./components/Cartao.jsx</code>
+funcionam igual, porque o Vite completa sozinho. O que não é opcional é a maiúscula do nome do arquivo —
+no Linux, <code>cartao.jsx</code> e <code>Cartao.jsx</code> são arquivos diferentes, e o erro de caminho
+aparece na hora de rodar.</p>
+
+<p>Quando o caminho não existe, quem reclama é o Vite, no terminal, antes de a página abrir. A mensagem
+diz qual arquivo tentou importar o quê:</p>
+
+<pre class="term">Failed to resolve import "./components/Cartao" from "src/App.jsx"</pre>
+
+<p>“Falha ao resolver o import” quer dizer: o caminho não apontou para nenhum arquivo. As causas comuns
+são três — a pasta não é a que você pensa, o nome do arquivo está com outra caixa, ou o arquivo está
+numa pasta acima e faltou o <code>../</code>. Repare que o erro já entrega os dois lados:
+<code>./components/Cartao</code> é o caminho escrito e <code>src/App.jsx</code> é o arquivo que escreveu.
+Comparando os dois, você acha a pasta certa.</p>
+
+<p>Quando o projeto cresce, os caminhos com <code>../</code> começam a se repetir e a virar
+<code>../../../components/Cartao</code>, que ninguém lê. O Vite permite criar um apelido no
+<code>vite.config.js</code>, normalmente <code>@</code>, apontando para <code>src</code>. Aí o import
+vira <code>@/components/Cartao</code> de qualquer lugar do projeto. É conveniência, não obrigação: em
+projeto pequeno, os caminhos relativos dizem mais sobre onde as coisas estão do que um apelido.</p>
+
+<h2>7. O main.jsx é a porta de entrada</h2>
+
+<p>Falta a peça que liga o React à página. O <code>main.jsx</code> é o único arquivo que conhece o HTML:
+ele pega a div raiz e entrega essa div ao React, dizendo qual componente desenhar dentro. É por isso que
+o <code>App</code> não aparece sozinho se você esquecer essa etapa.</p>
+
+<div class="tryreact" data-modo="manual" data-goal="texto:Padaria da Ana;;conta:h1=1">
+  <p class="try-task">Este é o <code>main.jsx</code>: ele já cria a raiz, mas está desenhando outra
+  coisa. Troque o que está dentro do <code>render</code> por <code>&lt;App /&gt;</code>.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+const raiz = ReactDOM.createRoot(document.getElementById("raiz"));
+raiz.render(&lt;p&gt;Carregando…&lt;/p&gt;);</pre>
+  <pre class="out">
+&lt;p&gt;Carregando…&lt;/p&gt;
+</pre>
+  <pre class="solucao">function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+const raiz = ReactDOM.createRoot(document.getElementById("raiz"));
+raiz.render(&lt;App /&gt;);</pre>
+</div>
+
+<p>Três linhas e o projeto inteiro se explica. A primeira pega o elemento do HTML; a segunda cria a raiz
+do React em cima dele; a terceira diz o que desenhar. Como esse código roda uma vez, ele fica separado do
+<code>App.jsx</code> — misturar os dois é o tipo de bagunça que faz o componente depender de um id que só
+existe numa página.</p>
+
+<p>Esse arquivo costuma ser o mais chato de depurar, porque roda fora dos componentes e qualquer
+erro dele derruba a página inteira. O caso mais comum é montar a raiz duas vezes — o que acontece quando
+alguém cola o trecho do <code>main.jsx</code> dentro de outro arquivo. A mensagem é curta e específica:</p>
+
+<pre class="term">Warning: createRoot(): Target container is already passed to createRoot().</pre>
+
+<p>“O contêiner já foi entregue ao createRoot” — quer dizer que existe mais de uma chamada apontando para
+a mesma div. A div raiz pertence a um dono só: o <code>main.jsx</code>. Se você vir essa mensagem, procure
+o segundo <code>createRoot</code> no projeto.</p>
+
+<p>No Vite, esse arquivo é gerado junto com o projeto e você quase nunca o edita. Nas caixas deste guia,
+quando a caixa tem <code>data-modo="manual"</code>, é você quem monta a raiz; nas outras, o motor faz
+esse papel e por isso o seu componente precisa se chamar <code>App</code>. Saber qual dos dois está
+acontecendo evita a dúvida “por que a tela ficou vazia?”.</p>
+
+<h2>8. Onde cada coisa mora</h2>
+
+<p>Com as peças no lugar, a regra de decisão cabe numa tabela. Ela não é lei; é o consenso que economiza
+discussão.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O arquivo é…</th><th>Mora em</th><th>Porque</th></tr>
+<tr><td>usado por duas ou mais telas</td><td><code>src/components/</code></td><td>é peça, não assunto de uma tela</td></tr>
+<tr><td>uma tela da navegação</td><td><code>src/pages/</code></td><td>monta peças para um assunto inteiro</td></tr>
+<tr><td>a raiz que escolhe a tela</td><td><code>src/App.jsx</code></td><td>é o primeiro componente do projeto</td></tr>
+<tr><td>uma função de data ou preço</td><td><code>src/utils/</code></td><td>não é componente; nasce quando há a segunda</td></tr>
+<tr><td>imagem, fonte, PDF</td><td><code>public/</code></td><td>é servido como está, sem build</td></tr>
+</table>
+</div>
+
+<p>A última linha tem uma pegadinha que a Ana viveu. Ela colocou a foto do pão em
+<code>src/assets/</code> e escreveu <code>&lt;img src="/pao.jpg"&gt;</code>; a imagem não apareceu,
+porque o caminho <code>/pao.jpg</code> procura na raiz do site, e o arquivo estava dentro de
+<code>src</code>. Duas saídas: mover a foto para <code>public/pao.jpg</code> e manter o caminho, ou deixar
+em <code>src/assets/</code> e importar a imagem no arquivo, deixando o Vite cuidar do caminho.</p>
+
+<p>O outro erro clássico de arquivo não é de caminho, é de export. Se o componente é exportado com nome
+(<code>export function Cartao</code>) e você importa como padrão (<code>import Cartao from …</code>), o
+nome chega <code>undefined</code> e o React reclama na hora de desenhar:</p>
+
+<pre class="term">Warning: React.jsx: type is invalid -- expected a string or a class/function but got: undefined.</pre>
+
+<p>“Tipo inválido, esperava uma string ou uma classe/função, recebi undefined” — traduzindo: no lugar de
+um componente, chegou nada. Quase sempre é o par export/import desencontrado, e o conselho é escolher um
+estilo por projeto: ou todo mundo usa <code>export default</code>, ou todo mundo usa export com nome. Os
+dois funcionam; misturar é que gera esse aviso.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: dois Cartao.jsx no projeto</h3>
+<p>Ela criou <code>Cartao.jsx</code> em <code>components/</code> e depois outro em <code>pages/</code>,
+para a tela de encomendas. Os dois funcionavam, mas metade das telas usava um e metade usava o outro. A
+saída foi dar nome ao segundo pelo assunto: <code>CartaoDeEncomenda.jsx</code>, na mesma pasta
+<code>components/</code>, e apagar o duplicado. Nome de arquivo repetido em pastas diferentes é legal para
+o sistema e caro para a cabeça.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a pasta utils com um arquivo</h3>
+<p>Ela criou <code>src/utils/</code> para guardar uma função que formata preço em real. Um arquivo só,
+mas usado em quatro telas — a pasta se justificou no primeiro dia. O contrário também aconteceu: criou
+<code>src/hooks/</code> antes de ter qualquer hook próprio, e a pasta ficou vazia por dois meses. Pasta
+vazia não é organização, é promessa.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o componente que ficou grande demais</h3>
+<p>O <code>App.jsx</code> dela chegou a seiscentas linhas. Dividir em arquivos resolveu a leitura, mas
+não o problema de fundo: um componente que fazia coisa demais. Organizar pasta e quebrar componente são
+dois assuntos diferentes — o segundo é o da próxima aula, <a href="quando-quebrar-em-componentes.html">Quando
+Quebrar em Componentes</a>.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Um componente usado por duas telas diferentes deve morar em…</p>
+<label><input type="radio" name="q1"> <code>src/pages/</code>, junto da tela mais importante</label>
+<label><input type="radio" name="q1"> <code>src/components/</code>, porque é peça e não tela</label>
+<label><input type="radio" name="q1"> <code>public/</code>, para o navegador achar mais rápido</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. O que o <code>main.jsx</code> faz?</p>
+<label><input type="radio" name="q2"> pega a div raiz, cria a raiz do React e monta o <code>App</code></label>
+<label><input type="radio" name="q2"> guarda o CSS de todos os componentes</label>
+<label><input type="radio" name="q2"> lista as rotas do site</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">3. No caminho <code>../components/Cartao</code>, o que o <code>../</code> significa?</p>
+<label><input type="radio" name="q3"> a pasta <code>components</code> dentro da atual</label>
+<label><input type="radio" name="q3"> a raiz do site, no servidor</label>
+<label><input type="radio" name="q3"> subir uma pasta antes de entrar em <code>components</code></label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: ligue o arquivo</h2>
+<p>O <code>App.jsx</code>, que mora em <code>src/</code>, precisa importar o componente
+<code>Cartao.jsx</code>, que mora em <code>src/components/</code>. Complete o caminho do import.</p>
+<div class="ex-code">import Cartao from "<input aria-label="resposta 1" data-answer="./components/Cartao|./components/Cartao.jsx" placeholder="...">";</div>
+<p class="ex-dica">Dica: <code>./</code> é a pasta do arquivo atual; depois dele vem a subpasta e o nome
+do componente, com maiúscula. A extensão é opcional.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Um projeto React tem poucos lugares e cada um com um papel: <code>index.html</code> é a página,
+<code>src/main.jsx</code> é a porta de entrada, <code>src/App.jsx</code> é a raiz dos componentes,
+<code>src/components/</code> guarda as peças e <code>src/pages/</code> guarda as telas.
+<code>public/</code> serve arquivos como estão.</p>
+
+<p>Um arquivo, um componente, com o mesmo nome nos dois e a primeira letra maiúscula. O arquivo oferece
+o componente com <code>export</code>; quem usa pede com <code>import</code> e um caminho que exista:
+<code>./</code> para a pasta atual, <code>../</code> para subir um nível. Errou o caminho, o Vite avisa
+antes de abrir a página; desencontrou export e import, o React avisa com “type is invalid … got
+undefined”.</p>
+
+<p>Organizar antes de precisar dá pasta vazia; organizar quando dói dá alívio. O critério é a pergunta
+“onde eu procuraria isso daqui a três meses”, e a resposta quase sempre é a pasta do assunto, não a pasta
+da moda. Com a casa arrumada, sobra o assunto seguinte: como decidir a hora de quebrar um componente
+grande em peças menores.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>index.html</code> tem a div raiz; <code>main.jsx</code> monta o React nela.</li>
+<li><code>App.jsx</code> é a raiz dos componentes; <code>components/</code> guarda peças; <code>pages/</code> guarda telas.</li>
+<li>Um componente por arquivo, nome igual ao do componente, primeira letra maiúscula, extensão <code>.jsx</code>.</li>
+<li><code>export default</code> oferece; <code>import</code> pede; os dois nomes precisam combinar.</li>
+<li><code>./</code> é a pasta atual; <code>../</code> sobe um nível.</li>
+<li>A extensão no import é opcional; a maiúscula do arquivo não.</li>
+<li>Caminho errado: erro do Vite, “Failed to resolve import”.</li>
+<li>Export desencontrado: aviso do React, “type is invalid … got undefined”.</li>
+<li><code>public/</code> para arquivos servidos como estão; <code>src/assets/</code> para importar no código.</li>
+<li>Pasta nasce quando o segundo arquivo do mesmo assunto aparece.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

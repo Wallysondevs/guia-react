@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Props Padrão | Guia React</title>
+<meta name="description" content="Props padrão no React: valor default na desestruturação, quando ele vale e quando não vale, o caso do zero e o que muda entre o ou e o nullish.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Props <span class="hl">Padrão</span></h1>
+<p class="intro">O botão da Ana tem três aparências: o principal, o secundário e o discreto. Na chamada,
+ela escreve <code>tipo="secundario"</code> quando precisa, e na maioria das vezes quer o principal. Só
+que “na maioria das vezes” virou problema: cada página nova ela esquece de escrever o tipo, e o botão sai
+com a classe <code>botao undefined</code>, sem cor nenhuma. Nesta aula ela aprende a dar um valor de
+fábrica às props: se ninguém mandar nada, o componente usa o padrão — e o botão volta a ter cor em todas
+as páginas.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como escrever um valor padrão na desestruturação: <code>{ tipo = "principal" }</code>.</li>
+  <li>Quando o padrão vale e quando ele é ignorado.</li>
+  <li>A diferença entre <code>undefined</code>, <code>null</code>, texto vazio e zero.</li>
+  <li>Como dar padrão para <code>children</code> e para props de liga e desliga.</li>
+  <li>Por que <code>||</code> estraga o zero e o <code>??</code> não.</li>
+  <li>O que fazer quando o padrão esconde um erro de verdade.</li>
+  <li>A forma antiga, <code>defaultProps</code>, que aparece em código de tutorial velho.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o botão sem cor</h2>
+
+<p>O componente do botão recebe o tipo por prop e monta a classe assim:</p>
+
+<pre class="file" data-file="App.jsx">function Botao({ texto, tipo }) {
+  return &lt;button className={"botao " + tipo}&gt;{texto}&lt;/button&gt;;
+}
+
+function App() {
+  return &lt;Botao texto="Encomendar" /&gt;;
+}</pre>
+
+<p>Quando a chamada não escreve <code>tipo</code>, a variável dentro do componente vale
+<code>undefined</code>, a classe sai como <code>botao undefined</code> e o CSS não encontra estilo
+nenhum. O botão aparece sem cor, sem borda, sem nada — e no painel dá para ver o estrago: o
+<code>className</code> com a palavra <code>undefined</code> no meio.</p>
+
+<p>Existem três saídas, e vale conhecer as três para escolher. A primeira é obrigar toda chamada a
+passar o tipo — funciona, mas é frágil: depende de disciplina de quem escreve. A segunda é tratar dentro
+do componente, com uma decisão: “se não veio tipo, use principal”. A terceira é o assunto desta aula: dar
+o valor <strong>na própria assinatura</strong>, junto com a desestruturação, e não pensar mais nisso.</p>
+
+<p>O nome técnico é <em>valor padrão</em> ou <em>default</em>. Você já usou isso em JavaScript sem saber,
+quando escreveu uma função que reagia bem a argumentos faltando. No React, o lugar natural é a
+desestruturação do parâmetro, onde o padrão fica visível para quem lê o componente.</p>
+
+<h2>2. O padrão é o que entra quando nada chega</h2>
+
+<p>A escrita é curta: dois-pontos… não, sinal de igual dentro das chaves. Cada nome da desestruturação
+pode receber um valor depois do <code>=</code>, e esse valor é usado quando a chave correspondente não
+veio — ou veio como <code>undefined</code>. Não é uma condição que você escreve: é o JavaScript fazendo
+o trabalho.</p>
+
+<dl class="anatomy">
+<dt>valor padrão</dt>
+<dd>O que a variável recebe quando a chave não existe: <code>{ tipo = "principal" }</code>.</dd>
+<dt>undefined</dt>
+<dd>O valor de “não existe”. É o que a desestruturação encontra quando a prop não foi passada — e é a
+única situação em que o padrão entra.</dd>
+<dt>null</dt>
+<dd>“Vazio de propósito”. Não é <code>undefined</code>, então o padrão <strong>não</strong> entra: a
+variável fica <code>null</code>.</dd>
+<dt>falsy</dt>
+<dd>Valores que o JavaScript trata como falso: <code>0</code>, <code>""</code>, <code>null</code>,
+<code>undefined</code>, <code>false</code>. Confundir falsy com “não veio” é a origem do bug do zero.</dd>
+<dt>opcional</dt>
+<dd>Prop que pode faltar sem quebrar o componente, porque tem padrão. O contrário de obrigatória.</dd>
+</dl>
+
+<p>Dá para fazer a mesma coisa sem o recurso da desestruturação, com uma condição no corpo. Fica assim:</p>
+
+<pre class="file" data-file="App.jsx">function Botao({ texto, tipo }) {
+  const tipoFinal = tipo === undefined ? "principal" : tipo;
+  return &lt;button className={"botao " + tipoFinal}&gt;{texto}&lt;/button&gt;;
+}</pre>
+
+<p>Funciona e é mais verboso. Além da linha extra, aparece uma variável nova que você precisa lembrar de
+usar em todos os lugares — e, no dia em que esquecer em um deles, o bug volta. O padrão na assinatura
+resolve o mesmo problema sem criar nome nenhum: a variável <code>tipo</code> já existe com o valor certo
+desde a primeira linha da função.</p>
+
+<p>Guarde a distinção do <code>null</code>, porque ela pega gente experiente. Se a página escreve
+<code>tipo={null}</code> querendo dizer “sem tipo”, o padrão não entra: a variável fica
+<code>null</code>, a classe vira <code>botao null</code> e o problema continua. O padrão só cobre o caso
+de a prop não ter sido mencionada.</p>
+
+<h2>3. O padrão na assinatura</h2>
+
+<p>Vamos consertar o botão. O componente ganha um valor para o tipo, e a página que não escreve nada
+passa a receber o principal:</p>
+
+<div class="tryreact" data-goal="attr:span|class=etiqueta amber;;texto:Novo">
+  <p class="try-task">A etiqueta sai sem cor quando a página não passa <code>fundo</code>: a classe vira
+  <code>etiqueta undefined</code>. Dê o valor padrão <strong>amber</strong> à prop <code>fundo</code> na
+  assinatura.</p>
+  <pre class="jsx">function Etiqueta({ texto, fundo }) {
+  return &lt;span className={"etiqueta " + fundo}&gt;{texto}&lt;/span&gt;;
+}
+
+function App() {
+  return &lt;Etiqueta texto="Novo" /&gt;;
+}</pre>
+  <pre class="out">
+&lt;span class="etiqueta undefined"&gt;Novo&lt;/span&gt;
+</pre>
+  <pre class="solucao">function Etiqueta({ texto, fundo = "amber" }) {
+  return &lt;span className={"etiqueta " + fundo}&gt;{texto}&lt;/span&gt;;
+}
+
+function App() {
+  return &lt;Etiqueta texto="Novo" /&gt;;
+}</pre>
+</div>
+
+<p>Uma linha, e o componente passou a funcionar sem que a página soubesse de nada. Quem chama continua
+podendo escolher outra cor — <code>fundo="red"</code> vence o padrão —, e quem não escolhe ganha o âmbar.
+A missão confere o atributo <code>class</code>, e não o texto: é assim que se prova que a cor veio do
+padrão e não de um acaso.</p>
+
+<p>Repare no lugar do padrão: junto do nome, na assinatura, e não no corpo da função. Essa escolha tem
+duas consequências boas. Primeira, o padrão fica visível para quem lê o componente — não é preciso
+procurar uma condição três linhas abaixo. Segunda, ele vale para todos os usos da variável, inclusive os
+que aparecem antes do <code>return</code>, como um <code>console.log</code>.</p>
+
+<h2>4. Quando o padrão vale</h2>
+
+<p>A regra é uma só, e a tabela mostra os casos que aparecem no dia a dia. O padrão entra quando o valor
+é <code>undefined</code>; qualquer outro valor, inclusive os “vazios”, passa direto. Entender isso evita
+duas horas de depuração.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na chamada</th><th>O que chega na variável</th><th>O padrão entrou?</th></tr>
+<tr><td>nada — <code>&lt;Botao texto="Ok" /&gt;</code></td><td><code>"principal"</code></td><td>sim</td></tr>
+<tr><td><code>tipo="secundario"</code></td><td><code>"secundario"</code></td><td>não: veio valor</td></tr>
+<tr><td><code>tipo={null}</code></td><td><code>null</code></td><td>não</td></tr>
+<tr><td><code>tipo=""</code></td><td>texto vazio</td><td>não</td></tr>
+<tr><td><code>tipo={0}</code></td><td><code>0</code></td><td>não</td></tr>
+<tr><td><code>tipo={false}</code></td><td><code>false</code></td><td>não</td></tr>
+<tr><td><code>tipo={undefined}</code></td><td><code>"principal"</code></td><td>sim: é o mesmo que não passar</td></tr>
+</table>
+</div>
+
+<p>A última linha explica um comportamento que parece mágica: passar <code>undefined</code> de propósito
+é igual a não passar nada. Faz sentido quando você lembra de onde vem o valor: um objeto que veio de
+outro lugar pode ter a chave com valor <code>undefined</code>, e o JavaScript trata isso como ausente.</p>
+
+<p>Na prática, o caso do <code>null</code> aparece quando o dado vem de outro lugar: uma função que
+devolve <code>null</code> para “não encontrei”, um campo de formulário vazio que virou
+<code>null</code> no meio do caminho. Se o componente monta classe de CSS com esse valor, o resultado é
+uma classe chamada <code>null</code> — e aí o problema não é o padrão, é a origem do dado. Tratar isso é
+assunto de condição, na aula de renderização condicional.</p>
+
+<p>Já as linhas do <code>null</code> e do texto vazio mostram por que “vazio” não é uma ideia só. Para o
+JavaScript, são valores como qualquer outro, e a desestruturação não tem opinião sobre eles. Se você quer
+que texto vazio conte como ausente, precisa dizer isso com uma condição — e a seção 6 mostra a ferramenta
+certa para cada caso.</p>
+
+<h2>5. Padrão para children e para liga e desliga</h2>
+
+<p><a href="children.html">children</a> também aceita padrão, e o resultado é uma tela de “nada por
+aqui” quando a página não manda conteúdo. É um recurso honesto: em vez de um espaço em branco sem explicação, o leitor vê uma frase que
+diz o que aconteceu.</p>
+
+<div class="tryreact" data-goal="texto:Nada por aqui;;conta:.aviso=1">
+  <p class="try-task">O aviso está sendo usado sem conteúdo e fica vazio. Dê o padrão
+  <strong>Nada por aqui</strong> ao <code>children</code>, para o espaço não ficar em branco.</p>
+  <pre class="jsx">function Aviso({ children }) {
+  return &lt;div className="aviso"&gt;{children}&lt;/div&gt;;
+}
+
+function App() {
+  return &lt;Aviso /&gt;;
+}</pre>
+  <pre class="out">
+&lt;div class="aviso"&gt;&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Aviso({ children = "Nada por aqui" }) {
+  return &lt;div className="aviso"&gt;{children}&lt;/div&gt;;
+}
+
+function App() {
+  return &lt;Aviso /&gt;;
+}</pre>
+</div>
+
+<p>A mesma escrita serve para prop de liga e desliga. Um botão que muda de aparência quando está
+destacado pode ter <code>{ destaque = false }</code> e você só escreve <code>destaque</code> quando quer
+ligar. Sem o padrão, <code>destaque</code> valeria <code>undefined</code> — que em condição funciona como
+falso, mas aparece em texto e em atributo com a palavra feia, como você já viu na classe do botão.</p>
+
+<p>Padrão em children tem um efeito colateral bom: documenta o que o componente faz quando está vazio.
+Quem lê a assinatura entende que o aviso pode vir sem recado, e que nesse caso mostra uma frase padrão. É
+uma decisão de desenho escrita no código, e não uma surpresa descoberta em produção.</p>
+
+<h2>6. O zero e o texto vazio</h2>
+
+<p>Existe uma forma mais antiga de dar padrão, e ela é a origem de um bug clássico: o
+<code>||</code> (ou). A ideia é “se o valor for falso, use o padrão”, e o problema é que zero e texto
+vazio são falsos. Uma quantidade zero vira três; um desconto de 0% vira o desconto padrão.</p>
+
+<div class="tryreact" data-goal="texto:0 pães">
+  <p class="try-task">A sacola recebe <code>quantidade={0}</code> e mostra 3, porque o <code>||</code>
+  trata o zero como ausente. Troque por <code>??</code>, que só substitui <code>null</code> e
+  <code>undefined</code>.</p>
+  <pre class="jsx">function Sacola({ quantidade }) {
+  const qtd = quantidade || 3;
+  return &lt;p&gt;{qtd} pães&lt;/p&gt;;
+}
+
+function App() {
+  return &lt;Sacola quantidade={0} /&gt;;
+}</pre>
+  <pre class="out">
+&lt;p&gt;3 pães&lt;/p&gt;
+</pre>
+  <pre class="solucao">function Sacola({ quantidade }) {
+  const qtd = quantidade ?? 3;
+  return &lt;p&gt;{qtd} pães&lt;/p&gt;;
+}
+
+function App() {
+  return &lt;Sacola quantidade={0} /&gt;;
+}</pre>
+</div>
+
+<p>O <code>??</code> é o “ou” dos nulos: substitui apenas <code>null</code> e <code>undefined</code>,
+que são os valores de “não tem”. Zero, texto vazio e falso passam intactos. A tabela compara os três
+jeitos, e ela vale como consulta: escolha a linha pelo que você quer que aconteça com o zero.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Como você escreveu</th><th>Valor 0</th><th>Texto vazio</th><th><code>null</code></th><th>Não passou</th></tr>
+<tr><td><code>{ qtd = 3 }</code></td><td><code>0</code></td><td><code>""</code></td><td><code>null</code></td><td><code>3</code></td></tr>
+<tr><td><code>qtd || 3</code></td><td><code>3</code></td><td><code>3</code></td><td><code>3</code></td><td><code>3</code></td></tr>
+<tr><td><code>qtd ?? 3</code></td><td><code>0</code></td><td><code>""</code></td><td><code>3</code></td><td><code>3</code></td></tr>
+</table>
+</div>
+
+<p>Dá para ler a tabela em três frases. O padrão na assinatura só age quando a prop não vem. O
+<code>||</code> age em tudo que é falso, e por isso é perigoso com número. O <code>??</code> age no que é
+nulo, e é o que você quer quando zero e vazio são valores legítimos. Para a maioria dos casos desta aula,
+o padrão na assinatura resolve; o <code>??</code> entra quando o valor pode ser calculado antes de
+mostrar.</p>
+
+<p>Uma dica de leitura de código alheio: quando você vir <code>props.cor || "azul"</code>, desconfie. Em
+texto quase sempre funciona, porque texto vazio raramente é intenção. Em número, é bug esperando a
+primeira quantidade zero.</p>
+
+<h2>7. Vários padrões e a ordem dos parâmetros</h2>
+
+<p>Um componente pode ter quantos padrões precisar, e eles convivem na mesma lista. A ordem não importa
+para o JavaScript, mas importa para quem lê: o costume é deixar as obrigatórias primeiro e as com padrão
+depois.</p>
+
+<pre class="file" data-file="App.jsx">function Botao({ texto, tipo = "principal", largura = "normal" }) {
+  return (
+    &lt;button className={"botao " + tipo + " botao-" + largura}&gt;
+      {texto}
+    &lt;/button&gt;
+  );
+}</pre>
+
+<p>Aqui <code>texto</code> é obrigatória — sem ela o botão fica vazio, e um padrão como “Botão” só
+esconderia o esquecimento. Já <code>tipo</code> e <code>largura</code> têm escolhas sensatas de fábrica, e
+a página só fala delas quando quer outra coisa. Essa é a pergunta que decide se uma prop merece padrão:
+existe um valor que serve na maioria das chamadas?</p>
+
+<p>Quando o mesmo padrão aparece em vários componentes — a cor da marca, por exemplo —, vale guardá-lo
+numa constante e usar a constante na assinatura: <code>{ cor = COR_MARCA }</code>. Assim, mudar a cor de
+todos os padrões é mudar uma linha, e quem lê o componente vê que aquilo não é um valor qualquer, é uma
+escolha do projeto. Vale para texto, número e qualquer valor que você queira repetir sem repetir a
+letra.</p>
+
+<p>Se a resposta for não, não invente padrão. Um componente de cartão de pão não tem “nome padrão”: o
+nome é o motivo de ele existir. Dar <code>nome = "Pão"</code> faria o cartão mostrar um pão inventado
+quando a página esquecesse o dado, e um dado errado é pior do que um espaço vazio — porque ninguém
+percebe. Padrão é para escolha de estilo, nunca para tapar falta de dado.</p>
+
+<h2>8. Tropeços de quem dá padrão</h2>
+
+<p>Os erros desta aula são mais sutis que os das anteriores, porque o código funciona — só funciona
+errado. Um padrão no lugar de um dado obrigatório esconde o problema; um <code>||</code> troca zero por
+três; um <code>null</code> passa por cima do padrão. A tabela reúne os casos.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você escreveu</th><th>O que acontece</th><th>O conserto</th></tr>
+<tr><td><code>nome = "Pão"</code> numa prop obrigatória</td><td>cartão mostra um dado inventado</td><td>tire o padrão e trate o vazio</td></tr>
+<tr><td><code>qtd || 3</code> com <code>0</code></td><td>zero vira três</td><td><code>qtd ?? 3</code></td></tr>
+<tr><td><code>cor = "amber"</code> e a página passa <code>null</code></td><td>classe vira <code>botao null</code></td><td>trate <code>null</code> antes de montar a classe</td></tr>
+<tr><td>padrão escrito no corpo, depois do uso</td><td>o valor já foi usado sem padrão</td><td>padrão na assinatura</td></tr>
+<tr><td><code>Componente.defaultProps = {…}</code></td><td>estilo antigo, invisível na assinatura</td><td>padrão na desestruturação</td></tr>
+<tr><td>padrão em todas as props</td><td>o componente “funciona” vazio e ninguém percebe</td><td>deixe obrigatórias sem padrão</td></tr>
+</table>
+</div>
+
+<p>A quinta linha merece um parágrafo, porque ela aparece em tutorial de 2020. Antes da desestruturação
+virar moda, dava-se padrão pendurando um objeto no componente: <code>Botao.defaultProps = { tipo:
+"principal" }</code>. Isso ainda funciona no React 19, mas é um estilo que a documentação atual não usa:
+o padrão fica fora da função, longe de quem lê, e some quando você converte o componente para outra
+forma. Se você encontrar num projeto antigo, entenda e siga; em código novo, use a assinatura.</p>
+
+<p>Um cuidado com padrão de objeto. Escrever <code>{ pao = { nome: "Pão do dia" } }</code> funciona, mas
+o objeto é criado de novo a cada vez que o componente roda — o que é bom, porque ninguém compartilha um
+objeto que não devia. O que não funciona é tentar mudar esse objeto esperando que a mudança fique: a
+próxima execução cria outro, novinho. Para dado que muda, existe estado; para dado que só preenche
+espaço, o padrão basta.</p>
+
+<pre class="term">console: cor: undefined</pre>
+
+<p>Essa linha é o retrato do “antes”: a página não passou a prop, o componente imprimiu o valor e saiu
+<code>undefined</code> — a palavra que aparece na classe e no texto quando ninguém tratou o caso. Depois
+do padrão, a mesma linha passa a imprimir o valor escolhido:</p>
+
+<pre class="term">console: cor: amber</pre>
+
+<p>Duas linhas, uma diferença de uma palavra, e a tela inteira muda. É um bom hábito colocar esse
+<code>console.log</code> quando estiver decidindo o padrão de um componente: você vê o valor que chega
+antes de escolher o que fazer com ele.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o botão de todas as páginas</h3>
+<p>O botão principal da padaria aparecia em cinco páginas, e em três delas a Ana esqueceu o
+<code>tipo</code>. O resultado era um botão sem cor, que ela atribuía ao CSS. Depois do
+<code>tipo = "principal"</code> na assinatura, as cinco páginas passaram a mostrar o botão certo sem
+nenhuma edição nelas — só no componente.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a sacola que cobrava três pães</h3>
+<p>Uma cliente escolheu zero pães de um item e o resumo mostrou três, porque a conta usava
+<code>||</code>. O zero era um valor de verdade e foi tratado como ausência. Trocado por <code>??</code>,
+o resumo passou a respeitar o zero. É o tipo de bug que só aparece com dado real.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o padrão que escondeu o erro</h3>
+<p>Ela deu <code>nome = "Pão do dia"</code> ao cartão para “nunca ficar vazio”. Semanas depois, uma
+página com um erro de digitação na prop passou a mostrar “Pão do dia” em vez do brioche, e ninguém
+desconfiou. O conserto foi tirar o padrão do dado e deixar o cartão em branco quando falta informação —
+vazio incomoda, e incomodar é bom quando o dado é obrigatório.</p>
+</div>
+
+<p>Quando o componente recebe uma lista em vez de um valor — os pães da vitrine, por exemplo —, o
+padrão vira uma lista vazia: <code>{ paes = [] }</code>. É o mesmo raciocínio, aplicado a um dado que
+será percorrido com <code>map</code> em <a href="listas-com-map.html">Listas com map</a>.</p>
+
+<p>Os três cenários ensinam a mesma distinção: padrão é para <em>escolha de estilo</em> — o tipo do
+botão, a largura, a cor de uma etiqueta. Dado obrigatório não tem padrão; tem validação. Quando você
+mistura as duas coisas, o componente parece mais robusto e fica mais difícil de consertar, porque o erro
+deixa de aparecer na tela.</p>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Como dar o valor padrão <code>"principal"</code> à prop
+<code>tipo</code>?</p>
+<label><input type="radio" name="q1"> <code>function Botao({ tipo || "principal" })</code></label>
+<label><input type="radio" name="q1"> <code>function Botao({ tipo = "principal" })</code></label>
+<label><input type="radio" name="q1"> <code>function Botao({ tipo: "principal" })</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. A página passa <code>cor={null}</code>. O que acontece
+com <code>{ cor = "amber" }</code>?</p>
+<label><input type="radio" name="q2"> o padrão entra e a cor fica âmbar</label>
+<label><input type="radio" name="q2"> o componente quebra, porque null não é permitido</label>
+<label><input type="radio" name="q2"> o valor fica <code>null</code>: o padrão só vale para <code>undefined</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Por que <code>quantidade || 3</code> é perigoso?</p>
+<label><input type="radio" name="q3"> porque zero é falso e vira 3</label>
+<label><input type="radio" name="q3"> porque o <code>||</code> só funciona com texto</label>
+<label><input type="radio" name="q3"> porque o React não aceita <code>||</code> em componentes</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a largura do botão</h2>
+<p>O componente <code>Botao</code> recebe <code>texto</code> e <code>largura</code>. Dê à
+<code>largura</code> o padrão <code>"normal"</code> e depois responda: qual é o operador que separa o nome
+do valor padrão?</p>
+<div class="ex-code">function Botao({ texto, largura <input aria-label="resposta 1" data-answer="=" placeholder="..."> "normal" }) { return &lt;button className={"botao botao-" + largura}&gt;{texto}&lt;/button&gt;; }</div>
+<p class="ex-dica">Dica: dentro da desestruturação, o padrão entra com o mesmo sinal que você usa para
+guardar um valor numa variável. Não é dois-pontos — dois-pontos serve para renomear.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Prop padrão é o valor que entra quando a prop não chega. Escreve-se na desestruturação, junto do nome:
+<code>{ tipo = "principal" }</code>. O padrão vale só para <code>undefined</code> — <code>null</code>,
+texto vazio, zero e falso passam direto e continuam sendo o valor.</p>
+
+<p>Use padrão para escolhas de estilo, não para tapar dado obrigatório. Para valores calculados, prefira
+<code>??</code> ao <code>||</code>: o primeiro só troca nulo e indefinido, o segundo troca também zero e
+texto vazio. E deixe o padrão na assinatura, onde ele é visível — a forma antiga com
+<code>defaultProps</code> funciona, mas esconde a informação fora da função.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>{ cor = "amber" }</code> é a escrita do padrão na desestruturação.</li>
+<li>O padrão entra quando a prop não veio ou veio <code>undefined</code>.</li>
+<li><code>null</code>, <code>""</code>, <code>0</code> e <code>false</code> ignoram o padrão.</li>
+<li>children também aceita: <code>{ children = "Nada por aqui" }</code>.</li>
+<li>Liga e desliga: <code>{ destaque = false }</code>.</li>
+<li><code>||</code> troca zero e vazio; <code>??</code> só troca nulo e indefinido.</li>
+<li>Não dê padrão a dado obrigatório: o erro precisa aparecer.</li>
+<li><code>defaultProps</code> é estilo antigo; na assinatura o padrão fica visível.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

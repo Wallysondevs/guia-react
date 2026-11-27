@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carregando e Erro | Guia React</title>
+<meta name="description" content="Os três estados de toda busca no React: carregando, pronto e erro. Como mostrar o aviso enquanto a resposta não chega, tratar a falha e oferecer um botão de tentar de novo.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Carregando e <span class="hl">Erro</span></h1>
+<p class="intro">A Ana colocou a busca no efeito e a vitrine passou a vir do servidor. Só que agora, nos
+três segundos entre abrir o site e receber os pães, o cliente vê uma tela quase vazia — e não sabe se o
+site está carregando ou se quebrou. Pior: quando o servidor da padaria cai, a tela fica vazia para
+sempre, sem uma palavra de explicação. Nesta aula a Ana aprende que toda busca tem três estados e que os
+dois mais esquecidos são justamente os que o cliente vê.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Os três estados de qualquer busca: carregando, pronto e erro.</li>
+  <li>Por que o estado inicial é <code>null</code> e não uma lista vazia.</li>
+  <li>Como mostrar um aviso de carregando sem atrapalhar a tela.</li>
+  <li>Como tratar a falha com <code>.catch</code> e com <code>try</code>/<code>catch</code>.</li>
+  <li>Como garantir que o carregando sempre termine, com <code>.finally</code>.</li>
+  <li>Como montar um botão de tentar de novo que realmente refaz o pedido.</li>
+  <li>A diferença entre a mensagem técnica do erro e a mensagem que o cliente entende.</li>
+</ul>
+</div>
+
+<h2>1. A cena: os três segundos de silêncio</h2>
+
+<p>O site da Ana agora busca os pães no servidor. No computador dela, na mesma rede da padaria, a resposta
+chega em 40 milissegundos e ninguém percebe o intervalo. No celular de um cliente na rua, com internet
+ruim, são três segundos. Durante três segundos a tela mostra o título "Padaria da Ana" e mais nada. O
+cliente faz o que qualquer pessoa faz: acha que o site quebrou e fecha.</p>
+
+<p>Esse intervalo não é um defeito a ser eliminado — é a natureza de pedir dados pela rede. Nenhuma
+técnica faz a resposta chegar instantaneamente. O que você controla é o que a tela diz enquanto espera. E
+a resposta é simples: diz que está esperando. Um parágrafo "Carregando os pães…" resolve mais do que
+qualquer otimização, porque troca a dúvida por uma informação.</p>
+
+<p>O outro lado do intervalo é o erro. Se o servidor estiver fora do ar, a resposta não vem; se vier, vem
+com um código de problema. Um componente que só sabe tratar o caso feliz fica travado na tela vazia — e
+nem o console do cliente nem o seu mostram por quê. Tratar o erro é o que separa um protótipo de um site
+que a padaria pode deixar no ar no domingo.</p>
+
+<h2>2. Os três estados de qualquer busca</h2>
+
+<p>Toda busca, em qualquer tela, tem três situações e nunca mais de uma ao mesmo tempo: ainda não sei
+(carregando), eu sei (pronto), deu problema (erro). O componente precisa saber desenhar as três, e a
+forma mais simples de fazer isso é guardar cada uma em um estado próprio e decidir no JSX.</p>
+
+<dl class="anatomy">
+<dt>carregando</dt>
+<dd>A situação entre o pedido e a resposta. Representada por <code>dados === null</code> ou por um
+estado booleano separado, <code>carregando</code>.</dd>
+<dt>pronto</dt>
+<dd>A resposta chegou e virou uma lista no estado. É o caso que você já sabe desenhar.</dd>
+<dt>erro</dt>
+<dd>A resposta não veio ou veio com problema. Guarde a mensagem em um estado para poder mostrá-la.</dd>
+<dt>estado inicial</dt>
+<dd>O valor que o estado tem antes da primeira resposta: <code>null</code> para "ainda não sei",
+<code>[]</code> para "sei, e está vazio".</dd>
+<dt>tentar de novo</dt>
+<dd>Um botão que provoca um novo pedido sem recarregar a página — na prática, um contador nas
+dependências do efeito.</dd>
+</dl>
+
+<p>Existe mais de um jeito de organizar isso. Um deles é um estado booleano <code>carregando</code> mais
+um estado <code>erro</code> mais um estado <code>dados</code> — três <code>useState</code>. Outro é usar
+<code>null</code> como "ainda não sei" e um estado <code>erro</code> — dois. Outro ainda é um único
+estado com um objeto <code>{ estado: "carregando" }</code>. Todos funcionam; o importante é que nunca
+existam dois estados dizendo coisas contraditórias, como "carregando" e "pronto" ao mesmo tempo.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Estado</th><th>Como representar</th><th>O que a tela mostra</th></tr>
+<tr><td>carregando</td><td><code>dados === null</code> e <code>erro === null</code></td><td>"Carregando os pães…"</td></tr>
+<tr><td>pronto, com dados</td><td>um array no estado</td><td>a lista</td></tr>
+<tr><td>pronto, vazio</td><td>um array vazio</td><td>"hoje não tem pão"</td></tr>
+<tr><td>erro</td><td>uma mensagem no estado de erro</td><td>"Deu ruim: …" e o botão de tentar de novo</td></tr>
+</table>
+</div>
+
+<p>Repare na terceira linha: "pronto, vazio" é diferente de "carregando". Uma lista vazia é uma resposta
+legítima — a padaria pode não ter pão nenhum naquele dia, e o cliente precisa ler isso, não um aviso de
+carregando eterno. É por isso que o estado inicial dos dados é <code>null</code>: <code>null</code> é
+"não sei", <code>[]</code> é "sei, e não tem nada".</p>
+
+<h2>3. Mostrando o carregando</h2>
+
+<p>A caixa a seguir tem a busca funcionando e o estado começando em <code>null</code>. Rode o código
+inicial: o painel mostra só o título. A busca desta caixa demora três segundos de propósito — assim você
+vê o problema que o cliente vê. A missão é mostrar um aviso enquanto <code>paes</code> for
+<code>null</code>.</p>
+
+<div class="tryreact" data-goal="texto:Carregando os pães…">
+  <p class="try-task">Enquanto <code>paes</code> for <code>null</code>, mostre o parágrafo
+  <strong>Carregando os pães…</strong>. Não mude a busca; mude só o que a tela mostra na espera.</p>
+  <pre class="jsx">function buscarPaes() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok(["pão francês", "croissant"]), 3000);
+  });
+}
+
+function App() {
+  const [paes, setPaes] = useState(null);
+
+  useEffect(() =&gt; {
+    buscarPaes().then((lista) =&gt; setPaes(lista));
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      {paes &amp;&amp; &lt;p&gt;Pães na vitrine: {paes.length}&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscarPaes() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok(["pão francês", "croissant"]), 3000);
+  });
+}
+
+function App() {
+  const [paes, setPaes] = useState(null);
+
+  useEffect(() =&gt; {
+    buscarPaes().then((lista) =&gt; setPaes(lista));
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      {paes === null &amp;&amp; &lt;p&gt;Carregando os pães…&lt;/p&gt;}
+      {paes &amp;&amp; &lt;p&gt;Pães na vitrine: {paes.length}&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Repare que a condição da solução é <code>paes === null</code>, e não <code>!paes</code>. Os dois
+funcionam aqui, mas <code>=== null</code> diz exatamente o que você quer dizer: "ainda não sei". Se o
+estado fosse uma lista vazia, <code>!paes</code> seria falso e o aviso nunca apareceria; e se fosse
+<code>undefined</code>, os dois dariam verdadeiro por acidente. Escrever a condição de propósito evita
+que o código mude de comportamento quando o estado mudar de forma.</p>
+
+<p>O painel mostra o retrato do primeiro instante: <code>&lt;p&gt;Carregando os pães…&lt;/p&gt;</code>.
+Se você esperar três segundos na prévia, os pães aparecem — é o segundo render, quando a resposta chega.
+Essa troca é o coração do assunto: a mesma tela, dois desenhos diferentes, e o leitor acompanhando sem
+susto.</p>
+
+<p>Duas decisões de projeto aparecem aqui. A primeira é onde o aviso fica: substituindo o conteúdo
+inteiro ou só a área dos pães? Se o título e o menu já estão prontos, é melhor trocar só a área — a tela
+não "pisca". A segunda é o texto: "Carregando…" funciona; "Buscando os pães de hoje…" é melhor, porque
+diz o que está acontecendo e distrai a espera.</p>
+
+<h2>4. Quando a resposta é um erro</h2>
+
+<p>Agora o caso que ninguém desenha. O servidor da padaria está fora do ar e a Promise é rejeitada. No
+código atual, ninguém trata a rejeição: o React não faz nada, a tela continua no estado anterior e o
+navegador registra um aviso no console que o cliente nunca vai abrir. É o pior tipo de falha, a que não
+avisa. O aviso é este, e ele fica só ali:</p>
+
+<pre class="term">Uncaught (in promise) Error: sem conexão
+    at App.jsx:7:31</pre>
+
+<p>Tratar significa dizer o que fazer quando a resposta não vier. Com <code>.then</code>, é um
+<code>.catch</code> no fim da fila. Com <code>async</code>/<code>await</code>, é um
+<code>try</code>/<code>catch</code> em volta das chamadas. Nos dois casos, o erro vira um estado, e o
+estado vira um parágrafo na tela.</p>
+
+<div class="tryreact" data-goal="texto:Deu ruim: sem conexão">
+  <p class="try-task">A busca falha (a Promise é rejeitada) e a tela não avisa nada. Guarde a mensagem
+  do erro em um estado e mostre o parágrafo <strong>Deu ruim: sem conexão</strong>.</p>
+  <pre class="jsx">function buscarPaes() {
+  return new Promise((ok, falha) =&gt; {
+    setTimeout(() =&gt; falha(new Error("sem conexão")), 20);
+  });
+}
+
+function App() {
+  const [paes, setPaes] = useState(null);
+
+  useEffect(() =&gt; {
+    buscarPaes().then((lista) =&gt; setPaes(lista));
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      {paes &amp;&amp; &lt;p&gt;Pães na vitrine: {paes.length}&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscarPaes() {
+  return new Promise((ok, falha) =&gt; {
+    setTimeout(() =&gt; falha(new Error("sem conexão")), 20);
+  });
+}
+
+function App() {
+  const [paes, setPaes] = useState(null);
+  const [erro, setErro] = useState(null);
+
+  useEffect(() =&gt; {
+    buscarPaes()
+      .then((lista) =&gt; setPaes(lista))
+      .catch((e) =&gt; setErro(e.message));
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      {erro &amp;&amp; &lt;p&gt;Deu ruim: {erro}&lt;/p&gt;}
+      {paes &amp;&amp; &lt;p&gt;Pães na vitrine: {paes.length}&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O <code>.catch</code> roda quando qualquer coisa antes dele falha — o pedido, a leitura do JSON, ou um
+<code>throw</code> seu no meio. E o parâmetro <code>e</code> é o objeto do erro; <code>e.message</code> é
+o texto que descreve o problema. Guardar esse texto em um estado é o que permite mostrar na tela a mesma
+informação que estava escondida no console.</p>
+
+<p>Cuidado com uma armadilha de ordem: <code>.catch</code> depois do <code>.then</code> certo é o que
+captura o erro do pedido. Se você inverter — <code>.catch</code> antes, <code>.then</code> depois —, o
+erro é capturado mas o <code>.then</code> ainda roda, com um valor indefinido. A fila é lida da esquerda
+para a direita, e cada erro pula os passos até o primeiro <code>.catch</code>.</p>
+
+<h2>5. Com <code>async</code>: <code>try</code>, <code>catch</code> e <code>finally</code></h2>
+
+<p>Na forma com <code>await</code>, o mesmo tratamento fica em bloco. O <code>try</code> guarda o código
+que pode falhar, o <code>catch</code> recebe o erro, e o <code>finally</code> roda de qualquer jeito —
+dando certo ou não. Esse último é o lugar perfeito para desligar o aviso de carregando, porque ele
+acontece nos dois caminhos.</p>
+
+<pre class="file" data-file="App.jsx">useEffect(() =&gt; {
+  async function carregar() {
+    setCarregando(true);
+    setErro(null);
+
+    try {
+      const resposta = await fetch("https://loja.test/api/paes");
+      if (!resposta.ok) {
+        throw new Error("o servidor respondeu " + resposta.status);
+      }
+      const lista = await resposta.json();
+      setPaes(lista);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  carregar();
+}, []);</pre>
+
+<p>Repare nos dois <code>set</code> de limpeza: o efeito começa apagando o erro anterior e termina
+desligando o carregando. Sem o primeiro, uma tentativa nova mostraria a mensagem de erro antiga enquanto
+tenta de novo. Sem o segundo, um erro deixaria a tela em "carregando" para sempre — o sintoma mais
+confuso de todos, porque a tela parece lenta e está apenas travada.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pedaço</th><th>Quando roda</th><th>Para que serve</th></tr>
+<tr><td><code>setCarregando(true)</code></td><td>no começo do efeito</td><td>liga o aviso de espera</td></tr>
+<tr><td><code>.then</code></td><td>quando a resposta chega bem</td><td>guardar os dados</td></tr>
+<tr><td><code>.catch</code></td><td>quando algo falha no caminho</td><td>guardar a mensagem de erro</td></tr>
+<tr><td><code>.finally</code></td><td>depois de um dos dois</td><td>desligar o aviso de espera</td></tr>
+</table>
+</div>
+
+<h2>6. O botão de tentar de novo</h2>
+
+<p>Mostrar o erro é meio caminho. O outro meio é dar ao cliente uma saída. Se o servidor voltou, ele
+aperta "Tentar de novo" e a lista aparece. Na caixa, o botão já existe e já soma uma tentativa; o que
+falta é o efeito perceber.</p>
+
+<p>Como o efeito só roda uma vez (o array está vazio), somar a tentativa não provoca nada. O conserto é
+colocar a tentativa nas dependências: quando ela muda, o efeito roda de novo e um novo pedido sai. Esse
+truque — um contador como dependência — é a forma mais simples de "refazer o pedido" em React.</p>
+
+<div class="tryreact" data-goal="clique:#tentar;;texto:Pães na vitrine: 2">
+  <p class="try-task">O botão <strong>Tentar de novo</strong> soma uma tentativa, mas o efeito não
+  acompanha. Coloque a tentativa nas dependências do efeito para o segundo pedido acontecer.</p>
+  <pre class="jsx">function buscarPaes(tentativa) {
+  return new Promise((ok, falha) =&gt; {
+    setTimeout(() =&gt; {
+      if (tentativa === 1) falha(new Error("sem conexão"));
+      else ok(["pão francês", "croissant"]);
+    }, 20);
+  });
+}
+
+function App() {
+  const [paes, setPaes] = useState(null);
+  const [erro, setErro] = useState(null);
+  const [tentativa, setTentativa] = useState(1);
+
+  useEffect(() =&gt; {
+    setErro(null);
+    buscarPaes(tentativa)
+      .then((lista) =&gt; setPaes(lista))
+      .catch((e) =&gt; setErro(e.message));
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      {erro &amp;&amp; &lt;p&gt;Deu ruim: {erro}&lt;/p&gt;}
+      {paes &amp;&amp; &lt;p&gt;Pães na vitrine: {paes.length}&lt;/p&gt;}
+      &lt;button id="tentar" onClick={() =&gt; setTentativa(tentativa + 1)}&gt;
+        Tentar de novo
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Deu ruim: sem conexão&lt;/p&gt;
+  &lt;button id="tentar"&gt;Tentar de novo&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscarPaes(tentativa) {
+  return new Promise((ok, falha) =&gt; {
+    setTimeout(() =&gt; {
+      if (tentativa === 1) falha(new Error("sem conexão"));
+      else ok(["pão francês", "croissant"]);
+    }, 20);
+  });
+}
+
+function App() {
+  const [paes, setPaes] = useState(null);
+  const [erro, setErro] = useState(null);
+  const [tentativa, setTentativa] = useState(1);
+
+  useEffect(() =&gt; {
+    setErro(null);
+    buscarPaes(tentativa)
+      .then((lista) =&gt; setPaes(lista))
+      .catch((e) =&gt; setErro(e.message));
+  }, [tentativa]);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      {erro &amp;&amp; &lt;p&gt;Deu ruim: {erro}&lt;/p&gt;}
+      {paes &amp;&amp; &lt;p&gt;Pães na vitrine: {paes.length}&lt;/p&gt;}
+      &lt;button id="tentar" onClick={() =&gt; setTentativa(tentativa + 1)}&gt;
+        Tentar de novo
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel já mostra o estado depois do clique: o erro some, os pães aparecem. A simulação foi montada
+para falhar na primeira tentativa e funcionar na segunda — do contrário não haveria o que consertar. No
+mundo de verdade, a segunda tentativa pode falhar também, e o botão continua ali para a terceira.</p>
+
+<p>Note o <code>setErro(null)</code> no começo do efeito. Ele apaga a mensagem antes de pedir de novo,
+para a tela não mostrar um erro que já está sendo resolvido. E note também que o
+<code>paes</code> anterior fica no estado durante a nova tentativa: se houvesse dados na tela, eles
+continuariam visíveis, o que costuma ser melhor do que apagar tudo e mostrar um espaço branco.</p>
+
+<h2>7. A mensagem certa para quem lê</h2>
+
+<p>O erro que o programador quer ver e o erro que o cliente precisa ver são diferentes. O primeiro é
+técnico e mora no console; o segundo é uma frase em português que diz o que aconteceu e o que fazer.
+Mostrar <code>TypeError: Failed to fetch</code> para o cliente da padaria não ajuda ninguém.</p>
+
+<p>Uma prática comum é traduzir na entrada do estado: guardar uma mensagem falada, não o texto cru. Se o
+problema foi rede, "Não conseguimos falar com o servidor. Confira a internet e tente de novo." Se foi um
+404, "Não encontramos essa página." Se foi 500, "A padaria está com um problema aqui. Já estamos
+consertando." O texto cru continua indo para o console, para você.</p>
+
+<pre class="file" data-file="App.jsx">try {
+  const resposta = await fetch("https://loja.test/api/paes");
+  if (!resposta.ok) {
+    throw new Error("status " + resposta.status);
+  }
+  const lista = await resposta.json();
+  setPaes(lista);
+} catch (e) {
+  console.error(e);                            // para você
+  setErro("Não conseguimos carregar os pães."); // para o cliente
+}</pre>
+
+<p>Há ainda um caso que não é deste efeito: o erro <em>de render</em>. Se um componente quebra no meio do
+JSX — porque um dado veio em formato inesperado, por exemplo —, o React desmonta a árvore inteira e a
+tela fica em branco. Tratar isso exige um componente especial chamado <em>error boundary</em>, assunto de
+um nível mais adiante. Vale saber que os dois erros existem e que o <code>.catch</code> do efeito não
+pega o segundo.</p>
+
+<pre class="term">GET https://loja.test/api/paes 500 (Internal Server Error)
+Uncaught (in promise) Error: status 500</pre>
+
+<p>Essas duas linhas são o que o cliente <strong>não</strong> deve ver, e é exatamente o que aparece
+quando o tratamento é esquecido. A primeira é do navegador, mostrando o status que voltou; a segunda é a
+rejeição da Promise sem <code>.catch</code>. Com o tratamento no lugar, sobra só a frase combinada na
+tela.</p>
+
+<h2>8. Os três estados na mesma tela</h2>
+
+<p>Juntando tudo, o desenho completo de um componente que busca dados tem esta forma: dois ou três
+estados, um efeito que liga o carregando, um <code>catch</code> que guarda a mensagem, um
+<code>finally</code> que desliga o carregando, e um JSX que escolhe o que mostrar em cada caso.</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const [paes, setPaes] = useState(null);
+  const [erro, setErro] = useState(null);
+
+  useEffect(() =&gt; {
+    buscarPaes()
+      .then((lista) =&gt; setPaes(lista))
+      .catch((e) =&gt; setErro(e.message));
+  }, []);
+
+  if (erro) return &lt;p&gt;Deu ruim: {erro}&lt;/p&gt;;
+  if (paes === null) return &lt;p&gt;Carregando os pães…&lt;/p&gt;;
+
+  return (
+    &lt;ul&gt;
+      {paes.map((p) =&gt; (
+        &lt;li key={p.nome}&gt;{p.nome}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+
+<p>O <code>return</code> antecipado é uma forma limpa de escrever isso: cada condição devolve a tela
+daquele estado e encerra a função, e o que sobra no fim é o caso feliz. Enquanto houver um
+<code>return</code> para cada caso, a leitura é de cima para baixo, sem aninhamento de
+<code>if</code> dentro do JSX. A aula de renderização condicional mostra as outras formas; todas
+funcionam.</p>
+
+<p>O que não funciona é mostrar os três ao mesmo tempo. Se o estado de erro e o de dados convivem sem
+regra, o cliente vê a lista antiga com uma mensagem de erro em cima, ou um "carregando" eterno embaixo
+de uma lista já preenchida. A regra é: um estado por vez, e o JSX escolhe um.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o carregando que nunca termina</h3>
+<p>O cliente vê "Carregando…" para sempre e o servidor está bem. Na maioria dos casos o
+<code>setCarregando(false)</code> ficou só no <code>.then</code>, e ninguém desligou o aviso no caminho do
+erro. O <code>.finally</code> resolve porque roda nos dois casos. A outra causa provável é o
+<code>set</code> sendo chamado em um componente que já saiu da tela — aí a
+limpeza do efeito é o assunto.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a mensagem de erro some antes de o cliente ler</h3>
+<p>Em um projeto com atualização automática, o erro é apagado por um pedido novo que falha de novo, e o
+texto pisca. O sintoma é a impressão de que "nada acontece". Uma saída é manter a mensagem até uma ação
+do cliente, e não até o próximo pedido; outra é deixar a mensagem visível enquanto a nova tentativa
+acontece, no lugar de limpá-la na hora.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o botão de tentar de novo não faz nada</h3>
+<p>A causa quase sempre é a mesma: o contador mudou, mas não está no array de dependências do efeito.
+Sem ele no array, o React compara o array, não vê diferença e pula o efeito — nenhum pedido sai. O
+segundo suspeito é uma função que muda a cada render dentro do array, que faz o efeito rodar sem parar.
+A regra da aula de dependências continua valendo: liste o que o efeito lê.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Quais são os três estados de uma busca?</p>
+<label><input type="radio" name="q1"> pedido, resposta e cache</label>
+<label><input type="radio" name="q1"> carregando, pronto e erro</label>
+<label><input type="radio" name="q1"> sucesso, aviso e perigo</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que começar o estado dos dados com <code>null</code>?</p>
+<label><input type="radio" name="q2"> porque <code>null</code> ocupa menos memória</label>
+<label><input type="radio" name="q2"> porque o React exige <code>null</code> em listas</label>
+<label><input type="radio" name="q2"> porque <code>null</code> significa "ainda não sei", e <code>[]</code> significa "sei, e está vazio"</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que fazer para o botão "Tentar de novo" provocar um novo pedido?</p>
+<label><input type="radio" name="q3"> mudar um valor que está no array de dependências do efeito</label>
+<label><input type="radio" name="q3"> chamar <code>location.reload()</code></label>
+<label><input type="radio" name="q3"> colocar o <code>fetch</code> dentro do <code>onClick</code> e pronto</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: desligar o carregando</h2>
+<p>Complete o bloco que obriga o aviso de carregando a terminar, tanto no sucesso quanto no erro:</p>
+<div class="ex-code">try { await carregar(); } catch (e) { setErro(e.message); } <input aria-label="resposta 1" data-answer="finally" placeholder="..."> { setCarregando(false); }</div>
+<p class="ex-dica">Dica: é a palavra que acompanha o <code>try</code> e o <code>catch</code> e roda nos
+dois caminhos.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Toda busca tem três estados, e nenhum deles é opcional: carregando, pronto e erro. O estado inicial
+dos dados é <code>null</code> para dizer "ainda não sei" e permitir o aviso de espera; uma lista vazia é
+uma resposta, não uma espera. O erro vira estado por meio de <code>.catch</code> ou
+<code>try</code>/<code>catch</code>, e o <code>.finally</code> garante que o aviso de carregando desligue
+nos dois caminhos.</p>
+
+<p>Para refazer o pedido sem recarregar a página, um contador de tentativas entra nas dependências do
+efeito: cada clique soma um, o React vê a mudança e roda o efeito de novo. E a mensagem que aparece na
+tela é uma tradução para o cliente, não o texto técnico do erro — esse fica no console, para você.</p>
+
+<p>Com isso, o componente da Ana já pede, espera, mostra, erra e tenta de novo. O que ainda falta é o que
+acontece quando o componente sai da tela com um pedido no ar: a resposta chega depois, e ninguém está
+mais ali para receber. É o assunto da próxima aula, o cleanup.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Três estados: carregando, pronto, erro. Um por vez.</li>
+<li><code>null</code> é "ainda não sei"; <code>[]</code> é "sei, e está vazio".</li>
+<li>O aviso de carregando aparece enquanto os dados são <code>null</code>.</li>
+<li><code>.catch</code> ou <code>try</code>/<code>catch</code> transformam o erro em estado.</li>
+<li><code>.finally</code> roda nos dois caminhos: é o lugar de desligar o carregando.</li>
+<li>Comece o efeito limpando o erro anterior: <code>setErro(null)</code>.</li>
+<li>Tentar de novo = um contador nas dependências do efeito.</li>
+<li>Mensagem na tela em português; o erro técnico fica no console.</li>
+<li>Erro no render não é pego pelo <code>.catch</code>: precisa de error boundary.</li>
+<li>Um <code>return</code> para cada estado deixa o JSX legível, sem aninhar <code>if</code>.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

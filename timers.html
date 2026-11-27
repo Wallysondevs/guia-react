@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timers | Guia React</title>
+<meta name="description" content="setTimeout e setInterval dentro do React: onde criar o timer, como atualizar o estado a cada tique sem valor velho, e como pausar ou desligar limpando no efeito.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Timers</span></h1>
+<p class="intro">O forno da Ana não avisa quando o pão fica pronto, e o relógio da vitrine não anda
+sozinho. As duas coisas dependem de tempo, e tempo em React não é estado: é o navegador contando. Nesta
+aula ela liga o <code>setTimeout</code> e o <code>setInterval</code> de dentro de um efeito, descobre por
+que o contador trava em 1 quando ela usa <code>setRestam(restam - 1)</code> e aprende a pausar e a
+desligar sem deixar timer fantasma.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que <code>setTimeout</code> e <code>setInterval</code> fazem e por que não são do React.</li>
+  <li>Onde criar um timer: dentro do efeito, nunca no corpo do componente.</li>
+  <li>Como mostrar um aviso que só aparece depois de um tempo.</li>
+  <li>Como fazer um contador subir sozinho e parar no fim.</li>
+  <li>Por que <code>setRestam(restam - 1)</code> trava o contador, e por que a forma funcional resolve.</li>
+  <li>Como pausar e continuar com o timer nas dependências do efeito.</li>
+  <li>O que os timers não prometem: precisão de milissegundo e ordem exata.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o pão que assa sozinho</h2>
+
+<p>A padaria da Ana tem um forno elétrico com timer mecânico, daqueles que fazem "tic" e desligam no fim.
+No site, o equivalente seria um componente que mostra "esperando o forno…" e, depois de alguns minutos,
+troca para "Pão pronto!". Não é um clique do cliente, não é uma resposta do servidor: é o tempo passando.
+E o tempo passa sem que o React faça nada.</p>
+
+<p>É aí que nasce a confusão. Em React, a tela só muda quando o estado muda. O React não fica olhando o
+relógio para saber se já passou tempo; ele desenha quando tem motivo. Então, para uma tela mudar com o
+tempo, alguém precisa avisar: um timer do navegador chama uma função sua, você atualiza o estado, e o
+React desenha de novo. O tempo não é estado; o <strong>resultado</strong> do tempo é estado.</p>
+
+<p>A segunda cena é o relógio da vitrine, que mostra a hora e atualiza a cada segundo. Aqui o timer é
+repetido, um <code>setInterval</code>. E com ele vem o problema mais instrutivo da aula: o timer guarda
+uma "foto" do estado do momento em que foi criado, e essa foto envelhece. Quem escreve
+<code>setRestam(restam - 1)</code> dentro do intervalo vê o contador parar de descer depois do primeiro
+tique — e passa meia hora procurando o culpado.</p>
+
+<h2>2. O que são timers e por que não são do React</h2>
+
+<p><code>setTimeout</code> recebe uma função e um número de milissegundos e chama a função uma vez,
+depois desse tempo. <code>setInterval</code> faz o mesmo, mas repetindo até alguém mandar parar. Os dois
+devolvem um número (o <code>id</code> do timer), que é o que você usa para cancelar com
+<code>clearTimeout</code> ou <code>clearInterval</code>.</p>
+
+<dl class="anatomy">
+<dt><code>setTimeout</code></dt>
+<dd>Chama a função uma vez, depois do tempo: <code>setTimeout(() =&gt; avisar(), 3000)</code>. Devolve o
+<code>id</code>.</dd>
+<dt><code>setInterval</code></dt>
+<dd>Chama a função repetidamente, a cada intervalo: <code>setInterval(() =&gt; tique(), 1000)</code>.
+Devolve o <code>id</code>.</dd>
+<dt><code>id</code> do timer</dt>
+<dd>O número que identifica o timer para cancelar. Guarde em uma constante do efeito.</dd>
+<dt><code>clearTimeout</code>/<code>clearInterval</code></dt>
+<dd>Cancelam o timer pelo <code>id</code>. Sem isso, ele dispara de qualquer jeito.</dd>
+<dt>closure</dt>
+<dd>O "pacote" de variáveis que a função do timer carrega do momento em que foi criada. É de onde vem o
+valor velho.</dd>
+</dl>
+
+<p>Nenhum dos dois é do React: são funções do navegador, como <code>document</code> e
+<code>fetch</code>. O React não sabe que eles existem, não pausa quando o componente sai da tela e não
+reinicia quando ele volta. Se você criar um intervalo e não desligar, ele continua chamando a sua função
+— e a lição da aula de cleanup é exatamente essa: quem cria, desfaz.</p>
+
+<p>Uma consequência prática: os timers contam tempo real, não tempo de render. Um intervalo de 1000 ms
+dispara aproximadamente a cada segundo, mesmo que a tela esteja travada processando outra coisa. E se a
+aba estiver escondida, o navegador pode atrasar os timers de propósito, para economizar bateria. Nada
+disso é problema do React; é o comportamento do navegador, e é bom saber para não caçar bug no lugar
+errado.</p>
+
+<h2>3. O timer no lugar certo</h2>
+
+<p>O corpo do componente roda a cada render. Se você criar um timer ali, cada render cria mais um — e
+eles se acumulam, cada um chamando a sua função. Em dois cliques, dois timers; em dez, dez. Por isso o
+timer vai dentro de um <code>useEffect</code>, e o efeito decide quantos existem.</p>
+
+<pre class="file" data-file="App.jsx">function Aviso() {
+  useEffect(() =&gt; {
+    const id = setTimeout(() =&gt; console.log("pão pronto"), 3000);
+
+    return () =&gt; clearTimeout(id);
+  }, []);
+
+  return &lt;p&gt;Esperando o forno…&lt;/p&gt;;
+}</pre>
+
+<p>Três decisões aparecem nesse trecho. A primeira é criar o timer dentro do efeito, não no corpo. A
+segunda é guardar o <code>id</code> em uma constante, para a limpeza conseguir cancelar. A terceira é o
+<code>[]</code>: o efeito roda uma vez, então existe exatamente um timer, criado na montagem e cancelado
+na desmontagem.</p>
+
+<p>Se o efeito tivesse uma dependência, o timer seria recriado quando ela mudasse — e a limpeza cancelaria
+o anterior antes de criar o novo. É esse par que permite coisas como "recomeçar a contagem quando o pão
+mudar" sem acumular intervalos. O efeito é o dono do timer; a limpeza é o que garante que o dono anterior
+saiu de cena.</p>
+
+<h2>4. O aviso que chega depois</h2>
+
+<p>A primeira caixa tem um aviso que deveria trocar sozinho: começa em "esperando o forno…" e vira "Pão
+pronto!" quando o tempo passa. Falta justamente o timer. A missão é criá-lo dentro do efeito, com a
+limpeza no lugar.</p>
+
+<div class="tryreact" data-goal="texto:Pão pronto!">
+  <p class="try-task">Use <code>setTimeout</code> dentro do efeito para trocar o aviso por
+  <strong>Pão pronto!</strong> depois de 20 milissegundos. Guarde o <code>id</code> e devolva o
+  <code>clearTimeout</code> na limpeza.</p>
+  <pre class="jsx">function App() {
+  const [aviso, setAviso] = useState("esperando o forno…");
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;esperando o forno…&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [aviso, setAviso] = useState("esperando o forno…");
+
+  useEffect(() =&gt; {
+    const id = setTimeout(() =&gt; setAviso("Pão pronto!"), 20);
+
+    return () =&gt; clearTimeout(id);
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O aviso mudou porque o timer chamou <code>setAviso</code>, e o <code>set</code> pediu um novo render.
+Sem o <code>set</code>, o timer poderia disparar mil vezes e a tela não mudaria — o React não desenha por
+força do tempo, desenha porque o estado mudou.</p>
+
+<p>Os 20 milissegundos são de propósito: no painel, o resultado aparece na hora. No site da Ana, o mesmo
+código teria <code>3000</code> no lugar do <code>20</code>. O código é idêntico; só o número muda. E se
+você deixar o timer sem limpeza, nada quebra visivelmente quando a tela fica aberta — o problema aparece
+quando o componente sai antes do tempo e a função roda em um componente que já não está lá.</p>
+
+<h2>5. O relógio que anda sozinho</h2>
+
+<p>Para repetir, é <code>setInterval</code>. O desenho é o mesmo do <code>setTimeout</code>: criar dentro
+do efeito, guardar o <code>id</code>, cancelar na limpeza. A diferença é o que a função do intervalo faz.
+No relógio da vitrine, ela atualiza a hora a cada segundo:</p>
+
+<pre class="file" data-file="App.jsx">useEffect(() =&gt; {
+  const id = setInterval(() =&gt; {
+    setHora(new Date().toLocaleTimeString("pt-BR"));
+  }, 1000);
+
+  return () =&gt; clearInterval(id);
+}, []);</pre>
+
+<p>Aqui o intervalo não lê nenhum estado: ele cria a hora a partir do relógio do sistema, e o
+<code>setHora</code> guarda o texto pronto. Como a função não depende de nada que mude, ela não sofre do
+problema de valor velho que vem a seguir. É quando o intervalo precisa <em>ler</em> o estado para
+calcular o próximo que a armadilha aparece.</p>
+
+<p>A Ana escreveu um contador de pães no forno: começa em 3 e desce a cada tique. Ela fez
+<code>setRestam(restam - 1)</code>, que é como ela escreve em qualquer outro lugar do componente. Rodou e
+o número foi para 2 e parou. O intervalo continuou rodando, chamando a função, mas o valor não descia
+mais.</p>
+
+<p>O motivo é a closure. A função do intervalo foi criada no primeiro render, quando
+<code>restam</code> valia 3. Ela carrega esse 3 para sempre: a cada tique, calcula
+<code>3 - 1</code> e chama <code>setRestam(2)</code>. O estado já é 2, então o React entende "não mudou
+nada" e nem redesenha. O timer está certo; a conta é que está usando uma foto velha.</p>
+
+<pre class="term">restam 2 pães
+restam 2 pães
+restam 2 pães</pre>
+
+<p>O console acima é o que a Ana viu, com um <code>console.log</code> dentro do intervalo: a mesma
+linha, repetida, sem fim. O conserto é pedir o valor atual
+ao React em vez de usar o da closure, com a forma funcional do <code>set</code>:</p>
+
+<pre class="file" data-file="App.jsx">setInterval(() =&gt; {
+  setRestam((r) =&gt; Math.max(0, r - 1));   // r é o valor mais recente
+}, 1000);</pre>
+
+<div class="tryreact" data-goal="texto:Forno apitou!">
+  <p class="try-task">O contador desce uma vez e para, porque a função do intervalo usa o
+  <code>restam</code> da primeira renderização. Troque por <code>setRestam((r) =&gt; Math.max(0, r -
+  1))</code> para o pão chegar a zero e o forno apitar.</p>
+  <pre class="jsx">function App() {
+  const [restam, setRestam] = useState(3);
+
+  useEffect(() =&gt; {
+    const id = setInterval(() =&gt; {
+      setRestam(restam - 1);
+    }, 10);
+    return () =&gt; clearInterval(id);
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Restam {restam} pães no forno&lt;/p&gt;
+      {restam === 0 &amp;&amp; &lt;p&gt;Forno apitou!&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Restam 2 pães no forno&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [restam, setRestam] = useState(3);
+
+  useEffect(() =&gt; {
+    const id = setInterval(() =&gt; {
+      setRestam((r) =&gt; Math.max(0, r - 1));
+    }, 10);
+    return () =&gt; clearInterval(id);
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Restam {restam} pães no forno&lt;/p&gt;
+      {restam === 0 &amp;&amp; &lt;p&gt;Forno apitou!&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<h2>6. Por que a forma funcional funciona</h2>
+
+<p><code>setRestam((r) =&gt; Math.max(0, r - 1))</code> é diferente de <code>setRestam(restam - 1)</code>
+em um ponto essencial: você não passa o valor novo, passa uma <strong>função</strong> que calcula o valor
+novo a partir do atual. Quem chama essa função é o React, no momento de aplicar a atualização, com o
+valor mais recente em mãos. O <code>r</code> nunca é uma foto velha; é o estado de agora.</p>
+
+<p>Isso não é um detalhe só de timers. Em qualquer lugar onde o valor novo depende do antigo — um clique
+duplo rápido, duas atualizações na mesma função, um intervalo —, a forma funcional é a segura. O
+<code>Math.max(0, ...)</code> é só para o número não ficar negativo enquanto o intervalo continua rodando
+depois de chegar a zero; o <code>set</code> com uma função pode ser chamado quantas vezes for, que 0
+continua sendo o piso.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>De onde vem o valor</th><th>Quando travar</th></tr>
+<tr><td><code>setRestam(restam - 1)</code></td><td>do render em que a função foi criada</td><td>sempre que o valor mudar depois da criação</td></tr>
+<tr><td><code>setRestam((r) =&gt; r - 1)</code></td><td>do estado no momento da aplicação</td><td>nunca; é a forma segura</td></tr>
+<tr><td><code>setNome("Ana")</code></td><td>de um valor fixo</td><td>nunca; não depende do estado anterior</td></tr>
+<tr><td><code>setLista([...lista, novo])</code></td><td>do render em que a função foi criada</td><td>em timers e cliques rápidos</td></tr>
+<tr><td><code>setLista((l) =&gt; [...l, novo])</code></td><td>do estado atual</td><td>nunca</td></tr>
+</table>
+</div>
+
+<p>Repare que o problema não é o <code>setInterval</code> — é a combinação de "função criada uma vez" com
+"valor que muda". Um timer criado uma vez sempre carrega a foto do primeiro render. Se a função só usa
+valores fixos, não há problema. Se ela lê qualquer estado, use a forma funcional ou inclua esse estado nas
+dependências do efeito (o que recria o timer a cada mudança e tem o seu próprio custo).</p>
+
+<h2>7. Pausar, continuar e desmontar</h2>
+
+<p>A terceira caixa tem um timer que anda em etapas e um botão de pausar. O botão já muda o estado
+<code>correndo</code>, e o efeito já tem <code>correndo</code> nas dependências — mas ninguém desliga o
+intervalo antigo. Ao pausar, o efeito deixa de criar um novo, e o antigo continua contando. É o mesmo
+vazamento da aula de cleanup, agora com um nome.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:parei de contar">
+  <p class="try-task">Ao pausar, o intervalo antigo continua rodando. Guarde o <code>id</code> e devolva
+  uma função de limpeza que faz <code>clearInterval(id)</code> e anota
+  <strong>parei de contar</strong> no caderninho. Depois clique em Pausar.</p>
+  <pre class="jsx">function App() {
+  const etapas = ["massando", "modelando", "no forno", "pronto"];
+  const [etapa, setEtapa] = useState(0);
+  const [correndo, setCorrendo] = useState(true);
+  const [registro, setRegistro] = useState([]);
+
+  useEffect(() =&gt; {
+    if (!correndo) return;
+    setRegistro((r) =&gt; [...r, "comecei a contar"]);
+    setInterval(() =&gt; {
+      setEtapa((e) =&gt; Math.min(e + 1, etapas.length - 1));
+    }, 10);
+  }, [correndo]);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Etapa do pão: {etapas[etapa]}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setCorrendo(!correndo)}&gt;
+        {correndo ? "Pausar" : "Continuar"}
+      &lt;/button&gt;
+      &lt;ul&gt;
+        {registro.map((m, i) =&gt; (
+          &lt;li key={i}&gt;{m}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Etapa do pão: pronto&lt;/p&gt;
+  &lt;button&gt;Pausar&lt;/button&gt;
+  &lt;ul&gt;
+    &lt;li&gt;comecei a contar&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const etapas = ["massando", "modelando", "no forno", "pronto"];
+  const [etapa, setEtapa] = useState(0);
+  const [correndo, setCorrendo] = useState(true);
+  const [registro, setRegistro] = useState([]);
+
+  useEffect(() =&gt; {
+    if (!correndo) return;
+    setRegistro((r) =&gt; [...r, "comecei a contar"]);
+    const id = setInterval(() =&gt; {
+      setEtapa((e) =&gt; Math.min(e + 1, etapas.length - 1));
+    }, 10);
+
+    return () =&gt; {
+      clearInterval(id);
+      setRegistro((r) =&gt; [...r, "parei de contar"]);
+    };
+  }, [correndo]);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Etapa do pão: {etapas[etapa]}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setCorrendo(!correndo)}&gt;
+        {correndo ? "Pausar" : "Continuar"}
+      &lt;/button&gt;
+      &lt;ul&gt;
+        {registro.map((m, i) =&gt; (
+          &lt;li key={i}&gt;{m}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O caderninho mostra "comecei a contar" na montagem e ganha "parei de contar" no clique — a prova de que
+a limpeza rodou. O <code>if (!correndo) return;</code> é a outra metade: quando a contagem está pausada,
+o efeito não cria timer nenhum. Sem essa linha, pausar criaria um timer e continuar criaria outro, os
+dois rodando.</p>
+
+<p>Repare também que a limpeza não precisa saber se o timer existe. Quando <code>correndo</code> é
+<code>false</code>, o efeito devolve <code>undefined</code> e o React não tem nada para chamar. Só que a
+limpeza da execução anterior — aquela em que o timer foi criado — ainda está guardada e roda normalmente.
+É o React guardando um par (efeito, limpeza) por execução, como você viu na aula de cleanup.</p>
+
+<h2>8. Os tropeços com timers</h2>
+
+<p>O primeiro é criar o timer no corpo do componente. Cada render cria mais um, e cliques rápidos
+multiplicam os intervalos. O sintoma é uma contagem que acelera sozinha com o tempo: um timer, dois, três,
+cada um somando ao mesmo estado.</p>
+
+<p>O segundo é não guardar o <code>id</code>. Sem ele não há como cancelar, e a única saída é deixar o
+timer rodando até o fim da aba. Guardar em uma constante dentro do efeito é o que permite a limpeza usar
+o mesmo valor.</p>
+
+<p>O terceiro é esperar precisão. O número em <code>setTimeout(f, 1000)</code> é um pedido, não uma
+promessa: o navegador pode atrasar por estar ocupado, por economia de energia ou por a aba estar
+escondida. Para um cronômetro de verdade, quem conta é o relógio, não a soma dos tiques.</p>
+
+<pre class="term">tique 1: 10 ms
+tique 2: 21 ms
+tique 3: 33 ms</pre>
+
+<p>Essas são as medidas de um intervalo pedido a cada 10 ms: os tiques chegam um pouco depois do pedido,
+e o atraso varia. Se o seu cronômetro soma 1 a cada tique e multiplica por 1000, em cinco minutos ele
+está errado. A forma certa é guardar o instante de início e calcular a diferença com
+<code>Date.now()</code>.</p>
+
+<p>O quarto é o <code>setTimeout(f, 0)</code>. Ele não roda na hora: roda depois que o navegador terminar
+o que está fazendo, no próximo ciclo. Isso é útil para "esperar um instante" e é a razão pela qual
+<code>setTimeout</code> com zero às vezes aparece em código de animação e de foco de campo. Zero não é
+imediato; é "logo depois".</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tropeço</th><th>Sintoma</th><th>Conserto</th></tr>
+<tr><td>timer no corpo do componente</td><td>a contagem acelera sozinha</td><td>criar dentro do <code>useEffect</code></td></tr>
+<tr><td>sem guardar o <code>id</code></td><td>não há como parar</td><td><code>const id = setInterval(...)</code></td></tr>
+<tr><td>sem limpeza</td><td>timers acumulados ao desmontar</td><td>devolver <code>() =&gt; clearInterval(id)</code></td></tr>
+<tr><td>valores lidos na closure</td><td>o contador trava no primeiro valor</td><td>forma funcional: <code>setN((n) =&gt; n + 1)</code></td></tr>
+<tr><td>contar tiques para medir tempo</td><td>o cronômetro atrasa</td><td>guardar o instante e calcular com <code>Date.now()</code></td></tr>
+</table>
+</div>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o contador que anda mais rápido depois de dois cliques</h3>
+<p>Cada clique que recria o efeito sem limpeza deixa um intervalo antigo rodando. Com dois intervalos
+somando no mesmo estado, a contagem dobra de velocidade — e com três, triplica. É o vazamento clássico de
+timer, e o conserto é sempre o mesmo: guardar o <code>id</code> e cancelar na limpeza.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a contagem continua depois que o cliente saiu da tela</h3>
+<p>O componente sumiu da página e o intervalo continuou chamando <code>setEtapa</code>. Em React 19 isso
+não gera mais aviso no console; o estado é atualizado em um componente que ninguém vê. O sintoma aparece
+depois, quando o componente volta e começa com um número estranho. A limpeza na desmontagem resolve.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o botão de continuar cria dois relógios</h3>
+<p>A Ana escreveu o efeito sem o <code>if (!correndo) return;</code>. Ao pausar, a limpeza cancelou o
+timer; ao continuar, a limpeza rodou de novo (nada a cancelar) e um timer novo foi criado — correto. Mas
+se ela tivesse esquecido a limpeza, cada pausa deixaria um relógio rodando, e continuar somaria mais um.
+Com o par certo, o número de timers é sempre zero ou um.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="1"><p class="mc-q">1. Qual dos dois repete a função até alguém parar?</p>
+<label><input type="radio" name="q1"> <code>setInterval</code></label>
+<label><input type="radio" name="q1"> <code>setTimeout</code></label>
+<label><input type="radio" name="q1"> <code>clearInterval</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que <code>setRestam(restam - 1)</code> dentro de um intervalo trava o contador?</p>
+<label><input type="radio" name="q2"> porque o React não aceita contas dentro de timers</label>
+<label><input type="radio" name="q2"> porque o intervalo dispara rápido demais</label>
+<label><input type="radio" name="q2"> porque a função guarda o valor da primeira renderização</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. Onde o timer deve ser criado?</p>
+<label><input type="radio" name="q3"> no corpo do componente, antes do <code>return</code></label>
+<label><input type="radio" name="q3"> dentro de um <code>useEffect</code>, com a limpeza devolvida</label>
+<label><input type="radio" name="q3"> dentro do <code>onClick</code> do botão de pausar</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: parando o intervalo</h2>
+<p>Complete a função de limpeza que cancela o intervalo criado no efeito:</p>
+<div class="ex-code">return () =&gt; <input aria-label="resposta 1" data-answer="clearInterval|clearInterval(id)" placeholder="...">(id);</div>
+<p class="ex-dica">Dica: é o par do <code>setInterval</code>, com o <code>id</code> que o efeito guardou.
+Sem ele, o intervalo continua depois que o componente sai da tela.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p><code>setTimeout</code> chama uma função uma vez depois do tempo; <code>setInterval</code> chama
+repetidamente. Os dois são do navegador, devolvem um <code>id</code> e não são cancelados pelo React —
+quem cancela é você, com <code>clearTimeout</code> ou <code>clearInterval</code>. O lugar de criar é
+dentro de um <code>useEffect</code>, e o lugar de cancelar é a função que o efeito devolve.</p>
+
+<p>Para mudar a tela com o tempo, o timer chama um <code>set</code>; é o estado que manda o React
+desenhar de novo. E quando o valor novo depende do anterior, use a forma funcional:
+<code>setN((n) =&gt; n + 1)</code>. A função do timer carrega a foto do render em que nasceu, e essa foto
+não se atualiza sozinha.</p>
+
+<p>Com timers, você tem as quatro peças do assunto: criar no efeito, guardar o <code>id</code>, atualizar
+o estado com a forma funcional e limpar quando o componente muda ou sai. A partir daqui, o próximo passo
+natural é guardar coisas no navegador — o assunto da aula
+<a href="localStorage.html">O localStorage</a>, que usa o mesmo formato de efeito com limpeza.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>setTimeout</code>: uma vez. <code>setInterval</code>: repetido. Os dois devolvem um
+<code>id</code>.</li>
+<li>Timer se cria dentro do <code>useEffect</code>, nunca no corpo do componente.</li>
+<li>Guarde o <code>id</code> para poder cancelar com <code>clearTimeout</code>/<code>clearInterval</code>.</li>
+<li>Devolva a limpeza: <code>return () =&gt; clearInterval(id)</code>.</li>
+<li>Função do timer lê o estado da foto em que nasceu: use <code>setN((n) =&gt; n + 1)</code>.</li>
+<li>Pausar é mudar uma dependência e limpar o timer antigo.</li>
+<li><code>if (!correndo) return;</code> evita criar timer quando não deve haver nenhum.</li>
+<li>Timers não são precisos: para cronômetro, calcule com <code>Date.now()</code>.</li>
+<li><code>setTimeout(f, 0)</code> não é imediato: é "logo depois".</li>
+<li>Abas escondidas atrasam timers de propósito, para economizar bateria.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

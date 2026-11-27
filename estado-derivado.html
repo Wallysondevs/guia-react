@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estado Derivado | Guia React</title>
+<meta name="description" content="Estado derivado no React: o que pode ser calculado não vira estado, total com reduce, lista filtrada na hora, e por que copiar props para um estado envelhece.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Estado <span class="hl">Derivado</span></h1>
+<p class="intro">A tela de encomendas da Ana mostra o total do dia. Ela guardou esse total num
+<code>useState</code> e atualizou em dois lugares — mas esqueceu o terceiro, o botão de remover, e desde
+então o caixa fecha com o valor errado. O problema não é o esquecimento: é que o total nunca precisou de
+um estado, porque ele pode ser <strong>calculado</strong> a partir da lista. Nesta aula a Ana aprende a
+diferença entre guardar e derivar.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um valor derivado e por que ele não vira estado.</li>
+  <li>Calcular no render: <code>reduce</code> para somar, <code>length</code> para contar.</li>
+  <li>Filtrar uma lista enquanto a pessoa digita, sem estado intermediário.</li>
+  <li>Por que sincronizar dois estados com <code>useEffect</code> costuma piorar as coisas.</li>
+  <li>O caso mais traiçoeiro: copiar props para dentro de um estado.</li>
+  <li>As raras situações em que guardar o valor calculado faz sentido.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o total que fecha errado</h2>
+
+<p>A padaria precisa fechar o caixa no fim do dia. A tela mostra os pedidos e o total. A Ana criou um
+estado para a lista e outro para o total, e atualizou o total em cada função que mexe na lista: ao
+acrescentar, somou o preço; ao esvaziar, zerou. Faltou o botão de remover — e uma semana depois a
+diferença entre o total da tela e a soma dos pedidos era de vinte e três reais.</p>
+
+<p>Esse bug tem uma característica que o torna caro: ele não aparece na hora. A tela continua bonita, o
+total continua sendo um número plausível, e só uma conferência na calculadora revela o erro. Pior: cada
+nova função que mexe na lista é uma chance nova de esquecer o total. Quanto mais o sistema cresce, mais
+lugares precisam lembrar de atualizar a mesma informação.</p>
+
+<p>A saída é parar de guardar o que pode ser calculado. Se você tem a lista de pedidos, o total é a soma
+dos preços — não é um dado novo, é uma <strong>conta</strong> sobre os dados que já existem. Guardar a
+conta junto com os dados é manter duas cópias de uma verdade só, e cópias se desencontram. Essa é a
+definição de estado derivado: o valor que sai de outro valor.</p>
+
+<p>A regra, escrita de forma direta: <em>se dá para calcular a partir do estado e das props que você já
+tem, calcule durante o render</em>. Nada de <code>useState</code> para o total, para a quantidade de
+itens, para a lista filtrada ou para saber se o botão deve ficar habilitado.</p>
+
+<h2>2. Estado é memória, não conta</h2>
+
+<p>O estado tem um papel específico: guardar o que <strong>não pode ser reconstruído</strong> a partir do
+resto. O texto que o cliente digitou não está em lugar nenhum além do estado. A lista de pedidos veio do
+servidor ou das ações do usuário — também não se recalcula. Mas o total, a contagem, a média, o filtro e
+o "está válido?" saem todos de combinações dessas fontes.</p>
+
+<dl class="anatomy">
+<dt>estado derivado</dt>
+<dd>Um valor calculado a partir de outros valores, a cada render. Não tem <code>useState</code>, não tem
+setter, não desencontra.</dd>
+<dt>cálculo no render</dt>
+<dd>Fazer a conta no corpo do componente, antes do <code>return</code>. Roda toda vez que o componente
+desenha, e isso é barato.</dd>
+<dt>fonte única</dt>
+<dd>A ideia de que cada informação tem um dono só. Se o total é derivado da lista, a lista é a fonte; o
+total é consequência.</dd>
+<dt>sincronização</dt>
+<dd>Manter dois valores iguais na mão, chamando setters em todo lugar que mexe num deles. É a origem do
+bug desta aula.</dd>
+<dt>snapshot</dt>
+<dd>Uma cópia tirada num momento, que deve ficar congelada mesmo que o original mude. É um dos poucos
+casos em que guardar faz sentido.</dd>
+</dl>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O valor</th><th>Vira <code>useState</code>?</th><th>De onde ele sai</th></tr>
+<tr><td>Texto da busca</td><td>sim</td><td>o cliente digitou; não existe em outro lugar</td></tr>
+<tr><td>Lista de pedidos</td><td>sim</td><td>veio do servidor ou das ações do usuário</td></tr>
+<tr><td>Total do dia</td><td>não</td><td>soma dos preços da lista</td></tr>
+<tr><td>Quantos estão na fila</td><td>não</td><td><code>pedidos.length</code></td></tr>
+<tr><td>Lista filtrada</td><td>não</td><td><code>filter</code> sobre a lista, com a busca</td></tr>
+<tr><td>Botão habilitado</td><td>não</td><td>uma condição calculada no render</td></tr>
+</table>
+</div>
+
+<p>Repare que derivar não é "fazer a conta toda hora por preguiça de otimizar". É a escolha que elimina
+uma classe inteira de bugs. Se a conta é pesada — somar dez mil itens a cada tecla, por exemplo —, existe
+uma ferramenta para isso, o <code>useMemo</code>, que guarda o resultado do cálculo enquanto as entradas
+não mudam. O <code>useMemo</code> é do Nível 2; a decisão de calcular vem antes da otimização.</p>
+
+<h2>3. Calculando o total no render</h2>
+
+<p>O <code>reduce</code> transforma uma lista num valor só: ele percorre os itens somando ao acumulador.
+A leitura é "comece em 0 e, para cada pedido, some o preço dele". Como é uma expressão, o resultado pode
+ser uma constante do componente — recalculada a cada render.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Total: R$ 20">
+  <p class="try-task">O total está guardado num estado e não acompanha a remoção. Tire o estado e calcule
+  a soma a partir da lista. A missão clica em Remover e confere que o total passou a "R$ 20".</p>
+  <pre class="jsx">function App() {
+  const [pedidos, setPedidos] = useState([
+    { id: 1, nome: "Pão francês", preco: 1 },
+    { id: 2, nome: "Bolo de cenoura", preco: 20 }
+  ]);
+  const [total, setTotal] = useState(21);
+
+  function remover(id) {
+    setPedidos(pedidos.filter((p) =&gt; p.id !== id));
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;ul&gt;
+        {pedidos.map((p) =&gt; (
+          &lt;li key={p.id}&gt;
+            {p.nome + " — R$ " + p.preco}{" "}
+            &lt;button onClick={() =&gt; remover(p.id)}&gt;Remover&lt;/button&gt;
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+      &lt;p&gt;Total: R$ {total}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;ul&gt;
+    &lt;li&gt;
+      Pão francês — R$ 1
+      &lt;button&gt;Remover&lt;/button&gt;
+    &lt;/li&gt;
+    &lt;li&gt;
+      Bolo de cenoura — R$ 20
+      &lt;button&gt;Remover&lt;/button&gt;
+    &lt;/li&gt;
+  &lt;/ul&gt;
+  &lt;p&gt;Total: R$ 21&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [pedidos, setPedidos] = useState([
+    { id: 1, nome: "Pão francês", preco: 1 },
+    { id: 2, nome: "Bolo de cenoura", preco: 20 }
+  ]);
+
+  const total = pedidos.reduce((soma, p) =&gt; soma + p.preco, 0);
+
+  function remover(id) {
+    setPedidos(pedidos.filter((p) =&gt; p.id !== id));
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;ul&gt;
+        {pedidos.map((p) =&gt; (
+          &lt;li key={p.id}&gt;
+            {p.nome + " — R$ " + p.preco}{" "}
+            &lt;button onClick={() =&gt; remover(p.id)}&gt;Remover&lt;/button&gt;
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+      &lt;p&gt;Total: R$ {total}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A diferença é brutal: a versão com estado tinha <code>setTotal</code> em três funções e esquecia uma.
+A versão derivada tem <code>setTotal</code> em nenhuma, porque o total não é atualizado — ele é
+<strong>recalculado</strong>. Remover, acrescentar, ordenar, limpar: qualquer mudança na lista chega ao
+total de graça, no render seguinte.</p>
+
+<p>Para acompanhar, um <code>console.log</code> mostrando os dois valores a cada render deixa claro de
+onde o número vem:</p>
+
+<pre class="term">render 1 — pedidos: 2, total: 21
+render 2 — pedidos: 1, total: 20</pre>
+
+<p>O total nunca "ficou velho", porque ele nem existe entre um render e outro. É uma variável local,
+recriada a cada chamada da função. O que persiste é a lista; o resto é conta.</p>
+
+<h2>4. Filtrar enquanto a pessoa digita</h2>
+
+<p>O mesmo raciocínio vale para a lista filtrada pela busca. Muita gente cria um estado para "a lista que
+aparece" e outro para o texto da busca, e tenta manter os dois em sincronia. O resultado é uma tela que
+só filtra quando alguém lembra de chamar o setter — e um segundo estado que envelhece.</p>
+
+<div class="tryreact" data-goal="digite:input=queijo;;conta:li=1">
+  <p class="try-task">Digite "queijo" na busca: a lista continua com os dois pedidos, porque os itens
+  visíveis foram copiados para um estado na primeira renderização. Mostre a lista filtrada na hora. A
+  missão confere que sobrou um item.</p>
+  <pre class="jsx">function App() {
+  const [pedidos] = useState([
+    { id: 1, nome: "Pão francês" },
+    { id: 2, nome: "Pão de queijo" }
+  ]);
+  const [busca, setBusca] = useState("");
+  const [visiveis, setVisiveis] = useState(pedidos);
+
+  return (
+    &lt;div&gt;
+      &lt;input value={busca} onChange={(e) =&gt; setBusca(e.target.value)} /&gt;
+      &lt;ul&gt;
+        {visiveis.map((p) =&gt; (
+          &lt;li key={p.id}&gt;{p.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input value=""&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Pão francês&lt;/li&gt;
+    &lt;li&gt;Pão de queijo&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [pedidos] = useState([
+    { id: 1, nome: "Pão francês" },
+    { id: 2, nome: "Pão de queijo" }
+  ]);
+  const [busca, setBusca] = useState("");
+
+  const visiveis = pedidos.filter((p) =&gt;
+    p.nome.toLowerCase().includes(busca.toLowerCase())
+  );
+
+  return (
+    &lt;div&gt;
+      &lt;input value={busca} onChange={(e) =&gt; setBusca(e.target.value)} /&gt;
+      &lt;ul&gt;
+        {visiveis.map((p) =&gt; (
+          &lt;li key={p.id}&gt;{p.nome}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O estado que ficou é só o texto da busca — o que o usuário digitou, que não existe em nenhum outro
+lugar. A lista filtrada virou uma constante calculada: muda quando <code>pedidos</code> muda e quando
+<code>busca</code> muda, sem nenhum setter no caminho.</p>
+
+<p>Note que a lista completa não se perde: <code>visiveis</code> é uma lista nova, e <code>pedidos</code>
+continua inteira no estado. Se a busca ficar vazia, <code>includes("")</code> é verdadeiro para todo
+texto e todos os itens voltam. Nada de guardar a lista original "para restaurar depois" — ela já está
+lá.</p>
+
+<h2>5. O efeito que sincroniza (e atrapalha)</h2>
+
+<p>Quando o valor guardado começa a desencontrar, a primeira ideia é sincronizar com
+<code>useEffect</code>: "sempre que a lista mudar, atualizo o total". O código parece cuidadoso e cria
+dois problemas novos.</p>
+
+<pre class="file" data-file="App.jsx">const [total, setTotal] = useState(0);
+
+useEffect(() =&gt; {
+  setTotal(pedidos.reduce((soma, p) =&gt; soma + p.preco, 0));
+}, [pedidos]);</pre>
+
+<p>O primeiro problema é o render duplo: o componente desenha com o total antigo, o efeito roda depois,
+chama <code>setTotal</code>, e o React desenha tudo de novo — com a tela piscando um valor velho no
+caminho. O painel da caixa mostra as duas passadas:</p>
+
+<pre class="term">render — pedidos: 1, total: 21
+render — pedidos: 1, total: 20   (o efeito chamou setTotal e desenhou de novo)</pre>
+
+<p>O segundo problema é pior: o efeito é uma segunda fonte da verdade. Se o total for atualizado em outro
+lugar, o efeito o sobrescreve no render seguinte. E se a lista de dependências estiver incompleta, o
+total para de acompanhar em silêncio. Você trocou um bug de esquecimento por um bug de ordem de
+execução, que é bem mais difícil de enxergar.</p>
+
+<p>A regra prática: <strong>nunca use efeito para calcular algo a partir do estado ou das props</strong>.
+Se o valor sai de um cálculo, escreva o cálculo. O <code>useEffect</code> serve para falar com o mundo
+fora do React — buscar dados, ouvir um evento do navegador, mexer no título da aba — e as aulas de
+efeitos tratam disso em detalhe. Há uma aula inteira, <a href="quando-nao-usar-efeito.html">quando não
+usar efeito</a>, sobre exatamente este atalho.</p>
+
+<p>Se você já tem um efeito desses no código, o conserto costuma ser apagar: delete o estado, delete o
+efeito e deixe a conta no corpo do componente. Menos linhas, menos renders, menos lugares para esquecer.</p>
+
+<h2>6. O caso mais traiçoeiro: props copiadas para o estado</h2>
+
+<p>Um componente recebe uma lista por props. Para "poder mexer nela", alguém copia a prop para um estado
+na primeira renderização:</p>
+
+<pre class="file" data-file="App.jsx">function Lista({ itens }) {
+  const [visiveis, setVisiveis] = useState(itens);
+  return &lt;ul&gt;{visiveis.map((i) =&gt; &lt;li key={i.id}&gt;{i.nome}&lt;/li&gt;)}&lt;/ul&gt;;
+}</pre>
+
+<p>O <code>useState(itens)</code> usa a prop apenas como <strong>valor inicial</strong>. O React guarda
+aquele array e não olha mais para a prop: nas renderizações seguintes, <code>itens</code> pode ter
+mudado, que <code>visiveis</code> continua com o primeiro array. A lista congela no dia em que o
+componente nasceu.</p>
+
+<div class="tryreact" data-goal="clique:button;;conta:li=2">
+  <p class="try-task">O botão acrescenta um pedido, mas a lista continua com um item, porque o componente
+  copiou a prop para um estado. Mostre o que ele recebe, sem estado intermediário. A missão clica em
+  Acrescentar e confere dois itens.</p>
+  <pre class="jsx">function Lista({ itens }) {
+  const [visiveis, setVisiveis] = useState(itens);
+
+  return (
+    &lt;ul&gt;
+      {visiveis.map((p) =&gt; (
+        &lt;li key={p.id}&gt;{p.nome}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}
+
+function App() {
+  const [pedidos, setPedidos] = useState([{ id: 1, nome: "Pão francês" }]);
+
+  return (
+    &lt;div&gt;
+      &lt;button
+        onClick={() =&gt;
+          setPedidos([...pedidos, { id: pedidos.length + 1, nome: "Pão de mel" }])
+        }
+      &gt;
+        Acrescentar
+      &lt;/button&gt;
+      &lt;Lista itens={pedidos} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Acrescentar&lt;/button&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Pão francês&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Lista({ itens }) {
+  return (
+    &lt;ul&gt;
+      {itens.map((p) =&gt; (
+        &lt;li key={p.id}&gt;{p.nome}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}
+
+function App() {
+  const [pedidos, setPedidos] = useState([{ id: 1, nome: "Pão francês" }]);
+
+  return (
+    &lt;div&gt;
+      &lt;button
+        onClick={() =&gt;
+          setPedidos([...pedidos, { id: pedidos.length + 1, nome: "Pão de mel" }])
+        }
+      &gt;
+        Acrescentar
+      &lt;/button&gt;
+      &lt;Lista itens={pedidos} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A prop é o canal por onde o dado desce; o estado é a memória local. Copiar um para o outro cria uma
+memória que nasce desatualizada. Se o componente só mostra o que recebe, desenhe a prop. Se ele precisa
+mudar o dado, a mudança é do pai — o filho chama uma função recebida por prop, e o pai atualiza a lista
+de verdade.</p>
+
+<p>Existe uma exceção legítima: quando o formulário precisa <strong>divergir</strong> do dado recebido
+até o usuário salvar. Aí a cópia é intencional — é um rascunho, um snapshot. Mesmo nesse caso, o valor
+inicial não deve ser lido uma vez só: costuma-se usar o <code>key</code> para remontar o formulário, ou
+comparar com a prop para oferecer "descartar alterações". É assunto de formulário, não de lista.</p>
+
+<h2>7. Quando guardar faz sentido</h2>
+
+<p>Derivar é o padrão, não uma lei absoluta. Existem três casos em que vale ter um estado para um valor
+que, em teoria, poderia ser calculado.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Por que guardar</th><th>Ferramenta</th></tr>
+<tr><td>Cálculo caro a cada render</td><td>evitar refazer a conta sem necessidade</td><td><code>useMemo</code> (Nível 2)</td></tr>
+<tr><td>Rascunho de formulário</td><td>o usuário edita antes de salvar; o dado original não pode ser alterado no meio</td><td><code>useState</code> com valor inicial da prop</td></tr>
+<tr><td>Dado que vem da rede</td><td>não há de onde calcular: o servidor é a fonte</td><td><code>useState</code> + <code>useEffect</code></td></tr>
+</table>
+</div>
+
+<p>Fora desses casos, o valor guardado é uma cópia esperando para desencontrar. E note que o primeiro
+caso — cálculo caro — não é sobre corretude e sim sobre velocidade: o resultado do <code>useMemo</code> é
+o mesmo cálculo, feito menos vezes. Se a conta é barata, nem isso.</p>
+
+<p>Um jeito de decidir em dois segundos: pergunte "se eu apagar este estado e calcular no render, a tela
+continua igual?". Se a resposta for sim, apague. O único motivo para manter é a tela precisar de um valor
+diferente do que o cálculo daria agora — e isso quase sempre significa que existe um estado de verdade
+escondido ali, como o texto que o usuário digitou.</p>
+
+<h2>8. Contas de verdade: números, arredondamento e formatação</h2>
+
+<p>Voltando ao total da Ana, dois cuidados práticos. O primeiro: preços em reais com centavos não são
+números redondos, e somar <code>0.1 + 0.2</code> em JavaScript dá <code>0.30000000000000004</code>.
+Trabalhar em centavos inteiros evita o problema: guarde <code>preco: 350</code> e mostre dividindo por
+100 na hora de desenhar.</p>
+
+<p>O segundo: formatar é derivar também. O texto "R$ 12,50" não precisa de estado; sai de
+<code>total.toFixed(2)</code> ou, melhor, de <code>total.toLocaleString("pt-BR", { style: "currency",
+currency: "BRL" })</code>, que já põe o símbolo, a vírgula e o ponto de milhar no lugar certo. Como é
+conta, muda sozinho quando o total muda.</p>
+
+<pre class="file" data-file="App.jsx">const total = pedidos.reduce((soma, p) =&gt; soma + p.preco, 0);
+const emReais = total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const vazio = pedidos.length === 0;</pre>
+
+<p>Três derivados, zero estados. E o componente fica fácil de ler: cada linha diz o que o valor é. Quando
+o cálculo cresce demais, ele pode virar uma função auxiliar fora do componente — o importante é que
+receba os dados e devolva o valor, sem guardar nada no caminho.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o contador que a tela mostra e o estado esquece</h3>
+<p>A Ana quis mostrar "3 pedidos na fila" e criou <code>const [quantidade, setQuantidade] =
+useState(0)</code>, incrementando ao acrescentar. Quando removeu um pedido, a quantidade continuou em 3.
+O número que ela queria é <code>pedidos.length</code> — a lista já sabe quantos itens tem. Contagem é
+sempre derivada; estado para contagem é bug marcado para depois.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o botão que fica habilitado com o carrinho vazio</h3>
+<p>Ela guardou <code>podeFechar</code> num estado e chamou <code>setPodeFechar(true)</code> quando o
+cliente digitou o nome. Ao apagar o nome, o botão continuou liberado. A condição é
+<code>nome.trim() !== "" &amp;&amp; pedidos.length &gt; 0</code>, calculada no render: assim o botão segue
+cada mudança sozinho, inclusive as que ela não previu. Botão habilitado é consequência, não memória.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o total que "funcionava" porque a lista era pequena</h3>
+<p>Em uma tela com dois campos, ninguém notou que o total guardado ficava velho: as duas funções
+atualizavam o valor e o terceiro caminho ainda não existia. O bug apareceu cinco meses depois, com o
+botão de remover. Estado derivado não é preciosismo — é a diferença entre um número que sempre fecha e
+um número que fecha até alguém acrescentar uma tela.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. O que é estado derivado?</p>
+<label><input type="radio" name="q1"> um estado que não pode ser mudado depois de criado</label>
+<label><input type="radio" name="q1"> um estado que vem de um componente pai</label>
+<label><input type="radio" name="q1"> um valor calculado a partir de outros valores, a cada render</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. Qual destes vale a pena guardar num <code>useState</code>?</p>
+<label><input type="radio" name="q2"> o texto que o cliente digitou no campo de busca</label>
+<label><input type="radio" name="q2"> a lista filtrada pela busca</label>
+<label><input type="radio" name="q2"> a quantidade de itens da lista</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. Por que <code>useState(itens)</code> num componente filho costuma dar errado?</p>
+<label><input type="radio" name="q3"> porque o React proíbe iniciar estado com props</label>
+<label><input type="radio" name="q3"> porque a prop só é lida na primeira renderização e a cópia envelhece</label>
+<label><input type="radio" name="q3"> porque arrays não podem ser valores iniciais de estado</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: três derivados da fila</h2>
+<p>Complete os cálculos: o total em centavos, quantos itens estão na fila e a lista filtrada pela busca.
+Nenhum deles pede <code>useState</code>.</p>
+<div class="ex-code">const total = pedidos.<input aria-label="resposta 1" data-answer="reduce" placeholder="...">((soma, p) =&gt; soma + p.preco, 0);
+
+const naFila = pedidos.<input aria-label="resposta 2" data-answer="length" placeholder="...">;
+
+const visiveis = pedidos.<input aria-label="resposta 3" data-answer="filter" placeholder="...">((p) =&gt; p.nome.includes(busca));</div>
+<p class="ex-dica">Dica: um método transforma a lista num valor só, um é uma propriedade que conta, e o
+outro devolve uma lista nova com os itens aprovados pela função.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Estado é memória; derivado é conta. O texto digitado, a lista de pedidos e o dado que veio do servidor
+precisam de <code>useState</code>. O total, a contagem, a lista filtrada, o texto formatado e a condição
+que habilita um botão saem do que já está lá, calculados no corpo do componente, a cada render. Se dá
+para calcular, não guarde.</p>
+
+<p>As ferramentas são as que você já conhece: <code>reduce</code> para somar, <code>length</code> para
+contar, <code>filter</code> para a lista que aparece, <code>toLocaleString</code> para o dinheiro.
+Sincronizar dois estados com <code>useEffect</code> não é solução: cria render duplo e uma segunda fonte
+da verdade. E copiar props para dentro de um estado é o caso extremo — a cópia nasce congelada e a lista
+para de crescer.</p>
+
+<p>Com isso, a Ana tem a fila funcionando e o caixa fechando certo. O próximo assunto parece pequeno e
+mexe com tudo o que veio antes: quando um clique chama três setters de uma vez, quantas vezes o
+componente desenha? A resposta explica por que um contador às vezes soma só um, e é o tema da aula de
+atualizações em lote.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Se dá para calcular a partir do estado e das props, calcule no render.</li>
+<li>Total: <code>pedidos.reduce((soma, p) =&gt; soma + p.preco, 0)</code>.</li>
+<li>Contagem: <code>pedidos.length</code>; nunca um estado que você incrementa na mão.</li>
+<li>Lista filtrada: <code>pedidos.filter(...)</code> na hora de desenhar.</li>
+<li>Estado só para o que o usuário digitou, o que veio da rede ou o que não se recalcula.</li>
+<li>Efeito que chama setter para sincronizar derivado = render duplo e segunda fonte da verdade.</li>
+<li><code>useState(props.itens)</code> congela a prop: a cópia não acompanha o pai.</li>
+<li>Guardar faz sentido em cálculo caro (<code>useMemo</code>), rascunho de formulário e dado da rede.</li>
+<li>Formatação é derivada: <code>toLocaleString</code> em vez de estado com texto pronto.</li>
+<li>Preço em centavos evita <code>0.30000000000000004</code>.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

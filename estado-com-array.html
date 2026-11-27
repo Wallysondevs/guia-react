@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estado com Array | Guia React</title>
+<meta name="description" content="Estado com array no React: acrescentar com spread, remover com filter, trocar um item com map, por que push não redesenha e as receitas de cada operação.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Estado com <span class="hl">Array</span></h1>
+<p class="intro">A Ana agora tem uma fila de encomendas: cada pedido que chega entra na lista, cada
+pedido entregue sai dela, e o pão que ficou pronto muda de estado. Ela escreveu
+<code>pedidos.push(novo)</code> e a lista continuou com os mesmos itens na tela. Escreveu
+<code>pedidos.splice(0, 1)</code> e nada saiu. Nesta aula ela aprende a guardar uma <strong>lista no
+estado</strong> e a mudá-la do jeito que o React percebe: construindo uma lista nova.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como guardar uma lista num estado e desenhá-la com <code>map</code>.</li>
+  <li>Acrescentar um item com <code>[...lista, novo]</code>.</li>
+  <li>Remover um item com <code>filter</code>, de preferência pelo <code>id</code>.</li>
+  <li>Trocar um item com <code>map</code>, sem mutar os outros.</li>
+  <li>Quais métodos de array mudam a lista no lugar — e por que evitá-los no estado.</li>
+  <li>Ordenar sem estragar a lista original.</li>
+  <li>As receitas prontas de cada operação de lista.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a fila de encomendas</h2>
+
+<p>A padaria da Ana passou a receber encomendas por telefone, e ela quer uma tela com a fila. Cada pedido
+tem um nome e uma situação: na fila ou pronto. Quando chega um pedido, entra na lista; quando o cliente
+leva, sai; quando o pão sai do forno, muda de situação.</p>
+
+<p>O primeiro instinto é o que todo mundo tem: a lista é um array, array tem <code>push</code> para
+acrescentar e <code>splice</code> para remover. Ela escreveu <code>pedidos.push(novoPedido)</code> e o
+item entrou — no array. Na tela, nada. Depois chamou <code>setPedidos(pedidos)</code> para "avisar o
+React", e nada de novo: o setter recebeu exatamente o mesmo array que já estava no estado.</p>
+
+<p>É o mesmo problema da aula de <a href="estado-com-objeto.html">estado com objeto</a>, com outra
+roupagem. O React compara a referência: se o array é o mesmo, ele conclui que nada mudou e não redesenha.
+<code>push</code>, <code>splice</code>, <code>sort</code> e <code>reverse</code> alteram a lista no
+lugar, sem criar outra. E o estado precisa receber uma lista nova.</p>
+
+<p>A solução não é complicada, e o React tem uma vantagem a oferecer: quando a lista é nova, o React
+consegue comparar item por item e atualizar só o que mudou na tela. Uma lista construída com calma é
+também uma tela mais rápida.</p>
+
+<h2>2. A lista no estado</h2>
+
+<p>Guardar uma lista num estado é igual a guardar qualquer outra coisa: o valor inicial é <code>[]</code>
+ou um array com itens. Para desenhar, usa-se <code>map</code>, que transforma cada item num pedaço de
+JSX; cada pedaço recebe uma <code>key</code> estável, para o React saber qual é qual.</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const [pedidos, setPedidos] = useState([
+    { id: 1, nome: "Pão francês", pronto: false },
+    { id: 2, nome: "Pão de queijo", pronto: true }
+  ]);
+
+  return (
+    &lt;ul&gt;
+      {pedidos.map((pedido) =&gt; (
+        &lt;li key={pedido.id}&gt;
+          {pedido.nome} — {pedido.pronto ? "pronto" : "na fila"}
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+
+<p>Se a lista estiver vazia, o <code>map</code> devolve uma lista vazia e nada é desenhado — a
+<code>ul</code> fica sem filhos. Vale tratar esse caso na tela, porque uma área em branco não diz se o
+site está carregando, se deu erro ou se não há pedidos. Um <code>{pedidos.length === 0 &amp;&amp; &lt;li&gt;Nenhum pedido na fila&lt;/li&gt;}</code>
+dentro da lista resolve a dúvida do cliente sem nenhum estado extra.</p>
+
+<p>O estado é um array de objetos. O <code>map</code> percorre e devolve uma lista de elementos
+<code>li</code>; o React desenha essa lista. A <code>key</code> é o <code>id</code>, e não o índice: o
+índice muda quando a lista muda, e aí o React reaproveita o elemento errado — a aula
+<a href="a-key.html">A key</a> entra nesse detalhe.</p>
+
+<dl class="anatomy">
+<dt>array</dt>
+<dd>Uma lista ordenada de valores, escrita entre colchetes: <code>["pão", "bolo"]</code>. No estado,
+começa vazio (<code>[]</code>) e vai crescendo.</dd>
+<dt>item</dt>
+<dd>Um elemento da lista. Numa fila de pedidos, cada item é um objeto com <code>id</code>,
+<code>nome</code> e <code>pronto</code>.</dd>
+<dt>índice</dt>
+<dd>A posição do item: 0 para o primeiro, 1 para o segundo. Muda quando você remove ou ordena — por isso
+não serve de identidade.</dd>
+<dt>id</dt>
+<dd>Um valor que não muda e não se repete: 1, 2, 3 ou um número gerado na hora. É o que identifica o
+item em qualquer posição.</dd>
+<dt>lista nova</dt>
+<dd>Um array recém-criado, com os itens que você quer. É o único jeito de o React perceber a mudança:
+referência nova, render novo.</dd>
+</dl>
+
+<h2>3. Acrescentar: uma lista nova com o item no fim</h2>
+
+<p>O <code>push</code> acrescenta no fim da lista existente. O spread faz o mesmo sem tocar na lista
+original: ele copia os itens para um array novo, e você escreve o item novo logo depois.</p>
+
+<div class="tryreact" data-goal="clique:button;;conta:li=2;;texto:Pão de mel">
+  <p class="try-task">O botão usa <code>push</code> e a tela não muda. Acrescente o pedido construindo
+  uma lista nova. A missão clica no botão e confere que apareceram dois itens, um deles "Pão de mel".</p>
+  <pre class="jsx">function App() {
+  const [pedidos, setPedidos] = useState(["Pão francês"]);
+
+  function acrescentar() {
+    pedidos.push("Pão de mel");
+    setPedidos(pedidos);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={acrescentar}&gt;Novo pedido&lt;/button&gt;
+      &lt;ul&gt;
+        {pedidos.map((pedido) =&gt; (
+          &lt;li key={pedido}&gt;{pedido}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Novo pedido&lt;/button&gt;
+  &lt;ul&gt;
+    &lt;li&gt;Pão francês&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [pedidos, setPedidos] = useState(["Pão francês"]);
+
+  function acrescentar() {
+    setPedidos([...pedidos, "Pão de mel"]);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={acrescentar}&gt;Novo pedido&lt;/button&gt;
+      &lt;ul&gt;
+        {pedidos.map((pedido) =&gt; (
+          &lt;li key={pedido}&gt;{pedido}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O spread resolve os dois requisitos de uma vez: os itens antigos vão para a lista nova (nada se perde)
+e o array é outro objeto (o React percebe). A ordem dos elementos no spread é a ordem final na tela —
+<code>[...pedidos, novo]</code> põe no fim, <code>[novo, ...pedidos]</code> põe no começo.</p>
+
+<p>Um detalhe que confunde: <code>push</code> devolve o novo tamanho da lista, não a lista. Escrever
+<code>setPedidos(pedidos.push(novo))</code> guarda o número 2 no estado, e a tela quebra no
+<code>map</code> com "pedidos.map is not a function". Se você vir esse erro, procure um
+<code>set</code> que recebeu o retorno de um método em vez da lista.</p>
+
+<p>Coloque um <code>console.log</code> no handler e você vê o desencontro: o array do estado cresceu, mas
+o componente não rodou de novo, então a tela ficou como estava. O painel da caixa só muda quando há
+render.</p>
+
+<pre class="term">no console: pedidos: ["Pão francês","Pão de mel"]
+na tela:    1 pedido</pre>
+
+<h2>4. Remover: filter devolve só o que fica</h2>
+
+<p>Para remover, a pergunta muda de lado: em vez de dizer o que sai, você diz o que fica. O
+<code>filter</code> percorre a lista e devolve uma lista nova com os itens para os quais a sua função
+respondeu <code>true</code>. O item removido simplesmente não entra.</p>
+
+<div class="tryreact" data-goal="clique:button;;conta:li=1">
+  <p class="try-task">O "Remover" usa <code>splice</code> e a lista continua com dois itens. Remova o
+  pedido sem mutar a lista. A missão clica no primeiro Remover e confere que sobrou um item.</p>
+  <pre class="jsx">function App() {
+  const [pedidos, setPedidos] = useState([
+    { id: 1, nome: "Pão francês" },
+    { id: 2, nome: "Pão de queijo" }
+  ]);
+
+  function remover(id) {
+    const i = pedidos.findIndex((p) =&gt; p.id === id);
+    pedidos.splice(i, 1);
+    setPedidos(pedidos);
+  }
+
+  return (
+    &lt;ul&gt;
+      {pedidos.map((p) =&gt; (
+        &lt;li key={p.id}&gt;
+          {p.nome} &lt;button onClick={() =&gt; remover(p.id)}&gt;Remover&lt;/button&gt;
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul&gt;
+  &lt;li&gt;
+    Pão francês
+    &lt;button&gt;Remover&lt;/button&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    Pão de queijo
+    &lt;button&gt;Remover&lt;/button&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [pedidos, setPedidos] = useState([
+    { id: 1, nome: "Pão francês" },
+    { id: 2, nome: "Pão de queijo" }
+  ]);
+
+  function remover(id) {
+    setPedidos(pedidos.filter((p) =&gt; p.id !== id));
+  }
+
+  return (
+    &lt;ul&gt;
+      {pedidos.map((p) =&gt; (
+        &lt;li key={p.id}&gt;
+          {p.nome} &lt;button onClick={() =&gt; remover(p.id)}&gt;Remover&lt;/button&gt;
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p><code>p.id !== id</code> lê como "todo pedido cujo id é diferente do que eu quero remover". A função
+devolve <code>false</code> justamente para o pedido clicado, e o <code>filter</code> o deixa de fora. Não
+há <code>splice</code>, não há índice, não há mutação — só uma lista nova.</p>
+
+<pre class="term">lista antiga: ["Pão francês","Pão de queijo"]
+lista nova:   ["Pão de queijo"]</pre>
+
+<p>A lista antiga continua existindo, com os dois itens, porque nada nela foi alterado. A lista nova é
+outro array, com o pedido que sobrou. É essa diferença que o React compara: referências diferentes,
+render novo.</p>
+
+<p>E por que remover pelo <code>id</code> e não pela posição? Porque a posição muda. Se a lista estiver
+ordenada por nome ou se um item já tiver saído, o índice que você viu na tela pode não ser o mesmo do
+array no momento do clique. O <code>id</code> viaja com o item e não se confunde.</p>
+
+<h2>5. Trocar um item: map com comparação</h2>
+
+<p>Atualizar um item é o caso mais interessante, porque a lista muda e o item também. A receita é
+<code>map</code>: para cada pedido, se for o do <code>id</code> clicado, devolva uma versão nova; se não,
+devolva o mesmo. A lista nova tem os mesmos itens, menos um — que é outro objeto.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:pronto">
+  <p class="try-task">O botão muda a propriedade dentro do objeto e a tela não reage. Troque o item por
+  um objeto novo, dentro de uma lista nova. A missão clica em Marcar e confere que aparece
+  <strong>pronto</strong> na lista.</p>
+  <pre class="jsx">function App() {
+  const [pedidos, setPedidos] = useState([
+    { id: 1, nome: "Pão francês", pronto: false },
+    { id: 2, nome: "Pão de queijo", pronto: false }
+  ]);
+
+  function marcar(id) {
+    const pedido = pedidos.find((p) =&gt; p.id === id);
+    pedido.pronto = true;
+    setPedidos(pedidos);
+  }
+
+  return (
+    &lt;ul&gt;
+      {pedidos.map((p) =&gt; (
+        &lt;li key={p.id}&gt;
+          {p.nome + " — " + (p.pronto ? "pronto" : "na fila")}{" "}
+          &lt;button onClick={() =&gt; marcar(p.id)}&gt;Marcar&lt;/button&gt;
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul&gt;
+  &lt;li&gt;
+    Pão francês — na fila
+    &lt;button&gt;Marcar&lt;/button&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    Pão de queijo — na fila
+    &lt;button&gt;Marcar&lt;/button&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [pedidos, setPedidos] = useState([
+    { id: 1, nome: "Pão francês", pronto: false },
+    { id: 2, nome: "Pão de queijo", pronto: false }
+  ]);
+
+  function marcar(id) {
+    setPedidos(
+      pedidos.map((p) =&gt; (p.id === id ? { ...p, pronto: true } : p))
+    );
+  }
+
+  return (
+    &lt;ul&gt;
+      {pedidos.map((p) =&gt; (
+        &lt;li key={p.id}&gt;
+          {p.nome + " — " + (p.pronto ? "pronto" : "na fila")}{" "}
+          &lt;button onClick={() =&gt; marcar(p.id)}&gt;Marcar&lt;/button&gt;
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p>A expressão tem três partes: <code>p.id === id</code> escolhe o item; <code>{ ...p, pronto: true }</code>
+cria uma versão nova dele, sem perder o nome nem o <code>id</code>; <code>: p</code> devolve os outros
+intactos. Duas aulas se encontram aqui: o spread do objeto e a lista nova do array.</p>
+
+<p>A <code>key</code> do item continua a mesma depois da troca, e é por isso que o React atualiza
+aquele <code>li</code> em vez de apagar e criar outro. Se o <code>key</code> fosse o índice ou o texto
+visível, o React perderia a referência: criaria um elemento novo e, num formulário dentro da linha, o
+foco e o texto digitado iriam embora. Chave estável é o que permite atualizar no lugar.</p>
+
+<p>Note que os itens não alterados são os mesmos objetos de antes — e isso é bom, é o que permite ao React
+concluir que eles não precisam ser redesenhados. Só o item clicado é novo.</p>
+
+<h2>6. Os métodos que mudam a lista no lugar</h2>
+
+<p>JavaScript tem dois tipos de método de array: os que alteram o array original e os que devolvem um
+array novo. No estado, só os segundos servem. Vale colar esta tabela em algum lugar da memória, porque o
+erro que os primeiros causam é sempre o mesmo: a tela parada.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método</th><th>Altera a lista original?</th><th>Devolve</th></tr>
+<tr><td><code>push</code>, <code>pop</code>, <code>shift</code>, <code>unshift</code></td><td>sim</td><td>o novo tamanho ou o item retirado</td></tr>
+<tr><td><code>splice</code></td><td>sim</td><td>a lista dos itens removidos</td></tr>
+<tr><td><code>sort</code>, <code>reverse</code>, <code>fill</code></td><td>sim</td><td>o próprio array, já alterado</td></tr>
+<tr><td><code>map</code>, <code>filter</code>, <code>slice</code>, <code>concat</code></td><td>não</td><td>um array novo</td></tr>
+<tr><td><code>toSorted</code>, <code>toReversed</code>, <code>toSpliced</code></td><td>não</td><td>uma cópia já alterada (JavaScript moderno)</td></tr>
+</table>
+</div>
+
+<p>Quando você precisa de um método da primeira linha, o caminho é copiar antes: <code>[...lista]</code>
+cria uma cópia rasa, e aí o <code>sort</code> pode trabalhar nela sem estragar o estado. As versões
+<code>toSorted</code> e companhia já fazem essa cópia por dentro, e funcionam nos navegadores atuais e no
+Node 22.</p>
+
+<p>Um aviso sobre a cópia rasa: <code>[...lista]</code> copia a lista, não os itens. Os objetos de dentro
+continuam sendo os mesmos — o que é exatamente o que queremos no <code>map</code> da seção 5, mas não
+protege ninguém de uma mutação feita direto no item.</p>
+
+<h2>7. Ordenar sem estragar a lista</h2>
+
+<p>A Ana quis mostrar a fila por ordem alfabética e escreveu <code>setPedidos(pedidos.sort())</code>. Duas
+coisas erradas de uma vez: o <code>sort</code> altera o array no lugar, então o estado muda sem o React
+saber; e o setter recebe o mesmo array, então nada é redesenhado. Na tela, a ordem antiga; no estado, a
+nova. Pior: qualquer render posterior mostra a lista embaralhada, e a origem do bug fica invisível.</p>
+
+<pre class="file" data-file="App.jsx">const ordenados = [...pedidos].sort((a, b) =&gt; a.nome.localeCompare(b.nome));
+setPedidos(ordenados);</pre>
+
+<p>O spread cria a cópia; o <code>sort</code> trabalha nela; o setter recebe um array novo. A função de
+comparação é necessária porque o <code>sort</code> padrão compara como texto, e "10" vem antes de "2". O
+<code>localeCompare</code> compara com as regras do português, acentos incluídos.</p>
+
+<p>Dá para evitar o spread usando <code>pedidos.toSorted((a, b) =&gt; ...)</code>, que devolve a cópia
+ordenada e deixa a original em paz. Os dois jeitos estão certos; o primeiro funciona em qualquer
+navegador, o segundo é mais curto e mais novo.</p>
+
+<p>Uma alternativa que muita gente prefere: guardar a ordem como um estado separado, e ordenar só na
+hora de desenhar, com <code>[...pedidos].sort(...)</code> dentro do JSX. A lista original continua na
+ordem em que os pedidos chegaram, e a tela mostra o que você escolheu. Esse é um caso de dado derivado —
+assunto da próxima aula.</p>
+
+<h2>8. As receitas de cada operação</h2>
+
+<p>Com o tempo, essas operações viram reflexo. Vale ter a tabela à mão nas primeiras semanas, porque a
+diferença entre a versão que funciona e a que não funciona é pequena — e o sintoma é sempre "a tela não
+mudou".</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você quer</th><th>Como se escreve</th><th>O que acontece</th></tr>
+<tr><td>Acrescentar no fim</td><td><code>setLista([...lista, novo])</code></td><td>lista nova com o item no fim</td></tr>
+<tr><td>Acrescentar no começo</td><td><code>setLista([novo, ...lista])</code></td><td>lista nova com o item na frente</td></tr>
+<tr><td>Remover pelo id</td><td><code>setLista(lista.filter((x) =&gt; x.id !== id))</code></td><td>lista nova sem o item</td></tr>
+<tr><td>Trocar um item</td><td><code>setLista(lista.map((x) =&gt; x.id === id ? { ...x, campo } : x))</code></td><td>lista nova com um item novo</td></tr>
+<tr><td>Esvaziar</td><td><code>setLista([])</code></td><td>lista nova, vazia</td></tr>
+<tr><td>Ordenar</td><td><code>setLista([...lista].sort(fn))</code></td><td>lista nova na ordem pedida</td></tr>
+</table>
+</div>
+
+<p>Repare que todas as linhas que funcionam têm uma coisa em comum: produzem um array novo. É o mesmo
+princípio do estado com objeto — o valor que vai para o setter nunca é o que já estava lá, é sempre um
+valor novo, construído a partir do antigo.</p>
+
+<p>Cada item também precisa de um <code>id</code> que não mude. Se você cria os itens na hora, um valor
+como <code>Date.now()</code> serve para um pedido por vez; para uma sequência de vários no mesmo
+milissegundo, o ideal é um contador. O importante é que o <code>id</code> acompanhe o item para sempre: é
+ele que o <code>key</code> usa e é por ele que você remove e atualiza.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a tela com dois itens e o estado com um</h3>
+<p>A Ana chamou <code>setPedidos([...pedidos])</code> logo depois do <code>push</code> e a tela passou a
+mostrar o item novo. Parece resolvido, mas o hábito é ruim: a lista é mutada antes de ser copiada, e
+qualquer outro componente que estivesse segurando a lista antiga vê o item aparecer sem aviso. Copiar no
+mesmo passo — <code>setPedidos([...pedidos, novo])</code> — produz o mesmo resultado sem efeito
+colateral.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: "pedidos.map is not a function"</h3>
+<p>Um clássico. Ela escreveu <code>setPedidos(pedidos.push(novo))</code>, e o estado passou a guardar o
+número 2, que é o que o <code>push</code> devolve. No render seguinte, o <code>map</code> não existe num
+número e a caixa mostra o erro. Quando aparecer essa mensagem, olhe o que foi entregue ao setter: tem de
+ser um array, não o retorno de um método.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o item errado saiu da lista</h3>
+<p>Ela removeu pela posição, com <code>filter((p, i) =&gt; i !== 0)</code>, para tirar "o primeiro da
+tela". Só que a lista estava ordenada por nome e o primeiro da tela não era o primeiro do array: saiu o
+pedido errado, e o certo continuou lá. Remover pelo <code>id</code> do item clicado não depende de ordem
+nenhuma. Posição serve para desenhar; identidade serve para agir.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Como acrescentar um item a uma lista que está no estado?</p>
+<label><input type="radio" name="q1"> <code>lista.push(novo)</code> e depois chamar o setter</label>
+<label><input type="radio" name="q1"> <code>setLista([...lista, novo])</code></label>
+<label><input type="radio" name="q1"> <code>setLista(lista.length + 1)</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que <code>lista.push(novo); setLista(lista)</code> não atualiza a tela?</p>
+<label><input type="radio" name="q2"> porque o React não aceita listas com mais de cinco itens</label>
+<label><input type="radio" name="q2"> porque o <code>push</code> só funciona fora de funções</label>
+<label><input type="radio" name="q2"> porque a referência do array é a mesma; o React descarta a atualização</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Qual método devolve uma lista nova sem mexer na original?</p>
+<label><input type="radio" name="q3"> <code>filter</code></label>
+<label><input type="radio" name="q3"> <code>splice</code></label>
+<label><input type="radio" name="q3"> <code>sort</code></label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: as três operações da fila</h2>
+<p>Complete as três atualizações da lista de pedidos: acrescentar um no fim, remover pelo
+<code>id</code> e trocar a situação de um item.</p>
+<div class="ex-code">setPedidos([<input aria-label="resposta 1" data-answer="...pedidos" placeholder="...">, novo]);
+
+setPedidos(pedidos.<input aria-label="resposta 2" data-answer="filter" placeholder="...">((p) =&gt; p.id !== id));
+
+setPedidos(pedidos.<input aria-label="resposta 3" data-answer="map" placeholder="...">((p) =&gt; p.id === id ? { ...p, pronto: true } : p));</div>
+<p class="ex-dica">Dica: a primeira linha copia a lista com os três pontinhos; as outras duas usam métodos
+que devolvem lista nova — um escolhe o que fica, o outro transforma cada item.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Uma lista no estado é um valor como outro qualquer, e a regra é a mesma dos objetos: nunca altere o
+que já está lá. <code>push</code>, <code>splice</code>, <code>sort</code>
+e <code>reverse</code> mexem na lista original e deixam o React sem motivo para redesenhar. O caminho é
+sempre construir uma lista nova — com spread para acrescentar, <code>filter</code> para remover e
+<code>map</code> para trocar um item.</p>
+
+<p>Os itens precisam de identidade: um <code>id</code> que não muda serve de <code>key</code> no
+<code>map</code> e de critério na hora de remover ou atualizar. Posição serve para desenhar, não para
+agir. E cada operação tem uma receita curta: <code>[...lista, novo]</code>,
+<code>lista.filter((x) =&gt; x.id !== id)</code>,
+<code>lista.map((x) =&gt; x.id === id ? { ...x, campo } : x)</code>.</p>
+
+<p>Com isso, a Ana já consegue manter a fila de encomendas viva na tela: entra pedido, sai pedido, muda
+situação. O que ainda falta é não guardar o que pode ser calculado — quantos pedidos estão na fila, quanto
+vai render o dia, qual item aparece primeiro. Guardar esses números em estados separados é o próximo
+tropeço, e é o assunto da aula seguinte.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Lista no estado: <code>useState([])</code>; desenhe com <code>map</code> e uma <code>key</code> estável.</li>
+<li>Acrescentar: <code>[...lista, novo]</code>; no começo: <code>[novo, ...lista]</code>.</li>
+<li>Remover: <code>lista.filter((x) =&gt; x.id !== id)</code>.</li>
+<li>Trocar um item: <code>lista.map((x) =&gt; x.id === id ? { ...x, campo } : x)</code>.</li>
+<li><code>push</code>, <code>splice</code>, <code>sort</code> e <code>reverse</code> mutam: evite no estado.</li>
+<li><code>push</code> devolve o tamanho — <code>setLista(lista.push(x))</code> guarda um número.</li>
+<li>Ordenar: <code>[...lista].sort(fn)</code> ou <code>lista.toSorted(fn)</code>.</li>
+<li>O spread copia a lista, não os objetos de dentro.</li>
+<li>Remova e atualize pelo <code>id</code>, nunca pela posição.</li>
+<li>Lista nova, render novo: referência nova é o que o React compara.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

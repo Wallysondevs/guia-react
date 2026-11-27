@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Renderização Condicional | Guia React</title>
+<meta name="description" content="Renderização condicional em React: o ternário dentro do JSX, o atalho com &amp;&amp;, o zero que aparece sem querer e o retorno antecipado que devolve null.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Renderização <span class="hl">Condicional</span></h1>
+<p class="intro">A página da Ana mostra tudo o que sabe, sempre: o aviso de última fornada mesmo quando
+o forno está cheio, o "fechado" no domingo de manhã, a lista vazia com um zero solto embaixo do título.
+Nesta aula ela aprende a deixar a tela decidir — mostrar o aviso só quando ele faz sentido, esconder a
+lista quando não há nada nela e devolver nada quando o componente não tem o que dizer.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é renderização condicional e por que ela não é CSS escondido.</li>
+  <li>O ternário dentro do JSX: <code>{cond ? a : b}</code>.</li>
+  <li>O atalho <code>&amp;&amp;</code> para mostrar ou não mostrar um elemento.</li>
+  <li>Por que um <code>0</code> aparece na tela quando você usa <code>&amp;&amp;</code> com um número.</li>
+  <li>O retorno antecipado: <code>if (!texto) return null;</code>.</li>
+  <li>Como escolher entre três ou mais opções sem embolar o JSX.</li>
+  <li>Condicional em atributos: <code>className</code>, <code>disabled</code>, <code>aria-hidden</code>.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a página que diz tudo ao mesmo tempo</h2>
+
+<p>A página inicial da padaria tem três avisos fixos: "Última fornada do dia", "Encomendas para hoje" e
+"Fechado aos domingos". A Ana escreveu os três no HTML e nunca mais mexeu. Na terça-feira, com o forno
+cheio e a loja aberta, o site dizia "última fornada" e "fechado" ao mesmo tempo. O cliente leu, acreditou
+e foi embora.</p>
+
+<p>O problema não é o texto: é que a página mostra informação que não vale naquele momento. Um site de
+verdade mostra o aviso quando o aviso é verdade e não mostra quando não é. Isso se chama
+<strong>renderização condicional</strong>: o componente decide, na hora de desenhar, se um pedaço de tela
+entra ou não.</p>
+
+<p>Antes de ver o código, vale entender o que "não entra" significa. Se o elemento não é desenhado, ele
+não existe no HTML: não ocupa espaço, não recebe clique, não é lido por leitor de tela, não aparece na
+busca do navegador com <code>Ctrl+F</code>. Isso é diferente de esconder com CSS
+(<code>display: none</code>): ali o elemento existe e só não é visto. Para um aviso que não vale, o
+certo é não desenhar — e é isso que as três técnicas desta aula fazem.</p>
+
+<p>Vale reparar no custo de mostrar tudo. O cliente não lê o site como um programador lê: ele lê uma
+frase de cada vez e acredita no que está escrito. Um aviso que não vale não é neutro — ele desinforma. Por
+isso a decisão de mostrar precisa estar no código, junto do dado que a sustenta, e não na memória de quem
+edita o HTML na sexta-feira.</p>
+
+<h2>2. A pergunta antes do desenho</h2>
+
+<p>Tudo o que você já sabe continua valendo: o componente é uma função, e o <code>return</code> devolve
+JSX. O que muda é que o JSX pode ser montado a partir de uma pergunta. As chaves <code>{ }</code> abrem
+espaço para JavaScript, e uma condição é JavaScript: dá para perguntar, comparar e escolher antes de
+devolver.</p>
+
+<p>Há três formas de fazer essa pergunta, e cada uma serve a um caso. O ternário escolhe entre duas
+coisas. O <code>&amp;&amp;</code> mostra uma coisa ou nada. O <code>if</code> com retorno antecipado sai
+da função antes de desenhar o resto. As três aparecem em qualquer projeto React, muitas vezes no mesmo
+arquivo.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Quando usar</th><th>Exemplo</th></tr>
+<tr><td>ternário <code>? :</code></td><td>duas opções, uma ou outra</td><td><code>{temPao ? "Tem pão" : "Acabou"}</code></td></tr>
+<tr><td>atalho <code>&amp;&amp;</code></td><td>mostrar ou não mostrar nada</td><td><code>{temPao &amp;&amp; &lt;p&gt;Saiu agora&lt;/p&gt;}</code></td></tr>
+<tr><td><code>if</code> + <code>return</code></td><td>sair do componente antes do JSX</td><td><code>if (!texto) return null;</code></td></tr>
+</table>
+</div>
+
+<p>Repare que as três formas devolvem uma <em>expressão</em>: alguma coisa que o JSX aceita dentro das
+chaves. Um <code>if</code> não é expressão em JavaScript, então ele não pode ficar no meio do JSX — ele
+fica antes do <code>return</code>. Essa é a razão prática pela qual o ternário e o
+<code>&amp;&amp;</code> existem: eles cabem onde o <code>if</code> não cabe.</p>
+
+<p>Uma condição é qualquer expressão que resulte em verdadeiro ou falso: uma comparação
+(<code>preco &gt; 10</code>), um pedaço de dado (<code>encomendas.length</code>), uma prop
+(<code>aberto</code>) ou uma função que devolve booleano. O que ela não pode é ser uma frase de efeito.
+<code>{temPao ? ...}</code> pergunta pelo valor de <code>temPao</code>, então essa variável precisa
+existir no escopo — como constante, variável, prop ou resultado de um cálculo feito antes do
+<code>return</code>.</p>
+
+<dl class="anatomy">
+<dt>condição</dt>
+<dd>Uma expressão que resulta em verdadeiro ou falso: <code>aberto</code>,
+<code>itens.length === 0</code>, <code>preco &gt; 10</code>.</dd>
+<dt>expressão</dt>
+<dd>Qualquer coisa que produza um valor — é o que pode ficar dentro das chaves do JSX.</dd>
+<dt>ternário</dt>
+<dd>A pergunta com duas respostas: <code>cond ? a : b</code>. As duas respostas são
+obrigatórias.</dd>
+<dt>curto-circuito</dt>
+<dd>O comportamento do <code>&amp;&amp;</code>: se a esquerda é falsa, a direita nem é avaliada — e o
+resultado é a própria esquerda.</dd>
+<dt>retorno antecipado</dt>
+<dd>Um <code>return</code> no meio da função, que encerra o componente antes do JSX principal.</dd>
+<dt>null</dt>
+<dd>O "nada" oficial do React: não cria elemento nenhum na página.</dd>
+</dl>
+
+<h2>3. O ternário dentro do JSX</h2>
+
+<p>O ternário tem a forma <code>condição ? valorSeVerdadeiro : valorSeFalso</code>. É uma pergunta com
+duas respostas, e as duas são obrigatórias. No JSX ele aparece dentro das chaves, e cada resposta pode
+ser um texto, uma variável ou um elemento inteiro.</p>
+
+<div class="tryreact" data-goal="texto:Esgotado;;conta:p=1">
+  <p class="try-task">O painel mostra "Disponível" sempre, porque o texto está escrito à mão. Use um
+  ternário com <code>temPao</code> para mostrar "Disponível" quando for verdadeiro e "Esgotado" quando
+  for falso.</p>
+  <pre class="jsx">function App() {
+  const temPao = false;
+
+  console.log("tem pão? " + temPao);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pão de queijo: Disponível&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Pão de queijo: Disponível&lt;/p&gt;
+&lt;/div&gt;
+console: tem pão? false
+</pre>
+  <pre class="solucao">function App() {
+  const temPao = false;
+
+  console.log("tem pão? " + temPao);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pão de queijo: {temPao ? "Disponível" : "Esgotado"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel agora mostra <code>Pão de queijo: Esgotado</code>, e o HTML gerado é um <code>p</code> com o
+texto já resolvido — não há rastro do ternário. Quando o React desenha, a pergunta já foi respondida.
+Troque <code>const temPao = false</code> por <code>true</code> e rode de novo: a mesma linha de código
+produz o outro texto.</p>
+
+<p>Antes do HTML, o painel mostra a linha que o código escreveu no console — e ela é a prova de que a
+condição foi avaliada com o valor que você imaginava:</p>
+
+<pre class="term">tem pão? false</pre>
+
+<p>Se o console dissesse <code>tem pão? true</code> e a tela mostrasse "Esgotado", o problema estaria na
+expressão, não no dado. Separar as duas coisas — o que a condição vale e o que a tela mostra — é metade do
+trabalho de depurar JSX.</p>
+
+<p>O ternário também escolhe entre elementos inteiros, não só entre textos:</p>
+
+<pre class="file" data-file="Status.jsx">function Status({ aberto }) {
+  return (
+    &lt;p className="status"&gt;
+      {aberto ? &lt;strong&gt;Aberto agora&lt;/strong&gt; : &lt;em&gt;Fechado&lt;/em&gt;}
+    &lt;/p&gt;
+  );
+}</pre>
+
+<p>Aqui as duas respostas são elementos diferentes, com tags diferentes. É permitido: o ternário devolve
+um ou outro, e o React desenha o que veio. O que não vale é esquecer o lado do
+<code>:</code> — <code>{aberto ? &lt;p&gt;Aberto&lt;/p&gt;}</code> é erro de sintaxe, porque o ternário
+exige as duas respostas. Para "ou nada", existe o <code>&amp;&amp;</code>.</p>
+
+<h2>4. O atalho do <code>&amp;&amp;</code></h2>
+
+<p>Quando a resposta falsa é "nada", o ternário fica com um buraco: <code>{temPao ? &lt;p&gt;Saiu
+agora&lt;/p&gt; : null}</code>. O JavaScript resolve isso com o curto-circuito: no
+<code>condição &amp;&amp; valor</code>, se a condição for falsa, o valor nem é avaliado — o resultado é
+a própria condição. No JSX, um resultado falso não desenha nada, então o efeito é "mostra ou não
+mostra".</p>
+
+<div class="tryreact" data-goal="texto:Nenhuma encomenda;;conta:p=1">
+  <p class="try-task">A lista de encomendas está vazia, e o aviso não aparece: no lugar dele o painel
+  mostra um <code>0</code> solto. Faça o aviso "Nenhuma encomenda" aparecer quando a lista estiver
+  vazia, sem deixar o zero na tela.</p>
+  <pre class="jsx">function App() {
+  const encomendas = [];
+
+  console.log("tem encomenda? " + (encomendas.length &gt; 0));
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Encomendas de hoje&lt;/h1&gt;
+      {encomendas.length &amp;&amp; &lt;p className="vazio"&gt;Nenhuma encomenda&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Encomendas de hoje&lt;/h1&gt;
+  0
+&lt;/div&gt;
+console: tem encomenda? false
+</pre>
+  <pre class="solucao">function App() {
+  const encomendas = [];
+
+  console.log("tem encomenda? " + (encomendas.length &gt; 0));
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Encomendas de hoje&lt;/h1&gt;
+      {encomendas.length === 0 &amp;&amp; &lt;p className="vazio"&gt;Nenhuma encomenda&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O conserto tem uma linha e uma ideia: o lado esquerdo do <code>&amp;&amp;</code> precisa ser um
+booleano de verdade, não um número. <code>encomendas.length</code> vale <code>0</code>, e zero é
+falso — mas o que o <code>&amp;&amp;</code> devolve não é o "nada" que o React ignora: é o próprio
+<code>0</code>, que o React desenha como texto. Com <code>=== 0</code>, o lado esquerdo é
+<code>true</code> ou <code>false</code>, e aí o atalho funciona como você espera.</p>
+
+<h2>5. O zero que aparece do nada</h2>
+
+<p>Esse erro é tão comum que merece nome: o "zero renderizado". Ele aparece em qualquer lista que usa o
+tamanho como condição — encomendas, itens no carrinho, resultados de busca — porque o tamanho é um
+número, e números podem ser zero.</p>
+
+<pre class="term">Encomendas de hoje
+0</pre>
+
+<p>Essa é a tela que a Ana viu: o título e um zero. O zero não é um bug do React; é o JavaScript fazendo
+exatamente o que você pediu. O React só desenha o que recebe, e recebeu o número zero. A confusão está
+em achar que <code>&amp;&amp;</code> devolve sempre verdadeiro ou falso. Ele devolve o primeiro valor
+falso que encontrar, seja ele qual for.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que está à esquerda</th><th>É falso?</th><th>O que cai na tela</th></tr>
+<tr><td><code>0</code></td><td>sim</td><td><code>0</code></td></tr>
+<tr><td><code>""</code> (string vazia)</td><td>sim</td><td>nada</td></tr>
+<tr><td><code>null</code></td><td>sim</td><td>nada</td></tr>
+<tr><td><code>undefined</code></td><td>sim</td><td>nada</td></tr>
+<tr><td><code>false</code></td><td>sim</td><td>nada</td></tr>
+<tr><td><code>NaN</code></td><td>sim</td><td><code>NaN</code></td></tr>
+<tr><td><code>"0"</code> (string com zero)</td><td>não</td><td>o elemento da direita</td></tr>
+</table>
+</div>
+
+<p>Duas saídas. A primeira é comparar de verdade: <code>encomendas.length === 0</code>,
+<code>encomendas.length &gt; 0</code>, <code>itens.length !== 0</code>. A segunda é forçar o valor para
+booleano: <code>Boolean(itens.length) &amp;&amp; ...</code> ou <code>!!itens.length &amp;&amp; ...</code>.
+As duas funcionam; a comparação explícita é mais fácil de ler e diz ao próximo leitor qual pergunta você
+está fazendo.</p>
+
+<p>De passagem, um hábito que pega esse erro antes de ele chegar na tela: sempre que escrever
+<code>&amp;&amp;</code>, pergunte "o lado esquerdo pode valer zero ou string vazia?". Se puder, use
+comparação. É mais barato do que descobrir pelo cliente reclamando de um zero no rodapé.</p>
+
+<h2>6. O retorno antecipado</h2>
+
+<p>Nem toda decisão cabe dentro do JSX. Quando o componente inteiro não deve aparecer — porque falta um
+dado, porque o usuário não está logado, porque ainda está carregando —, o caminho mais claro é sair da
+função antes do <code>return</code>: o retorno antecipado.</p>
+
+<div class="tryreact" data-goal="conta:p=1;;texto:Pão saindo do forno às 6h">
+  <p class="try-task">O componente <code>Aviso</code> recebe um texto vazio e desenha um parágrafo em
+  branco. Faça ele devolver <code>null</code> quando não houver texto, para sobrar só o parágrafo do
+  forno.</p>
+  <pre class="jsx">function Aviso({ texto }) {
+  return &lt;p className="aviso"&gt;{texto}&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;Aviso texto="" /&gt;
+      &lt;p&gt;Pão saindo do forno às 6h&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p class="aviso"&gt;&lt;/p&gt;
+  &lt;p&gt;Pão saindo do forno às 6h&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Aviso({ texto }) {
+  if (!texto) {
+    return null;
+  }
+
+  return &lt;p className="aviso"&gt;{texto}&lt;/p&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;Aviso texto="" /&gt;
+      &lt;p&gt;Pão saindo do forno às 6h&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel perde o parágrafo vazio: sobrou um <code>p</code> só. <code>null</code> é a forma de dizer
+"não tenho nada para desenhar" — o React aceita e não cria nó nenhum. É diferente de devolver uma string
+vazia, que também não desenha nada mas engana na leitura, e de devolver <code>undefined</code> por
+esquecimento, que é o mesmo que não ter <code>return</code>.</p>
+
+<p>Compare as duas soluções para o mesmo problema: <code>{texto &amp;&amp; &lt;p&gt;{texto}&lt;/p&gt;}</code>
+resolve dentro do JSX, mas deixa o resto do componente sendo desenhado; <code>if (!texto) return
+null</code> decide pelo componente inteiro. Use a primeira quando a decisão é local, de um pedaço da
+tela; use a segunda quando o componente não faz sentido sem aquele dado. Misturar as duas sem critério é
+o que produz componentes com três níveis de chaves aninhadas e ninguém sabe mais o que aparece quando.</p>
+
+<p>O retorno antecipado é ótimo porque achata o componente: cada caso cedo vira uma linha, e o JSX final
+fica sendo o caso "normal". A regra prática é colocar os casos de saída no topo, na ordem do mais
+provável para o menos provável, e deixar o <code>return</code> grande por último. Componentes assim são
+lidos de cima para baixo sem susto.</p>
+
+<h2>7. Escolhendo entre várias opções</h2>
+
+<p>Ternário serve para dois casos. Quando são três ou quatro, ternário dentro de ternário vira um ninho
+ilegível. A saída é voltar ao JavaScript normal antes do <code>return</code>: calcular uma variável com
+<code>if</code> e <code>else if</code>, ou usar um objeto como tabela de consulta.</p>
+
+<pre class="file" data-file="StatusDaPadaria.jsx">function StatusDaPadaria({ situacao }) {
+  let rotulo = "Fechado";
+
+  if (situacao === "aberto") {
+    rotulo = "Aberto agora";
+  } else if (situacao === "ultimas") {
+    rotulo = "Últimas unidades";
+  } else if (situacao === "feriado") {
+    rotulo = "Fechado no feriado";
+  }
+
+  return &lt;p className="status"&gt;{rotulo}&lt;/p&gt;;
+}</pre>
+
+<p>Esse formato tem uma vantagem enorme: o JSX final é uma linha só, e toda a decisão está no meio, em
+JavaScript que você já sabe ler. Nada de aninhar três ternários e passar dez minutos procurando qual
+<code>:</code> falta.</p>
+
+<p>Para listas de opções fixas, um objeto como tabela fica ainda mais curto — e o valor padrão aparece
+com <code>||</code>:</p>
+
+<pre class="file" data-file="Aviso.jsx">const ROTULOS = {
+  aberto: "Aberto agora",
+  ultimas: "Últimas unidades",
+  feriado: "Fechado no feriado"
+};
+
+function Status({ situacao }) {
+  return &lt;p&gt;{ROTULOS[situacao] || "Fechado"}&lt;/p&gt;;
+}</pre>
+
+<p>Quando a decisão cresce, o sinal é que ela não pertence ao componente. Extraia para uma função com
+nome — <code>function rotuloDe(situacao) { ... }</code> — e chame no JSX: o componente volta a ser uma
+lista de elementos, e a regra ganha um lugar só dela, fácil de ler e de testar. Um <code>switch</code>
+também serve, e costuma ficar mais legível que uma cadeia de <code>else if</code> quando cada caso tem
+várias linhas.</p>
+
+<p>Cuidado com o <code>||</code>: ele devolve o lado direito quando o esquerdo é falso, e uma string
+vazia é falsa. Isso costuma ser o que você quer nesse caso — "sem rótulo, mostra Fechado" — mas é bom
+saber que o comportamento é esse. Se o valor válido pudesse ser <code>0</code> ou <code>""</code>, use
+<code>??</code> (que só troca por <code>null</code> e <code>undefined</code>) ou uma condição
+explícita.</p>
+
+<h2>8. Condicional em atributos</h2>
+
+<p>A mesma pergunta que decide se um elemento aparece também decide como ele aparece. Atributos são só
+valores, e valores podem ser calculados. Os três casos mais comuns são classe, desabilitado e
+acessibilidade.</p>
+
+<pre class="file" data-file="Aba.jsx">function Aba({ nome, ativa }) {
+  return (
+    &lt;button className={ativa ? "aba ativa" : "aba"} disabled={!ativa}&gt;
+      {nome}
+    &lt;/button&gt;
+  );
+}</pre>
+
+<p>Em <code>className</code>, o ternário troca a string inteira. Quando você só quer acrescentar uma
+classe, os dois lados precisam conter a parte comum — ou você pode montar a string com um pedaço
+condicional: <code>{"aba" + (ativa ? " ativa" : "")}</code>. O resultado é o mesmo; a diferença é
+quanto você repete.</p>
+
+<p>Um tropeço comum é escrever <code>className={ativa}</code> esperando que o React invente a classe. Ele
+não inventa: o atributo recebe a string <code>"true"</code>, e o CSS não encontra nada. Atributo é sempre
+texto; quem monta o texto é você. O ternário existe justamente para isso.</p>
+
+<p>Em <code>disabled</code>, o valor é booleano e o React cuida do resto: verdadeiro escreve o atributo,
+falso remove. O mesmo vale para <code>hidden</code>, <code>checked</code> e <code>readOnly</code>. E há
+um detalhe de acessibilidade que vale ouro: esconder um elemento com CSS não o esconde do leitor de
+tela; não desenhar, sim. Se o aviso não vale, não desenhe — e, se ele só está visualmente oculto, use
+<code>aria-hidden="true"</code> para dizer isso em voz alta.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a condição que é sempre verdadeira</h3>
+<p>A Ana escreveu <code>{estoque ? "Tem pão" : "Acabou"}</code> e o aviso nunca mudava. O estoque vinha
+de um formulário como texto, e a string <code>"0"</code> é verdadeira em JavaScript — só o número
+<code>0</code> é falso. O conserto foi converter antes: <code>Number(estoque) &gt; 0</code>. Sempre que
+uma condição parecer travada, desconfie do tipo do valor antes de desconfiar do React.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a tela em branco</h3>
+<p>Ela trocou o texto de um aviso por um <code>if</code> que devolvia <code>null</code>, mas esqueceu de
+colocar o <code>return</code> do caso normal. O componente passou a devolver <code>undefined</code> em
+todos os caminhos e a página ficou vazia. Retorno antecipado só funciona se existir um retorno no fim;
+na dúvida, leia a função de baixo para cima e confira se o último <code>return</code> está lá.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o aviso que pisca</h3>
+<p>O aviso aparecia e desaparecia a cada segundo porque a condição usava <code>Date.now()</code> direto
+no JSX. Cada desenho calculava um valor novo, e o resultado mudava sozinho. Condição boa é feita de
+dado, não de relógio: calcule a situação uma vez, guarde numa variável com nome e use essa variável no
+JSX. Quando o estado entrar na sua vida, na próxima aula, essa separação vai ficar ainda mais
+importante.</p>
+</div>
+
+<p>Nos três cenários o conserto foi o mesmo: transformar a pergunta numa expressão booleana explícita e
+deixá-la perto do dado que a responde. Nada de condição escondida em string, em CSS ou em relógio. Quando
+a condição é legível, o JSX fica legível — e o contrário também é verdade: um JSX embolado quase sempre
+esconde uma condição que ninguém conseguiu nomear.</p>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. O que a renderização condicional faz com um elemento?</p>
+<label><input type="radio" name="q1"> esconde com <code>display: none</code></label>
+<label><input type="radio" name="q1"> desenha e apaga no segundo seguinte</label>
+<label><input type="radio" name="q1"> decide se ele entra no HTML ou não</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">2. Por que <code>{itens.length &amp;&amp; &lt;p&gt;Vazio&lt;/p&gt;}</code> mostra um zero?</p>
+<label><input type="radio" name="q2"> porque o React transforma zero em texto por engano</label>
+<label><input type="radio" name="q2"> porque <code>&amp;&amp;</code> devolve o próprio <code>0</code>, e o React desenha o que recebe</label>
+<label><input type="radio" name="q2"> porque falta uma key na lista</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que <code>return null</code> faz em um componente?</p>
+<label><input type="radio" name="q3"> não desenha nada, sem criar elemento</label>
+<label><input type="radio" name="q3"> desenha um parágrafo vazio</label>
+<label><input type="radio" name="q3"> gera um erro de componente</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o aviso que pode não existir</h2>
+<p>Complete o componente para que ele não desenhe nada quando o texto estiver vazio. Qual valor o
+<code>return</code> antecipado devolve?</p>
+<div class="ex-code">if (!texto) { return <input aria-label="resposta 1" data-answer="null" placeholder="...">; }</div>
+<p class="ex-dica">Dica: é o valor que o React entende como "não tenho nada para desenhar". Não é
+<code>false</code>, não é <code>""</code> e não é <code>undefined</code> — embora os três também não
+desenhem nada, só um deles diz a verdade: não existe conteúdo.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Renderizar condicionalmente é decidir, dentro do componente, se um pedaço de tela entra no HTML. O
+ternário escolhe entre duas coisas, o <code>&amp;&amp;</code> mostra uma coisa ou nada, e o
+<code>if</code> com <code>return null</code> sai do componente antes do desenho. As três formas são
+JavaScript puro dentro das chaves — e é justamente por isso que funcionam: o JSX não tem regra própria
+de condição, ele usa a linguagem.</p>
+
+<p>O erro clássico é o zero: <code>{itens.length &amp;&amp; ...}</code> desenha <code>0</code> quando a
+lista está vazia, porque <code>&amp;&amp;</code> devolve o valor da esquerda, não um booleano. Compare
+de verdade (<code>=== 0</code>, <code>&gt; 0</code>) e o problema some. O segundo erro clássico é
+confundir esconder com não desenhar: CSS esconde da vista, não do leitor de tela, do teclado nem do HTML.
+Se não vale, não desenhe.</p>
+
+<p>Também vale guardar o que a aula <em>não</em> resolveu: até aqui, a condição é calculada a partir de
+constantes e props. A página da Ana ainda não muda sozinha — ela precisa que o leitor clique em algo e
+que a tela responda. Esse "algo que muda com o tempo" é o estado, e é o assunto da próxima aula. A
+renderização condicional é a metade visível desse mecanismo: o estado decide <em>o quê</em>, a condição
+decide <em>se aparece</em>.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Condicional no JSX é uma expressão dentro das chaves: <code>{cond ? a : b}</code>.</li>
+<li><code>&amp;&amp;</code> é para "mostrar ou nada"; ternário é para "um ou outro".</li>
+<li><code>{0 &amp;&amp; ...}</code> desenha <code>0</code>: compare (<code>=== 0</code>,
+<code>&gt; 0</code>) em vez de usar o número cru.</li>
+<li><code>null</code> é o "nada" oficial do componente; <code>undefined</code> é esquecimento.</li>
+<li>Retorno antecipado achata o componente: casos de saída no topo, JSX normal no fim.</li>
+<li>Três ou mais opções? Calcule a variável antes do <code>return</code>.</li>
+<li>Atributos também são condicionais: <code>className</code>, <code>disabled</code>,
+<code>aria-hidden</code>.</li>
+<li>Não desenhar ≠ esconder com CSS: o elemento ausente não existe no HTML.</li>
+<li>Condição boa vem de dado, não de relógio nem de sorteio.</li>
+<li>Condição travada? Confira o tipo: <code>"0"</code> é verdadeiro, <code>0</code> é falso.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

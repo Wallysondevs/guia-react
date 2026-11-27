@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estado com Objeto | Guia React</title>
+<meta name="description" content="Estado com objeto no React: guardar a ficha do cliente num só useState, atualizar com spread, por que a mutação não redesenha e como copiar objetos aninhados.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Estado com <span class="hl">Objeto</span></h1>
+<p class="intro">A ficha do cliente da Ana tem quatro campos: nome, telefone, rua e número. Ela guardou
+cada um no seu <code>useState</code> — e agora, para carregar os dados de um cliente que já comprou
+antes, precisa chamar quatro setters e lembrar de todos. Esqueceu um, e a rua do cliente antigo apareceu
+no pedido novo. Nesta aula ela junta os quatro num <strong>objeto</strong>, aprende a trocar um campo sem
+perder os outros e descobre por que mexer no objeto direto não redesenha a tela.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Quando vale guardar um objeto num estado em vez de vários valores soltos.</li>
+  <li>Como ler <code>cliente.nome</code> dentro do JSX.</li>
+  <li>Por que o setter troca o objeto <strong>inteiro</strong> e o que acontece com os campos esquecidos.</li>
+  <li>O <code>spread</code>: <code>{ ...cliente, nome: valor }</code>, e por que a ordem importa.</li>
+  <li>Por que alterar o objeto direto não atualiza a tela.</li>
+  <li>Como atualizar um campo dentro de um objeto aninhado.</li>
+  <li>Um único handler para vários campos, com <code>name</code> e chave calculada.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a ficha do cliente em quatro caixinhas</h2>
+
+<p>Depois de aprender a ter <a href="varios-estados.html">vários estados</a>, a Ana montou a ficha do
+cliente com quatro declarações: <code>nome</code>, <code>telefone</code>, <code>rua</code> e
+<code>numero</code>. Cada campo do formulário conversa com o seu estado, e digitar funciona. O problema
+apareceu numa funcionalidade boba: preencher o formulário com os dados de um cliente que já comprou.</p>
+
+<p>Para isso ela escreveu quatro chamadas: <code>setNome(clienteAntigo.nome)</code>,
+<code>setTelefone(...)</code>, <code>setRua(...)</code>, <code>setNumero(...)</code>. Um mês depois,
+acrescentou o bairro ao formulário e esqueceu de incluir o <code>setBairro</code> na função de
+preenchimento. Resultado: pedido novo com o bairro do pedido anterior. Esse tipo de bug não dá erro, não
+aparece no console e é difícil de reproduzir — depende da ordem em que as pessoas clicaram.</p>
+
+<p>O problema não é o número de setters; é que os quatro campos são <strong>um dado só</strong>. Eles
+nunca mudam separadamente: quando a Ana troca de cliente, troca o nome, o telefone, a rua e o número
+juntos. Guardar em quatro caixinhas separa o que a vida mantém unido — e aí cabe a você lembrar de mexer
+nas quatro.</p>
+
+<p>Um objeto no estado resolve isso: uma caixinha, quatro campos dentro, uma atualização. Quem lê o
+código vê <code>cliente.rua</code> e sabe de quem é aquela rua. Quem preenche o formulário entrega um
+objeto inteiro, e não quatro pedaços que podem se desencontrar.</p>
+
+<h2>2. O objeto como valor de um estado</h2>
+
+<p>Nada muda na forma do <code>useState</code>: o valor inicial é um objeto, e o par continua sendo
+valor e setter. O que muda é a leitura, que ganha um ponto para chegar ao campo.</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const [cliente, setCliente] = useState({
+    nome: "Ana",
+    telefone: "9999-0000",
+    rua: "das Flores",
+    numero: "10"
+  });
+
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;{cliente.nome}&lt;/h2&gt;
+      &lt;p&gt;Telefone: {cliente.telefone}&lt;/p&gt;
+      &lt;p&gt;{cliente.rua}, {cliente.numero}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>O estado agora guarda <em>um</em> valor — um objeto com quatro propriedades. Essa distinção parece
+filosófica e tem consequência prática: para o React, <code>cliente</code> é uma coisa só. Quando você
+chama o setter, ele não está trocando a propriedade <code>nome</code>; está trocando o valor inteiro do
+estado. O que existir dentro do objeto novo é o que vai aparecer na tela.</p>
+
+<p>Por isso o setter não "mistura" o objeto novo com o antigo. Essa é a pegadinha central da aula, e é
+onde quase todo mundo tropeça na primeira vez.</p>
+
+<h2>3. O setter troca o objeto inteiro</h2>
+
+<p>Veja o que acontece quando a Ana atualiza só o campo que mudou:</p>
+
+<pre class="file" data-file="App.jsx">setCliente({ nome: e.target.value });</pre>
+
+<p>Parece razoável: "o nome mudou, mando o nome novo". Mas o estado deixa de ser
+<code>{ nome, telefone, rua, numero }</code> e passa a ser <code>{ nome }</code>. As outras três
+propriedades somem — não viram vazio, viram <code>undefined</code>. Na tela, o telefone desaparece e o
+campo correspondente começa a se comportar de forma estranha, porque o React recebe
+<code>value={undefined}</code> e passa a tratar o campo como não controlado.</p>
+
+<div class="tryreact" data-goal="digite:input#nome=Ana;;digite:input#tel=9999-0000;;texto:Ana — 9999-0000">
+  <p class="try-task">Cada <code>onChange</code> está mandando um objeto com um campo só, e o outro se
+  perde. Conserte os dois para que o telefone sobreviva à mudança do nome, e vice-versa. A missão digita
+  <strong>Ana</strong> no nome e <strong>9999-0000</strong> no telefone, e confere os dois campos.</p>
+  <pre class="jsx">function App() {
+  const [cliente, setCliente] = useState({ nome: "", telefone: "" });
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Cliente&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={cliente.nome}
+        onChange={(e) =&gt; setCliente({ nome: e.target.value })}
+      /&gt;
+
+      &lt;label htmlFor="tel"&gt;Telefone&lt;/label&gt;
+      &lt;input
+        id="tel"
+        value={cliente.telefone}
+        onChange={(e) =&gt; setCliente({ telefone: e.target.value })}
+      /&gt;
+
+      &lt;p&gt;{cliente.nome || "sem nome"} — {cliente.telefone || "sem telefone"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="nome"&gt;Cliente&lt;/label&gt;
+  &lt;input id="nome" value=""&gt;
+  &lt;label for="tel"&gt;Telefone&lt;/label&gt;
+  &lt;input id="tel" value=""&gt;
+  &lt;p&gt;sem nome — sem telefone&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [cliente, setCliente] = useState({ nome: "", telefone: "" });
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Cliente&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={cliente.nome}
+        onChange={(e) =&gt; setCliente({ ...cliente, nome: e.target.value })}
+      /&gt;
+
+      &lt;label htmlFor="tel"&gt;Telefone&lt;/label&gt;
+      &lt;input
+        id="tel"
+        value={cliente.telefone}
+        onChange={(e) =&gt; setCliente({ ...cliente, telefone: e.target.value })}
+      /&gt;
+
+      &lt;p&gt;{cliente.nome || "sem nome"} — {cliente.telefone || "sem telefone"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O conserto é aquele <code>...</code> antes do nome. Ele copia para o objeto novo todas as propriedades
+do objeto antigo; depois, a propriedade escrita na sequência substitui a que veio na cópia. É a receita
+para "trocar um campo sem perder os outros".</p>
+
+<p>Repare numa malandragem do bug: o campo que perdeu o valor continua mostrando o que você digitou, e o
+parágrafo logo abaixo já não sabe do nome. Isso acontece porque <code>value={undefined}</code> faz o React
+tratar o campo como não controlado — ele volta a guardar o próprio texto, e a ilusão fica completa. O
+React avisa no console ("changing a controlled input to be uncontrolled"), mas o sintoma visível é uma
+tela que parece certa. Por isso a missão acima confere o <strong>parágrafo</strong>, e não o campo: é ali
+que o estado aparece sem disfarce.</p>
+
+<h2>4. O spread: copiar e sobrescrever</h2>
+
+<p>Os três pontinhos se chamam <strong>spread</strong>, espalhar. Dentro de um objeto, eles significam
+"traga para cá todas as propriedades deste outro objeto". O JavaScript monta um objeto novo, com as
+mesmas propriedades do antigo, e a partir daí você pode acrescentar ou substituir campos à vontade.</p>
+
+<pre class="file" data-file="App.jsx">const cliente = { nome: "Ana", telefone: "9999-0000" };
+
+const novo = { ...cliente, nome: "Maria" };
+console.log("com spread:", JSON.stringify(novo));
+console.log("sem spread:", JSON.stringify({ nome: "Maria" }));</pre>
+
+<pre class="term">com spread: {"nome":"Maria","telefone":"9999-0000"}
+sem spread: {"nome":"Maria"}</pre>
+
+<p>Duas coisas importantes nesse exemplo. A primeira: o objeto <code>cliente</code> original continua
+intacto — o spread cria outro objeto, não altera o que existia. A segunda: a <strong>ordem</strong>
+importa. As propriedades são aplicadas da esquerda para a direita, então o que vier depois ganha. Se você
+escrever <code>{ nome: "Maria", ...cliente }</code>, o spread traz o nome antigo de volta e o resultado é
+"Ana". Nome novo sempre depois do spread.</p>
+
+<p>O spread é raso: ele copia as propriedades de primeiro nível. Se um dos campos do objeto for outro
+objeto, a cópia guarda a mesma referência para o objeto interno — e isso é o assunto da seção 6, porque é
+a causa de um bug clássico com estados aninhados.</p>
+
+<dl class="anatomy">
+<dt>spread</dt>
+<dd>Os três pontinhos antes de um objeto (<code>...cliente</code>) dentro de outro objeto. Significam
+"traga as propriedades daquele objeto para cá". Criam um objeto novo, não alteram o original.</dd>
+<dt>cópia rasa</dt>
+<dd>Uma cópia que leva as propriedades do primeiro nível. Um objeto dentro do objeto não é copiado: as
+duas versões apontam para o mesmo interno.</dd>
+<dt>referência</dt>
+<dd>O endereço do objeto na memória. Duas variáveis podem apontar para o mesmo objeto; é isso que o React
+compara quando você chama o setter.</dd>
+<dt>mutação</dt>
+<dd>Alterar o objeto que já existe, como em <code>cliente.nome = "Maria"</code>. O conteúdo muda, a
+referência não — e o React, que compara referências, não redesenha.</dd>
+<dt>chave calculada</dt>
+<dd>Uma propriedade escrita com colchetes: <code>[campo]: valor</code>. O nome da propriedade vem do
+valor da variável, não do texto digitado no código.</dd>
+</dl>
+
+<h2>5. A mutação que não redesenha a tela</h2>
+
+<p>Existe um jeito de atualizar o objeto que parece funcionar e não funciona. É quando você altera o
+campo direto e depois manda o mesmo objeto de volta:</p>
+
+<pre class="file" data-file="App.jsx">function trocarParaMaria() {
+  cliente.nome = "Maria";
+  setCliente(cliente);
+}</pre>
+
+<p>A linha <code>cliente.nome = "Maria"</code> altera o objeto que está no estado — isso se chama
+<strong>mutação</strong>. O valor na tela até que existe, mas o React não redesenha: quando você entrega
+ao setter o mesmo objeto que ele já tinha, o React compara as referências, vê que é o mesmo e conclui
+que nada mudou. Economia de trabalho — e uma tela que fica parada.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Cliente: Maria">
+  <p class="try-task">O botão altera o nome dentro do objeto e devolve o mesmo objeto ao setter, então a
+  tela não muda. Faça a troca com um objeto novo. A missão clica no botão e confere que a tela mostra
+  "Cliente: Maria".</p>
+  <pre class="jsx">function App() {
+  const [cliente, setCliente] = useState({ nome: "Ana", telefone: "9999-0000" });
+
+  return (
+    &lt;div&gt;
+      &lt;button
+        onClick={() =&gt; {
+          cliente.nome = "Maria";
+          setCliente(cliente);
+        }}
+      &gt;
+        Trocar para Maria
+      &lt;/button&gt;
+      &lt;p&gt;Cliente: {cliente.nome}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Trocar para Maria&lt;/button&gt;
+  &lt;p&gt;Cliente: Ana&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [cliente, setCliente] = useState({ nome: "Ana", telefone: "9999-0000" });
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={() =&gt; setCliente({ ...cliente, nome: "Maria" })}&gt;
+        Trocar para Maria
+      &lt;/button&gt;
+      &lt;p&gt;Cliente: {cliente.nome}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A aula de <a href="props-com-objetos.html">props com objetos</a> já tinha avisado que o objeto passado
+adiante é o mesmo objeto, e não uma cópia. Com estado, esse detalhe deixa de ser curiosidade e vira bug:
+mudar o conteúdo não muda a referência, e é a referência que o React compara.</p>
+
+<p>A confusão é justificável: dentro do handler, <code>cliente.nome</code> já vale "Maria" — a mutação
+aconteceu de verdade. O que não aconteceu foi o render. O React não observa o conteúdo dos objetos; ele
+compara a referência que você entregou com a que tinha. Mesma referência, nenhum trabalho. O painel da
+caixa, que mostra o que foi desenhado na tela, continua com "Ana":</p>
+
+<pre class="term">no console: nome depois do clique: Maria
+na tela:    Cliente: Ana</pre>
+
+<p>Daí a regra que vale para objetos, arrays e qualquer valor composto: <strong>nunca altere o valor que
+já está no estado</strong>. Construa um valor novo — com spread, com <code>map</code>, com
+<code>filter</code> — e entregue esse. O estado é uma foto; para mudar a foto, você tira outra, não pinta
+em cima da antiga.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você escreveu</th><th>O que o React vê</th><th>Resultado</th></tr>
+<tr><td><code>cliente.nome = "Maria"</code></td><td>o mesmo objeto de antes</td><td>nada é desenhado de novo</td></tr>
+<tr><td><code>setCliente(cliente)</code></td><td>a mesma referência que já está no estado</td><td>o React descarta a atualização</td></tr>
+<tr><td><code>setCliente({ ...cliente, nome: "Maria" })</code></td><td>um objeto novo, com os campos antigos</td><td>a tela é redesenhada com o nome novo</td></tr>
+<tr><td><code>setCliente({ nome: "Maria" })</code></td><td>um objeto novo, com <strong>só</strong> o nome</td><td>os outros campos viram <code>undefined</code></td></tr>
+</table>
+</div>
+
+<h2>6. Objeto dentro de objeto</h2>
+
+<p>Quando um campo do objeto é outro objeto — o endereço dentro do pedido, por exemplo —, o spread de
+fora não basta. Copiar o pedido copia a <em>referência</em> do endereço: os dois pedidos passam a apontar
+para o mesmo endereço, e mexer num mexe no outro. A receita é um spread para cada nível que você vai
+alterar.</p>
+
+<div class="tryreact" data-goal="digite:input=Rua Nova;;texto:Entrega: Rua Nova, 10">
+  <p class="try-task">O campo da rua está dentro de <code>pedido.entrega</code>, e o
+  <code>onChange</code> monta um endereço novo só com a rua — o número se perde. Copie também o endereço
+  antigo. A missão digita <strong>Rua Nova</strong> e confere "Entrega: Rua Nova, 10".</p>
+  <pre class="jsx">function App() {
+  const [pedido, setPedido] = useState({
+    cliente: "Ana",
+    entrega: { rua: "das Flores", numero: "10" }
+  });
+
+  return (
+    &lt;div&gt;
+      &lt;input
+        value={pedido.entrega.rua}
+        onChange={(e) =&gt;
+          setPedido({ ...pedido, entrega: { rua: e.target.value } })
+        }
+      /&gt;
+      &lt;p&gt;Entrega: {pedido.entrega.rua + ", " + pedido.entrega.numero}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input value="das Flores"&gt;
+  &lt;p&gt;Entrega: das Flores, 10&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [pedido, setPedido] = useState({
+    cliente: "Ana",
+    entrega: { rua: "das Flores", numero: "10" }
+  });
+
+  return (
+    &lt;div&gt;
+      &lt;input
+        value={pedido.entrega.rua}
+        onChange={(e) =&gt;
+          setPedido({
+            ...pedido,
+            entrega: { ...pedido.entrega, rua: e.target.value }
+          })
+        }
+      /&gt;
+      &lt;p&gt;Entrega: {pedido.entrega.rua + ", " + pedido.entrega.numero}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Leia de dentro para fora: <code>{ ...pedido.entrega, rua: ... }</code> cria um endereço novo, com a
+rua trocada e o número preservado; <code>{ ...pedido, entrega: ... }</code> cria um pedido novo, com o
+endereço novo dentro. Cada nível ganha o seu spread. Se o objeto tivesse três níveis, seriam três.</p>
+
+<p>Isso pode parecer exagero para um formulário de dois campos. O custo compensa quando o objeto é
+compartilhado: dois componentes que recebem o mesmo objeto, ou uma lista de pedidos em que cada item
+aponta para um endereço. Com cópia por nível, cada atualização produz um valor independente; com
+mutação, um altera o outro e o bug aparece num lugar que você nem estava editando.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma de atualizar</th><th>O que é copiado</th><th>O que acontece</th></tr>
+<tr><td><code>setPedido({ ...pedido, cliente: "Bia" })</code></td><td>só o nível de fora</td><td>funciona para <code>cliente</code>; o endereço continua o mesmo objeto</td></tr>
+<tr><td><code>setPedido({ ...pedido, entrega: { ...pedido.entrega, rua } })</code></td><td>os dois níveis</td><td>funciona para um campo de dentro do endereço</td></tr>
+<tr><td><code>setPedido({ ...pedido, entrega: { rua } })</code></td><td>só o nível de fora</td><td>o endereço novo tem apenas a rua: o número se perde</td></tr>
+<tr><td><code>pedido.entrega.rua = valor</code></td><td>nada</td><td>mutação: o valor muda e a tela não</td></tr>
+</table>
+</div>
+
+<h2>7. Um handler para vários campos</h2>
+
+<p>Com objeto no estado, os campos ficam tão parecidos que dá vontade de escrever uma função só. Dá: use
+o atributo <code>name</code> do input para dizer qual propriedade mudar, e a chave calculada do
+JavaScript para escrever nela.</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const [cliente, setCliente] = useState({ nome: "", telefone: "" });
+
+  function mudar(e) {
+    const campo = e.target.name;
+    setCliente({ ...cliente, [campo]: e.target.value });
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;input name="nome" value={cliente.nome} onChange={mudar} /&gt;
+      &lt;input name="telefone" value={cliente.telefone} onChange={mudar} /&gt;
+      &lt;p&gt;{cliente.nome} — {cliente.telefone}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p><code>[campo]</code> entre colchetes significa "use o valor desta variável como nome da propriedade".
+Se <code>campo</code> vale <code>"telefone"</code>, o objeto ganha <code>telefone</code>. Não é magia do
+React: é JavaScript puro, o mesmo recurso que permite <code>obj[chave]</code> fora do JSX.</p>
+
+<p>Vale a honestidade: esse atalho só compensa a partir de três ou quatro campos. Com dois, escrever cada
+<code>onChange</code> é mais claro e menos sujeito a erro de digitação no <code>name</code>. E há um
+cuidado: se o <code>name</code> não bater com a propriedade do estado, o objeto ganha um campo a mais e a
+tela não mostra nada — erro silencioso, daqueles que tomam meia hora.</p>
+
+<h2>8. Lendo o objeto na tela</h2>
+
+<p>Objeto não se desenha. Se você escrever <code>{cliente}</code> dentro do JSX, o React reclama com a
+mensagem <em>Objects are not valid as a React child</em> — "objetos não são filhos válidos do React".
+Faz sentido: o React sabe desenhar texto, números e elementos; um objeto com quatro campos não é nada
+disso. Você escolhe o que mostrar, campo por campo.</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const [cliente, setCliente] = useState({ nome: "Ana", telefone: "" });
+
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;{cliente.nome}&lt;/h2&gt;
+      &lt;p&gt;{cliente.telefone || "telefone não informado"}&lt;/p&gt;
+      &lt;p&gt;{cliente.nome.length} letras no nome&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Como cada campo é um valor comum, tudo o que você já sabe continua valendo: dá para testar se está
+vazio, contar letras, colocar em maiúsculas, mostrar uma mensagem alternativa. O objeto é só a
+embalagem.</p>
+
+<p>Ao depurar, lembre que o painel da caixa mostra o que o <code>console.log</code> escreveu. O motor
+converte objetos em JSON, então <code>console.log(cliente)</code> aparece como
+<code>console: {"nome":"Ana","telefone":""}</code> — legível, com os campos na ordem em que foram criados.
+Se você juntar o objeto numa string com <code>+</code>, o resultado é <code>[object Object]</code> e não
+ajuda em nada: passe o objeto como argumento separado ou use <code>JSON.stringify(cliente)</code>.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a rua que foi parar no lugar errado</h3>
+<p>Ao atualizar o endereço, a Ana escreveu <code>setPedido({ ...pedido, rua: e.target.value })</code>.
+O pedido ganhou uma propriedade <code>rua</code> no primeiro nível, enquanto a tela lia
+<code>pedido.entrega.rua</code> — que continuou com o valor antigo. O spread copiou o nível de fora, mas o
+campo alterado estava um nível abaixo. Quando o caminho da leitura e o caminho da escrita não batem, a
+tela não muda e nada avisa.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a cópia que conserta por acidente</h3>
+<p>Para "avisar o React", ela mutava o objeto e depois chamava <code>setCliente({ ...cliente })</code> —
+uma cópia sem nenhuma alteração. Funcionava porque a cópia é uma referência nova, então o render
+acontecia. O hábito é ruim: se o objeto tiver um campo aninhado, a cópia rasa compartilha o interno, e
+qualquer alteração nele contamina o estado anterior. Copie sempre trocando o campo, num passo só.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o console que só mostra [object Object]</h3>
+<p>Ela escreveu <code>console.log("cliente: " + cliente)</code> e viu <code>cliente: [object Object]</code>.
+A concatenação transforma qualquer objeto nessa string inútil antes de chegar ao console. As saídas que
+funcionam são <code>console.log("cliente:", cliente)</code>, com o objeto como argumento separado, ou
+<code>console.log(JSON.stringify(cliente))</code>. No painel das caixas, o objeto aparece em JSON nos dois
+casos.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Como se atualiza só o nome dentro de um estado de objeto?</p>
+<label><input type="radio" name="q1"> <code>cliente.nome = "Maria"</code>, e o React percebe sozinho</label>
+<label><input type="radio" name="q1"> <code>setCliente({ ...cliente, nome: "Maria" })</code></label>
+<label><input type="radio" name="q1"> <code>setCliente({ nome: "Maria" })</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que <code>cliente.nome = "Maria"; setCliente(cliente)</code> não muda a tela?</p>
+<label><input type="radio" name="q2"> porque strings não podem ser alteradas em JavaScript</label>
+<label><input type="radio" name="q2"> porque o setter só aceita números</label>
+<label><input type="radio" name="q2"> porque é o mesmo objeto: o React compara a referência e descarta</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que <code>{ ...cliente, nome: "Maria" }</code> produz?</p>
+<label><input type="radio" name="q3"> um objeto novo, com tudo copiado e o nome trocado; o original fica intacto</label>
+<label><input type="radio" name="q3"> o mesmo objeto, com o nome alterado dentro dele</label>
+<label><input type="radio" name="q3"> uma string com o conteúdo do objeto</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: copiar o nível certo</h2>
+<p>Complete as duas atualizações: a do nome do cliente e a da rua dentro do endereço do pedido. O que
+falta em cada chave é a cópia do nível de cima.</p>
+<div class="ex-code">setCliente({ <input aria-label="resposta 1" data-answer="...cliente" placeholder="...">, nome: e.target.value });
+
+setPedido({
+  ...pedido,
+  entrega: { <input aria-label="resposta 2" data-answer="...pedido.entrega|...pedido.endereco" placeholder="...">, rua: e.target.value }
+});</div>
+<p class="ex-dica">Dica: os três pontinhos antes do nome do objeto copiam as propriedades dele. O nível de
+dentro precisa dos seus próprios pontinhos, apontando para o objeto de dentro.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Um objeto no estado faz sentido quando os campos são um dado só — a ficha do cliente, o endereço de
+entrega, a configuração de um pedido. A declaração continua sendo <code>useState({ ... })</code>, a
+leitura ganha um ponto (<code>cliente.nome</code>) e a atualização passa a ser sempre "objeto novo com os
+campos antigos mais o campo alterado": <code>setCliente({ ...cliente, nome: valor })</code>.</p>
+
+<p>Duas regras sustentam o resto. A primeira: o setter troca o valor inteiro, não mistura; se você mandar
+um objeto com um campo só, os outros viram <code>undefined</code>. A segunda: o React compara
+referências, então mutar o objeto e devolvê-lo não redesenha nada — e mutar o objeto do estado é sempre
+erro, mesmo quando a tela parece funcionar. Objetos aninhados pedem um spread por nível, de dentro para
+fora.</p>
+
+<p>Para ler, escolha o campo: objeto não é filho válido do React, e <code>{cliente}</code> vira erro.
+Para depurar, <code>console.log("cliente:", cliente)</code> mostra o objeto em JSON no painel. E o mesmo
+raciocínio vale para listas: em vez de alterar a lista existente, construa uma nova — que é exatamente o
+assunto da próxima aula.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Objeto no estado quando os campos sempre mudam juntos.</li>
+<li>Ler é <code>cliente.nome</code>; desenhar é campo por campo, nunca o objeto inteiro.</li>
+<li>Atualizar é <code>setCliente({ ...cliente, nome: valor })</code>: copiar e sobrescrever.</li>
+<li>A ordem importa: o campo alterado vem depois do spread.</li>
+<li>O setter troca o valor inteiro; campos esquecidos viram <code>undefined</code>.</li>
+<li>Nunca mute o objeto do estado: <code>cliente.nome = ...</code> não redesenha.</li>
+<li>Mesma referência, nenhum render: o React compara com <code>Object.is</code>.</li>
+<li>Objeto aninhado pede um spread por nível.</li>
+<li>Vários campos iguais podem dividir um handler com <code>name</code> e <code>[campo]</code>.</li>
+<li><code>console.log("cliente:", cliente)</code> mostra JSON; com <code>+</code> vira <code>[object Object]</code>.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

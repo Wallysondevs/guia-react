@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atualizar o Estado | Guia React</title>
+<meta name="description" content="Como o state do React é atualizado de verdade: o retrato de cada desenho, dois setters seguidos, a forma de função com o valor anterior e os tropeços do return.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Atualizar o <span class="hl">Estado</span></h1>
+<p class="intro">A Ana clicou em "vender dois pães" e o contador subiu um. O código tinha dois
+<code>setQtd</code> seguidos, um embaixo do outro, e mesmo assim o total ficou errado. Nesta aula ela
+descobre por que: cada desenho do componente é um retrato, e o setter não muda o retrato que já está na
+tela. Entender isso é o que separa "meu contador funcionou por sorte" de "eu sei o que estou fazendo".</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que "atualizar o estado" significa de verdade: substituir, não modificar.</li>
+  <li>Por que o valor lido dentro de uma função é o do desenho em que ela nasceu.</li>
+  <li>Por que dois setters seguidos com o mesmo valor contam como um.</li>
+  <li>A forma de função: <code>setQtd((atual) =&gt; atual + 1)</code>.</li>
+  <li>Como ler o valor novo na mesma função quando você precisa dele ali.</li>
+  <li>Os tropeços da função: chaves sem <code>return</code>, <code>q++</code> e nome ruim.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o pedido de três que virou um</h2>
+
+<p>O contador da Ana já funciona: um número, mais, menos, zerar. Ela acrescentou um botão novo, "vender
+dois", com dois <code>setQtd(qtd + 1)</code> seguidos, um por pão. Clicou com o contador em zero e viu
+1. Clicou de novo e viu 2. Ou seja: cada clique somava um, não dois.</p>
+
+<p>O código era exatamente o que ela queria escrever, e a tela dizia outra coisa. Esse tipo de
+divergência entre o que você lê e o que acontece é o que mais atrapalha quem está começando — não porque
+o React seja misterioso, mas porque existe um modelo mental por trás que ninguém contou ainda. É o que
+esta aula conta.</p>
+
+<p>A ideia central é curta: <strong>o estado é lido uma vez por desenho</strong>. A função do componente
+roda, pega o valor do estado, e esse valor não muda mais até o próximo desenho. Chamar o setter não
+reescreve a variável que está na sua mão; ele pede ao React que faça outro desenho, e é no desenho
+seguinte que o valor novo aparece. Tudo o que você vai ver daqui para frente é consequência disso.</p>
+
+<h2>2. Atualizar é substituir</h2>
+
+<p>O setter do <code>useState</code> tem um nome que engana um pouco. Ele não "atualiza" no sentido de
+somar, acrescentar ou corrigir: ele <strong>define</strong> o novo valor. <code>setPaes(5)</code>
+significa "o estado agora é 5", não "acrescente 5". Se o valor era 100 e você chama
+<code>setPaes(5)</code>, o estado vira 5 — não 105.</p>
+
+<p>Essa diferença parece pequena e explica muita coisa. Quando você chama <code>setPaes(5)</code>, o
+React não pergunta qual era o valor de antes; ele simplesmente guarda 5. Quando você chama
+<code>setPaes(paes + 1)</code>, é o seu código que faz a conta com o valor que ele conhece, e o React
+recebe o resultado pronto. Nos dois casos, o que chega ao React é um número fechado — nunca uma
+instrução.</p>
+
+<p>Por isso, para somar, você faz a conta antes: <code>setPaes(paes + 1)</code>. Essa linha diz "o novo
+valor é o valor atual mais um". É a mesma coisa que <code>setPaes(5)</code>, só que a conta é feita com o
+valor que o desenho atual conhece. E é aí que a história fica interessante: qual valor o desenho atual
+conhece?</p>
+
+<p>Conhece o valor do começo do desenho. Não o valor que outro setter acabou de pedir, não o valor que
+está no console, não o valor que você imagina que vai estar. A função do componente recebe o estado como
+uma fotografia tirada no início da execução, e trabalha com ela até o fim.</p>
+
+<h2>3. O retrato do desenho</h2>
+
+<p>Vale acompanhar um clique passo a passo, com o contador em 1 e um botão que soma um. O React entra em
+ação quando o evento termina: ele vê que o estado pedido é diferente do atual, agenda um desenho e chama
+a função do componente outra vez. Nessa nova execução, <code>paes</code> já vale 2. O retrato novo tem 2;
+o retrato antigo tinha 1; os dois existiram, mas não ao mesmo tempo.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Momento</th><th>O que o código faz</th><th>Valor de <code>paes</code> naquele desenho</th></tr>
+<tr><td>desenho inicial</td><td>mostra o texto e os botões</td><td>1</td></tr>
+<tr><td>clique</td><td><code>setPaes(paes + 1)</code>, que calcula 2</td><td>1 (o valor ainda é o do desenho)</td></tr>
+<tr><td>novo desenho</td><td>a função roda de novo, do começo</td><td>2</td></tr>
+<tr><td>segundo clique</td><td><code>setPaes(paes + 1)</code>, que calcula 3</td><td>2</td></tr>
+</table>
+</div>
+
+<dl class="anatomy">
+<dt>retrato</dt>
+<dd>O valor do estado no começo de um desenho. Vale até o fim daquela execução, mesmo que um setter seja
+chamado no meio.</dd>
+<dt>substituir</dt>
+<dd>O que o setter faz: define o valor novo, sem somar nem acumular. <code>setQtd(5)</code> é 5.</dd>
+<dt>atualização</dt>
+<dd>O pedido de mudança. Fica na fila do React e é aplicada no desenho seguinte, em ordem.</dd>
+<dt>forma de função</dt>
+<dd><code>setQtd((atual) =&gt; atual + 1)</code>: o React entrega o valor mais recente e usa o que a
+função devolver.</dd>
+<dt>efeito colateral</dt>
+<dd>Qualquer coisa fora do JSX que você faz no manipulador: log, alerta, chamada de rede.</dd>
+</dl>
+
+<p>Repare na terceira linha: a função roda <em>do começo</em>, não a partir do ponto em que parou. Todas
+as variáveis locais são recriadas, todos os cálculos acontecem de novo, e o estado vem com o valor
+atualizado. Por isso um <code>console.log</code> no corpo do componente aparece a cada clique: ele está
+no caminho de todo desenho.</p>
+
+<p>Essa é a razão pela qual "guardar o valor numa variável para usar depois" não funciona do jeito que
+parece. A variável morre no fim do desenho. Só o estado atravessa.</p>
+
+<h2>4. Dois setters seguidos</h2>
+
+<div class="tryreact" data-goal="clique:button;;texto:Total: 2">
+  <p class="try-task">O botão chama <code>setQtd(qtd + 1)</code> duas vezes, mas só soma um. Use a forma
+  de função — <code>setQtd((atual) =&gt; atual + 1)</code> — nas duas chamadas para o clique somar
+  dois.</p>
+  <pre class="jsx">function App() {
+  const [qtd, setQtd] = useState(0);
+
+  function venderDois() {
+    setQtd(qtd + 1);
+    console.log("setter pediu: " + (qtd + 1));
+    setQtd(qtd + 1);
+    console.log("setter pediu: " + (qtd + 1));
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Total: {qtd}&lt;/p&gt;
+      &lt;button onClick={venderDois}&gt;Vender dois&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Total: 0&lt;/p&gt;
+  &lt;button&gt;Vender dois&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [qtd, setQtd] = useState(0);
+
+  function venderDois() {
+    setQtd((atual) =&gt; atual + 1);
+    console.log("setter pediu um a mais");
+    setQtd((atual) =&gt; atual + 1);
+    console.log("setter pediu um a mais");
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Total: {qtd}&lt;/p&gt;
+      &lt;button onClick={venderDois}&gt;Vender dois&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No código inicial, as duas chamadas usam o mesmo <code>qtd</code> — o do desenho, que é zero. A
+primeira pede 1, a segunda pede 1 também. O React recebe dois pedidos do mesmo valor, e o resultado é
+1. O console mostra a prova:</p>
+
+<pre class="term">setter pediu: 1
+setter pediu: 1</pre>
+
+<p>Essas duas linhas aparecem no console do navegador depois do clique — o painel da caixa mostra o que
+foi escrito durante o desenho, e o manipulador roda depois dele. Abra o DevTools com <code>F12</code> e
+clique para ver a sequência acontecendo.</p>
+
+<p>Duas linhas, o mesmo número. Não é que o React tenha ignorado a segunda chamada: ela pediu o mesmo
+valor que já estava pedido. O estado não mudou duas vezes porque as duas contas deram no mesmo lugar.
+Esse é o "somar dois que soma um" — e ele aparece em carrinho, em curtidas, em votos, em qualquer lugar
+onde a mesma ação mexe no mesmo estado mais de uma vez.</p>
+
+<p>Existe uma explicação mais funda, que envolve como o React agrupa as atualizações do mesmo evento.
+Ela tem aula própria, mais adiante, e não é necessária para consertar o problema. O que importa agora é
+que o setter, sozinho, não sabe somar: ele só sabe receber um valor. Quem sabe somar é você — ou a forma
+de função, que vem a seguir.</p>
+
+<h2>5. A forma de função</h2>
+
+<p>Quando o valor novo depende do valor anterior, o setter aceita uma função em vez de um valor. O React
+chama essa função com o estado mais recente e usa o que ela devolver como novo estado. A escrita é:</p>
+
+<pre class="file" data-file="Contador.jsx">setQtd((atual) =&gt; atual + 1);</pre>
+
+<p>Leia em voz alta: "setQtd, pegue o valor atual e me dê o atual mais um". O parâmetro
+<code>atual</code> é o valor mais recente que o React tem na fila — não o do desenho. Por isso duas
+chamadas seguidas funcionam: a primeira recebe 0 e devolve 1; a segunda recebe 1 e devolve 2. Cada uma
+parte de onde a anterior chegou.</p>
+
+<p>O nome do parâmetro é escolha sua: <code>atual</code>, <code>anterior</code>, <code>prev</code>,
+<code>q</code>. A comunidade usa bastante <code>prev</code> em exemplos em inglês e <code>atual</code>
+em código em português. O que não vale é chamar de <code>qtd</code> — o mesmo nome do estado —, porque
+aí a leitura fica confusa: dentro da função, aquele <code>qtd</code> é o valor da fila, não o da
+variável de fora.</p>
+
+<pre class="file" data-file="Cestinha.jsx">function acrescentar() {
+  setQtd((atual) =&gt; atual + 1);
+  setQtd((atual) =&gt; atual + 1);
+  setQtd((atual) =&gt; atual + 1);
+}</pre>
+
+<p>Três chamadas, três incrementos: 0 vira 3. A forma de função é a resposta certa sempre que o valor
+novo for calculado a partir do anterior — somar, subtrair, alternar um booleano, empilhar num array,
+incrementar um contador. Nesses casos, ela não é só mais segura: é a única que continua correta quando
+duas atualizações acontecem juntas.</p>
+
+<h2>6. O valor novo na mesma função</h2>
+
+<p>Agora o outro lado da mesma moeda. Se o setter não muda a variável, como ler o valor novo logo depois
+de pedir a atualização? A resposta é: você não lê — você calcula. O valor novo é uma conta que você faz,
+e ela pode ficar numa variável sua, que existe durante aquela função e serve para o que você precisar:
+log, validação, outro cálculo.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:vendeu 2">
+  <p class="try-task">O resumo usa o total antigo e mostra "vendeu 1". Calcule o valor novo numa
+  variável, use essa variável para atualizar o estado e também para montar o resumo: depois do clique, o
+  painel precisa mostrar <strong>vendeu 2</strong>.</p>
+  <pre class="jsx">function App() {
+  const [qtd, setQtd] = useState(1);
+  const [resumo, setResumo] = useState("ninguém comprou ainda");
+
+  function vender() {
+    setQtd(qtd + 1);
+    setResumo("vendeu " + qtd);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Total: {qtd}&lt;/p&gt;
+      &lt;p&gt;{resumo}&lt;/p&gt;
+      &lt;button onClick={vender}&gt;Vender um&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Total: 1&lt;/p&gt;
+  &lt;p&gt;ninguém comprou ainda&lt;/p&gt;
+  &lt;button&gt;Vender um&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [qtd, setQtd] = useState(1);
+  const [resumo, setResumo] = useState("ninguém comprou ainda");
+
+  function vender() {
+    const novo = qtd + 1;
+    setQtd(novo);
+    setResumo("vendeu " + novo);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Total: {qtd}&lt;/p&gt;
+      &lt;p&gt;{resumo}&lt;/p&gt;
+      &lt;button onClick={vender}&gt;Vender um&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Três linhas, três papéis. O cálculo produz o número novo. O setter entrega esse número ao React. O
+resumo usa o mesmo número, porque a variável ainda está na mão do manipulador. Sem a variável, o resumo
+teria de ler <code>qtd</code> — e <code>qtd</code> ainda é o valor antigo, como o painel mostrou antes do
+conserto: "vendeu 1" com o total já em 2.</p>
+
+<p>É a receita para qualquer efeito colateral que dependa do valor atualizado: calcule, guarde, use. E,
+se você quiser acompanhar no console, o mesmo vale: <code>console.log(novo)</code>, nunca
+<code>console.log(qtd)</code> depois do setter.</p>
+
+<pre class="term">total na tela: 2</pre>
+
+<p>Essa linha só aparece depois do clique, no console do navegador — o painel da caixa mostra o que o
+código escreveu durante o desenho, e o manipulador roda depois dele.</p>
+
+<p>E se o valor novo depender de uma atualização que ainda não aconteceu? Aí não existe caminho honesto
+dentro do mesmo evento — o valor ainda não existe. O que se faz, quando isso importa de verdade, é outro
+tipo de solução (um efeito que observa o estado). Mas, na maioria dos casos, calcular antes resolve — e é
+o que vale tentar primeiro.</p>
+
+<h2>7. Valor ou função?</h2>
+
+<p>A escolha entre as duas formas não é gosto: é uma pergunta sobre o valor novo. Se ele não depende do
+anterior, passe o valor. Se depende, passe a função. O quadro abaixo resume os casos que aparecem em
+qualquer projeto.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Forma</th><th>Por quê</th></tr>
+<tr><td>zerar a conta</td><td><code>setQtd(0)</code></td><td>o novo valor é fixo, não olha para o anterior</td></tr>
+<tr><td>escolher um pão</td><td><code>setPao("Broa")</code></td><td>idem: valor conhecido</td></tr>
+<tr><td>fechar a placa</td><td><code>setAberto(false)</code></td><td>idem: booleano fixo</td></tr>
+<tr><td>somar um</td><td><code>setQtd((atual) =&gt; atual + 1)</code></td><td>depende do anterior</td></tr>
+<tr><td>alternar aberto/fechado</td><td><code>setAberto((a) =&gt; !a)</code></td><td>depende do anterior</td></tr>
+<tr><td>acrescentar num array</td><td><code>setItens((i) =&gt; [...i, novo])</code></td><td>depende do anterior</td></tr>
+</table>
+</div>
+
+<p>Há um caso em que a forma de função é obrigatória mesmo quando parece exagero: quando a mesma função
+pode rodar mais de uma vez antes do próximo desenho. Isso acontece com dois cliques rápidos, com um
+manipulador que atualiza duas vezes e com efeitos. Na dúvida, função — ela nunca dá resultado errado, e
+o custo é um parêntese a mais.</p>
+
+<h2>8. Os tropeços da função</h2>
+
+<p>A forma de função tem uma armadilha de sintaxe que pega quase todo mundo: a seta com chaves. Quando
+você troca a expressão por um bloco — <code>(atual) =&gt; { ... }</code> —, precisa de
+<code>return</code>. Sem ele, a função devolve <code>undefined</code>, e o estado passa a valer
+<code>undefined</code>.</p>
+
+<div class="tryreact" data-goal="clique:button;;clique:button;;texto:Total: 2">
+  <p class="try-task">O manipulador usa chaves, mas esqueceu o <code>return</code>: o estado vira
+  <code>undefined</code> e o total some. Conserte para o botão somar um a cada clique — depois de dois
+  cliques, <strong>Total: 2</strong>.</p>
+  <pre class="jsx">function App() {
+  const [qtd, setQtd] = useState(0);
+
+  function somar() {
+    setQtd((atual) =&gt; {
+      atual + 1;
+    });
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Total: {qtd}&lt;/p&gt;
+      &lt;button onClick={somar}&gt;Somar um&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Total: 0&lt;/p&gt;
+  &lt;button&gt;Somar um&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [qtd, setQtd] = useState(0);
+
+  function somar() {
+    setQtd((atual) =&gt; {
+      return atual + 1;
+    });
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Total: {qtd}&lt;/p&gt;
+      &lt;button onClick={somar}&gt;Somar um&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois do primeiro clique, o painel mostra <code>Total:</code> e nada depois — o estado é
+<code>undefined</code>, e o React não desenha nada para ele. No clique seguinte, <code>undefined + 1</code>
+é <code>NaN</code>, e o painel mostra <code>NaN</code>, que é o "não é um número" do JavaScript. Os dois
+sintomas vêm do mesmo <code>return</code> que faltou.</p>
+
+<p>Outro tropeço clássico é <code>(atual) =&gt; atual++</code>. O <code>++</code> devolve o valor
+<em>antigo</em> e muda a variável — que, aqui, é descartada. O estado recebe o valor de antes e a tela
+não muda. Escreva <code>atual + 1</code>. E há ainda o tropeço de mexer no valor em vez de devolver um
+novo, como <code>setItens((i) =&gt; { i.push(novo); return i; })</code>: funciona na tela até alguém
+comparar referências e descobrir que o array é o mesmo objeto de antes. A regra é devolver um valor novo,
+não alterar o que veio.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o carrinho que soma dois</h3>
+<p>O botão "adicionar 2" do carrinho chamava <code>setItens(itens + 1)</code> duas vezes e somava um. A
+Ana trocou por duas chamadas com <code>(atual) =&gt; atual + 1</code> e o carrinho passou a somar dois. É
+o mesmo caso da caixa desta aula, num contexto em que o erro custa dinheiro — e é por isso que a forma de
+função virou hábito na comunidade.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o total que virou NaN</h3>
+<p>Depois de uma tarde mexendo no código, o total da venda passou a mostrar <code>NaN</code>. O culpado
+era uma função de atualização com chaves e sem <code>return</code>, que gravou <code>undefined</code> no
+estado. O conserto foi uma palavra. O sintoma, porém, apareceu longe: numa conta de soma, num alerta e
+no rodapé. Quando um número começar a se comportar como texto, procure quem gravou <code>undefined</code>
+no estado.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o preço que não atualizava</h3>
+<p>Ela mudava a quantidade com a forma de função, e o preço total continuava o antigo. O total estava
+guardado em outro estado, atualizado à parte, e um dos dois atrasava. A solução não foi mais um setter:
+foi parar de guardar o total e calculá-lo na hora, a partir da quantidade e do preço. Estado é para o que
+não dá para calcular; o resto é conta.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. O que <code>setQtd(qtd + 1)</code> faz?</p>
+<label><input type="radio" name="q1"> soma um ao estado na hora, sem desenhar de novo</label>
+<label><input type="radio" name="q1"> soma um ao valor que está na tela</label>
+<label><input type="radio" name="q1"> pede um novo desenho com o valor atual mais um</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">2. Por que dois <code>setQtd(qtd + 1)</code> seguidos somam um só?</p>
+<label><input type="radio" name="q2"> porque o React ignora a segunda chamada</label>
+<label><input type="radio" name="q2"> porque as duas contas usam o mesmo valor do desenho</label>
+<label><input type="radio" name="q2"> porque falta uma key no botão</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Quando usar a forma de função?</p>
+<label><input type="radio" name="q3"> quando o valor novo depende do valor anterior</label>
+<label><input type="radio" name="q3"> sempre, mesmo para zerar o contador</label>
+<label><input type="radio" name="q3"> só dentro de <code>useEffect</code></label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a atualização que soma um</h2>
+<p>Complete a chamada para somar um ao valor anterior, usando a forma de função:</p>
+<div class="ex-code">setQtd((atual) =&gt; atual <input aria-label="resposta 1" data-answer="+ 1|+1" placeholder="...">);</div>
+<p class="ex-dica">Dica: é a conta que devolve o valor novo a partir do parâmetro. Não é <code>++</code>:
+o <code>++</code> devolve o valor antigo, e o estado receberia o mesmo número de antes.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Atualizar estado é substituir: o setter recebe o valor novo, não um pedaço dele. Cada desenho do
+componente trabalha com um retrato do estado tirado no começo da execução, e esse retrato não muda até o
+próximo desenho. Chamar o setter só agenda o próximo retrato. Por isso o valor lido logo depois do
+setter ainda é o antigo — é o mesmo valor que a função inteira enxerga.</p>
+
+<p>Quando o valor novo depende do anterior, use a forma de função:
+<code>setQtd((atual) =&gt; atual + 1)</code>. O React entrega o valor mais recente da fila, e cada
+chamada parte de onde a anterior chegou — é o que faz duas chamadas seguidas somarem dois. Quando o valor
+é fixo, passe direto: <code>setQtd(0)</code>. E quando você precisa do número novo na mesma função,
+calcule numa variável antes: <code>const novo = qtd + 1</code>.</p>
+
+<p>Os tropeços são de sintaxe, não de conceito: chaves sem <code>return</code>, <code>atual++</code>,
+alterar o objeto em vez de devolver um novo. Com a forma de função no lugar certo, a atualização deixa de
+ser sorte e passa a ser conta. A próxima aula fecha o ciclo do estado com o que dispara tudo isso: o
+clique, o evento e o <code>onClick</code>.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Setter define o valor novo; ele não soma nem acumula.</li>
+<li>Cada desenho trabalha com o retrato do estado tirado no início.</li>
+<li>Ler o estado depois do setter devolve o valor antigo — sempre.</li>
+<li>Dois <code>setQtd(qtd + 1)</code> seguidos pedem o mesmo valor: somam um.</li>
+<li>Para depender do anterior: <code>setQtd((atual) =&gt; atual + 1)</code>.</li>
+<li>Valor fixo (zerar, escolher, fechar): <code>setQtd(0)</code>, sem função.</li>
+<li>Setas com chaves precisam de <code>return</code>; sem ele o estado vira <code>undefined</code>.</li>
+<li><code>atual++</code> devolve o valor antigo: use <code>atual + 1</code>.</li>
+<li>Precisa do novo valor agora? Calcule numa variável e use a variável.</li>
+<li>Dúvida entre valor e função? Função nunca dá resultado errado.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Input Controlado | Guia React</title>
+<meta name="description" content="O elemento input no React: o atributo type e o que ele muda, os atributos que não são estado, o valor que chega sempre como texto e como formatar sem brigar com o cursor.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Input <span class="hl">Controlado</span></h1>
+<p class="intro">A Ana está montando o cadastro do site da padaria: nome, e-mail, senha, telefone e um
+campo de busca. Ela escreveu todos com a mesma tag, do mesmo jeito, e o resultado ficou estranho — a
+senha aparece para quem está do lado, o e-mail abre o teclado de letras no celular, o telefone aceita
+letra. Nesta aula ela aprende o que diferencia um <code>input</code> do outro: o atributo
+<code>type</code>, os atributos de configuração e o fato de que o valor que chega ao estado é
+<strong>sempre texto</strong>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que todo <code>input</code> controlado tem em comum, em uma revisão rápida.</li>
+  <li>O que o atributo <code>type</code> muda — e o que ele não muda.</li>
+  <li>Os tipos que resolvem o dia a dia: texto, e-mail, senha, busca, telefone, data e número.</li>
+  <li>A diferença entre atributo de configuração e estado que muda.</li>
+  <li>Por que o valor do campo chega como string, mesmo em campo numérico.</li>
+  <li>Como converter e formatar o texto sem que o cursor pule.</li>
+  <li>Por que um <code>input</code> é uma linha só, e quando o campo precisa de outra tag.</li>
+</ul>
+</div>
+
+<h2>1. A cena: cinco campos e uma tag só</h2>
+
+<p>A padaria da Ana precisa de um cadastro simples: o cliente digita o nome, o e-mail, uma senha, o
+telefone e, se quiser, procura um pão no campo de busca. Ela abriu o editor e escreveu cinco
+campos iguais, mudando só o rótulo de cada um. Funcionou do jeito que funciona uma folha em
+branco: todos aceitam qualquer coisa. A senha aparece em letras legíveis na tela, o telefone aceita
+"abc", o e-mail aceita "maria" sem arroba, e no celular o teclado que sobe é o de letras, mesmo no campo
+de telefone.</p>
+
+<p>Nada disso é culpa do React. É o comportamento padrão do elemento <code>input</code>: sem instruções,
+ele é um campo de texto de uma linha. O que diz a ele como se comportar é um atributo chamado
+<code>type</code>. Trocar <code>type="text"</code> por <code>type="email"</code> não muda a ligação com o
+estado — muda o teclado, a validação nativa e, no caso da senha, o que aparece na tela. É um atributo
+pequeno com efeito grande, e é por onde esta aula começa.</p>
+
+<p>Antes de seguir, vale um aviso de roteiro: nesta aula o foco é o <strong>elemento</strong>. O par
+<code>value</code> + <code>onChange</code>, o ciclo de uma tecla por vez e o campo que trava sem
+<code>onChange</code> já foram contados com calma na aula <a href="entrada-controlada.html">Entrada
+Controlada</a>. Se algum desses pontos ainda estiver nebuloso, vale voltar lá primeiro; daqui para a
+frente eu assumo que você reconhece o par.</p>
+
+<h2>2. O que todo input controlado tem em comum</h2>
+
+<p>Independente do tipo, um campo controlado é sempre a mesma dupla: <code>value</code> recebendo o
+estado e <code>onChange</code> devolvendo o texto novo para o estado. O tipo muda a aparência e o
+comportamento do campo; o estado continua sendo o dono do valor. Este é o esqueleto que você vai repetir
+em todos os campos do cadastro:</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const [nome, setNome] = useState("");
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Seu nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        type="text"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;p&gt;Olá, {nome || "cliente"}!&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Três detalhes desse esqueleto merecem atenção porque voltam sempre. O primeiro é o
+<code>id</code>: ele existe para o <code>label</code> apontar para o campo com <code>htmlFor</code> e para
+o navegador saber qual rótulo pertence a qual campo. O segundo é o <code>value</code> curto e previsível:
+o estado é uma string, e o campo mostra essa string. O terceiro é o <code>{nome || "cliente"}</code> no
+parágrafo: quando o estado está vazio, a expressão cai no texto da direita, o que evita um "Olá, !" sem
+graça.</p>
+
+<p>Se você trocar o parágrafo por um resumo do pedido, ou puser o nome dentro de um <code>h2</code>, nada
+muda no campo: o mecanismo é o mesmo. O que muda de uma tela para outra é o que você faz com o valor
+depois de receber. Guarde o esqueleto e vamos variar o <code>type</code>.</p>
+
+<h2>3. O atributo type é o que muda tudo</h2>
+
+<p>O <code>type</code> é uma instrução para o navegador, não para o React. Ele decide que tipo de
+controle desenhar, que teclado sugerir no celular, que validação nativa aplicar e como mostrar o texto.
+Para o React, o campo continua sendo um campo controlado: <code>value</code> e <code>onChange</code>
+funcionam igual em todos os tipos. Vale conhecer as peças do elemento antes de escolher o tipo:</p>
+
+<dl class="anatomy">
+<dt><code>type</code></dt>
+<dd>O tipo do campo: <code>text</code>, <code>email</code>, <code>password</code>, <code>number</code>,
+<code>search</code>, <code>tel</code>, <code>date</code>. Sem ele, o navegador assume <code>text</code>.</dd>
+<dt><code>value</code> e <code>onChange</code></dt>
+<dd>O par que liga o campo ao estado. O <code>value</code> mostra; o <code>onChange</code> devolve o texto
+novo para o estado.</dd>
+<dt>atributo de configuração</dt>
+<dd>O que fica fixo no JSX e não muda com a digitação: <code>type</code>, <code>id</code>,
+<code>placeholder</code>, <code>maxLength</code>, <code>autoComplete</code>, <code>readOnly</code>.</dd>
+<dt>propriedade × atributo</dt>
+<dd>O que você vê digitado é a propriedade <code>value</code> do elemento; o painel das caixas mostra os
+atributos do HTML, então o texto digitado não aparece lá.</dd>
+<dt><code>e.target.value</code></dt>
+<dd>O texto atual do campo no momento do evento, sempre como string. É o que o <code>onChange</code>
+entrega para o seu estado.</dd>
+</dl>
+
+<p>Com essas peças claras, o tipo deixa de ser um detalhe estético. Um <code>type="email"</code> diz ao
+celular para mostrar o arroba no teclado e ao navegador para conferir o formato no envio do formulário.
+Um <code>type="password"</code> esconde os caracteres na tela. Um <code>type="number"</code> mostra
+setinhas e aceita rolagem do mouse. Nenhum deles impede o usuário de digitar bobagem — a validação de
+verdade é sua e tem aula própria —, mas todos melhoram a experiência sem custar uma linha de
+JavaScript.</p>
+
+<h2>4. Os tipos que a padaria usa</h2>
+
+<p>A tabela abaixo é a lista que cobre quase todo formulário de site pequeno. Guarde as três colunas:
+o tipo, para que serve e o que muda na prática. O que chega no estado é sempre texto, como você viu na
+seção anterior, e não muda de um tipo para outro.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th><code>type</code></th><th>Para quê serve</th><th>O que muda na prática</th></tr>
+<tr><td><code>text</code></td><td>nome, endereço, apelido</td><td>nada especial; é o padrão</td></tr>
+<tr><td><code>email</code></td><td>e-mail do cadastro</td><td>teclado com arroba no celular; conferência de formato no envio</td></tr>
+<tr><td><code>password</code></td><td>senha</td><td>os caracteres aparecem como bolinhas na tela</td></tr>
+<tr><td><code>search</code></td><td>busca de pão no site</td><td>um "x" para limpar aparece no canto</td></tr>
+<tr><td><code>tel</code></td><td>telefone e WhatsApp</td><td>teclado numérico no celular</td></tr>
+<tr><td><code>date</code></td><td>data de retirada</td><td>abre o calendário do sistema; o valor vem como AAAA-MM-DD</td></tr>
+<tr><td><code>number</code></td><td>quantidade, porção</td><td>setinhas e teclado numérico; o valor continua texto</td></tr>
+</table>
+</div>
+
+<p>Agora o primeiro trabalho da Ana: os campos do cadastro estão todos como texto comum. O e-mail precisa
+do tipo certo para o celular colaborar, e a senha precisa esconder o que está sendo digitado. Repare que
+o estado e o <code>onChange</code> já estão prontos — o que falta é o atributo:</p>
+
+<div class="tryreact" data-goal="attr:input#email|type=email;;attr:input#senha|type=password">
+  <p class="try-task">Troque o <code>type</code> do campo de e-mail para <code>email</code> e o do campo
+  de senha para <code>password</code>. O resto do componente já está pronto.</p>
+  <pre class="jsx">function App() {
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="email"&gt;E-mail&lt;/label&gt;
+      &lt;input
+        id="email"
+        type="text"
+        value={email}
+        onChange={(e) =&gt; setEmail(e.target.value)}
+      /&gt;
+      &lt;label htmlFor="senha"&gt;Senha&lt;/label&gt;
+      &lt;input
+        id="senha"
+        type="text"
+        value={senha}
+        onChange={(e) =&gt; setSenha(e.target.value)}
+      /&gt;
+      &lt;p&gt;Cadastro de {email || "..."}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="email"&gt;E-mail&lt;/label&gt;
+  &lt;input id="email" type="text" value=""&gt;
+  &lt;label for="senha"&gt;Senha&lt;/label&gt;
+  &lt;input id="senha" type="text" value=""&gt;
+  &lt;p&gt;Cadastro de ...&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="email"&gt;E-mail&lt;/label&gt;
+      &lt;input
+        id="email"
+        type="email"
+        value={email}
+        onChange={(e) =&gt; setEmail(e.target.value)}
+      /&gt;
+      &lt;label htmlFor="senha"&gt;Senha&lt;/label&gt;
+      &lt;input
+        id="senha"
+        type="password"
+        value={senha}
+        onChange={(e) =&gt; setSenha(e.target.value)}
+      /&gt;
+      &lt;p&gt;Cadastro de {email || "..."}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Rode com a sua versão e olhe o painel: os atributos <code>type="email"</code> e
+<code>type="password"</code> aparecem no HTML gerado. Digite nos dois campos: o valor continua chegando no estado, o parágrafo continua mudando
+com o e-mail, e o texto da senha fica invisível na prévia. Essa é a prova de que o tipo é uma camada de
+apresentação por cima do mesmo mecanismo — e não uma peça diferente do React.</p>
+
+<h2>5. O valor que chega é sempre texto</h2>
+
+<p>Aqui está a consequência do <code>type</code> que mais confunde: ele não muda o tipo do valor. Todo
+campo de texto do HTML entrega uma string em <code>e.target.value</code>. <code>type="number"</code>
+inclui setinhas, teclado numérico e até recusa de letras no navegador, mas o estado recebe
+<code>"3"</code>, com aspas, e não <code>3</code>. Se você somar, o JavaScript cola os textos; se
+multiplicar, ele converte por conta própria. Essa diferença é a origem de metade dos totais errados por
+aí.</p>
+
+<p>A Ana quer vender pão a R$ 2 e deixar o cliente escolher a quantidade. O campo parece numérico, o
+código parece uma conta e o resultado aparece como "R$ 32" para três pães. O problema está na linha do
+total, não no campo:</p>
+
+<div class="tryreact" data-goal="digite:input=3;;texto:Total: R$ 6">
+  <p class="try-task">Digite <strong>3</strong> no campo: o total aparece como "R$ 32", porque o valor do
+  campo é texto e está sendo colado no 2. Use <code>Number()</code> para transformar a quantidade em
+  número e multiplicar por 2.</p>
+  <pre class="jsx">function App() {
+  const [quantidade, setQuantidade] = useState("1");
+  const total = quantidade + 2;
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="qtd"&gt;Quantos pães?&lt;/label&gt;
+      &lt;input
+        id="qtd"
+        type="number"
+        value={quantidade}
+        onChange={(e) =&gt; setQuantidade(e.target.value)}
+      /&gt;
+      &lt;p&gt;Total: R$ {total}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="qtd"&gt;Quantos pães?&lt;/label&gt;
+  &lt;input id="qtd" type="number" value="1"&gt;
+  &lt;p&gt;Total: R$ 12&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [quantidade, setQuantidade] = useState("1");
+  const total = Number(quantidade) * 2;
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="qtd"&gt;Quantos pães?&lt;/label&gt;
+      &lt;input
+        id="qtd"
+        type="number"
+        value={quantidade}
+        onChange={(e) =&gt; setQuantidade(e.target.value)}
+      /&gt;
+      &lt;p&gt;Total: R$ {total}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p><code>Number()</code> converte texto em número: <code>Number("3")</code> vira <code>3</code>,
+<code>Number("")</code> vira <code>0</code> e <code>Number("3,5")</code> vira <code>NaN</code>, porque a
+vírgula não é o separador decimal do JavaScript. Se o seu campo aceita vírgula, troque por ponto antes de
+converter: <code>Number(texto.replace(",", "."))</code>. O <code>NaN</code> é o "não é número": aparece
+quando a conversão não deu certo, e é melhor tratar antes de mostrar no total.</p>
+
+<p>No console do navegador, a diferença entre o texto do campo e o número da conta fica evidente:</p>
+
+<pre class="term">typeof e.target.value: string
+Number("3"): 3
+Number(""): 0
+Number("3,5"): NaN</pre>
+
+<p>Existe um atalho do React para campos numéricos: <code>e.target.valueAsNumber</code> entrega o número
+já convertido, ou <code>NaN</code> quando o campo está vazio. Funciona, mas espalha tratamento de
+<code>NaN</code> por todo lado. Para quem está começando, guardar a string e converter no lugar da conta
+é mais fácil de ler. O importante é não esquecer a conversão: o tipo do campo é uma promessa do navegador,
+não do valor.</p>
+
+<h2>6. Atributos que não são estado</h2>
+
+<p>Nem tudo no <code>input</code> é <code>value</code>. Existe uma família de atributos que configura o
+campo e fica igual durante toda a digitação. Eles não precisam de estado, não mudam com o evento e podem
+ser escritos direto no JSX. A tabela abaixo separa o que é configuração do que é valor:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Atributo</th><th>O que faz</th><th>Cuidado</th></tr>
+<tr><td><code>placeholder</code></td><td>mostra uma dica cinza dentro do campo vazio</td><td>não é valor: some ao digitar e não deve substituir o rótulo</td></tr>
+<tr><td><code>maxLength</code></td><td>limita quantos caracteres o usuário consegue digitar</td><td>não vale para texto colado por código; valide também</td></tr>
+<tr><td><code>autoComplete</code></td><td>ajuda o navegador a preencher (ou a não preencher)</td><td><code>off</code> é útil em campo de busca; <code>on</code> ajuda no cadastro</td></tr>
+<tr><td><code>readOnly</code></td><td>mostra o valor e não deixa editar</td><td>o valor ainda é enviado; use quando o dado é só leitura</td></tr>
+<tr><td><code>disabled</code></td><td>desliga o campo e o cinza</td><td>campo desabilitado não é enviado e não recebe foco</td></tr>
+<tr><td><code>required</code></td><td>pede preenchimento na validação nativa do navegador</td><td>só age no envio de um formulário; não substitui a sua validação</td></tr>
+</table>
+</div>
+
+<p>Um exemplo com os três mais usados, num campo de busca da padaria. O <code>placeholder</code> dá a
+dica, o <code>maxLength</code> impede um texto gigante, o <code>autoComplete="off"</code> evita que o
+navegador sugira o endereço da casa da Ana no meio da busca, e o <code>value</code> continua vindo do
+estado:</p>
+
+<pre class="file" data-file="Busca.jsx">function Busca() {
+  const [termo, setTermo] = useState("");
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="busca"&gt;Buscar pão&lt;/label&gt;
+      &lt;input
+        id="busca"
+        type="search"
+        placeholder="Pão de queijo"
+        maxLength={40}
+        autoComplete="off"
+        value={termo}
+        onChange={(e) =&gt; setTermo(e.target.value)}
+      /&gt;
+      &lt;p&gt;Procurando por: {termo || "nada ainda"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Repare que só o <code>value</code> muda durante o uso. Se você colocar o <code>placeholder</code>
+dentro de um estado, ele passa a mudar sem motivo e o campo perde a dica quando o texto é apagado de
+outro jeito. A regra é simples: o que varia com o usuário é estado; o que configura o campo é
+atributo.</p>
+
+<h2>7. Formatar sem brigar com o cursor</h2>
+
+<p>Formatar é transformar o texto antes de guardar: deixar só dígitos no telefone, maiúsculas no nome,
+sem espaços no começo. O lugar certo é o <code>onChange</code>, porque ali você recebe o texto cru e
+devolve o texto tratado para o estado. O campo mostra o resultado no próximo desenho, já limpo.</p>
+
+<p>A Ana quer o telefone só com números — é o formato que ela usa para mandar mensagem no WhatsApp. Se
+guardar os parênteses e o traço, o número não serve para nada na hora de discar. A missão é limpar o
+texto na entrada:</p>
+
+<div class="tryreact" data-goal="digite:input=(11) 99999-8888;;texto:Telefone: 11999998888;;attr:input|maxlength=11">
+  <p class="try-task">O telefone está sendo guardado com parênteses e traço. Use
+  <code>replace(/\D/g, "")</code> dentro do <code>onChange</code> para guardar só dígitos e acrescente
+  <code>maxLength={11}</code> no campo.</p>
+  <pre class="jsx">function App() {
+  const [telefone, setTelefone] = useState("");
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="tel"&gt;Telefone&lt;/label&gt;
+      &lt;input
+        id="tel"
+        type="tel"
+        value={telefone}
+        onChange={(e) =&gt; setTelefone(e.target.value)}
+      /&gt;
+      &lt;p&gt;Telefone: {telefone}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="tel"&gt;Telefone&lt;/label&gt;
+  &lt;input id="tel" type="tel" value=""&gt;
+  &lt;p&gt;Telefone:&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [telefone, setTelefone] = useState("");
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="tel"&gt;Telefone&lt;/label&gt;
+      &lt;input
+        id="tel"
+        type="tel"
+        maxLength={11}
+        value={telefone}
+        onChange={(e) =&gt; setTelefone(e.target.value.replace(/\D/g, ""))}
+      /&gt;
+      &lt;p&gt;Telefone: {telefone}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p><code>\D</code> significa "qualquer coisa que não seja dígito", e o <code>g</code> manda trocar todas as
+ocorrências, não só a primeira. Por isso <code>"(11) 99999-8888"</code> vira
+<code>"11999998888"</code>. O <code>maxLength</code> limita o que a pessoa consegue digitar; a limpeza no
+<code>onChange</code> garante que nada além de dígito entre no estado, mesmo colado.</p>
+
+<p>Dá para testar a expressão sozinha no console, antes de colocar no componente:</p>
+
+<pre class="term">"(11) 99999-8888".replace(/\D/g, "")
+"11999998888"</pre>
+
+<p>Agora o cuidado que separa formatar de brigar com o usuário. Toda vez que você muda o texto no
+<code>onChange</code>, o campo é redesenhado com o texto novo e o navegador recoloca o cursor no fim.
+Para um telefone isso quase não incomoda, porque a pessoa digita da esquerda para a direita. Para
+maiúsculas no meio de uma frase, incomoda muito: a pessoa corrige uma letra no meio e o cursor salta. A
+saída é formatar só quando o campo perde o foco (<code>onBlur</code>) ou aceitar as transformações que não
+movem o cursor, como remover caracteres indesejados.</p>
+
+<h2>8. O input é uma linha só</h2>
+
+<p>Um <code>input</code> é, por definição, uma linha. Apertar Enter dentro dele não cria uma linha nova: em
+um formulário, o Enter envia; fora dele, não faz nada. Se o campo precisa de várias linhas — o recado no
+bolo, a observação do pedido, o endereço completo —, a tag certa é <code>textarea</code>, com regras
+próprias de altura e quebras de linha. Se a escolha é entre poucas opções fixas, a tag certa é
+<code>select</code>. E se a resposta é sim ou não, é <code>checkbox</code>.</p>
+
+<p>Essa separação não é preciosismo: cada tag tem um comportamento e uma acessibilidade diferentes. Um
+<code>input</code> com <code>type="text"</code> usado como campo de recado esconde o texto quando passa da
+largura, não aceita Enter e não dá para arrastar a altura. Trocar a tag é mais simples do que tentar
+consertar o <code>input</code> depois. As próximas aulas do nível são exatamente essas: textarea, select,
+checkbox, radio e validação — na ordem em que os formulários costumam crescer.</p>
+
+<p>Vale também saber o que o <code>input</code> não faz sozinho. Ele não guarda o valor em lugar nenhum
+depois que a página fecha, não envia nada para o servidor e não impede o usuário de digitar errado. Quem
+guarda é o estado, quem envia é o formulário, quem impede é a validação. O campo é só a porta de
+entrada.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o e-mail sem arroba passou no cadastro</h3>
+<p>A Ana trocou o campo para <code>type="email"</code> e achou que estava validado. Só que a conferência
+nativa do navegador acontece no envio de um <code>form</code> e pode ser desligada com
+<code>noValidate</code>. Fora de um formulário, o campo aceita "maria" numa boa. O tipo melhora o teclado e
+dá uma dica ao navegador; a validação de verdade é uma função sua, que olha o valor antes de seguir. Isso
+tem aula própria, mas já vale a expectativa certa: <code>type</code> não é validação.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o placeholder virou valor na cabeça do código</h3>
+<p>Ela escreveu <code>placeholder="Seu nome"</code> e, no resumo do pedido, testou
+<code>if (nome)</code> esperando que o campo tivesse algo. O placeholder é só uma dica visual: não entra
+no estado e some na primeira tecla. Quem diz se o campo está preenchido é o <code>value</code> do estado,
+e é ele que você confere com <code>nome.trim() !== ""</code> antes de enviar. Placeholder não é dado.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: a senha apareceu no resumo do pedido</h3>
+<p>O campo de senha esconde os caracteres na tela, mas o estado tem o texto puro. Quando a Ana colocou
+<code>{senha}</code> num parágrafo de conferência, a senha apareceu em letras legíveis para qualquer um
+que olhasse a tela. <code>type="password"</code> é uma cortina, não um cofre: o valor continua disponível
+para o seu código. A regra prática é nunca imprimir senha em tela, em log ou em resumo — mostre só a
+quantidade de caracteres.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que o <code>type="password"</code> muda?</p>
+<label><input type="radio" name="q1"> o valor que chega no estado, que passa a vir escondido</label>
+<label><input type="radio" name="q1"> só a exibição: os caracteres viram bolinhas, mas o estado tem o texto puro</label>
+<label><input type="radio" name="q1"> a ligação com o React, que deixa de precisar de <code>onChange</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Para que serve o <code>placeholder</code>?</p>
+<label><input type="radio" name="q2"> guardar o valor inicial do campo no estado</label>
+<label><input type="radio" name="q2"> substituir o <code>label</code> quando falta espaço na tela</label>
+<label><input type="radio" name="q2"> mostrar uma dica cinza dentro do campo vazio, que some ao digitar</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que chega em <code>e.target.value</code> quando o leitor digita 42 num campo <code>type="number"</code>?</p>
+<label><input type="radio" name="q3"> o texto "42", que precisa de <code>Number()</code> para virar número</label>
+<label><input type="radio" name="q3"> o número 42, pronto para somar</label>
+<label><input type="radio" name="q3"> <code>undefined</code>, porque campo numérico não tem valor</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: esconder a senha</h2>
+<p>Complete o atributo <code>type</code> do campo abaixo para que os caracteres apareçam como bolinhas na
+tela. Escreva só o valor do atributo:</p>
+<div class="ex-code">&lt;input id="senha" type="<input aria-label="resposta 1" data-answer="password" placeholder="...">" value={senha} onChange={(e) =&gt; setSenha(e.target.value)} /&gt;</div>
+<p class="ex-dica">Dica: é a mesma palavra que aparece na tabela dos tipos, em inglês, sem acento e toda
+em minúsculas. Não confunda com <code>text</code>, que mostraria a senha para quem estiver do lado.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Todo <code>input</code> controlado é a mesma dupla: <code>value</code> mostrando o estado e
+<code>onChange</code> devolvendo o texto novo. O que diferencia um campo do outro é o atributo
+<code>type</code>, que fala com o navegador — teclado, máscara, validação nativa — e não com o React. O
+valor que chega em <code>e.target.value</code> é sempre string, inclusive em <code>type="number"</code>;
+para fazer conta, converta com <code>Number()</code> e trate o <code>NaN</code>.</p>
+
+<p>Os outros atributos são configuração e ficam fora do estado: <code>placeholder</code> dá a dica,
+<code>maxLength</code> limita a digitação, <code>autoComplete</code> ajuda ou atrapalha o preenchimento,
+<code>readOnly</code> e <code>disabled</code> tiram a edição de formas diferentes. Formatar é transformar
+o texto dentro do <code>onChange</code> antes de guardar; cuidado com o cursor, que volta para o fim
+quando o valor é reescrito a cada tecla.</p>
+
+<p>Por fim, o elemento tem limites: uma linha só, sem Enter, sem altura arrastável. Quando o campo
+precisa de mais, a tag muda — e o mecanismo de estado que você aprendeu aqui continua o mesmo. É por isso
+que vale entender o <code>input</code> com calma: os próximos quatro formulários do nível são variações
+deste mesmo par <code>value</code> e <code>onChange</code>, cada um com suas manias.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>type</code> muda teclado, máscara e validação nativa; não muda a ligação com o estado.</li>
+<li>Todo valor de campo chega como string, mesmo em <code>type="number"</code>.</li>
+<li><code>Number("")</code> é <code>0</code>; <code>Number("3,5")</code> é <code>NaN</code>.</li>
+<li><code>valueAsNumber</code> existe, mas espalha <code>NaN</code> pelo código.</li>
+<li><code>placeholder</code> é dica, não valor; não substitui o <code>label</code>.</li>
+<li><code>maxLength</code> limita a digitação, mas não o texto colado por código.</li>
+<li><code>readOnly</code> mantém o valor e o envio; <code>disabled</code> desliga tudo.</li>
+<li>Formatar no <code>onChange</code> com <code>replace(/\D/g, "")</code> deixa só dígitos.</li>
+<li>Reescrever o valor a cada tecla move o cursor para o fim.</li>
+<li><code>input</code> é uma linha; recado é <code>textarea</code>, escolha é <code>select</code>.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

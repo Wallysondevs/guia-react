@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O Cleanup | Guia React</title>
+<meta name="description" content="A função de limpeza do useEffect: como devolver o cleanup, quando ele roda, como desligar timers, cancelar assinaturas e ignorar a resposta de um pedido que ficou para trás.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O <span class="hl">Cleanup</span></h1>
+<p class="intro">A Ana escondeu o relógio da vitrine com um clique e reparou numa coisa estranha: o
+relógio sumiu da tela, mas continuou funcionando. O intervalo que ela ligou no efeito nunca foi desligado
+— e cada vez que ela esconde e mostra de novo, nasce mais um. Nesta aula ela aprende a devolver uma
+função no fim do efeito: o <strong>cleanup</strong>, que o React chama para desfazer o que o efeito fez
+antes de começar outro.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é a função de limpeza e como se devolve ela do <code>useEffect</code>.</li>
+  <li>As duas horas em que o cleanup roda: antes de cada nova execução e na desmontagem.</li>
+  <li>Como desligar um <code>setInterval</code> e um <code>setTimeout</code>.</li>
+  <li>Como cancelar uma assinatura quando o dado que ela usa muda.</li>
+  <li>Como cancelar o que ainda não aconteceu, com o exemplo do salvamento adiado.</li>
+  <li>Como ignorar a resposta de um pedido que ficou para trás — a corrida entre buscas.</li>
+  <li>Os erros comuns: esquecer o <code>return</code>, limpar o que não criou, limpar no lugar errado.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o relógio que continua andando</h2>
+
+<p>Na vitrine da Ana há um relógio que atualiza a hora a cada segundo. Ele vive em um componente
+chamado <code>Relogio</code>, e o componente de cima decide quando mostrá-lo: um botão "Mostrar ou
+esconder". Ao clicar, o React tira o <code>Relogio</code> da página — a desmontagem. O que a Ana não
+sabia é que desmontar não desliga nada que o componente tenha ligado por fora.</p>
+
+<p>O <code>setInterval</code> que ela criou no efeito continua rodando, chamando <code>setHora</code>
+em um componente que não existe mais. Se ela esconde e mostra cinco vezes, ficam cinco intervalos
+rodando ao mesmo tempo — cinco atualizações por segundo em vez de uma, cada uma com um pedaço de memória
+preso. No começo ninguém nota. Depois de meia hora com a aba aberta, o notebook esquenta.</p>
+
+<p>Esse é o problema que o cleanup resolve, e ele não é exclusivo de timer. Um listener de evento
+adicionado ao <code>document</code> fica escutando depois que o componente sai. Uma assinatura de
+notificação continua recebendo. Um pedido em andamento volta para ninguém. Todos esses casos têm a mesma
+forma: o efeito <strong>cria</strong> algo fora do React, e precisa de um lugar para
+<strong>desfazer</strong> aquilo.</p>
+
+<h2>2. O que é a função de limpeza</h2>
+
+<p>Para desfazer, o React dá ao efeito um canal de saída: o valor devolvido. Se a função do efeito
+devolver <strong>outra função</strong>, o React guarda essa segunda função e chama quando for hora de
+limpar. Essa segunda função é o cleanup. Não tem nome especial na hora de declarar, nem gancho próprio:
+é só um <code>return</code>.</p>
+
+<pre class="file" data-file="App.jsx">useEffect(() =&gt; {
+  const id = setInterval(() =&gt; setHora(new Date()), 1000);
+
+  return () =&gt; {
+    clearInterval(id);
+  };
+}, []);</pre>
+
+<dl class="anatomy">
+<dt>cleanup</dt>
+<dd>A função devolvida pelo efeito, que o React chama para desfazer o que ele fez. Em inglês,
+<em>clean up</em>: limpar.</dd>
+<dt>desmontagem</dt>
+<dd>O momento em que o componente sai da página — porque a condição que o mostrava ficou falsa, porque
+o pai trocou de tela, ou porque a aba fechou.</dd>
+<dt>efeito sujo</dt>
+<dd>Um efeito que cria algo por fora e não devolve nada para desfazer. É a causa da maioria dos
+vazamentos.</dd>
+<dt>criar e desfazer</dt>
+<dd>O par que sempre anda junto: <code>setInterval</code> com <code>clearInterval</code>,
+<code>addEventListener</code> com <code>removeEventListener</code>, <code>fetch</code> com
+<code>abort</code>.</dd>
+<dt>corrida</dt>
+<dd>Duas buscas em andamento em que a resposta mais antiga chega por último e sobrescreve a mais nova.
+O cleanup é a ferramenta para resolver.</dd>
+</dl>
+
+<p>Um detalhe de sintaxe que derruba muita gente: o <code>return</code> com a função de limpeza tem de
+estar dentro do corpo do efeito, e o corpo precisa estar entre chaves. Se você escrever
+<code>useEffect(() =&gt; () =&gt; clearInterval(id), [])</code>, o efeito devolve a função direto e
+funciona — mas ninguém entende depois, e não há espaço para criar o intervalo no meio. Use as chaves e
+deixe o <code>return</code> explícito.</p>
+
+<p>Outro detalhe: a função de limpeza não pode ser <code>async</code>. O React chama a limpeza e segue
+em frente; ele não espera. Se você precisa de <code>await</code> para limpar (fechar uma conexão, por
+exemplo), faça o trabalho assíncrono dentro de uma função chamada sem <code>await</code>.</p>
+
+<h2>3. Quando o cleanup roda</h2>
+
+<p>São dois momentos, e o segundo surpreende. O primeiro é a desmontagem: o componente sai da página e o
+React limpa o que ele havia criado. O segundo é antes de cada nova execução do efeito: se as dependências
+mudaram e o efeito vai rodar de novo, o React roda primeiro a limpeza da execução anterior. Sempre nessa
+ordem — limpa o velho, executa o novo.</p>
+
+<p>Essa ordem é o que garante que o mundo de fora reflita o estado atual e nada mais. No caso da
+assinatura do jornal do bairro, o componente assina o Centro, a Ana muda para Vila Nova, e o React
+cancela a assinatura do Centro antes de assinar a da Vila Nova. Se você esquecer o cleanup, o componente
+fica com duas assinaturas e recebe o jornal de um bairro onde não mora mais.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Aconteceu</th><th>O que o React faz</th><th>Efeito prático</th></tr>
+<tr><td>o componente montou</td><td>roda o efeito</td><td>o intervalo é criado</td></tr>
+<tr><td>uma dependência mudou</td><td>roda o cleanup antigo, depois o efeito de novo</td><td>um intervalo só, com o valor novo</td></tr>
+<tr><td>o componente desmontou</td><td>roda o cleanup</td><td>o intervalo é desligado</td></tr>
+<tr><td>o componente remontou</td><td>efeito, e depois a limpeza quando sair</td><td>nada fica acumulado</td></tr>
+</table>
+</div>
+
+<p>Nas caixas desta aula você vai ver o cleanup acontecer por meio de um <strong>caderninho de
+registro</strong>: uma lista no estado do componente de cima, onde o efeito anota o que fez. O painel
+mostra o HTML gerado, então o caderninho aparece na tela — e a anotação "desliguei o intervalo" só existe
+se a limpeza realmente rodou. É a forma de provar o invisível.</p>
+
+<h2>4. O primeiro cleanup: o timer</h2>
+
+<p>Na caixa, o componente <code>Relogio</code> liga um intervalo e anota no caderninho. O efeito não
+devolve nada, então ninguém desliga o intervalo. A missão é devolver a função de limpeza: desligar e
+anotar.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:desliguei o intervalo">
+  <p class="try-task">O <code>Relogio</code> liga um intervalo e nunca o desliga. Faça o efeito devolver
+  uma função que chama <code>clearInterval(id)</code> e anota <strong>desliguei o intervalo</strong> no
+  caderninho. Depois clique em Mostrar ou esconder.</p>
+  <pre class="jsx">function Relogio({ anotar }) {
+  useEffect(() =&gt; {
+    anotar("liguei o intervalo");
+    setInterval(() =&gt; {}, 1000);
+  }, []);
+
+  return &lt;p&gt;Relógio ligado&lt;/p&gt;;
+}
+
+function App() {
+  const [aberto, setAberto] = useState(true);
+  const [registro, setRegistro] = useState([]);
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={() =&gt; setAberto(!aberto)}&gt;Mostrar ou esconder&lt;/button&gt;
+      {aberto &amp;&amp; &lt;Relogio anotar={(m) =&gt; setRegistro((r) =&gt; [...r, m])} /&gt;}
+      &lt;ul&gt;
+        {registro.map((m, i) =&gt; (
+          &lt;li key={i}&gt;{m}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Mostrar ou esconder&lt;/button&gt;
+  &lt;p&gt;Relógio ligado&lt;/p&gt;
+  &lt;ul&gt;
+    &lt;li&gt;liguei o intervalo&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Relogio({ anotar }) {
+  useEffect(() =&gt; {
+    anotar("liguei o intervalo");
+    const id = setInterval(() =&gt; {}, 1000);
+
+    return () =&gt; {
+      clearInterval(id);
+      anotar("desliguei o intervalo");
+    };
+  }, []);
+
+  return &lt;p&gt;Relógio ligado&lt;/p&gt;;
+}
+
+function App() {
+  const [aberto, setAberto] = useState(true);
+  const [registro, setRegistro] = useState([]);
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={() =&gt; setAberto(!aberto)}&gt;Mostrar ou esconder&lt;/button&gt;
+      {aberto &amp;&amp; &lt;Relogio anotar={(m) =&gt; setRegistro((r) =&gt; [...r, m])} /&gt;}
+      &lt;ul&gt;
+        {registro.map((m, i) =&gt; (
+          &lt;li key={i}&gt;{m}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel do código inicial termina com uma linha só no caderninho: "liguei o intervalo". Depois da
+missão e do clique, aparecem duas: "liguei o intervalo" e "desliguei o intervalo". O relógio saiu da tela
+e a limpeza rodou — a segunda linha é a prova.</p>
+
+<p>Repare que a limpeza precisa do <code>id</code> que o <code>setInterval</code> devolveu. Esse
+<code>id</code> é criado dentro do efeito e capturado pela função de limpeza; é o mesmo mecanismo de
+closure que você já usa em qualquer função. Se você criar o intervalo no corpo do componente e tentar
+limpá-lo no efeito, o <code>id</code> não vai estar lá — e o conserto é sempre criar e desfazer no mesmo
+lugar.</p>
+
+<h2>5. O cleanup que roda antes da próxima execução</h2>
+
+<p>Agora o segundo momento do cleanup, aquele que surpreende. Na caixa, o componente assina o jornal de
+um bairro. Quando o bairro muda, o efeito roda de novo porque <code>bairro</code> está nas dependências.
+Sem cleanup, a assinatura antiga fica viva: o React não tem como saber que ela existia.</p>
+
+<div class="tryreact" data-goal="clique:#vila;;texto:cancelei o jornal do Centro;;texto:assinei o jornal do Vila Nova">
+  <p class="try-task">A assinatura do bairro antigo nunca é cancelada. Faça o efeito devolver uma função
+  que anota <strong>cancelei o jornal do</strong> seguido do bairro. Depois clique em Mudei para a Vila
+  Nova.</p>
+  <pre class="jsx">function Assinatura({ bairro, anotar }) {
+  useEffect(() =&gt; {
+    anotar("assinei o jornal do " + bairro);
+  }, [bairro]);
+
+  return &lt;p&gt;Assinatura ativa: {bairro}&lt;/p&gt;;
+}
+
+function App() {
+  const [bairro, setBairro] = useState("Centro");
+  const [registro, setRegistro] = useState([]);
+
+  return (
+    &lt;div&gt;
+      &lt;Assinatura bairro={bairro} anotar={(m) =&gt; setRegistro((r) =&gt; [...r, m])} /&gt;
+      &lt;button id="vila" onClick={() =&gt; setBairro("Vila Nova")}&gt;
+        Mudei para a Vila Nova
+      &lt;/button&gt;
+      &lt;ul&gt;
+        {registro.map((m, i) =&gt; (
+          &lt;li key={i}&gt;{m}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Assinatura ativa: Centro&lt;/p&gt;
+  &lt;button id="vila"&gt;Mudei para a Vila Nova&lt;/button&gt;
+  &lt;ul&gt;
+    &lt;li&gt;assinei o jornal do Centro&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Assinatura({ bairro, anotar }) {
+  useEffect(() =&gt; {
+    anotar("assinei o jornal do " + bairro);
+
+    return () =&gt; anotar("cancelei o jornal do " + bairro);
+  }, [bairro]);
+
+  return &lt;p&gt;Assinatura ativa: {bairro}&lt;/p&gt;;
+}
+
+function App() {
+  const [bairro, setBairro] = useState("Centro");
+  const [registro, setRegistro] = useState([]);
+
+  return (
+    &lt;div&gt;
+      &lt;Assinatura bairro={bairro} anotar={(m) =&gt; setRegistro((r) =&gt; [...r, m])} /&gt;
+      &lt;button id="vila" onClick={() =&gt; setBairro("Vila Nova")}&gt;
+        Mudei para a Vila Nova
+      &lt;/button&gt;
+      &lt;ul&gt;
+        {registro.map((m, i) =&gt; (
+          &lt;li key={i}&gt;{m}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Rode a solução e clique em "Mudei para a Vila Nova": o caderninho passa a ter três linhas, nesta
+ordem — "assinei o jornal do Centro", "cancelei o jornal do Centro", "assinei o jornal do Vila Nova". A do
+meio é a prova de que o React limpou antes de recomeçar. E repare que a função de limpeza usou <code>bairro</code>: ela foi criada na execução antiga
+do efeito, então <code>bairro</code> ali é o valor antigo — o Centro. Isso é o que se quer: cancelar o que
+foi assinado antes, não o que está sendo assinado agora.</p>
+
+<p>Essa é a razão pela qual o cleanup precisa estar na mesma execução do efeito. Cada execução cria a sua
+limpeza, com os valores daquele momento. É o React guardando um par (efeito, limpeza) para cada vez que
+roda — e chamando a limpeza certa na hora certa.</p>
+
+<h2>6. O cleanup que cancela o que ainda não aconteceu</h2>
+
+<p>Nem tudo o que um efeito agenda acontece logo. Um <code>setTimeout</code> de dois segundos é uma
+promessa para o futuro; se o valor mudou nesse meio-tempo, o que estava agendado não interessa mais. O
+cleanup cancela o agendamento. É assim que se escreve um <em>debounce</em>: esperar o leitor parar de
+digitar antes de salvar.</p>
+
+<div class="tryreact" data-goal="digite:input=pão de queijo;;texto:cancelei o salvamento anterior;;texto:salvei pão de queijo">
+  <p class="try-task">O efeito agenda o salvamento do texto e nunca cancela o agendamento antigo. Devolva
+  uma função de limpeza que faz <code>clearTimeout(id)</code> e anota
+  <strong>cancelei o salvamento anterior</strong>. Depois digite na caixa de texto.</p>
+  <pre class="jsx">function App() {
+  const [texto, setTexto] = useState("pão francês");
+  const [registro, setRegistro] = useState([]);
+
+  useEffect(() =&gt; {
+    setRegistro((r) =&gt; [...r, "agendei o salvamento"]);
+    setTimeout(() =&gt; {
+      setRegistro((r) =&gt; [...r, "salvei " + texto]);
+    }, 40);
+  }, [texto]);
+
+  return (
+    &lt;div&gt;
+      &lt;input value={texto} onChange={(e) =&gt; setTexto(e.target.value)} /&gt;
+      &lt;ul&gt;
+        {registro.map((m, i) =&gt; (
+          &lt;li key={i}&gt;{m}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input value="pão francês"&gt;
+  &lt;ul&gt;
+    &lt;li&gt;agendei o salvamento&lt;/li&gt;
+    &lt;li&gt;salvei pão francês&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [texto, setTexto] = useState("pão francês");
+  const [registro, setRegistro] = useState([]);
+
+  useEffect(() =&gt; {
+    setRegistro((r) =&gt; [...r, "agendei o salvamento"]);
+    const id = setTimeout(() =&gt; {
+      setRegistro((r) =&gt; [...r, "salvei " + texto]);
+    }, 40);
+
+    return () =&gt; {
+      clearTimeout(id);
+      setRegistro((r) =&gt; [...r, "cancelei o salvamento anterior"]);
+    };
+  }, [texto]);
+
+  return (
+    &lt;div&gt;
+      &lt;input value={texto} onChange={(e) =&gt; setTexto(e.target.value)} /&gt;
+      &lt;ul&gt;
+        {registro.map((m, i) =&gt; (
+          &lt;li key={i}&gt;{m}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No código inicial, cada letra digitada agenda um salvamento e nenhum é cancelado: quem digita "pão de
+queijo" faz o sistema salvar uma vez por tecla, cada uma com um pedaço do texto. Na solução, cada nova
+digitação cancela o agendamento anterior, e só o último sobrevive — o caderninho mostra "cancelei o
+salvamento anterior" no meio do caminho.</p>
+
+<p>Com dois segundos no lugar de 40 milissegundos, esse é o comportamento que o cliente espera: parar de
+digitar, esperar um instante e ver "salvo". O mesmo desenho serve para a busca que só consulta o servidor
+quando o leitor para de digitar — e aí o cleanup também evita uma enxurrada de pedidos.</p>
+
+<h2>7. A corrida dos pedidos</h2>
+
+<p>Falta o caso mais importante, e o mais invisível: o pedido que volta depois. A Ana digita "pão", o
+pedido sai, ela digita "queijo" e outro pedido sai. O segundo pode responder antes do primeiro — e
+quando o primeiro chegar, sobrescreve a lista com o resultado errado. A tela mostra os pães de uma busca
+que já não interessa.</p>
+
+<p>O cleanup resolve com uma variável combinada: cada execução do efeito marca que está viva, e a limpeza
+marca que não está mais. O código que recebe a resposta confere a marca antes de chamar o
+<code>set</code>:</p>
+
+<pre class="file" data-file="App.jsx">useEffect(() =&gt; {
+  let ativo = true;
+
+  async function carregar() {
+    const resposta = await fetch("https://loja.test/api/paes?busca=" + termo);
+    const lista = await resposta.json();
+    if (ativo) {
+      setPaes(lista);
+    }
+  }
+
+  carregar();
+
+  return () =&gt; {
+    ativo = false;
+  };
+}, [termo]);</pre>
+
+<p>A variável <code>ativo</code> não é estado: é uma variável comum dentro do efeito, que a função de
+limpeza enxerga pela closure. Quando o termo muda, a limpeza da execução antiga roda e coloca
+<code>ativo = false</code>. A resposta que chegar depois encontra a marca desligada e não faz nada. Cada
+execução tem a sua própria variável, então a marca de uma não interfere na outra.</p>
+
+<p>A outra forma é abortar o pedido de verdade, com o <code>AbortController</code> do navegador. A
+diferença é que o pedido é interrompido na rede em vez de só ser ignorado na chegada — mais econômico, e
+o erro que aparece é um <code>AbortError</code>, que você precisa saber ignorar:</p>
+
+<pre class="file" data-file="App.jsx">useEffect(() =&gt; {
+  const controle = new AbortController();
+
+  fetch("https://loja.test/api/paes?busca=" + termo, { signal: controle.signal })
+    .then((resposta) =&gt; resposta.json())
+    .then((lista) =&gt; setPaes(lista))
+    .catch((e) =&gt; {
+      if (e.name !== "AbortError") setErro(e.message);
+    });
+
+  return () =&gt; controle.abort();
+}, [termo]);</pre>
+
+<p>Sem o filtro do <code>AbortError</code>, o cancelamento vira mensagem de erro na tela — e o cliente vê
+"deu ruim" quando, na verdade, tudo funcionou como planejado. Detalhe que confunde: se você checar
+<code>resposta.ok</code> depois de um abort, o erro que aparece não é o de status, é o da requisição
+cancelada. Por isso o <code>catch</code> precisa olhar o nome do erro antes de decidir o que mostrar.</p>
+
+<pre class="term">DOMException: The user aborted a request.
+Uncaught (in promise) DOMException: The user aborted a request.</pre>
+
+<h2>8. Os erros comuns do cleanup</h2>
+
+<p>O primeiro é esquecer o <code>return</code>. O efeito cria o timer, o listener ou a assinatura e
+termina sem devolver nada; o React não tem o que chamar e o recurso fica vivo. O sintoma é sempre
+cumulativo: uma vez não incomoda, dez vezes trava. Quando o componente "fica mais lento cada vez que
+abre", desconfie disso.</p>
+
+<p>O segundo é limpar o que não foi criado. Se o efeito não criou o timer, ele não deve
+<code>clearInterval</code> em nada — e, pior, não deve limpar um recurso que pertence a outro efeito. Cada
+efeito limpa o que ele mesmo criou, nem mais nem menos. É o mesmo princípio de "um efeito por assunto" da
+primeira aula.</p>
+
+<p>O terceiro é o lugar da limpeza. A função de limpeza tem de ser <strong>devolvida</strong>, não
+chamada no fim do efeito: <code>return () =&gt; clearInterval(id)</code>, nunca
+<code>clearInterval(id); return;</code>. A segunda forma desliga o intervalo imediatamente, no instante em
+que o efeito começa, e o timer nunca chega a funcionar. O sintoma é um efeito que "não faz nada", e a
+causa está na última linha.</p>
+
+<p>O quarto é o esquecimento na desmontagem por causa de uma condição. Se o componente aparece e
+desaparece conforme um <code>if</code>, ele desmonta de verdade e o cleanup roda. Mas se ele fica na
+árvore com <code>display: none</code> (via CSS), nada desmonta e nada é limpo — o componente continua
+montado, com efeito rodando. Trocar CSS por renderização condicional é o que faz a diferença entre
+esconder e desmontar.</p>
+
+<p>Os quatro cabem em uma tabela de consulta, com o sintoma de cada um e o conserto:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Erro</th><th>O que você vê</th><th>O conserto</th></tr>
+<tr><td>efeito sem <code>return</code></td><td>o recurso se acumula: um timer, dois, três</td><td>devolver a função que desfaz</td></tr>
+<tr><td><code>clearInterval</code> no fim do efeito</td><td>o timer nunca funciona</td><td>devolver a função em vez de chamá-la</td></tr>
+<tr><td>dois efeitos limpando o mesmo recurso</td><td>comportamento imprevisível</td><td>cada efeito limpa só o que criou</td></tr>
+<tr><td>esconder com CSS em vez de desmontar</td><td>o efeito continua rodando</td><td>renderização condicional</td></tr>
+</table>
+</div>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o console mostra "montei" e "limpei" em pares</h3>
+<p>No modo de desenvolvimento, com <code>StrictMode</code>, cada efeito roda, é limpo e roda de novo. O
+console mostra a sequência "montei, limpei, montei" — o que parece errado e é de propósito. O React quer
+ver se o seu efeito sabe se limpar: se o segundo "montei" encontrar o mundo ainda sujo, é sinal de
+vazamento. As caixas deste guia não usam <code>StrictMode</code>, então você vê cada linha uma vez.
+No navegador, o console fica assim:</p>
+
+<pre class="term">montei o relógio
+limpei o relógio
+montei o relógio</pre>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a lista pisca com dados de uma busca anterior</h3>
+<p>É a corrida. A busca antiga responde depois e sobrescreve. O conserto é a marca <code>ativo</code> ou o
+<code>AbortController</code>, os dois desta aula. Enquanto o conserto não vem, um paliativo é limpar a
+lista no começo do efeito — mas isso troca o problema por outro: a tela fica vazia entre uma digitação e
+outra, o que incomoda mais do que parece.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o timer do forno dispara depois que a tela mudou</h3>
+<p>A Ana agenda um aviso de "pão pronto" em cinco minutos e troca de tela. O aviso dispara na tela nova,
+em cima de outro conteúdo. Com <code>clearTimeout</code> na limpeza, o aviso é cancelado junto com a
+saída do componente. É a mesma regra do intervalo: quem cria, desfaz — e o efeito é o dono do que cria.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Como o efeito devolve a função de limpeza?</p>
+<label><input type="radio" name="q1"> chamando <code>cleanup(funcao)</code> no fim</label>
+<label><input type="radio" name="q1"> com <code>return () =&gt; { ... }</code></label>
+<label><input type="radio" name="q1"> passando a função como terceiro argumento</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Quando o cleanup roda?</p>
+<label><input type="radio" name="q2"> só quando a página é fechada</label>
+<label><input type="radio" name="q2"> antes da primeira execução do efeito</label>
+<label><input type="radio" name="q2"> na desmontagem e antes de cada nova execução do efeito</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Para que serve o cleanup no caso do <code>setInterval</code>?</p>
+<label><input type="radio" name="q3"> para desligar o intervalo quando ele não é mais necessário</label>
+<label><input type="radio" name="q3"> para o intervalo rodar mais rápido</label>
+<label><input type="radio" name="q3"> para guardar o id do intervalo no estado</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: desfazendo o listener</h2>
+<p>O efeito adiciona um listener ao <code>document</code> e precisa removê-lo na limpeza. Complete a
+função que o React chama:</p>
+<div class="ex-code">return () =&gt; document.<input aria-label="resposta 1" data-answer="removeEventListener" placeholder="...">("keydown", aoTeclar);</div>
+<p class="ex-dica">Dica: é o par do <code>addEventListener</code> — o mesmo nome do evento e a mesma
+função que foi adicionada.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O cleanup é a função que o efeito devolve. Ele roda em dois momentos: quando o componente desmonta e
+antes de cada nova execução do efeito. Sua função é desfazer o que o efeito fez — desligar o
+<code>setInterval</code>, remover o <code>addEventListener</code>, cancelar o <code>setTimeout</code>,
+abortar o <code>fetch</code> — para que o mundo de fora reflita o estado atual e nada mais.</p>
+
+<p>O par é sempre criar e desfazer no mesmo efeito, com o mesmo <code>id</code> ou a mesma referência. A
+limpeza é criada junto com o efeito e guarda os valores daquela execução, o que é exatamente o que se
+precisa para cancelar o que foi criado. Devolver a função é diferente de chamá-la: chamar desfaz na hora,
+e aí não há nada para limpar depois.</p>
+
+<p>Com timers, assinaturas e pedidos limpos, o componente pode montar e desmontar quantas vezes for sem
+deixar rastro. E o relógio que continuava andando depois de sumir da tela? Agora ele para — e a próxima
+aula é sobre os timers em si: como usar <code>setTimeout</code> e <code>setInterval</code> dentro do
+React sem cair nas armadilhas de estado velho.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Cleanup é a função que o efeito devolve: <code>return () =&gt; { ... }</code>.</li>
+<li>Roda na desmontagem e antes de cada nova execução do efeito.</li>
+<li>Cada execução tem a sua própria limpeza, com os valores daquele momento.</li>
+<li>Quem cria, desfaz: <code>setInterval</code> com <code>clearInterval</code>, listener com
+<code>removeEventListener</code>.</li>
+<li>Cancelar o que ainda não aconteceu: <code>clearTimeout</code> no debounce.</li>
+<li>Pedido que voltou tarde: marque <code>ativo = false</code> na limpeza e confira antes do
+<code>set</code>.</li>
+<li><code>AbortController</code> aborta de verdade; o <code>AbortError</code> não é erro de verdade.</li>
+<li>Devolver a limpeza é diferente de chamá-la no fim do efeito.</li>
+<li>Cada efeito limpa só o que ele criou.</li>
+<li>Com <code>StrictMode</code>, o par efeito/limpeza roda duas vezes: é teste, não bug.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

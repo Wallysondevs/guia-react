@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O Contador | Guia React</title>
+<meta name="description" content="Um contador em React do zero: somar, subtrair sem ficar negativo, zerar, dois contadores independentes e botões com rótulos que o leitor de tela entende.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O <span class="hl">Contador</span></h1>
+<p class="intro">A Ana quer contar quantos pães cada cliente leva, sem papel e sem calculadora. Um
+número na tela, um botão que soma, um que subtrai — e a tela acompanhando. O contador é o menor programa
+React que faz alguma coisa de verdade, e é por isso que ele ensina tanto: estado, manipulador, limite e
+reaproveitamento cabem em vinte linhas.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>As três partes de um contador: o valor, o botão que soma e o botão que subtrai.</li>
+  <li>Como impedir que o contador fique negativo.</li>
+  <li>Como zerar o valor sem olhar para o que estava antes.</li>
+  <li>Por que dois contadores na mesma tela precisam de estados separados.</li>
+  <li>Como escrever botões que o leitor de tela entende.</li>
+  <li>O que um contador ensina sobre qualquer pedaço de estado que você fizer depois.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o papel de pão e o número na tela</h2>
+
+<p>Na vitrine, a Ana anota cada pão num papelzinho e, no fim do dia, soma. Funciona até o dia em que o
+papel molha. Ela quer o mesmo gesto no site: um número grande, um botão de somar e um de subtrair. Cada
+clique muda o número, e o número muda a tela — nada de recarregar página.</p>
+
+<p>O contador é o exercício clássico de React porque ele tem tudo o que um componente interativo tem, em
+escala mínima: um estado que guarda um número, dois manipuladores que mudam esse número e um pedaço de
+JSX que mostra o resultado. Quem entende um contador entende o esqueleto de um carrinho de compras, de um
+formulário com passos e de um painel de pedidos.</p>
+
+<p>Contador aparece em mais lugares do que parece: quantidade no carrinho, número de convidados,
+passo do formulário, estoque que entra e sai, nota de avaliação. Todos têm a mesma forma, e todos
+compartilham os mesmos riscos: ficar negativo, esquecer de redesenhar, guardar duas cópias do número. Por
+isso vale construir um com calma, entendendo cada linha, em vez de copiar um pronto.</p>
+
+<p>Nesta aula o contador é construído em pedaços. Primeiro o valor e o botão de somar, que já estão
+prontos no exemplo. Depois o limite, para o pão não ficar negativo. Depois o botão de zerar. No fim, o
+mesmo contador aparece duas vezes na tela — um para pães, outro para cafés — sem um atrapalhar o outro.</p>
+
+<h2>2. O desenho do contador</h2>
+
+<p>Um contador tem quatro peças. O <strong>estado</strong> guarda a quantidade. O <strong>texto</strong>
+mostra o estado. O <strong>botão de somar</strong> chama o setter com o valor mais um, e o
+<strong>botão de subtrair</strong> chama o setter com o valor menos um. Repare que não existe uma quarta
+variável guardando "o total": o texto lê o estado direto, e é por isso que ele nunca fica
+desatualizado.</p>
+
+<pre class="file" data-file="Contador.jsx">function Contador() {
+  const [paes, setPaes] = useState(0);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Pães: {paes}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setPaes(paes + 1)}&gt;+&lt;/button&gt;
+      &lt;button onClick={() =&gt; setPaes(paes - 1)}&gt;−&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<dl class="anatomy">
+<dt>contador</dt>
+<dd>Um componente com um número no estado, um botão que soma, um que subtrai e um texto que lê o
+valor.</dd>
+<dt>manipulador</dt>
+<dd>A função que roda no clique: <code>somar</code>, <code>subtrair</code>, <code>zerar</code>. É onde
+mora a regra.</dd>
+<dt>limite</dt>
+<dd>A condição que impede o valor de passar do razoável: <code>if (paes &gt; 0)</code>.</dd>
+<dt>instância</dt>
+<dd>Cada uso de um componente na tela. Duas instâncias têm dois estados independentes.</dd>
+<dt>fonte da verdade</dt>
+<dd>O único lugar onde o número existe. O texto lê dele; não guarda cópia.</dd>
+</dl>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Peça</th><th>No código</th><th>O que faz</th></tr>
+<tr><td>o valor</td><td><code>const [paes, setPaes] = useState(0)</code></td><td>guarda a quantidade entre um desenho e outro</td></tr>
+<tr><td>o texto</td><td><code>&lt;p&gt;Pães: {paes}&lt;/p&gt;</code></td><td>mostra o valor de agora, sem cópia</td></tr>
+<tr><td>somar</td><td><code>setPaes(paes + 1)</code></td><td>pede um desenho novo com um a mais</td></tr>
+<tr><td>subtrair</td><td><code>setPaes(paes - 1)</code></td><td>pede um desenho novo com um a menos</td></tr>
+</table>
+</div>
+
+<p>O <code>+</code> e o <code>−</code> nos botões são só o texto visível. O que importa é o
+<code>onClick</code>: uma função que será chamada quando o clique acontecer. A forma
+<code>() =&gt; setPaes(paes + 1)</code> é uma função de uma linha; a aula de eventos vai destrinchar
+todas as maneiras de escrever isso, incluindo os casos em que a função é declarada antes com um nome.</p>
+
+<p>Um detalhe que costuma passar batido: o texto é <code>{paes}</code>, e não uma variável
+<code>total</code> que você atualiza junto. Guardar o texto à parte seria criar duas fontes para a mesma
+verdade — e a segunda sempre atrasa. O estado é a fonte; a tela é a leitura dele.</p>
+
+<h2>3. O botão que soma</h2>
+
+<p>O botão de somar é o mais simples dos dois: pega o valor atual, soma um e entrega ao setter. Se o
+valor for 3, o setter recebe 4, o React desenha de novo e o texto passa a mostrar 4. Cada clique é um
+ciclo completo — não existe "somar na tela"; existe pedir um novo desenho com outro número.</p>
+
+<p>Vale reparar que a conta é feita com o <code>paes</code> do desenho atual. Isso dá o resultado certo
+para um clique por vez. Se dois cliques acontecerem antes de o React desenhar, os dois usam o mesmo valor
+antigo e o resultado é um a menos do que você espera. Esse caso tem nome, atualização em lote, e uma
+aula própria mais adiante — por enquanto, um clique de cada vez funciona.</p>
+
+<p>Quem chama a função é o navegador, no momento do clique — não o seu código. Isso é o que
+<code>onClick={somar}</code> significa: "guarde esta função e execute quando alguém clicar". Você não está
+chamando <code>somar</code> ali; está entregando ela. A diferença entre entregar e chamar é o assunto da
+aula de eventos, e é uma das confusões mais comuns de quem começa: com parênteses, a função roda na hora
+do desenho, e o clique fica sem nada para fazer.</p>
+
+<p>Também vale saber por que não usamos <code>paes++</code>. O <code>++</code> muda a variável e devolve
+o valor antigo: o setter receberia o número de antes e a tela não mudaria. Em React, toda atualização é
+um valor novo entregue ao setter, não uma instrução que mexe na variável. É <code>setPaes(paes + 1)</code>,
+sempre.</p>
+
+<h2>4. O limite: não existe pão negativo</h2>
+
+<p>O botão de subtrair funciona, mas funciona demais. Se a Ana clicar duas vezes com o valor em 1, a tela
+mostra <code>-1</code>, e não existe cliente devolvendo pão que ela não vendeu. Um contador de coisas
+físicas precisa de um piso: em zero, o botão não faz nada.</p>
+
+<div class="tryreact" data-goal="clique:button.menos;;clique:button.menos;;texto:Pães: 0">
+  <p class="try-task">O botão de menos não tem freio: dois cliques levam o contador a -1. Faça o
+  manipulador parar no zero, para o painel mostrar <strong>Pães: 0</strong> depois dos dois cliques.</p>
+  <pre class="jsx">function App() {
+  const [paes, setPaes] = useState(1);
+
+  console.log("pães na tela: " + paes);
+
+  function somar() {
+    setPaes(paes + 1);
+  }
+
+  function subtrair() {
+    setPaes(paes - 1);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pães: {paes}&lt;/p&gt;
+      &lt;button className="mais" onClick={somar}&gt;+&lt;/button&gt;
+      &lt;button className="menos" onClick={subtrair}&gt;−&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Pães: 1&lt;/p&gt;
+  &lt;button class="mais"&gt;+&lt;/button&gt;
+  &lt;button class="menos"&gt;−&lt;/button&gt;
+&lt;/div&gt;
+console: pães na tela: 1
+</pre>
+  <pre class="solucao">function App() {
+  const [paes, setPaes] = useState(1);
+
+  console.log("pães na tela: " + paes);
+
+  function somar() {
+    setPaes(paes + 1);
+  }
+
+  function subtrair() {
+    if (paes &gt; 0) {
+      setPaes(paes - 1);
+    }
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pães: {paes}&lt;/p&gt;
+      &lt;button className="mais" onClick={somar}&gt;+&lt;/button&gt;
+      &lt;button className="menos" onClick={subtrair}&gt;−&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A solução tem duas partes e uma ideia: o limite mora no manipulador, não no JSX. Dá para conferir e
+simplesmente não chamar o setter quando o valor já é zero. Também dá para escrever
+<code>setPaes(Math.max(0, paes - 1))</code>, que devolve o maior entre zero e o resultado — mesma
+decisão, em uma linha. Escolha a forma que você lê melhor; o importante é que a regra esteja no código,
+não na cabeça de quem clica.</p>
+
+<p>O <code>console.log</code> que ficou no corpo do componente ajuda a acompanhar o efeito do limite: ele
+está fora dos manipuladores, então quem escreve é o desenho, não o clique. É a diferença entre "o botão
+foi clicado" e "o componente foi desenhado de novo" — e, nesta altura, você já sabe que a segunda é a que
+muda a tela.</p>
+
+<p>Cada desenho do componente escreve uma linha, e a sequência no console do navegador conta a história
+do limite:</p>
+
+<pre class="term">pães na tela: 1
+pães na tela: 0</pre>
+
+<p>A primeira linha é o desenho inicial, com 1 — é a que aparece também no painel da caixa, logo depois
+do HTML. A segunda é o desenho depois do primeiro clique, já com 0, e só aparece no console do navegador,
+porque acontece depois do desenho. O segundo clique não escreveu nada, porque o manipulador não chamou o setter: sem mudança de estado,
+não há desenho, não há log. Ver a ausência da linha é tão informativo quanto ver a linha.</p>
+
+<h2>5. O botão de zerar</h2>
+
+<p>No fim de cada cliente, a Ana zera a conta. Zerar é o exemplo mais claro de atualização que
+<strong>não depende</strong> do valor anterior: o novo valor é zero, sempre. Por isso o setter pode
+receber o número direto, sem conta nenhuma: <code>setPaes(0)</code>.</p>
+
+<div class="tryreact" data-goal="clique:button.mais;;clique:button.mais;;clique:button.zerar;;texto:Pães: 0">
+  <p class="try-task">Falta o botão de zerar a conta. Acrescente um
+  <code>&lt;button className="zerar"&gt;Zerar&lt;/button&gt;</code> que chame o setter com zero e rode:
+  dois cliques no mais, depois um no zerar, e a tela precisa voltar a "Pães: 0".</p>
+  <pre class="jsx">function App() {
+  const [paes, setPaes] = useState(0);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pães: {paes}&lt;/p&gt;
+      &lt;button className="mais" onClick={() =&gt; setPaes(paes + 1)}&gt;+&lt;/button&gt;
+      &lt;button className="menos" onClick={() =&gt; setPaes(paes - 1)}&gt;−&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Pães: 0&lt;/p&gt;
+  &lt;button class="mais"&gt;+&lt;/button&gt;
+  &lt;button class="menos"&gt;−&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [paes, setPaes] = useState(0);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pães: {paes}&lt;/p&gt;
+      &lt;button className="mais" onClick={() =&gt; setPaes(paes + 1)}&gt;+&lt;/button&gt;
+      &lt;button className="menos" onClick={() =&gt; setPaes(paes - 1)}&gt;−&lt;/button&gt;
+      &lt;button className="zerar" onClick={() =&gt; setPaes(0)}&gt;Zerar&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Repare que o botão de zerar poderia chamar <code>setPaes(paes - paes)</code>, e funcionaria. Mas
+escrever a conta para chegar a zero é contar uma história mais complicada do que a verdade: o novo valor
+é zero. Código que diz o que quer dizer é mais fácil de manter — e, quando alguém ler daqui a três meses,
+não vai precisar fazer a conta.</p>
+
+<p>Com os três botões, o contador está completo. O que falta é a pergunta que todo componente reutilizável
+enfrenta: e se a padaria vender café também?</p>
+
+<h2>6. O mesmo contador em dois lugares</h2>
+
+<p>A Ana quer dois contadores na tela: um de pães e um de cafés. O caminho natural é transformar o
+contador num componente com uma prop de nome e usar duas vezes. O tropeço é onde guardar o número: se o
+estado ficar no <code>App</code> e for passado para os dois, os dois mostram o mesmo valor — clicar num
+mexe no outro.</p>
+
+<div class="tryreact" data-goal="clique:#paes button.mais;;texto:Pães: 1;;texto:Cafés: 0">
+  <p class="try-task">Os dois contadores compartilham o mesmo estado: clique no <strong>+</strong> dos
+  pães e os cafés sobem junto. Mova o <code>useState</code> para dentro do componente
+  <code>Contador</code>, para cada um ter a sua própria memória.</p>
+  <pre class="jsx">function Contador({ id, nome, qtd, somar }) {
+  console.log(nome + " = " + qtd);
+
+  return (
+    &lt;section id={id}&gt;
+      &lt;p&gt;{nome + ": " + qtd}&lt;/p&gt;
+      &lt;button className="mais" onClick={somar}&gt;+&lt;/button&gt;
+    &lt;/section&gt;
+  );
+}
+
+function App() {
+  const [qtd, setQtd] = useState(0);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;Contador id="paes" nome="Pães" qtd={qtd} somar={() =&gt; setQtd(qtd + 1)} /&gt;
+      &lt;Contador id="cafes" nome="Cafés" qtd={qtd} somar={() =&gt; setQtd(qtd + 1)} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;section id="paes"&gt;
+    &lt;p&gt;Pães: 0&lt;/p&gt;
+    &lt;button class="mais"&gt;+&lt;/button&gt;
+  &lt;/section&gt;
+  &lt;section id="cafes"&gt;
+    &lt;p&gt;Cafés: 0&lt;/p&gt;
+    &lt;button class="mais"&gt;+&lt;/button&gt;
+  &lt;/section&gt;
+&lt;/div&gt;
+console: Pães = 0
+console: Cafés = 0
+</pre>
+  <pre class="solucao">function Contador({ id, nome }) {
+  const [qtd, setQtd] = useState(0);
+
+  console.log(nome + " = " + qtd);
+
+  return (
+    &lt;section id={id}&gt;
+      &lt;p&gt;{nome + ": " + qtd}&lt;/p&gt;
+      &lt;button className="mais" onClick={() =&gt; setQtd(qtd + 1)}&gt;+&lt;/button&gt;
+    &lt;/section&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;Contador id="paes" nome="Pães" /&gt;
+      &lt;Contador id="cafes" nome="Cafés" /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois do conserto, um clique no <strong>+</strong> dos pães muda só os pães. O console do navegador
+conta a mesma história, e é uma das melhores provas de que o estado é por componente — o painel mostra as
+duas primeiras linhas, do desenho inicial, e a terceira aparece no DevTools quando você clica:</p>
+
+<pre class="term">Pães = 0
+Cafés = 0
+Pães = 1</pre>
+
+<p>Três linhas, dois componentes, um desenho novo. A primeira dupla é do primeiro desenho, quando os dois
+nasceram com zero. A terceira é do desenho seguinte, e só o contador de pães foi chamado — o de cafés
+continua com o mesmo nó e o mesmo zero. Quando o React desenha um componente, ele chama a função dele;
+os irmãos que não mudaram não são recriados.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde fica o estado</th><th>O que acontece ao clicar</th><th>Quando é a escolha certa</th></tr>
+<tr><td>no pai, um estado para os dois</td><td>os dois contadores mudam juntos</td><td>quando existe um total único de verdade</td></tr>
+<tr><td>em cada contador</td><td>só o clicado muda</td><td>quando cada número é independente</td></tr>
+<tr><td>no pai, um estado por contador</td><td>só o clicado muda</td><td>quando o pai precisa somar os dois no fim</td></tr>
+</table>
+</div>
+
+<p>A terceira linha é a que aparece quando a Ana quiser mostrar o total da venda na nota: aí o número
+precisa estar no pai, mas em dois estados separados (ou num objeto). O assunto tem aula própria — elevar
+o estado — e a regra é sempre a mesma: o estado mora no componente mais próximo que precisa dele, e sobe
+só quando alguém de cima também precisa.</p>
+
+<h2>7. Rótulos que explicam o botão</h2>
+
+<p>Os botões do contador mostram <code>+</code> e <code>−</code>, o que é ótimo para quem vê e péssimo
+para quem ouve. Um leitor de tela anuncia "botão, mais" e "botão, menos" sem dizer de quê. A solução é
+dar um nome acessível ao botão, que não muda o visual:</p>
+
+<pre class="file" data-file="Contador.jsx">function Contador() {
+  const [paes, setPaes] = useState(0);
+
+  return (
+    &lt;div&gt;
+      &lt;p aria-live="polite"&gt;Pães: {paes}&lt;/p&gt;
+      &lt;button aria-label="Somar um pão" onClick={() =&gt; setPaes(paes + 1)}&gt;+&lt;/button&gt;
+      &lt;button aria-label="Subtrair um pão" onClick={() =&gt; setPaes(paes - 1)}&gt;−&lt;/button&gt;
+      &lt;button onClick={() =&gt; setPaes(0)}&gt;Zerar&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p><code>aria-label</code> substitui o texto do botão para quem usa leitor de tela — o
+<code>+</code> continua na tela, mas o nome falado é "Somar um pão". E
+<code>aria-live="polite"</code> no parágrafo faz o leitor anunciar o número novo quando ele muda, sem
+interromper o que a pessoa estava ouvindo. São dois atributos, nenhum JavaScript, e a página fica
+utilizável para muito mais gente.</p>
+
+<p>O terceiro botão não precisa de <code>aria-label</code>: "Zerar" já é um nome bom. A regra é simples:
+se o texto visível não diz o que o botão faz, dê um nome com <code>aria-label</code>; se diz, deixe como
+está. Botão com nome claro também ajuda quem usa o site pelo teclado, porque o foco chega nele e o
+navegador mostra o nome.</p>
+
+<h2>8. Três decisões que valem para qualquer contador</h2>
+
+<p>O contador é pequeno, mas as decisões que ele exige aparecem em todo estado que você fizer daqui para
+frente. A primeira: <strong>uma fonte da verdade</strong>. O número fica no estado, e o texto lê o
+estado. Nada de guardar o número em dois lugares — a cópia sempre atrasa. A segunda: <strong>a regra no
+manipulador</strong>. O limite de zero, a validação, o "não pode" moram na função que muda o estado, não
+no CSS nem no bom senso de quem clica. A terceira: <strong>o estado o mais perto possível de quem
+usa</strong>. Se só o contador precisa do número, o estado é dele; se a nota precisa, sobe.</p>
+
+<p>Há ainda uma decisão de tipo que vale registrar. O contador guarda número, e número em React não
+formata sozinho: <code>{paes}</code> mostra <code>3</code>. Quando precisar de "3 pães" no singular ou
+plural, calcule na hora — <code>{paes === 1 ? "1 pão" : paes + " pães"}</code> — em vez de guardar o
+texto no estado. Estado é dado; texto é leitura.</p>
+
+<p>Se você guardar <code>"3"</code> (texto) por engano, o botão de somar vai concatenar e virar
+<code>"31"</code>. Por isso
+<code>useState(0)</code> com zero de verdade, e não <code>useState("0")</code>. Quando o valor vem de um
+campo de formulário — que sempre entrega texto —, converta antes de guardar:
+<code>Number(valor)</code> ou <code>parseInt(valor, 10)</code>.</p>
+
+<pre class="file" data-file="Quantidade.jsx">function Quantidade({ paes }) {
+  const rotulo = paes === 1 ? "pão" : "pães";
+  return &lt;p&gt;{paes} {rotulo}&lt;/p&gt;;
+}</pre>
+
+<p>Esse componente é burro de propósito: recebe o número e devolve o texto certo. Se amanhã a padaria
+vender "broa" e "broas", você acrescenta uma prop e o resto continua igual. Separar o dado da
+apresentação é o que permite reaproveitar — e é o mesmo motivo pelo qual o contador de pães e o de cafés
+compartilham o componente.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o contador que pula de dois em dois</h3>
+<p>A Ana clicou rápido e o número subiu dois de uma vez. O culpado era <code>paes++</code> no
+manipulador: ele altera a variável e devolve o valor antigo, então o setter recebia o mesmo número. Trocar
+por <code>setPaes(paes + 1)</code> resolveu. Em React, atualizar estado é entregar o valor novo, não
+modificar o que já existe.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o botão de menos que não faz nada</h3>
+<p>Depois de colocar o limite, o botão de menos parecia morto quando o valor era zero — e era mesmo: o
+manipulador confere e não chama o setter. Isso é o esperado, mas é bom avisar quem usa: desabilitar o
+botão com <code>disabled={paes === 0}</code> deixa a regra visível na tela, e não só no clique. Aí o
+leitor entende antes de tentar.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o total que não batia</h3>
+<p>Ela mostrava o total da venda somando os dois contadores no papel, e um dia a conta não fechou. O
+motivo: os dois contadores tinham estados independentes, e o total era digitado à mão em outro lugar.
+Enquanto o total for um número escrito em outro canto, ele vai divergir. Quando isso importar, o caminho
+é elevar o estado e calcular o total a partir dele — nunca manter duas cópias.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="1"><p class="mc-q">1. Qual é o jeito certo de somar um no contador?</p>
+<label><input type="radio" name="q1"> <code>setPaes(paes + 1)</code></label>
+<label><input type="radio" name="q1"> <code>paes++</code></label>
+<label><input type="radio" name="q1"> <code>paes = paes + 1</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Onde deve ficar o limite de não ficar negativo?</p>
+<label><input type="radio" name="q2"> no CSS, escondendo o botão</label>
+<label><input type="radio" name="q2"> no texto do parágrafo, com um aviso</label>
+<label><input type="radio" name="q2"> no manipulador, que confere antes de chamar o setter</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. Dois contadores na tela com estados separados...</p>
+<label><input type="radio" name="q3"> não é possível: todo estado é global</label>
+<label><input type="radio" name="q3"> funcionam sozinhos, cada um com a sua memória</label>
+<label><input type="radio" name="q3"> precisam de dois componentes diferentes, com nomes diferentes</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o valor novo</h2>
+<p>Complete o manipulador do botão de somar, sabendo que o estado se chama <code>paes</code> e o setter,
+<code>setPaes</code>:</p>
+<div class="ex-code">function somar() { <input aria-label="resposta 1" data-answer="setPaes(paes + 1)" placeholder="...">; }</div>
+<p class="ex-dica">Dica: é o setter recebendo o valor atual mais um. Não use <code>++</code> e não
+esqueça o <code>+ 1</code>: sem ele, o estado recebe o mesmo número e o React não redesenha.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Um contador é um estado numérico, dois botões que chamam o setter com o valor novo e um parágrafo que
+lê o estado. O limite mora no manipulador — <code>if (paes &gt; 0)</code> ou
+<code>Math.max(0, paes - 1)</code> — e o zerar entrega o zero direto, sem conta. O texto nunca guarda
+cópia do número: ele lê a fonte.</p>
+
+<p>Quando o mesmo contador aparece duas vezes, o estado vai para dentro do componente. Cada instância tem
+a sua memória, e um clique em um não mexe no outro. Se um dia o total dos dois precisar aparecer junto,
+o estado sobe para o pai — mas sobe uma vez, para uma fonte só.</p>
+
+<p>O contador também ensina o que nenhum texto ensina: que o React redesenha o componente inteiro a cada
+mudança de estado, que a conta é feita com o valor do desenho atual e que atualizar estado é substituir,
+não modificar. Na próxima aula, a pergunta que ficou no ar: e quando o valor novo depende de duas
+mudanças na mesma função? Aí a forma de função do setter entra em cena.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Contador = estado + texto que lê o estado + botões que chamam o setter.</li>
+<li>Some com <code>setPaes(paes + 1)</code>; <code>paes++</code> entrega o valor antigo.</li>
+<li>Limite e validação ficam no manipulador, não no CSS.</li>
+<li>Zerar é <code>setPaes(0)</code>: valor direto, sem conta.</li>
+<li>Cada componente tem o seu estado: dois contadores, duas memórias.</li>
+<li>Estado no pai compartilha o número entre os filhos; estado no filho isola.</li>
+<li>O estado mora o mais perto possível de quem usa; sobe só quando precisa.</li>
+<li>Botão só com símbolo pede <code>aria-label</code>.</li>
+<li><code>aria-live="polite"</code> anuncia a mudança para o leitor de tela.</li>
+<li>Número é dado; o texto "3 pães" é calculado na hora.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>style Inline | Guia React</title>
+<meta name="description" content="O style inline no React: as chaves duplas, o objeto em camelCase, números que viram pixels, estilo condicional vindo do estado e o que só o CSS consegue fazer.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>style <span class="hl">Inline</span></h1>
+<p class="intro">A cor do preço da Ana agora depende do estoque: vermelho quando o pão acabou, preto
+quando tem pão no balcão. Isso não cabe em uma folha de CSS, porque o valor nasce do estado e muda a
+cada clique. Nesta aula ela aprende a segunda forma de estilizar no React — a prop
+<code>style</code>, que recebe um objeto JavaScript — e a reconhecer o que ela faz bem e o que ela
+simplesmente não faz.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que o <code>style</code> tem chaves duplas.</li>
+  <li>A escrever as propriedades em camelCase e a entender o que o React faz com elas.</li>
+  <li>Por que <code>fontSize: 20</code> vira <code>20px</code> e <code>opacity: 0.5</code> não.</li>
+  <li>Como deixar o estilo mudar com o estado, inclusive com o que a pessoa digita.</li>
+  <li>O que o <code>style</code> inline não faz: <code>:hover</code>, media query e animação.</li>
+  <li>Quando usar classe, quando usar estilo inline e quando usar os dois juntos.</li>
+  <li>Como ler o atributo <code>style</code> no painel e no DevTools.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a cor que o CSS não decide sozinha</h2>
+
+<p>Na aula anterior a Ana resolveu o selo de esgotado com uma classe: <code>esgotado</code> pinta o
+texto de cinza, e o componente decide se a classe entra. Funcionou. Agora ela quer mais: o preço deve
+ficar vermelho quando o balcão está vazio e voltar ao preto quando ela assa mais pão. Cinza não basta —
+ela quer um vermelho específico, que o cliente vê de longe.</p>
+
+<p>Duas classes resolveriam: <code>preco</code> e <code>preco--esgotado</code>, cada uma com a sua cor.
+E essa continua sendo a melhor solução quando são dois ou três estados fixos. Mas a Ana quer mais um
+passo: uma barra que mostra quanto pão sobrou, preenchendo 20% quando tem dois pães e 100% quando tem
+dez. Uma porcentagem calculada não vira classe: não dá para escrever uma classe para cada número
+possível.</p>
+
+<p>É aí que entra a segunda ferramenta. Todo elemento HTML aceita um atributo <code>style</code>, com
+declarações de CSS escritas ali mesmo. No React, esse atributo vira uma prop chamada
+<code>style</code> — com uma diferença importante: ele <strong>não recebe texto</strong>, recebe um
+objeto JavaScript. Quem vem do HTML estranha no começo; depois de três usos, parece natural.</p>
+
+<p>A divisão de trabalho fica assim: a <strong>classe</strong> cuida do desenho que pertence ao site —
+cores, fontes, espaçamentos, tudo o que é igual em todos os pães. O <strong>style</strong> inline cuida
+do valor que vem do dado — a cor de hoje, a largura da barra, a ordem de um item. Uma regra prática: se
+o valor é o mesmo para todos os elementos daquele tipo, é CSS; se o valor sai de um estado, é
+<code>style</code>.</p>
+
+<h2>2. A prop style é um objeto</h2>
+
+<p>A sintaxe assusta por causa das duas chaves: <code>style={{ color: "crimson" }}</code>. Não é
+capricho. A primeira chave diz "aqui começa JavaScript dentro do JSX"; a segunda diz "aqui começa um
+objeto". Por dentro, são propriedades de CSS com o nome escrito em camelCase e o valor em texto ou
+número.</p>
+
+<dl class="anatomy">
+<dt>style</dt>
+<dd>A prop que preenche o atributo <code>style</code> do elemento. Recebe um objeto, não uma
+string.</dd>
+<dt>objeto de estilo</dt>
+<dd>O mapa entre nome de propriedade e valor: <code>{ color: "crimson", fontSize: 20 }</code>.</dd>
+<dt>camelCase</dt>
+<dd>O jeito de escrever nomes compostos: <code>backgroundColor</code>, <code>fontSize</code>,
+<code>marginTop</code>. No CSS eles têm hífen.</dd>
+<dt>pixel automático</dt>
+<dd>Quando o valor é número, o React acrescenta <code>px</code> — menos nas propriedades que não
+têm unidade.</dd>
+<dt>variável CSS</dt>
+<dd>Um nome que começa com <code>--</code> e guarda um valor para ser usado com
+<code>var(--nome)</code>. Funciona dentro do objeto, entre aspas.</dd>
+</dl>
+
+<p>Antes de escrever a primeira linha, vale ver o que o React produz. A tabela abaixo mostra o objeto,
+o atributo que sai no HTML e o efeito. Note que o painel das caixas mostra exatamente a segunda coluna:
+o atributo <code>style</code> com as declarações já normalizadas.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No JSX</th><th>No HTML gerado</th><th>O que acontece</th></tr>
+<tr><td><code>style={{ color: "crimson" }}</code></td><td><code>style="color: crimson;"</code></td><td>a cor é aplicada</td></tr>
+<tr><td><code>style={{ fontSize: 20 }}</code></td><td><code>style="font-size: 20px;"</code></td><td>número virou pixel</td></tr>
+<tr><td><code>style={{ opacity: 0.5, zIndex: 3 }}</code></td><td><code>style="opacity: 0.5; z-index: 3;"</code></td><td>estas não ganham <code>px</code></td></tr>
+<tr><td><code>style={{ "background-color": "crimson" }}</code></td><td><code>style="background-color: crimson;"</code></td><td>funciona, mas foge da convenção</td></tr>
+<tr><td><code>style="color: crimson"</code></td><td>nenhum elemento</td><td>string não é objeto: o componente não desenha</td></tr>
+<tr><td><code>style={{ background_color: "red" }}</code></td><td>só as outras propriedades</td><td>nome inválido é ignorado em silêncio</td></tr>
+</table>
+</div>
+
+<p>Duas linhas dessa tabela merecem atenção. A quinta é a que mais dói: passar uma string faz o
+componente inteiro falhar, e o painel fica vazio, sem uma pista no lugar do HTML. Se você vir "o React
+não desenhou nada", desconfie do <code>style</code> escrito como texto. A sexta é o oposto: um nome com
+sublinhado em vez de maiúscula não quebra nada, só não aparece — e você perde vinte minutos procurando o
+erro no lugar errado.</p>
+
+<p>No DevTools, a conferência é de duas linhas. A primeira mostra o que o React escreveu; a segunda, o
+valor que o navegador calculou depois de aplicar tudo:</p>
+
+<pre class="term">document.querySelector("p").getAttribute("style")
+'color: crimson; font-size: 20px;'
+getComputedStyle(document.querySelector("p")).fontSize
+'20px'</pre>
+
+<h2>3. O primeiro estilo</h2>
+
+<p>Hora de escrever. O preço do pão precisa de três coisas: vermelho-escuro
+(<code>crimson</code>), tamanho 20 e negrito. As três cabem em um objeto, e o objeto vai entre as
+chaves do JSX. Como a cor vem em texto e o tamanho vem em número, a mistura de aspas é normal: só o
+número dispensa aspas.</p>
+
+<div class="tryreact" data-goal="css:p|color=rgb(220, 20, 60);;css:p|font-size=20px;;css:p|font-weight=700">
+  <p class="try-task">O preço está sem estilo nenhum. Dê a ele a cor <code>crimson</code>, o tamanho
+  <code>20</code> e o peso <code>"bold"</code>, usando a prop <code>style</code>.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Pão francês — R$ 12,00&lt;/p&gt;
+      &lt;p&gt;Pão de queijo — R$ 8,00&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Pão francês — R$ 12,00&lt;/p&gt;
+  &lt;p&gt;Pão de queijo — R$ 8,00&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  return (
+    &lt;div&gt;
+      &lt;p style={{ color: "crimson", fontSize: 20, fontWeight: "bold" }}&gt;
+        Pão francês — R$ 12,00
+      &lt;/p&gt;
+      &lt;p&gt;Pão de queijo — R$ 8,00&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois da solução, o painel mostra
+<code>&lt;p style="color: crimson; font-size: 20px; font-weight: bold;"&gt;</code>. Três declarações,
+exatamente na ordem em que você escreveu, com o <code>px</code> acrescentado no tamanho. Repare que
+<code>20</code> virou <code>20px</code> porque o <code>fontSize</code> é uma medida; o mesmo aconteceria
+com <code>margin</code>, <code>padding</code>, <code>width</code> e <code>borderRadius</code>.</p>
+
+<p>Se você quisesse 20 pontos em vez de pixels — o que quase nunca é o certo —, o valor precisaria ser
+texto: <code>fontSize: "20pt"</code>. Sempre que a unidade não é pixel, escreva a unidade junto, entre
+aspas. E cuidado com a vírgula entre as propriedades: é um objeto JavaScript comum, então esquecer a
+vírgula quebra a compilação do JSX, com uma mensagem apontando a linha — o mesmo tipo de erro que você
+já viu nas aulas de JSX.</p>
+
+<p>Um detalhe que confunde quem vem do CSS: <code>font-weight</code> aceita <code>"bold"</code> e também
+número, <code>700</code>. Os dois funcionam, e o painel mostra <code>font-weight: bold;</code> no
+primeiro caso. O número é mais preciso quando você quer <code>600</code> ou <code>800</code>; a palavra
+é mais legível. Em ambos, o resultado é o mesmo peso na tela.</p>
+
+<h2>4. Estilo que vem do estado</h2>
+
+<p>Aqui começa a parte que o CSS não faz. O valor da propriedade pode ser uma expressão que lê o estado,
+e o React recalcula o objeto a cada renderização. Quando o estado muda, o objeto muda, o atributo muda e
+a tela muda — sem nenhuma classe nova no CSS e sem nenhum efeito.</p>
+
+<p>A Ana quer o preço vermelho quando não há pão. Ela já tem o estado <code>paes</code> e a variável
+<code>esgotado</code>, calculada na renderização. O estilo é só uma conta em cima disso, com um
+ternário.</p>
+
+<div class="tryreact" data-goal="css:p.preco|color=rgb(255, 0, 0);;clique:button;;css:p.preco|color=rgb(0, 0, 0)">
+  <p class="try-task">O preço está sempre preto. Use o ternário com <code>esgotado</code> para que ele
+  fique <code>"red"</code> quando não há pão e <code>"black"</code> quando há.</p>
+  <pre class="jsx">function App() {
+  const [paes, setPaes] = useState(0);
+  const esgotado = paes === 0;
+
+  return (
+    &lt;div&gt;
+      &lt;p className="preco" style={{ color: "black" }}&gt;Pão francês — R$ 12,00&lt;/p&gt;
+      &lt;p&gt;{paes} pães no balcão&lt;/p&gt;
+      &lt;button onClick={() =&gt; setPaes(paes + 1)}&gt;Assar mais um&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p class="preco" style="color: black;"&gt;Pão francês — R$ 12,00&lt;/p&gt;
+  &lt;p&gt;0 pães no balcão&lt;/p&gt;
+  &lt;button&gt;Assar mais um&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [paes, setPaes] = useState(0);
+  const esgotado = paes === 0;
+
+  return (
+    &lt;div&gt;
+      &lt;p className="preco" style={{ color: esgotado ? "red" : "black" }}&gt;
+        Pão francês — R$ 12,00
+      &lt;/p&gt;
+      &lt;p&gt;{paes} pães no balcão&lt;/p&gt;
+      &lt;button onClick={() =&gt; setPaes(paes + 1)}&gt;Assar mais um&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Na solução, o painel mostra <code>style="color: red;"</code> antes do clique e
+<code>style="color: black;"</code> depois — o atributo muda de verdade, e não é uma classe a mais. Se
+você quiser combinar com a aula anterior, dá para deixar a classe cuidar do resto: <code>preco</code>
+traz o tamanho e a margem, o <code>style</code> traz só a cor que depende do estoque. Duas ferramentas,
+cada uma com o seu pedaço.</p>
+
+<p>Note também que o estado não guarda o estilo. Guardar <code>const [cor, setCor] = useState("black")</code>
+e mudar a cor em um efeito seria repetir o erro da aula de quando não usar efeito: a cor é derivada de
+<code>paes</code>. O objeto de estilo é uma conta feita na hora, como o total do pedido.</p>
+
+<h2>5. O valor que a pessoa escolhe</h2>
+
+<p>O caso mais direto de estilo inline é o valor que vem de um campo. A Ana quer testar cores no
+balcão: digita o nome de uma cor e vê o cartão mudar. O input guarda texto no estado; o
+<code>style</code> usa esse texto direto. Nada de classe, nada de efeito, nada de conversão.</p>
+
+<div class="tryreact" data-goal="digite:input=crimson;;css:p|background-color=rgb(220, 20, 60)">
+  <p class="try-task">O cartão está sempre branco. Pinte o fundo com a cor que estiver no estado
+  <code>cor</code>, usando <code>backgroundColor</code>.</p>
+  <pre class="jsx">function App() {
+  const [cor, setCor] = useState("white");
+
+  return (
+    &lt;div&gt;
+      &lt;input value={cor} onChange={(e) =&gt; setCor(e.target.value)} /&gt;
+      &lt;p style={{ backgroundColor: "white" }}&gt;Pão francês — R$ 12,00&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input value="white"&gt;
+  &lt;p style="background-color: white;"&gt;Pão francês — R$ 12,00&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [cor, setCor] = useState("white");
+
+  return (
+    &lt;div&gt;
+      &lt;input value={cor} onChange={(e) =&gt; setCor(e.target.value)} /&gt;
+      &lt;p style={{ backgroundColor: cor }}&gt;Pão francês — R$ 12,00&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Digite "crimson" na solução e o painel passa a mostrar
+<code>style="background-color: crimson;"</code>. Digite uma cor inválida, como "crimsonn", e o React
+escreve o atributo do mesmo jeito; é o navegador que descarta o valor e mantém o fundo anterior. Isso é
+importante: o React não valida CSS. Ele escreve o que você mandou, e o navegador decide o que fazer com
+aquilo.</p>
+
+<p>Uma consequência prática: nunca construa uma string inteira de CSS, tipo
+<code>style={"background-color: " + cor}</code>. Vai virar string, e string não é objeto — o componente
+nem desenha. O objeto é a única forma, e ele já aceita expressões em cada valor, como você acabou de
+ver.</p>
+
+<h2>6. Números, unidades e o que não é pixel</h2>
+
+<p>O React acrescenta <code>px</code> nos valores numéricos porque isso resolve 95% dos casos. Mas
+existem propriedades em que <code>px</code> não faz sentido, e o React sabe quais são: ele mantém o
+número puro nas chamadas "sem unidade". As mais comuns são <code>opacity</code>,
+<code>zIndex</code>, <code>flex</code>, <code>flexGrow</code>, <code>order</code>,
+<code>lineHeight</code> e <code>fontWeight</code>.</p>
+
+<p>Então <code>opacity: 0.5</code> fica <code>opacity: 0.5</code>, e não
+<code>0.5px</code>. Já <code>lineHeight: 1.5</code> fica sem unidade, o que em CSS significa "uma vez e
+meia o tamanho da fonte". Se você quisesse 24 pixels de altura de linha, escreveria
+<code>lineHeight: "24px"</code> — com aspas, porque a unidade é parte do texto.</p>
+
+<pre class="file" data-file="App.jsx">const estiloAviso = {
+  opacity: 0.5,        // 0.5, sem px
+  lineHeight: 1.5,     // 1.5, sem px
+  zIndex: 3,           // 3, sem px
+  marginTop: 12,       // 12px
+  fontSize: "1.2rem"   // unidade escrita à mão
+};</pre>
+
+<p>Quando o valor vem de uma conta, cuidado com o resultado. <code>width: 100 / 3</code> vira
+<code>33.333333333333336px</code>, o que é feio de ler no DevTools e inútil na prática. Arredonde antes
+de entregar: <code>Math.round(100 / 3)</code>. O mesmo vale para porcentagens: se você quer
+<code>40%</code>, o valor é <code>"40%"</code>, com aspas — o React não sabe que aquele número deveria
+ser porcentagem.</p>
+
+<p>Há uma exceção que vale conhecer: as <strong>variáveis CSS</strong>. Propriedades que começam com
+<code>--</code> precisam de aspas no nome, porque têm hífen, e o valor é texto. Elas servem para passar
+um valor para o CSS a partir do JavaScript, sem repetir a propriedade em cada elemento:</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const [cor, setCor] = useState("crimson");
+
+  return (
+    &lt;div style={{ "--cor-destaque": cor }}&gt;
+      &lt;p style={{ color: "var(--cor-destaque)" }}&gt;Pão francês&lt;/p&gt;
+      &lt;p style={{ borderColor: "var(--cor-destaque)", borderStyle: "solid" }}&gt;Pão de queijo&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Trocar <code>cor</code> muda os dois parágrafos de uma vez, porque os dois leem a mesma variável. É o
+jeito mais limpo de fazer tema que muda com o estado sem repetir o valor em cada elemento — e o mesmo
+truque funciona para o tema claro e escuro que este guia usa.</p>
+
+<h2>7. O que o style inline não faz</h2>
+
+<p>O atributo <code>style</code> é poderoso e tem limites duros. Ele escreve declarações naquele
+elemento e só. Não tem seletor, então não existe <code>:hover</code>, não existe
+<code>::placeholder</code>, não existe <code>:focus</code>, não existe media query e não existe
+<code>@keyframes</code>. Essas quatro coisas pertencem à folha de CSS, e não há como imitá-las com
+objeto.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você quer</th><th>Dá com style inline?</th><th>Como fazer</th></tr>
+<tr><td>mudar a cor quando o mouse passa</td><td>não</td><td><code>.botao:hover</code> no CSS</td></tr>
+<tr><td>mudar o layout em tela pequena</td><td>não</td><td><code>@media</code> no CSS</td></tr>
+<tr><td>animar a entrada de um card</td><td>não</td><td><code>@keyframes</code> e uma classe</td></tr>
+<tr><td>largura que vem de um estado</td><td>sim</td><td><code>style={{ width: largura + "%" }}</code></td></tr>
+<tr><td>cor de tema escolhida pela pessoa</td><td>sim</td><td>variável CSS no <code>style</code></td></tr>
+</table>
+</div>
+
+<p>Há ainda duas limitações menos citadas. A primeira: <code>!important</code> não funciona no objeto —
+o React escreve a declaração normal, e uma regra de CSS com <code>!important</code> vence. A segunda: o
+objeto é recriado a cada renderização, então o React reescreve o atributo mesmo quando os valores são
+iguais. Para um parágrafo, é imperceptível; em uma lista de mil linhas, aparece. É uma das razões pelas
+quais classe costuma ser a escolha padrão e estilo inline, a exceção.</p>
+
+<p>Existe também o problema do estilo que some sem erro. Um nome com sublinhado
+(<code>background_color</code>), uma propriedade que não existe no navegador, um valor inválido para
+aquela propriedade: em todos, o React não reclama e o console não mostra nada. O jeito de descobrir é
+olhar o atributo gerado — se a declaração não está lá, o problema é no nome; se está lá e não pinta, o
+problema é no valor.</p>
+
+<pre class="term">getComputedStyle(document.querySelector("p")).backgroundColor
+'rgb(255, 255, 255)'
+document.querySelector("p").getAttribute("style")
+'font-size: 20px;'</pre>
+
+<p>A leitura acima conta a história inteira: o elemento não tem <code>background-color</code> no
+atributo, então o fundo continua o branco padrão. O <code>background_color</code> com sublinhado foi
+engolido pelo React, e nenhum aviso apareceu em lugar nenhum.</p>
+
+<h2>8. Classe e estilo, cada um no seu lugar</h2>
+
+<p>Depois de duas aulas, a Ana tem o critério completo. Classe é contrato com a folha de estilo: o
+desenho do card, o tamanho da fonte, o espaçamento entre seções, o estado de um botão. Estilo inline é
+valor que nasce do dado: a cor do dia, a largura da barra, a posição de um item em uma lista ordenada.
+Os dois convivem sem briga no mesmo elemento, e a ordem em que aparecem no JSX não importa.</p>
+
+<p>Quando o estilo inline começa a crescer, o primeiro passo é dar nome ao objeto. Um
+<code>const estiloBarra = { ... }</code> fora do componente deixa o JSX legível e evita recriar o objeto
+a cada renderização — o que ajuda o <code>memo</code> a perceber que nada mudou. O segundo passo é
+perceber que aquele estilo não depende de estado nenhum e voltar para o CSS. Muita coisa que começa
+inline termina em uma classe bem nomeada.</p>
+
+<p>E vale desconfiar quando o objeto tem mais de cinco propriedades. Nessa hora, o desenho pertence ao
+site, não ao dado: vira classe. O estilo inline fica com uma ou duas propriedades dinâmicas, e o resto
+vai para a folha — onde o navegador cacheia, onde o <code>:hover</code> existe e onde a pessoa que cuida
+do visual consegue mexer sem abrir o JavaScript.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a barra de estoque que não enche</h3>
+<p>A Ana escreveu <code>style={{ width: paes * 10 }}</code> e a barra ficou com 20 pixels em vez de 20%.
+O número virou pixel, como manda a regra. Para porcentagem, o valor precisa ser texto:
+<code>width: (paes * 10) + "%"</code>. E para limitar em 100%, <code>Math.min(paes * 10, 100)</code>
+antes de montar a string — senão a barra vaza do card quando há mais de dez pães.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o botão perdeu o estilo ao passar o mouse</h3>
+<p>Ela trocou a classe do botão por um objeto de estilo e o <code>:hover</code> parou de funcionar. Não
+é bug: <code>:hover</code> é um seletor, e o <code>style</code> inline não tem seletor. O conserto é
+voltar a classe para o que é interação e deixar o inline só com o valor dinâmico — por exemplo, a cor
+que vem do tema, enquanto o hover continua no CSS.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o estilo apareceu no HTML e a tela não mudou</h3>
+<p>O painel mostrava <code>style="background_color: red;"</code> e o cartão continuava branco. O nome
+estava com sublinhado, e o navegador não conhece essa propriedade: descarta sem avisar. Trocado para
+<code>backgroundColor</code>, funcionou na hora. Sempre que um estilo inline "não pega", compare o nome
+com a lista de propriedades do CSS — o camelCase é a única diferença entre os dois mundos.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. O que a prop <code>style</code> espera?</p>
+<label><input type="radio" name="q1"> uma string com as declarações de CSS</label>
+<label><input type="radio" name="q1"> uma lista de classes</label>
+<label><input type="radio" name="q1"> um objeto com as propriedades em camelCase</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">2. O que sai de <code>style={{ fontSize: 20, opacity: 0.5 }}</code>?</p>
+<label><input type="radio" name="q2"> <code>font-size: 20; opacity: 0.5px;</code></label>
+<label><input type="radio" name="q2"> <code>font-size: 20px; opacity: 0.5;</code></label>
+<label><input type="radio" name="q2"> <code>font-size: 20px; opacity: 0.5px;</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Qual destes o estilo inline <strong>não</strong> consegue fazer?</p>
+<label><input type="radio" name="q3"> mudar a cor do texto quando o mouse passa por cima</label>
+<label><input type="radio" name="q3"> mudar a largura de uma barra conforme o estado</label>
+<label><input type="radio" name="q3"> usar uma cor que a pessoa escolheu no campo</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a cor e o tamanho</h2>
+<p>Complete o objeto de estilo do preço. A primeira propriedade é a cor de fundo, escrita no padrão do
+React. A segunda é o tamanho da fonte, que deve chegar ao CSS como <code>20px</code>:</p>
+<div class="ex-code">&lt;p style={{ <input aria-label="resposta 1" data-answer="backgroundColor" placeholder="...">: "crimson", fontSize: <input aria-label="resposta 2" data-answer="20" placeholder="..."> }}&gt;Pão francês&lt;/p&gt;</div>
+<p class="ex-dica">Dica: a primeira resposta é <code>background-color</code> em camelCase — sem hífen. A
+segunda é um número puro: o React acrescenta o <code>px</code> sozinho, então escrever
+<code>"20px"</code> também funciona, mas o número é o jeito mais comum.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>A prop <code>style</code> recebe um objeto JavaScript, e é por isso que são duas chaves: uma para
+entrar no JSX, outra para abrir o objeto. As propriedades vão em camelCase, os números ganham
+<code>px</code> automaticamente — menos nas que não têm unidade, como <code>opacity</code>,
+<code>zIndex</code> e <code>lineHeight</code> — e os valores dinâmicos saem direto do estado, com
+ternário ou variável.</p>
+
+<p>O que o inline faz bem: valor que muda com o dado, cor escolhida pela pessoa, largura calculada,
+variável CSS para tema. O que ele não faz: <code>:hover</code>, <code>:focus</code>, media query,
+<code>@keyframes</code> e <code>!important</code> — nada que precise de seletor. E há dois erros para
+reconhecer de longe: passar string em vez de objeto, que faz o componente não desenhar, e escrever o
+nome com sublinhado, que o React ignora sem avisar.</p>
+
+<p>A divisão com a aula anterior fica simples de guardar. Se o valor é do desenho e igual para todos, é
+classe. Se o valor vem do dado e muda a cada renderização, é <code>style</code>. Os dois juntos no mesmo
+elemento são o normal, não a exceção: a classe carrega o que é estável, o objeto carrega o que é
+dinâmico.</p>
+
+<p>E fica uma vantagem honesta do inline, que às vezes é esquecida: ele não precisa de arquivo de CSS
+nenhum. Para um componente que precisa se virar sozinho — um card que recebe a cor por prop, um gráfico
+que calcula a altura da barra — o objeto resolve sem depender de uma folha externa. Só não peça a ele o
+que é trabalho de seletor.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>style</code> recebe objeto: <code>style={{ color: "crimson" }}</code>.</li>
+<li>Propriedades em camelCase: <code>backgroundColor</code>, <code>fontSize</code>, <code>marginTop</code>.</li>
+<li>Número vira <code>px</code>; <code>opacity</code>, <code>zIndex</code> e <code>lineHeight</code> ficam sem unidade.</li>
+<li>Outra unidade: escreva entre aspas — <code>fontSize: "1.2rem"</code>.</li>
+<li>Valor dinâmico: <code>style={{ color: esgotado ? "red" : "black" }}</code>.</li>
+<li>String em vez de objeto faz o componente não desenhar.</li>
+<li>Nome com sublinhado é ignorado sem erro: o painel é o lugar de conferir.</li>
+<li><code>:hover</code>, media query e animação são trabalho do CSS, não do inline.</li>
+<li>Variável CSS no objeto: <code>style={{ "--cor": cor }}</code>, com aspas no nome.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

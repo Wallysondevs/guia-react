@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quando Não Usar Efeito | Guia React</title>
+<meta name="description" content="Quando não usar useEffect: cálculo derivado direto na renderização, reação a clique dentro do handler, prop que não precisa virar estado e o que ainda pede um efeito.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Quando Não Usar <span class="hl">Efeito</span></h1>
+<p class="intro">A Ana descobriu o <code>useEffect</code> e passou a usar em tudo: no total do pedido,
+no botão de enviar, no preço que vem de fora. O resultado foi um painel que mostra um total de dois
+cliques atrás, um pedido que só é enviado na primeira vez e um preço congelado. Nesta aula ela aprende
+o outro lado do <code>useEffect</code>: quando ele <strong>não</strong> é a ferramenta certa, e o que
+escrever no lugar. O painel das caixas mostra a diferença em cada caso.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que um efeito faz de verdade: roda depois da renderização e serve para falar com o mundo de fora.</li>
+  <li>A reconhecer cálculo derivado e a fazê-lo direto no corpo do componente.</li>
+  <li>Por que reagir a um clique é trabalho do handler, não de um efeito.</li>
+  <li>Por que copiar prop para estado congela a tela, e o que fazer no lugar.</li>
+  <li>O truque da <code>key</code> para recomeçar um componente do zero.</li>
+  <li>Os três sintomas de efeito no lugar errado: dado atrasado, laço infinito e disparo duplicado.</li>
+  <li>Os casos em que o efeito continua sendo a resposta certa.</li>
+</ul>
+</div>
+
+<h2>1. A cena: três efeitos que brigam com a tela</h2>
+
+<p>Depois da aula de <code>useEffect</code>, a Ana virou fã. Qualquer coisa que precisasse acontecer
+"quando mudasse alguma coisa" virou efeito. O total do pedido ganhou um efeito que soma os pães. O
+botão de enviar ganhou um efeito que observa um sinalizador. O preço que chega por prop ganhou um
+efeito que copia o valor para dentro de um estado.</p>
+
+<p>Os três funcionaram no primeiro teste e falharam no segundo. O total ficou um clique atrasado. O
+segundo pedido do dia não foi enviado. O preço continuou o de ontem, mesmo depois de a Ana mudar a
+tabela. Nenhum dos três era um erro de digitação: os três eram <strong>o mesmo erro de desenho</strong>
+— usar um efeito para calcular ou reagir a algo que já está dentro do React.</p>
+
+<p>A regra que resolve os três casos é curta e vale a aula inteira: <strong>efeito serve para
+conversar com o que está fora do React</strong>. Rede, arquivos, <code>localStorage</code>, um timer, o
+título da aba, uma biblioteca de mapa que desenha num <code>div</code> — tudo isso vive fora do React e
+precisa de um efeito para ser tocado. Somar dois números, filtrar uma lista, trocar um texto quando
+alguém clica: isso é React puro, e React puro se faz na renderização ou no handler do evento.</p>
+
+<h2>2. O que um efeito é, de verdade</h2>
+
+<p>Vale voltar um passo, porque a confusão nasce daqui. O React chama o seu componente para descobrir
+como a tela deve ficar. Essa chamada é a <strong>renderização</strong>, e ela tem uma regra: não pode
+ter efeito colateral. Nada de gravar, nada de pedir dados, nada de mexer no mundo — só calcular o que
+aparece na tela e devolver o JSX. Depois que a tela está no lugar, o React executa os efeitos. A ordem
+é sempre essa, e é isso que explica por que um efeito não serve para calcular o que a tela mostra
+<em>agora</em>: quando ele roda, a tela daquele render já foi desenhada.</p>
+
+<dl class="anatomy">
+<dt>renderização</dt>
+<dd>A chamada da função componente. Tem de ser pura: mesmos dados, mesmo JSX, nada de mundo lá
+fora.</dd>
+<dt>efeito</dt>
+<dd>Função que o React executa <em>depois</em> de desenhar, para sincronizar o componente com algo
+externo: rede, timer, <code>localStorage</code>, DOM.</dd>
+<dt>handler</dt>
+<dd>A função que roda em resposta a um evento — o <code>onClick</code>, o <code>onChange</code>. É o
+lugar de reagir a uma ação da pessoa.</dd>
+<dt>estado derivado</dt>
+<dd>Um valor que pode ser calculado a partir de outro. Se dá para calcular, não precisa de
+<code>useState</code>.</dd>
+<dt>sistema externo</dt>
+<dd>Qualquer coisa que o React não controla: o servidor, o disco do navegador, o relógio, uma
+biblioteca de terceiros.</dd>
+</dl>
+
+<p>Com essas cinco palavras, a decisão vira uma tabela de três perguntas. Ela não cobre todos os casos
+do mundo, mas cobre quase tudo o que aparece nos primeiros meses de React.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>A pergunta</th><th>Se a resposta for sim</th><th>Exemplo</th></tr>
+<tr><td>É um valor que dá para calcular a partir do que já tenho?</td><td>calcule na renderização, sem estado e sem efeito</td><td>o total do pedido, a lista filtrada, o texto do botão</td></tr>
+<tr><td>É uma reação a um clique, uma tecla ou um envio?</td><td>faça no handler do evento</td><td>enviar o pedido, limpar o formulário, contar cliques</td></tr>
+<tr><td>Preciso tocar em algo que o React não controla?</td><td>aí sim: <code>useEffect</code>, com dependências e cleanup</td><td>buscar na rede, ler o <code>localStorage</code>, ligar um timer</td></tr>
+</table>
+</div>
+
+<p>Para ver a diferença de tempo entre as duas coisas, rode este componente e olhe o console. Ele
+escreve uma linha na renderização e outra no efeito. As duas aparecem, mas em ordem — e a linha do
+efeito vem sempre depois, uma vez por renderização:</p>
+
+<pre class="term">renderizou com 2 pães
+efeito rodou com 2 pães
+renderizou com 3 pães
+efeito rodou com 3 pães</pre>
+
+<p>Guardar essa ordem resolve a dúvida "por que meu total está atrasado?". Se o número que você mostra
+na tela depende do efeito, ele depende de uma execução que acontece <em>depois</em> do desenho. A tela
+mostra o valor antigo, o efeito atualiza o estado, e aí vem uma segunda renderização com o valor certo.
+Duas renderizações para mostrar um número que dava para calcular na primeira.</p>
+
+<h2>3. O total que dá dois passos</h2>
+
+<p>O primeiro caso é o mais comum de todos. O total do pedido é
+<code>quantidade × preço</code>. A Ana guardou a quantidade em um estado, o total em outro, e ligou os
+dois com um efeito. No primeiro clique, a tela mostrou o total de antes: o efeito ainda não tinha
+rodado. No caso dela, com a lista de dependências vazia, o total nunca mais mudou.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:total: R$ 36,00">
+  <p class="try-task">O total é calculado dentro de um efeito que roda uma vez só, então ele fica
+  parado em R$ 24,00 enquanto os pães aumentam. Apague o estado e o efeito do total e calcule
+  <code>paes * 12</code> direto no corpo do componente.</p>
+  <pre class="jsx">function App() {
+  const [paes, setPaes] = useState(2);
+  const [total, setTotal] = useState(0);
+
+  useEffect(() =&gt; {
+    setTotal(paes * 12);
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{paes} pães por R$ 12,00 cada&lt;/p&gt;
+      &lt;p&gt;{"total: R$ " + total + ",00"}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setPaes(paes + 1)}&gt;Mais um pão&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;2 pães por R$ 12,00 cada&lt;/p&gt;
+  &lt;p&gt;total: R$ 24,00&lt;/p&gt;
+  &lt;button&gt;Mais um pão&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [paes, setPaes] = useState(2);
+  const total = paes * 12;
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{paes} pães por R$ 12,00 cada&lt;/p&gt;
+      &lt;p&gt;{"total: R$ " + total + ",00"}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setPaes(paes + 1)}&gt;Mais um pão&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em Rodar na solução e depois em "Mais um pão": os três pães aparecem junto com o total de
+R$ 36,00, na mesma renderização. No código inicial, o mesmo clique mostra três pães e R$ 24,00 — um
+número que nunca existiu, porque o efeito tinha a lista de dependências vazia e só rodou na montagem.</p>
+
+<p>O que mudou não foi a matemática, foi o lugar da conta. O total deixou de ser um estado e virou uma
+variável comum, calculada a cada renderização a partir do que já está na mão. Isso tem três
+consequências boas: não existe total desatualizado, porque ele é recalculado sempre; não existe
+segunda renderização para corrigir a primeira; e não existe a chance de alguém esquecer de atualizar o
+total em algum canto do código. <strong>Estado que dá para calcular é estado que vai divergir
+algum dia.</strong></p>
+
+<p>A mesma ideia vale para listas filtradas, textos de botão, somas de carrinho, validações de
+formulário e nomes completos montados a partir de primeiro e último nome. Todos são valores derivados.
+O único cuidado é não fazer trabalho caro sem necessidade: se a conta for pesada e a lista tiver
+milhares de itens, o <code>useMemo</code> guarda o resultado entre renderizações — mas ele é
+otimização, não correção. Primeiro calcula, depois mede, e só então otimiza.</p>
+
+<h2>4. O clique que precisa do handler</h2>
+
+<p>O segundo caso é mais sutil, porque o efeito funciona na primeira vez. A Ana queria enviar o pedido
+quando a pessoa clicasse. Ela criou um estado <code>pedido</code>, começando em <code>false</code>,
+que o clique vira para <code>true</code>, e um efeito que observa esse estado e faz o envio. No
+primeiro clique, tudo certo: o estado mudou de falso para verdadeiro, o efeito rodou, o pedido foi
+enviado.</p>
+
+<p>No segundo clique, nada. E o motivo é lógico: o clique faz <code>setPedido(true)</code>, e
+<code>true</code> já era o valor. O React compara, vê que nada mudou e nem redesenha o componente —
+logo, o efeito não tem por que rodar. O estado sinalizador não é um contador de pedidos; é uma chave
+que fica ligada. Reagir a uma ação com um efeito é transformar a ação em um estado que precisa
+"voltar" para o valor anterior, e ninguém volta.</p>
+
+<div class="tryreact" data-goal="clique:button;;clique:button;;texto:enviados: 2">
+  <p class="try-task">O sinalizador <code>pedido</code> liga no primeiro clique e nunca desliga, então
+  o segundo envio não acontece. Tire o estado <code>pedido</code> e o efeito: envie dentro do
+  <code>onClick</code>, somando um no contador a cada clique.</p>
+  <pre class="jsx">function App() {
+  const [pedido, setPedido] = useState(false);
+  const [enviados, setEnviados] = useState(0);
+
+  useEffect(() =&gt; {
+    if (pedido) {
+      setEnviados(enviados + 1);
+    }
+  }, [pedido]);
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={() =&gt; setPedido(true)}&gt;Enviar pedido&lt;/button&gt;
+      &lt;p&gt;enviados: {enviados}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Enviar pedido&lt;/button&gt;
+  &lt;p&gt;enviados: 0&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [enviados, setEnviados] = useState(0);
+
+  function enviar() {
+    setEnviados(enviados + 1);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={enviar}&gt;Enviar pedido&lt;/button&gt;
+      &lt;p&gt;enviados: {enviados}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Com a solução, dois cliques mostram <code>enviados: 2</code>. Com o código inicial, dois cliques
+mostram <code>enviados: 1</code>: o segundo clique não mudou nada, então o React ignorou. Guarde esse
+sintoma, porque ele aparece disfarçado de "o botão não funciona": quase sempre é um estado que já estava
+no valor que você tentou colocar.</p>
+
+<p>"Mas e se o envio for uma chamada de rede?" Nesse caso a chamada acontece dentro do handler, que é
+assíncrono por natureza — o handler pode esperar a resposta, mostrar "enviando", tratar o erro. O
+efeito não é necessário: a ação nasceu de um clique, então o lugar dela é o clique. O que o efeito faz
+bem é o que nasce de uma <em>mudança de dado</em>, não de um dedo no botão.</p>
+
+<p>Além de não funcionar duas vezes, o padrão do sinalizador tem outro defeito: em desenvolvimento, com
+o StrictMode, o efeito roda duas vezes na montagem e o pedido sairia duplicado. Dois defeitos que
+desaparecem quando o envio vai para o handler.</p>
+
+<h2>5. A prop que virou estado</h2>
+
+<p>O terceiro caso é o mais silencioso. O preço do pão chega por prop, e a Ana quis "guardar" o valor
+em um estado, copiando com um efeito. Funciona na montagem: o estado nasce vazio, o efeito copia a
+prop, a tela mostra o preço certo. Depois que a Ana muda o preço, o componente filho continua mostrando
+o valor antigo — o efeito tem <code>[]</code> nas dependências e rodou uma vez só.</p>
+
+<p>E se ela colocasse <code>[valor]</code>? Aí funcionaria, mas por um caminho torto: a cada mudança de
+prop haveria uma renderização com o valor velho, depois o efeito, depois outra renderização com o valor
+novo. Duas renderizações, um piscar na tela e uma fonte de verdade duplicada. Quando a prop já é o
+dado, use a prop.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:preço: R$ 15,00">
+  <p class="try-task">O componente <code>Preco</code> copia a prop para um estado com um efeito que
+  roda uma vez só, e o preço congela em R$ 10,00. Apague o estado e o efeito e mostre a prop
+  <code>valor</code> direto.</p>
+  <pre class="jsx">function Preco({ valor }) {
+  const [mostrado, setMostrado] = useState(0);
+
+  useEffect(() =&gt; {
+    setMostrado(valor);
+  }, []);
+
+  return &lt;p&gt;{"preço: R$ " + mostrado + ",00"}&lt;/p&gt;;
+}
+
+function App() {
+  const [valor, setValor] = useState(10);
+
+  return (
+    &lt;div&gt;
+      &lt;Preco valor={valor} /&gt;
+      &lt;button onClick={() =&gt; setValor(valor + 5)}&gt;Aumentar R$ 5&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;preço: R$ 10,00&lt;/p&gt;
+  &lt;button&gt;Aumentar R$ 5&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Preco({ valor }) {
+  return &lt;p&gt;{"preço: R$ " + valor + ",00"}&lt;/p&gt;;
+}
+
+function App() {
+  const [valor, setValor] = useState(10);
+
+  return (
+    &lt;div&gt;
+      &lt;Preco valor={valor} /&gt;
+      &lt;button onClick={() =&gt; setValor(valor + 5)}&gt;Aumentar R$ 5&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Na solução, o clique leva o preço a R$ 15,00 na mesma hora, porque o filho não guarda nada: ele
+recebe o valor e desenha. O componente <code>Preco</code> ficou com uma linha, e isso não é perda de
+poder — é o desenho certo. Quem manda no preço é o pai; o filho só mostra. Essa divisão de trabalho é o
+que permite mudar o preço em um lugar e ver o efeito em todos os lugares.</p>
+
+<p>Existe um caso legítimo de "estado que começa com a prop": quando a prop é só o valor
+<strong>inicial</strong> de um rascunho editável, e você quer que o rascunho ignore mudanças
+posteriores. Aí a intenção é diferente, e vale escrever isso com clareza — por exemplo, um campo de
+observação que nasce com o texto sugerido e depois pertence a quem digita. Se você não consegue explicar
+em uma frase por que o valor deve divergir da prop, provavelmente não deve.</p>
+
+<p>Para o outro problema parecido — "quero que o formulário esqueça tudo quando eu trocar de cliente" —
+não use efeito nem estado: use a <code>key</code>. Passar <code>key={cliente}</code> em um componente
+diz ao React "este é outro componente"; quando a chave muda, ele desmonta o antigo e cria um novo, com
+todo o estado zerado. É a forma mais limpa de "recomeçar do zero" e não precisa de nenhum
+<code>useEffect</code>.</p>
+
+<h2>6. O efeito que busca o que já está na mão</h2>
+
+<p>Há uma família inteira de efeitos inúteis que nasce da pressa. A Ana queria que a busca do cliente
+filtrasse a lista. Escreveu um estado para a lista filtrada e um efeito que roda quando o texto muda.
+Funciona — com uma renderização extra a cada tecla, e com a chance de a lista e o texto ficarem
+desalinhados se alguém esquecer uma dependência.</p>
+
+<p>O mesmo resultado, sem efeito e sem estado extra, cabe em uma linha: a lista filtrada é uma variável
+calculada a partir da lista e do texto. Quando o texto muda, o componente renderiza de novo, a conta
+roda de novo e a tela mostra a lista nova. Não existe "atualizar a lista": ela é o resultado da conta,
+como o total da seção 3.</p>
+
+<pre class="file" data-file="App.jsx">function App({ clientes }) {
+  const [busca, setBusca] = useState("");
+
+  // a lista filtrada é calculada, não guardada
+  const encontrados = clientes.filter((c) =&gt; c.nome.includes(busca));
+
+  return (
+    &lt;div&gt;
+      &lt;input value={busca} onChange={(e) =&gt; setBusca(e.target.value)} /&gt;
+      &lt;p&gt;{encontrados.length} cliente(s)&lt;/p&gt;
+      &lt;ul&gt;
+        {encontrados.map((c) =&gt; &lt;li key={c.nome}&gt;{c.nome}&lt;/li&gt;)}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Vale a mesma ressalva de sempre: se a lista for enorme e o filtro for caro, <code>useMemo</code>
+evita repetir a conta quando nada relevante mudou. Mas o desenho continua este — o dado nasce da lista,
+não de um efeito que a copia. A diferença entre "calcular" e "sincronizar" é a diferença entre um valor
+que sempre está certo e um valor que está certo até alguém esquecer de atualizá-lo.</p>
+
+<p>O caso em que o efeito é realmente necessário aparece quando o dado <strong>não está</strong> na mão:
+a lista vem do servidor. Aí não há o que calcular; há o que pedir. E o efeito precisa das três peças
+que você já viu nas aulas de busca: a dependência certa, um estado para carregando e um
+<code>AbortController</code> no cleanup para descartar a resposta que chegou fora de hora.</p>
+
+<h2>7. Os três sintomas de efeito no lugar errado</h2>
+
+<p>Você não precisa decorar uma lista de regras para desconfiar de um efeito. Precisa reconhecer três
+sintomas, que aparecem sempre juntos com o mesmo desenho de código.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sintoma</th><th>Causa provável</th><th>O que fazer</th></tr>
+<tr><td>o valor na tela está um passo atrás</td><td>o valor é estado atualizado por efeito</td><td>calcule na renderização</td></tr>
+<tr><td>o segundo clique não faz nada</td><td>um sinalizador booleano que não volta a falso</td><td>faça a ação no handler</td></tr>
+<tr><td>a tela pisca ou o console acusa laço</td><td>o efeito grava um estado que ele mesmo observa</td><td>tire a escrita do efeito ou corrija a dependência</td></tr>
+<tr><td>o mesmo pedido é enviado duas vezes</td><td>efeito reagindo a uma ação, rodando na montagem</td><td>mova para o handler do clique</td></tr>
+</table>
+</div>
+
+<p>O terceiro merece um exemplo, porque o erro que ele produz é curto e assustador. Um efeito que chama
+<code>setTotal</code> e tem <code>[total]</code> nas dependências cria um ciclo: grava o estado, o
+estado muda, o efeito roda, grava de novo. O React corta o ciclo depois de algumas voltas e escreve no
+console:</p>
+
+<pre class="term">Uncaught Error: Maximum update depth exceeded. This can happen when a
+component calls setState inside useEffect, but useEffect either doesn't
+have a dependency array, or one of the dependencies changes on every render.</pre>
+
+<p>A mensagem é literalmente o diagnóstico: "um componente chamando setState dentro do useEffect". A
+correção quase nunca é mexer nas dependências para "fazer parar"; é perguntar por que aquele estado
+existe. Na maioria dos casos, o valor que o efeito calcula podia ser uma variável na renderização, e o
+laço desaparece junto com o estado.</p>
+
+<p>Há ainda um quarto sintoma, mais discreto: um efeito que roda e não faz nada de útil. Se você lê o
+corpo do efeito e ele só conversa com estados do próprio componente, ele provavelmente está no lugar
+errado. Efeito bom tem sempre uma chamada para fora: <code>fetch</code>, <code>setInterval</code>,
+<code>localStorage</code>, <code>document.title</code>, uma biblioteca de gráfico. Se não tem, o
+trabalho era da renderização ou do handler.</p>
+
+<h2>8. O que ainda pede um efeito</h2>
+
+<p>Tirado o excesso, o <code>useEffect</code> continua sendo a ferramenta certa em quatro situações, e
+vale reconhecê-las para não jogar o bebê fora com a água.</p>
+
+<p><strong>Sincronizar com o navegador.</strong> Mudar o <code>document.title</code> da aba, rolar até
+um elemento, medir a altura de uma caixa, focar um campo quando a tela abre. O React não controla esses
+objetos; o efeito é a ponte. <strong>Ligar e desligar coisas com tempo.</strong> Um
+<code>setInterval</code> que atualiza o relógio, um <code>setTimeout</code> que esconde o aviso — sempre
+com o cleanup que limpa o timer. <strong>Assinar eventos de fora.</strong> O evento
+<code>storage</code>, que avisa quando outra aba grava no <code>localStorage</code>; o
+<code>resize</code> da janela; um WebSocket. <strong>Buscar dados.</strong> Quando a informação não
+está na mão e precisa vir da rede, o efeito é o único lugar com o momento certo.</p>
+
+<p>Nos quatro casos, o mesmo cuidado: a lista de dependências precisa conter tudo o que o efeito usa de
+fora, e o cleanup precisa desfazer o que o efeito fez. Um efeito sem cleanup que assina um evento
+acumula assinaturas a cada mudança; um efeito sem cleanup que pede dados pode gravar a resposta de uma
+busca antiga por cima da busca nova. Essas duas armadilhas já apareceram nas aulas de dependências e de
+cleanup — e elas existem justamente porque esses efeitos são legítimos.</p>
+
+<p>Um jeito prático de decidir: escreva o que o efeito faz em uma frase com um verbo de fora. "Muda o
+título da aba." "Liga um timer." "Pede os pedidos ao servidor." "Assina o evento de storage." Se a
+frase for "atualiza o total quando os pães mudam", pare: o total não é de fora, é uma conta. Se for
+"envia o pedido quando o sinalizador liga", pare: o envio nasceu de um clique. Frase com verbo de fora,
+efeito. Frase sem verbo de fora, renderização ou handler.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o total corrige sozinho depois de um piscar</h3>
+<p>A Ana viu o total aparecer errado e se corrigir em seguida. É a assinatura do estado sincronizado por
+efeito: a primeira renderização desenha o valor antigo, o efeito grava o novo e a segunda renderização
+corrige. O usuário vê um piscar; no celular mais lento, vira meio segundo de número errado. Calcular na
+renderização elimina as duas renderizações e o piscar.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o botão de enviar só funciona na primeira vez</h3>
+<p>Ela usou um estado <code>enviado</code> que vira <code>true</code> no clique e um efeito que observa
+esse estado. Na segunda vez, <code>setEnviado(true)</code> não muda nada e o efeito não roda. A
+correção é mover o envio para o handler; se precisar mostrar "enviado", use um estado que represente o
+resultado (a mensagem, o horário), não uma chave que fica ligada. Estados de verdade carregam
+informação; sinalizadores carregam história.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o campo de observação não aceita o texto novo do pedido</h3>
+<p>O campo nasce com a observação do pedido e copia a prop para o estado. Quando a Ana troca de pedido,
+o texto continua o anterior, porque o estado só foi inicializado uma vez. Duas saídas limpas: mostrar a
+prop direto, se o campo for só leitura; ou pôr <code>key={pedido.id}</code> no formulário, para o React
+criar um componente novo — e um estado novo — a cada pedido. A segunda é a que a Ana escolheu, e ela não
+precisou de um único <code>useEffect</code>.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="1"><p class="mc-q">1. O total do pedido pode ser calculado a partir da quantidade e do preço. O que fazer?</p>
+<label><input type="radio" name="q1"> calcular na renderização, sem estado e sem efeito</label>
+<label><input type="radio" name="q1"> guardar em um estado e atualizar com um efeito</label>
+<label><input type="radio" name="q1"> guardar em um <code>useRef</code> e atualizar no clique</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que o segundo clique não dispara o efeito do sinalizador?</p>
+<label><input type="radio" name="q2"> porque o efeito só pode rodar uma vez por componente</label>
+<label><input type="radio" name="q2"> porque o React desliga efeitos depois do primeiro clique</label>
+<label><input type="radio" name="q2"> porque <code>true</code> para <code>true</code> não é mudança, e sem mudança não há nova renderização</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. Qual destes é um uso legítimo de <code>useEffect</code>?</p>
+<label><input type="radio" name="q3"> somar os itens do carrinho para mostrar o total</label>
+<label><input type="radio" name="q3"> assinar o evento de redimensionar a janela, com cleanup</label>
+<label><input type="radio" name="q3"> copiar uma prop para um estado quando o componente nasce</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: sem efeito, por favor</h2>
+<p>Complete as duas linhas. Na primeira, o total é calculado na renderização a partir de
+<code>paes</code> (cada pão custa 12). Na segunda, o formulário recomeça do zero quando o cliente muda,
+usando a prop especial que o React lê para recriar o componente:</p>
+<div class="ex-code">const total = <input aria-label="resposta 1" data-answer="paes * 12|paes*12" placeholder="...">;
+&lt;Formulario <input aria-label="resposta 2" data-answer="key" placeholder="...">={cliente} /&gt;</div>
+<p class="ex-dica">Dica: a primeira resposta é a conta que substitui o estado e o efeito. A segunda é o
+nome da prop que, quando muda, faz o React desmontar o componente antigo e criar um novo — com o estado
+zerado.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O <code>useEffect</code> existe para uma coisa só: sincronizar o componente com algo que o React não
+controla. Ele roda depois do desenho, então não serve para calcular o que a tela mostra agora. Quando o
+valor sai de outros valores, calcule na renderização; quando a ação nasce de um clique, escreva no
+handler; quando o dado já chegou por prop, use a prop. Os três casos desta aula são as três formas de
+dizer a mesma frase: <strong>se dá para calcular, não guarde; se nasceu de um evento, trate no
+evento</strong>.</p>
+
+<p>Os sintomas ajudam a reconhecer o problema em código que já existe. Valor um passo atrás é estado
+calculável virou estado guardado. Segundo clique sem efeito é sinalizador que não volta. Laço com
+"Maximum update depth exceeded" é efeito gravando o estado que ele observa. Pedido enviado duas vezes é
+efeito reagindo a uma ação. Em todos, a correção é mudar o lugar do trabalho, não ajustar a lista de
+dependências até o erro sumir.</p>
+
+<p>E o efeito continua tendo o seu lugar. Título da aba, timer, assinatura de evento, leitura do
+<code>localStorage</code>, busca na rede: coisas de fora, com dependências honestas e cleanup. O que
+muda com esta aula é o critério. Antes, "preciso que algo aconteça quando X mudar" virava efeito por
+reflexo. Agora vira uma pergunta: X é uma conta, um clique ou o mundo de fora? A resposta decide o
+lugar, e o código fica menor em todos os casos.</p>
+
+<p>Vale reparar no que a Ana ganhou: o painel deixou de piscar, o segundo pedido passou a ser enviado e
+o preço acompanha a tabela. Nenhuma linha nova foi escrita — várias foram apagadas. Esse é um bom sinal
+em React: quase toda vez que você tira um estado desnecessário, o componente fica menor, mais rápido e
+mais fácil de explicar para outra pessoa.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Efeito é para falar com o que está fora do React: rede, disco, timer, DOM.</li>
+<li>Valor que sai de outros valores: calcule na renderização, sem <code>useState</code>.</li>
+<li>Ação da pessoa: trate no handler do evento, não em um efeito.</li>
+<li>Prop que já é o dado: use a prop; não copie para estado.</li>
+<li>Formulário que precisa recomeçar: <code>key={cliente}</code>, sem efeito.</li>
+<li>Sinalizador booleano que não volta é a causa do "só funciona na primeira vez".</li>
+<li>Efeito que grava o estado que ele observa dá "Maximum update depth exceeded".</li>
+<li>Efeito legítimo tem verbo de fora e cleanup: timer, assinatura, busca, <code>localStorage</code>.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

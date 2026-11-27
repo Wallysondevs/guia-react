@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atributos e className | Guia React</title>
+<meta name="description" content="Como os atributos do HTML viram props no JSX: className no lugar de class, htmlFor no lugar de for, style como objeto e os atributos que ligam e desligam.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Atributos e <span class="hl">className</span></h1>
+
+<p class="intro">A Ana copiou para o JSX o cartão que já existia no site da padaria — o mesmo HTML de
+sempre, com <code>class</code>, <code>style</code> e um botão desabilitado. Na tela, o cartão apareceu
+sem a moldura, o preço saiu preto em vez de vermelho e o botão de comprar nasceu travado. Nada disso era
+erro de digitação: eram atributos escritos do jeito do HTML, num lugar onde o React lê atributos do jeito
+dele. Esta aula é sobre essa tradução — o que muda de nome, o que muda de tipo e o que continua igual.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como um atributo do HTML vira uma prop do React.</li>
+  <li>Por que <code>className</code> e não <code>class</code>.</li>
+  <li>Quando o valor vai entre aspas e quando vai entre chaves.</li>
+  <li>Por que <code>style</code> precisa de objeto.</li>
+  <li>A diferença entre <code>disabled="false"</code> e <code>disabled={false}</code>.</li>
+  <li>Atributos que não mudam de nome: <code>data-*</code>, <code>aria-*</code>, <code>href</code>.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o cartão que perdeu a moldura</h2>
+
+<p>O cartão da padaria, no site antigo, era um <code>div</code> com a classe <code>cartao</code>. O CSS
+dava a ele moldura, sombra e um respiro interno. No React, o mesmo <code>class="cartao"</code> deveria
+bastar. A Ana colou o bloco no <code>return</code> do componente, salvou e voltou ao navegador: o texto
+estava lá, mas sem moldura nenhuma, encostado na margem.</p>
+
+<p>Ela abriu o inspetor do navegador e viu o culpado: o <code>div</code> não tinha classe. O React não
+tinha aplicado o atributo. E o motivo não é capricho — no JSX, o que fica entre o nome da tag e o
+<code>&gt;</code> não é um atributo de HTML: é uma <strong>prop</strong>, um dado que o React vai entregar
+ao elemento. O elemento que representa uma tag comum repassa essas props para o DOM, mas com os nomes que
+ele conhece.</p>
+
+<p>Por isso a aula tem duas metades. A primeira é o nome: alguns atributos mudam de nome no JSX, e o caso
+mais famoso é o da classe. A segunda é o tipo do valor: alguns atributos que no HTML aceitam qualquer
+texto, no React esperam um valor de outro tipo — e aí a string silenciosamente não serve.</p>
+
+<h2>2. Atributo, prop e o que o React faz com eles</h2>
+
+<p>Um componente é uma função, e as props que ele recebe são um objeto. Quando você escreve
+<code>&lt;div className="cartao"&gt;</code>, o React monta <code>{ className: "cartao" }</code> e entrega
+ao elemento <code>div</code>. O elemento sabe quais props viram atributos de HTML, quais viram
+propriedades do DOM e quais ele deve tratar de um jeito especial. <code>className</code> vira
+<code>class</code>; <code>style</code> vira um conjunto de propriedades de estilo; <code>onClick</code>
+vira um ouvinte de evento.</p>
+
+<dl class="anatomy">
+<dt>prop</dt>
+<dd>O dado que você passa para um componente ou elemento, escrito como <code>nome=valor</code> dentro da
+tag.</dd>
+<dt>atributo</dt>
+<dd>O que aparece no HTML final, dentro da tag: <code>class="cartao"</code>, <code>href="..."</code>.</dd>
+<dt>className</dt>
+<dd>A prop do React que corresponde ao atributo <code>class</code> do HTML.</dd>
+<dt>valor literal</dt>
+<dd>Texto entre aspas duplas: <code>"cartao"</code>. Vai para o atributo como está.</dd>
+<dt>expressão</dt>
+<dd>Valor entre chaves: <code>{cor}</code>. O React calcula e usa o resultado.</dd>
+</dl>
+
+<p>A consequência prática é que você pode fazer com atributos tudo o que já sabe fazer com expressões:
+usar variável, fazer conta, escolher com ternário. <code>className={ativo ? "cartao ativo" : "cartao"}</code>
+funciona, e é assim que se muda a aparência de um item selecionado. Só que a porta das chaves só existe
+no lado do React — no HTML puro, atributo é sempre texto.</p>
+
+<h2>3. <code>className</code>, o nome que o React usa</h2>
+
+<p>O motivo histórico é curto: <code>class</code> é palavra reservada do JavaScript, e o JSX é traduzido
+para JavaScript. Cem anos de código React usaram <code>className</code> por isso, e é o nome que
+documentação, exemplos e bibliotecas usam até hoje. Desde o React 19, escrever <code>class</code> em uma
+tag comum também chega ao DOM — o React passou a repassar atributos desconhecidos —, mas o nome oficial
+continua sendo <code>className</code>, e é ele que você deve usar.</p>
+
+<p>A missão abaixo é curta de propósito: o cartão precisa de duas classes, e o valor precisa entrar pela
+porta do React.</p>
+
+<div class="tryreact" data-goal="attr:.cartao|class=cartao destaque">
+  <p class="try-task">O cartão tem só a classe <code>cartao</code>, e ela está escrita do jeito do HTML.
+  Use <code>className</code> e acrescente a classe <code>destaque</code>:
+  <code>className="cartao destaque"</code>.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;div class="cartao"&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pão quentinho saindo do forno&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div class="cartao"&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Pão quentinho saindo do forno&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  return (
+    &lt;div className="cartao destaque"&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pão quentinho saindo do forno&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A prévia desta página não carrega o CSS da padaria, então o cartão não fica com moldura nem aqui nem
+lá — o que se confere é o atributo no HTML gerado, e é isso que o painel mostra. Esse é um bom hábito:
+quando o visual não muda, olhe o HTML antes de suspeitar do CSS.</p>
+
+<pre class="term">&lt;div class="cartao destaque"&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Pão quentinho saindo do forno&lt;/p&gt;
+&lt;/div&gt;</pre>
+
+<p>Repare no que o painel exibe: <code>className</code> virou <code>class</code>. A tradução acontece na
+hora de desenhar. Se você inspecionar o elemento no navegador, vai ver a mesma coisa — e é por isso que o
+CSS antigo continua válido, sem uma linha de mudança.</p>
+
+<p>Uma sutileza que vale guardar: <code>className</code> é uma prop como qualquer outra. Se o valor vier
+de uma variável, use chaves: <code>className={classe}</code>. Se vier vazio, o atributo desaparece do HTML
+em vez de virar <code>class=""</code> — comportamento diferente de <code>className=""</code>, que produz
+um atributo vazio. E um número entre chaves é convertido para texto: <code>className={2}</code> gera
+<code>class="2"</code>.</p>
+
+<h2>4. A tabela de conversões</h2>
+
+<p>Poucos atributos mudam de nome, e os que mudam são justamente os mais usados. A tabela abaixo cobre os
+que aparecem em qualquer projeto; o resto continua igual e você pode escrever como sempre escreveu.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No HTML</th><th>No JSX</th><th>Por quê</th></tr>
+<tr><td><code>class</code></td><td><code>className</code></td><td><code>class</code> é palavra reservada do JavaScript</td></tr>
+<tr><td><code>for</code></td><td><code>htmlFor</code></td><td>mesma razão: <code>for</code> também é do JavaScript</td></tr>
+<tr><td><code>tabindex</code></td><td><code>tabIndex</code></td><td>atributos compostos viram camelCase</td></tr>
+<tr><td><code>maxlength</code></td><td><code>maxLength</code></td><td>idem, e vale para <code>readOnly</code>, <code>autoComplete</code></td></tr>
+<tr><td><code>onclick</code></td><td><code>onClick</code></td><td>evento recebe função, não texto</td></tr>
+<tr><td><code>style="color: red"</code></td><td><code>style={{ color: "red" }}</code></td><td><code>style</code> espera um objeto</td></tr>
+<tr><td><code>data-*</code> e <code>aria-*</code></td><td>igual</td><td>o React repassa como estão</td></tr>
+<tr><td><code>href</code>, <code>src</code>, <code>alt</code>, <code>id</code></td><td>igual</td><td>nomes simples não mudam</td></tr>
+</table>
+</div>
+
+<p>O critério para decorar é simples: se o nome é uma palavra do JavaScript (<code>class</code>,
+<code>for</code>) ou é composto por mais de uma palavra (<code>tabindex</code>, <code>maxlength</code>),
+ele muda. Se é uma palavra só e não é reservada, fica igual. E os que começam com <code>data-</code> ou
+<code>aria-</code> são uma exceção explícita à regra do camelCase: eles foram feitos para serem escritos
+com hífen, e o React os respeita.</p>
+
+<p>Um atalho para quem está convertendo uma página inteira de HTML para JSX: traduza só três nomes —
+<code>class</code>, <code>for</code> e <code>style</code> — e rode. O que estiver errado no resto costuma
+aparecer no painel com o número da linha. Fazendo isso em uma página de cada vez, o trabalho rende e você
+não precisa decorar a tabela de uma vez: depois de três ou quatro conversões, <code>className</code> sai
+sem pensar.</p>
+
+<p>O caso dos eventos merece um aviso, porque a falha é silenciosa: <code>onclick="..."</code> com texto é
+descartado, e <code>onclick={() =&gt; ...}</code> com a letra minúscula também. O React só reconhece o
+nome <code>onClick</code>, com C maiúsculo, recebendo uma função. O comportamento em si tem aula própria
+mais adiante; aqui basta saber que este é um atributo em que errar a caixa da letra custa o evento
+inteiro.</p>
+
+<h2>5. Valor com aspas ou valor com chaves</h2>
+
+<p>Toda prop tem um valor, e esse valor pode chegar de dois jeitos. Entre aspas, ele é texto e vai como
+está: <code>alt="Pão quentinho"</code>. Entre chaves, ele é JavaScript e o React usa o resultado:
+<code>alt={descricao}</code>. A regra é essa e não tem exceção — inclusive para números, que precisam de
+chaves (<code>tabIndex={2}</code> produz <code>tabindex="2"</code>).</p>
+
+<p>Três detalhes economizam depuração. Primeiro: aspas dentro de aspas não funcionam; se o texto tem
+aspas, use chaves com uma string: <code>title={"O pão d'água"}</code>. Segundo: chaves com texto precisam
+das aspas da string dentro delas — <code>className={"cartao"}</code> é válido, e <code>className={cartao}</code>
+procura uma variável chamada <code>cartao</code>. Terceiro: valor booleano não precisa de nada,
+<code>disabled</code> sozinho já significa verdadeiro — como no HTML.</p>
+
+<p>Há um caso em que a diferença entre os dois jeitos é visível: atributo vazio. <code>alt=""</code> é
+texto vazio e produz <code>alt=""</code> no HTML, o que é correto para imagem decorativa. Já
+<code>alt={undefined}</code> faz o atributo desaparecer. São intenções diferentes, e o navegador trata as
+duas de forma diferente também — leitor de tela ignora a imagem decorativa e reclama da imagem sem
+descrição.</p>
+
+<h2>6. <code>style</code> é um objeto, não uma string</h2>
+
+<p>Este é o atributo que mais derruba iniciante, porque a falha é total: a tela fica vazia. No HTML,
+<code>style</code> é texto com declarações CSS. No React, <code>style</code> é um objeto JavaScript em que
+cada chave é uma propriedade de estilo. Passar texto não é convertido: o componente quebra, e o painel
+avisa que nada foi desenhado.</p>
+
+<div class="tryreact" data-goal="css:#alvo|color=rgb(255, 0, 0)">
+  <p class="try-task">O parágrafo do preço usa <code>style="color: red"</code>, do jeito do HTML, e a
+  prévia fica em branco. Troque por um objeto: <code>style={{ color: "red" }}</code>.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p id="alvo" style="color: red"&gt;Pão quentinho&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+(o React não desenhou nada: o componente devolveu null?)
+</pre>
+  <pre class="solucao">function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p id="alvo" style={{ color: "red" }}&gt;Pão quentinho&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>As duas chaves duplas não são um operador novo: são as chaves do JSX (esta prop recebe um valor
+calculado) envolvendo as chaves do objeto (o valor é um objeto). Ler como "entregue este objeto" resolve o
+susto. As chaves do objeto são nomes de propriedade CSS em camelCase: <code>backgroundColor</code>,
+<code>fontSize</code>, <code>borderRadius</code>. O valor é texto, com unidade: <code>"12px"</code>,
+<code>"1rem"</code>, <code>"50%"</code>.</p>
+
+<p>Sobre números: quando a propriedade aceita comprimento, o React acrescenta <code>px</code> sozinho.
+<code>style={{ width: 100 }}</code> vira <code>width: 100px</code>; já <code>style={{ opacity: 0.5 }}</code>
+não ganha unidade, porque opacidade é um número puro. Na dúvida, escreva a unidade você mesmo — é o que
+todo exemplo da documentação faz, e não deixa ambiguidade.</p>
+
+<pre class="term">&gt; document.querySelector("#alvo").style.color
+'rgb(255, 0, 0)'
+&gt; document.querySelector("#alvo").getAttribute("style")
+'color: red;'</pre>
+
+<p>O console mostra as duas caras do mesmo estilo: a propriedade do DOM devolve o valor normalizado pelo
+navegador, e o atributo devolve o texto que o React escreveu. As duas linhas provam que o objeto virou
+declaração CSS de verdade.</p>
+
+<p>Uma vantagem do objeto que o texto não tem: ele aceita variável de CSS. As chaves de costume são
+propriedades do CSS em camelCase, mas nomes que começam com dois hífens passam como estão —
+<code>style={{ "--cor": cor, color: "var(--cor)" }}</code> grava a variável no elemento e a usa na linha
+seguinte. É o jeito mais direto de deixar uma cor vir de um dado sem escrever uma folha de estilo para
+cada combinação.</p>
+
+<p>Quando usar <code>style</code>? Em casos pontuais, que dependem de dado: a cor de um selo calculada a
+partir de um estado, a largura de uma barra de progresso, uma animação simples. Para o visual do dia a dia,
+classe em folha de estilo é melhor: reaproveita, não polui o JSX e permite <code>:hover</code>, media
+query e transição. E existe um limite honesto: <code>style</code> não escreve pseudo-classe nem media
+query, então o que precisa dessas coisas tem de ser classe.</p>
+
+<h2>7. Atributos que ligam e desligam</h2>
+
+<p>Alguns atributos do HTML não carregam informação, apenas estado: <code>disabled</code>,
+<code>required</code>, <code>readOnly</code>, <code>hidden</code>. A presença vale mais que o valor — o
+botão está desabilitado, ponto. É aí que a string atrapalha: <code>disabled="false"</code> não significa
+"não desabilitado", significa "o atributo está aqui", e o botão fica travado do mesmo jeito.</p>
+
+<div class="tryreact" data-goal="conta:button[disabled]=0">
+  <p class="try-task">O botão de comprar nasceu travado. O código diz <code>disabled="false"</code>, mas o
+  atributo presente já desabilita. Troque por <code>disabled={false}</code> para que o botão funcione.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;button disabled="false"&gt;Comprar pão&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;button disabled=""&gt;Comprar pão&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;button disabled={false}&gt;Comprar pão&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Com chaves, o React olha o valor booleano: <code>false</code> remove o atributo, <code>true</code> o
+coloca. É esse mecanismo que permite ligar e desligar o botão a partir de um dado — estoque vazio, pedido
+já enviado, formulário incompleto. Com string, essa possibilidade não existe, porque toda string é
+verdadeira, inclusive <code>"false"</code>.</p>
+
+<p>O mesmo raciocínio vale para <code>required</code> em campo de formulário e para
+<code>readOnly</code> em campo preenchido pelo sistema. E vale também para o contrário: para <em>ligar</em>
+o estado, escrever o nome sozinho é o atalho (<code>&lt;button disabled&gt;</code>), e é equivalente a
+<code>disabled={true}</code>. Escrever <code>disabled="disabled"</code>, como se fazia no HTML antigo,
+também funciona, mas é ruído.</p>
+
+<h2>8. Os que não mudam e os que enganam</h2>
+
+<p>A maior parte dos atributos atravessa o JSX sem tradução. <code>href</code>, <code>src</code>,
+<code>alt</code>, <code>title</code>, <code>id</code>, <code>lang</code>, <code>target</code>,
+<code>placeholder</code>, <code>type</code> — todos iguais. Os que começam com <code>data-</code> e
+<code>aria-</code> também, e isso é sorte: são justamente os que carregam dado extra e informação de
+acessibilidade, e mudar de nome neles quebraria bibliotecas inteiras.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Atributo</th><th>Como escrever</th><th>Quando usar</th></tr>
+<tr><td><code>data-*</code></td><td><code>data-acao="comprar"</code></td><td>guardar dado no elemento para scripts e testes</td></tr>
+<tr><td><code>aria-*</code></td><td><code>aria-label="Comprar pão"</code></td><td>dar nome a um botão que só tem ícone</td></tr>
+<tr><td><code>alt</code></td><td><code>alt="Pão quentinho"</code></td><td>descrever imagem; vazio se for decorativa</td></tr>
+<tr><td><code>id</code></td><td><code>id="alvo"</code></td><td>ligar <code>label</code> a campo e apontar âncora</td></tr>
+<tr><td><code>hidden</code></td><td><code>hidden={escondido}</code></td><td>tirar do layout sem CSS</td></tr>
+</table>
+</div>
+
+<p>Agora a parte que engana. O React 19 repassa atributos desconhecidos para o DOM, então um erro de
+digitação no nome não gera erro: ele vira um atributo esquisito no HTML e a classe não é aplicada. O
+inspetor mostra <code>clases="cartao"</code> e o CSS não tem o que fazer com isso. É a falha mais difícil
+de achar, porque o código parece certo e nada reclama.</p>
+
+<pre class="term">&gt; document.querySelector("button").getAttribute("onclick")
+null
+&gt; document.querySelector("div").getAttribute("clases")
+'cartao'</pre>
+
+<p>A primeira linha mostra o <code>onclick</code> escrito como texto sendo descartado — o React não cria
+atributo de evento; ele espera a prop <code>onClick</code> com uma função. A segunda mostra o erro de
+digitação preservado no DOM. As duas lições: confira o nome no HTML gerado, e desconfie de atributo que
+existe no inspetor mas não faz efeito.</p>
+
+<p>Um último cuidado com acessibilidade, porque é barato e faz diferença: <code>aria-label</code> não é
+enfeite. Um botão que mostra só um ícone precisa de nome, e o nome vem daí. Um campo precisa de
+<code>label</code> ligado por <code>htmlFor</code> ao <code>id</code> do campo — no React o atributo do
+rótulo é <code>htmlFor</code>, e é o único lugar em que <code>for</code> aparece com outro nome.</p>
+
+<p>Por fim, três props que nunca viram atributo: <code>key</code>, <code>children</code> e
+<code>ref</code>. Elas são do React, não do HTML. <code>children</code> é o conteúdo entre as tags;
+<code>key</code> identifica itens de lista, e o React a consome sem escrever nada no elemento;
+<code>ref</code> guarda uma ligação direta com o elemento do DOM. Procurar <code>key="1"</code> no
+inspetor é perda de tempo — ele está no React, não no HTML.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a classe que não chega no componente</h3>
+<p>A Ana criou um componente <code>Cartao</code> e usou <code>&lt;Cartao className="cartao" /&gt;</code>.
+Nada mudou na tela. O motivo não é o nome: <code>className</code> é uma prop, e o componente precisa
+repassá-la ao elemento que desenha — com <code>&lt;div className={props.className}&gt;</code> ou com
+<code>&lt;div {...props}&gt;</code>. Sem isso, a prop chega e morre. É a diferença entre um atributo de
+tag comum, que o React aplica sozinho, e uma prop de componente, que é decisão de quem escreveu o
+componente.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o preço que sumiu junto com o parágrafo</h3>
+<p>Ela colou <code>style="color: red"</code> no parágrafo do preço e a página inteira ficou vazia. Não é
+o CSS que está errado: o componente quebra antes de desenhar, porque <code>style</code> com texto não é
+aceito. O conserto é trocar por objeto — <code>style={{ color: "red" }}</code> — e o hábito que evita o
+susto é conferir o painel depois de colar código de outro lugar: HTML copiado costuma trazer
+<code>class</code> e <code>style</code> no formato antigo.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o botão que nunca habilita</h3>
+<p>O código já calculava o estoque e escrevia <code>disabled={quantidade === 0}</code>, mas o botão
+continuava travado. A causa estava uma linha acima: o valor chegava como texto, vindo de um formulário,
+e <code>"0" === 0</code> é falso em JavaScript. Com o tipo certo, o botão passou a responder. Atributo
+booleano só funciona com booleano de verdade — e o caminho até o booleano é conferir o tipo do dado, não o
+atributo.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Qual é a prop do React que corresponde ao atributo
+<code>class</code> do HTML?</p>
+<label><input type="radio" name="q1"> <code>class</code>, igual ao HTML</label>
+<label><input type="radio" name="q1"> <code>className</code></label>
+<label><input type="radio" name="q1"> <code>cssClass</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Como se escreve o estilo em linha no JSX?</p>
+<label><input type="radio" name="q2"> <code>style="color: red"</code></label>
+<label><input type="radio" name="q2"> <code>style={"color: red"}</code></label>
+<label><input type="radio" name="q2"> <code>style={{ color: "red" }}</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que faz o atributo <code>disabled="false"</code> em um
+botão?</p>
+<label><input type="radio" name="q3"> desabilita: o atributo presente já basta</label>
+<label><input type="radio" name="q3"> habilita, porque o valor é "false"</label>
+<label><input type="radio" name="q3"> nada, porque o React recusa strings</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: traduzir o atributo</h2>
+<p>O HTML antigo da padaria tinha <code>&lt;div class="cartao"&gt;</code>. No JSX, o nome da prop muda.
+Complete com o nome correto:</p>
+<div class="ex-code">&lt;div <input aria-label="resposta 1" data-answer="className" placeholder="...">="cartao"&gt;Pão quentinho&lt;/div&gt;</div>
+<p class="ex-dica">Dica: é <code>className</code>, com C e N maiúsculos, sem hífen e sem ponto. O valor
+continua sendo texto entre aspas, e no HTML final o atributo aparece como <code>class="cartao"</code>.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Atributo no JSX é prop, e prop tem nome e tipo. O nome muda em três situações: palavra reservada
+(<code>class</code> vira <code>className</code>, <code>for</code> vira <code>htmlFor</code>), nome composto
+(<code>tabindex</code> vira <code>tabIndex</code>, <code>maxlength</code> vira <code>maxLength</code>) e
+evento (<code>onclick</code> vira <code>onClick</code>, com função em vez de texto). Os que começam com
+<code>data-</code> ou <code>aria-</code> não mudam, e os nomes simples também não.</p>
+
+<p>O tipo depende de como o valor é escrito. Entre aspas, é texto literal. Entre chaves, é JavaScript
+calculado — e isso vale para número, variável, ternário e string montada. Dois atributos têm tipo
+obrigatório: <code>style</code> quer um objeto com propriedades em camelCase, e atributo de estado
+(<code>disabled</code>, <code>required</code>, <code>readOnly</code>) quer booleano de verdade, porque
+<code>"false"</code> é texto e texto presente já liga o estado.</p>
+
+<p>E a armadilha que fecha a aula: o React 19 é tolerante com atributo desconhecido e o repassa ao DOM.
+Um nome digitado errado não dá erro — vira atributo inútil, e o CSS não acha a classe. Quando o visual
+não responde, a ordem de investigação é HTML gerado, depois tipo do valor, e só então o CSS.</p>
+
+<p>Na próxima aula o assunto sai da marcação e vai para a ferramenta: criar o projeto de verdade no
+computador, com Node, Vite e o servidor que recarrega a página sozinho.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>class</code> no HTML é <code>className</code> no React.</li>
+<li><code>for</code> vira <code>htmlFor</code>; compostos viram camelCase.</li>
+<li>Aspas para texto, chaves para valor calculado.</li>
+<li><code>style</code> recebe objeto: <code>{{ color: "red" }}</code>.</li>
+<li>Número em estilo ganha <code>px</code> quando faz sentido.</li>
+<li><code>disabled="false"</code> ainda desabilita; use <code>{false}</code>.</li>
+<li><code>data-*</code> e <code>aria-*</code> ficam iguais.</li>
+<li>Prop de componente só chega ao DOM se for repassada.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

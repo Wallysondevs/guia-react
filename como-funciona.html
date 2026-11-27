@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Como Ele Funciona | Guia React</title>
+<meta name="description" content="O caminho de um componente React: JSX transformado em chamadas de função, o elemento como objeto, o createRoot que monta no DOM e a comparação que atualiza só o que mudou.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Como Ele <span class="hl">Funciona</span></h1>
+
+<p class="intro">Na aula passada a Ana entendeu <em>por que</em> usar React. Agora ela quer saber
+<em>como</em>: o que acontece entre o clique em Rodar e aquele HTML aparecendo no painel? Se você já
+ficou incomodado com a sensação de que React é mágica, esta aula é o truque revelado. Não tem mágica
+nenhuma: tem uma tradução, um objeto, uma raiz e uma comparação. Quatro passos, todos visíveis se você
+souber onde olhar.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que o JSX vira depois de traduzido, e quem faz essa tradução.</li>
+  <li>Que o JSX não cria a tela: ele cria um <strong>objeto</strong> que descreve a tela.</li>
+  <li>O papel do <code>react-dom</code>: pegar esse objeto e montar no navegador.</li>
+  <li>O que é a raiz (<code>createRoot</code>) e a linha de <code>render</code> que liga tudo.</li>
+  <li>Quem chama o seu componente — e por que não é você.</li>
+  <li>Como o React atualiza só o que mudou, em vez de redesenhar a página.</li>
+</ul>
+</div>
+
+<h2>1. A cena: entre o clique e o HTML</h2>
+
+<p>O botão Rodar já foi clicado umas trinta vezes na frente da Ana, e ela nunca pensou no que acontece
+nesse meio. O texto que ela escreveu vira HTML na tela; parece direto, mas não é. Entre o código e o
+painel existem quatro estações, e cada uma faz um trabalho diferente.</p>
+
+<p>Entender essas estações resolve três tipos de dúvida que voltam sempre: por que existe um passo de
+"compilar", por que o React reclama de alguma coisa que parece certa, e por que a tela não pisca
+inteira quando um número muda. É o tipo de conhecimento que não muda o seu dia hoje e economiza um dia
+inteiro no futuro.</p>
+
+<p>Vamos por partes, na ordem em que as coisas acontecem.</p>
+
+<h2>2. JSX é JavaScript com roupa de HTML</h2>
+
+<p>O bloco abaixo parece HTML. Não é. Repare que ele está dentro de uma função e que o
+<code>return</code> devolve aquilo como se fosse um valor — HTML não funciona assim, e é por isso que
+essa escrita tem nome próprio: <strong>JSX</strong>.</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>O navegador não sabe ler isso. Ele sabe ler JavaScript. Então existe uma ferramenta que traduz o
+JSX para JavaScript antes de qualquer coisa rodar. Aqui no guia essa ferramenta é o <strong>Babel</strong>;
+num projeto de verdade, é um plugin do Vite fazendo o mesmo serviço. Traduzir, nesse caso, é bem
+literal: cada tag vira uma chamada de função.</p>
+
+<pre class="file" data-file="App.js (o que o Babel gera)">function App() {
+  return React.createElement("div", {
+    className: "cartao"
+  }, React.createElement("h1", null, "Padaria da Ana"), React.createElement("p", null, "Aberto das 6h às 18h"));
+}</pre>
+
+<p>Essa é a tradução de verdade, sem enfeite. Os comentários que o Babel costuma colocar
+(<code>/*#__PURE__*/</code>) foram removidos para não atrapalhar a leitura. Repare no formato de
+<code>createElement</code>: primeiro o tipo (<code>"div"</code>), depois os atributos
+(<code>{ className: "cartao" }</code>) e depois os filhos, um a um. Aquele <code>null</code> ali é onde
+ficariam atributos quando não há nenhum.</p>
+
+<p>É por isso que o JSX não é HTML: ele é uma <em>escrita mais curta</em> para essas chamadas. O
+navegador nunca vê o seu <code>&lt;div className="cartao"&gt;</code>; ele vê o resultado da tradução.
+Guardar isso explica metade dos erros de sintaxe do guia: o compilador reclama do JSX porque é ele quem
+precisa dar conta da tradução, e algumas coisas que o HTML aceita não têm tradução válida.</p>
+
+<h2>3. O JSX vira um objeto simples</h2>
+
+<p>Agora o passo que mais surpreende: <code>React.createElement</code> não cria um elemento na página.
+Ele devolve um <strong>objeto</strong> — uma descrição do que você quer. Esse objeto tem três campos,
+e só isso: o tipo, os atributos e os filhos.</p>
+
+<p>Dá para ver com os próprios olhos. No código abaixo, o JSX é guardado em uma variável e impresso no
+console antes de ser devolvido:</p>
+
+<div class="tryreact" data-goal="console:&quot;type&quot;:&quot;h1&quot;;;console:Pão quentinho;;html:&lt;h1&gt;">
+  <p class="try-task">Guarde o JSX em <code>titulo</code> e mande o elemento inteiro para o console com
+  <code>console.log(titulo)</code>. Depois imprima também o texto de dentro:
+  <code>console.log(titulo.props.children)</code>.</p>
+  <pre class="jsx">function App() {
+  const titulo = &lt;h1&gt;Pão quentinho&lt;/h1&gt;;
+  return titulo;
+}</pre>
+  <pre class="out">
+&lt;h1&gt;Pão quentinho&lt;/h1&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const titulo = &lt;h1&gt;Pão quentinho&lt;/h1&gt;;
+  console.log(titulo);
+  console.log(titulo.props.children);
+  return titulo;
+}</pre>
+</div>
+
+<p>O painel mostra o HTML e, embaixo, o que foi para o console. A primeira linha do console é o objeto
+inteiro, e é ela que interessa:</p>
+
+<pre class="term">console: {"type":"h1","key":null,"ref":null,"props":{"children":"Pão quentinho"}}
+console: Pão quentinho</pre>
+
+<p>Leia com calma, porque é o coração da aula. Não há DOM ali, não há página, não há HTML: há um objeto
+com <code>type</code> valendo <code>"h1"</code> e um <code>props</code> com
+<code>children</code> valendo <code>"Pão quentinho"</code>. Se você quisesse, poderia escrever esse
+objeto à mão — o React aceitaria do mesmo jeito. O JSX é só um jeito confortável de montá-lo.</p>
+
+<p>Isso tem uma consequência importante: criar um elemento React é <em>barato</em>. É só um objeto na
+memória do JavaScript. Você pode criar milhares deles sem tocar na tela. Quem toca na tela é a próxima
+estação.</p>
+
+<dl class="anatomy">
+<dt>elemento</dt>
+<dd>O objeto que descreve uma peça da tela: <code>{ type, props }</code>. Não é o nó do DOM; é a
+receita dele.</dd>
+<dt>componente</dt>
+<dd>A função que devolve elementos. Quando o <code>type</code> de um elemento é uma função, o React a
+chama para saber o que vem no lugar.</dd>
+<dt>raiz (root)</dt>
+<dd>O ponto da página onde o React manda montar. É um elemento do HTML escolhido por você.</dd>
+<dt>react-dom</dt>
+<dd>A parte do React que conversa com o navegador: transforma elementos em nós de verdade e atualiza o
+DOM.</dd>
+<dt>reconciliação</dt>
+<dd>A comparação entre a descrição anterior e a nova, para descobrir o mínimo a mudar no DOM.</dd>
+</dl>
+
+<h2>4. Quem desenha o objeto é o react-dom</h2>
+
+<p>Se o elemento é só um objeto, alguém precisa pegar esse objeto e construir elementos de verdade na
+página. Esse alguém é o <strong>react-dom</strong>, a parte do React feita para o navegador. O
+<code>react</code> cuida de componentes, elementos e estado; o <code>react-dom</code> cuida da página.</p>
+
+<p>A divisão não é detalhe de organização: é o que permite o mesmo React desenhar em lugares
+diferentes. No celular, o react-native faz o papel do react-dom criando componentes nativos em vez de
+tags. No servidor, outra peça gera uma string de HTML. O núcleo é o mesmo — muda quem desenha.</p>
+
+<p>Para o react-dom trabalhar, ele precisa de duas informações: <em>o que</em> desenhar (o elemento) e
+<em>onde</em> desenhar (a raiz). O "onde" é um elemento do HTML, geralmente uma
+<code>div</code> vazia com um id. É ali que o React vai morar: ele não toma conta da página inteira,
+toma conta daquele pedaço.</p>
+
+<p>Aqui no guia, a caixa já tem esse pedaço pronto: uma <code>&lt;div id="raiz"&gt;&lt;/div&gt;</code>
+esperando. Por isso, no modo normal, você só escreve o componente e o motor faz a ligação. No modo
+manual, você mesmo escreve a ligação — e é o que vamos fazer agora.</p>
+
+<h2>5. A raiz e a linha que monta</h2>
+
+<p>Este é o trecho que existe em todo projeto React do mundo, geralmente em um arquivo chamado
+<code>main.jsx</code>. Duas linhas: uma cria a raiz, a outra manda desenhar. No código abaixo, a
+segunda está faltando — e sem ela, nada aparece.</p>
+
+<div class="tryreact" data-modo="manual" data-goal="texto:Padaria da Ana;;conta:#raiz>h1=1">
+  <p class="try-task">A raiz já foi criada, mas ninguém mandou desenhar. Acrescente a linha
+  <code>root.render(&lt;App /&gt;);</code> no fim do arquivo.</p>
+  <pre class="jsx">function App() {
+  return &lt;h1&gt;Padaria da Ana&lt;/h1&gt;;
+}
+
+const raiz = document.getElementById("raiz");
+const root = ReactDOM.createRoot(raiz);</pre>
+  <pre class="out">
+(o React não desenhou nada: o componente devolveu null?)
+</pre>
+  <pre class="solucao">function App() {
+  return &lt;h1&gt;Padaria da Ana&lt;/h1&gt;;
+}
+
+const raiz = document.getElementById("raiz");
+const root = ReactDOM.createRoot(raiz);
+root.render(&lt;App /&gt;);</pre>
+</div>
+
+<p>Antes de rodar, o painel diz que nada foi desenhado. É a verdade: existia uma raiz, mas ninguém pediu
+nada para ela. Depois de acrescentar a linha, o <code>&lt;h1&gt;</code> aparece. Repare também no
+ detalhe de <code>document.getElementById("raiz")</code>: o id tem de ser o mesmo da
+<code>div</code> do HTML. Se errar o nome, o React reclama de um jeito pouco amigável — e a causa quase
+sempre é essa.</p>
+
+<p>Num projeto de verdade, essas linhas aparecem assim, com o <code>import</code> no topo:</p>
+
+<pre class="file" data-file="main.jsx">import { createRoot } from "react-dom/client";
+import App from "./App.jsx";
+
+createRoot(document.getElementById("root")).render(&lt;App /&gt;);</pre>
+
+<p>Duas diferenças em relação à caixa, e as duas são só de arrumação. A primeira: o
+<code>createRoot</code> vem de um <code>import</code>, porque num projeto cada peça é um arquivo. A
+segunda: o id costuma ser <code>root</code>, porque é o que o Vite escreve no
+<code>index.html</code>; aqui a caixa usa <code>raiz</code>. Fora isso, é a mesma ideia:
+<em>pegue o elemento e mande desenhar na raiz</em>.</p>
+
+<h2>6. Quem chama o componente é o React</h2>
+
+<p>Uma coisa que confunde muito: você escreve <code>function App()</code> e nunca escreve
+<code>App()</code> em lugar nenhum. Quem chama é o React, na hora de desenhar. É por isso que o
+componente pode calcular coisas no começo da função: ele está sendo executado, e não apenas
+declarado.</p>
+
+<p>Dá para provar com <code>console.log</code>. No código abaixo, uma linha solta roda assim que o
+arquivo é executado; a linha de dentro do <code>App</code> só roda quando o React vai desenhar. A ordem
+no painel mostra quem manda em quem.</p>
+
+<div class="tryreact" data-goal="console:antes do React montar;;console:App rodou;;texto:Pão quentinho">
+  <p class="try-task">Acrescente <code>console.log("App rodou")</code> dentro do <code>App</code>, antes
+  do <code>return</code>, e rode. Observe a ordem das duas linhas do console.</p>
+  <pre class="jsx">console.log("antes do React montar");
+
+function App() {
+  return &lt;p&gt;Pão quentinho&lt;/p&gt;;
+}</pre>
+  <pre class="out">
+&lt;p&gt;Pão quentinho&lt;/p&gt;
+console: antes do React montar
+</pre>
+  <pre class="solucao">console.log("antes do React montar");
+
+function App() {
+  console.log("App rodou");
+  return &lt;p&gt;Pão quentinho&lt;/p&gt;;
+}</pre>
+</div>
+
+<p>O painel mostra o HTML e, embaixo, as duas linhas na ordem em que aconteceram:</p>
+
+<pre class="term">console: antes do React montar
+console: App rodou</pre>
+
+<p>Primeiro o arquivo inteiro roda — é aí que a função <code>App</code> é só definida, sem executar. Só
+depois o React chama <code>App()</code>, recebe o elemento e monta. Se você escrevesse
+<code>App()</code> você mesmo, teria um elemento solto na mão e nada na tela; a tela só aparece porque
+alguém com acesso ao DOM recebeu aquele elemento.</p>
+
+<p>Esse detalhe explica por que o componente roda <em>de novo</em> cada vez que algo muda: quem decide
+quando chamar é o React, não você. E é também o motivo de o componente precisar ser previsível: mesma
+entrada, mesma descrição de tela.</p>
+
+<p>Há um comportamento que assusta quem está começando e que vale conhecer desde já. Em modo de
+desenvolvimento, um projeto React costuma ligar o <code>StrictMode</code>, um recurso que chama cada
+componente duas vezes de propósito. Não é bug: é um teste. Se o seu componente faz algo com efeito
+colateral — grava em algum lugar, busca dados, altera uma variável de fora —, a segunda chamada
+denuncia o problema na hora. Componente bem-comportado é aquele que, chamado duas vezes com os mesmos
+dados, devolve exatamente a mesma descrição. Aqui nas caixas isso não acontece: cada Rodar é uma
+execução só.</p>
+
+<h2>7. Quando algo muda: comparar e trocar o mínimo</h2>
+
+<p>Volte ao objeto do passo 3. Se os dados mudam, o React chama o componente de novo e recebe uma
+descrição nova — outro objeto, com outro texto. Agora ele tem duas descrições: a antiga e a nova. O
+trabalho passa a ser aplicar só a diferença na página.</p>
+
+<p>Esse é o ponto que faz o React parecer mágico. Sem ele, a saída óbvia seria jogar fora todo o
+conteúdo da raiz e desenhar de novo — o que funciona, mas destrói o que a pessoa estava fazendo: o
+cursor do campo de texto, a posição da rolagem, a animação em andamento. Comparando, o React muda só o
+texto que mudou e o resto fica intacto.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Elemento React (o objeto)</th><th>Nó do DOM (o elemento de verdade)</th></tr>
+<tr><td>vive na memória do JavaScript</td><td>vive na página, dentro do documento</td></tr>
+<tr><td>tem <code>type</code> e <code>props</code></td><td>tem tag, atributos e estilo computado</td></tr>
+<tr><td>é tratado como imutável: para mudar, cria-se outro</td><td>é mutável: dá para alterar com JavaScript</td></tr>
+<tr><td>criar é barato, milhares de uma vez</td><td>mexer é caro: o navegador recalcula o desenho</td></tr>
+<tr><td>não sabe onde está na tela</td><td>sabe a posição, o tamanho e o que está em volta</td></tr>
+<tr><td>é o que o seu componente devolve</td><td>é o que o <code>react-dom</code> constrói a partir dele</td></tr>
+</table>
+</div>
+
+<p>Essa comparação é o que se chama de <strong>reconciliação</strong>. Você não precisa saber o algoritmo
+— e não precisa otimizar nada no começo. O que vale guardar é a consequência prática: no React você
+descreve a tela inteira de novo, sem medo de estar refazendo trabalho, porque quem faz o mínimo é ele.
+Quem tenta "ajudar" mexendo no DOM à mão costuma brigar com esse mecanismo.</p>
+
+<h2>8. O caminho completo, em quatro estações</h2>
+
+<p>Juntando tudo, o percurso de um componente é sempre o mesmo. A tabela abaixo serve como mapa para
+quando algo não aparecer na tela: descubra em qual estação o processo parou.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Estação</th><th>O que existe</th><th>Quem faz</th><th>Sintoma de erro</th></tr>
+<tr><td>1. JSX escrito</td><td>texto no arquivo, ainda não é JavaScript</td><td>você</td><td>erro de sintaxe do compilador</td></tr>
+<tr><td>2. Tradução</td><td>chamadas de <code>React.createElement</code></td><td>Babel (ou Vite)</td><td>"não compilou" com a linha do problema</td></tr>
+<tr><td>3. Elemento</td><td>um objeto <code>{ type, props }</code></td><td><code>react</code></td><td>elemento com tipo errado: aparece texto estranho ou nada</td></tr>
+<tr><td>4. Montagem</td><td>nós de verdade dentro da raiz</td><td><code>react-dom</code></td><td>raiz errada: nada aparece, ou erro do React</td></tr>
+</table>
+</div>
+
+<p>Note que os sintomas são bem diferentes, e é isso que torna o mapa útil. Um erro de sintaxe impede
+até a tradução: o componente nem chega a rodar. Um elemento com tipo errado roda normalmente e desenha
+outra coisa. Uma raiz errada é silenciosa: o componente roda, o objeto é criado, mas não há onde montar.
+São três mundos distintos, e o painel das caixas mostra qual deles você está vivendo.</p>
+
+<p>Para investigar, o console é a ferramenta das estações 3 e 4. Imprimir o elemento mostra o objeto
+da estação 3; imprimir <code>document.getElementById("raiz").innerHTML</code> mostra o que o react-dom
+construiu na estação 4. Comparando os dois, você vê se o problema é o que você <em>pediu</em> ou o que foi
+<em>montado</em>. É primitivo e é o que funciona quando a tela teima.</p>
+
+<p>Tem ainda um quarto caso, mais sutil: nada dá erro, o HTML aparece certo e a tela não muda como você
+esperava. Aí não é falha de React — é a sua descrição que não reflete os dados. Nesse momento vale
+imprimir os dados no console, que é a estação 3 vista por dentro.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: "por que preciso de uma raiz?"</h3>
+<p>A Ana perguntou por que o React não cuida da página inteira. Porque a página pode ter outras coisas:
+um cabeçalho servido por outro sistema, um script de análise, um formulário antigo. A raiz é o contrato:
+"daqui para dentro é meu". Isso também permite ter duas raízes na mesma página — um widget de pedidos no
+meio de um site comum, por exemplo. O React não invade o que não é dele.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: "o HTML que eu escrevo some?"</h3>
+<p>Some, e é proposital. O conteúdo da raiz é substituído pelo que o React desenhar. Se você escrever
+um parágrafo dentro da <code>div</code> da raiz no HTML, ele não vai sobreviver à montagem. Para o
+conteúdo estático, use uma raiz ao lado; para o conteúdo que o React controla, descreva tudo dentro do
+componente. Misturar os dois é a receita de "cadê o texto que eu tinha escrito?".</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: "a tela pisca quando muda?"</h3>
+<p>Não deveria, e quando pisca é sinal de que algo está sendo recriado. A comparação da estação 4
+mantém os nós que não mudaram. O caso clássico de piscada é uma lista sem identificação: o React não
+sabe qual item é qual e recria todos. Isso se resolve com a <code>key</code>, que tem aula própria —
+mas já vale saber que o sintoma vem daí, e não do React ser lento.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. O que o JSX devolve, depois de traduzido?</p>
+<label><input type="radio" name="q1"> uma string de HTML pronta para o navegador</label>
+<label><input type="radio" name="q1"> um nó do DOM já montado na página</label>
+<label><input type="radio" name="q1"> um objeto com <code>type</code> e <code>props</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. Quem constrói os elementos de verdade na página?</p>
+<label><input type="radio" name="q2"> o <code>react-dom</code>, a partir do elemento e da raiz</label>
+<label><input type="radio" name="q2"> o Babel, ao traduzir o arquivo</label>
+<label><input type="radio" name="q2"> o navegador, que lê o JSX direto</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. Quem chama a função do seu componente?</p>
+<label><input type="radio" name="q3"> o próprio arquivo, ao chegar na definição</label>
+<label><input type="radio" name="q3"> o React, na hora de desenhar</label>
+<label><input type="radio" name="q3"> o navegador, ao encontrar a tag do componente</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a linha que monta</h2>
+<p>Complete a chamada que manda o React desenhar o componente dentro da raiz já criada:</p>
+<div class="ex-code">const root = ReactDOM.createRoot(document.getElementById("raiz"));<br>root.<input aria-label="resposta 1" data-answer="render" placeholder="...">(&lt;App /&gt;);</div>
+<p class="ex-dica">Dica: é o método que recebe o elemento e o coloca na raiz. Sem ele, a raiz existe e
+fica vazia.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O caminho é sempre o mesmo. Você escreve JSX; uma ferramenta traduz cada tag em
+<code>React.createElement</code>; essa chamada devolve um <strong>objeto</strong> simples, com
+<code>type</code> e <code>props</code>; e o <code>react-dom</code> pega esse objeto e constrói os nós de
+verdade dentro da raiz.</p>
+
+<p>A raiz é uma <code>div</code> do HTML escolhida por você, e a linha de <code>render</code> é o
+contrato: "desenhe isto aqui". Sem <code>render</code>, a raiz existe e nada acontece. Com uma raiz
+errada, o componente roda e nada aparece. É por isso que o primeiro lugar para olhar, quando a tela fica
+vazia, é a ligação — e não o componente.</p>
+
+<p>Quem chama o seu componente é o React, nunca você. Ele chama na montagem e chama de novo quando os
+dados mudam. Cada chamada produz uma descrição nova, e o React compara com a anterior para aplicar só a
+diferença no DOM — a reconciliação. Isso é o que mantém o campo de texto com o cursor no lugar e evita o
+pisca-pisca.</p>
+
+<p>Guarde o mapa das quatro estações: sintaxe, tradução, elemento, montagem. Quando algo não aparecer,
+descubra em qual delas o processo parou, e você economiza a caçada. A próxima aula entra na estação 1,
+com as regras que o JSX precisa seguir para ser traduzido sem erro.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>JSX não é HTML: é uma escrita curta para <code>React.createElement</code>.</li>
+<li>O Babel (ou o Vite) traduz; o navegador só vê JavaScript.</li>
+<li>O resultado do JSX é um objeto <code>{ type, props }</code>, não um nó da página.</li>
+<li>Criar elementos React é barato; mexer no DOM é caro.</li>
+<li><code>createRoot</code> escolhe onde montar; <code>render</code> manda desenhar.</li>
+<li>O id da raiz no HTML tem de ser o mesmo que você busca no código.</li>
+<li>Quem chama o componente é o React; você só o define.</li>
+<li>Na atualização, o React compara e troca só o que mudou.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

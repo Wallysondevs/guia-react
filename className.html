@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>className e Estilo | Guia React</title>
+<meta name="description" content="className no React: uma string, várias classes, classe condicional, o false que entra no atributo e o que fazer quando a classe aparece no HTML mas o CSS não pinta nada.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>className e <span class="hl">Estilo</span></h1>
+<p class="intro">O CSS da padaria da Ana já tem a classe <code>.esgotado</code>, pronta para pintar de
+cinza o pão que acabou. Ela escreveu o CSS, mas o selo nunca aparece. O problema não está no CSS: está
+no atributo que liga o JSX à folha de estilo. Nesta aula a Ana aprende a montar o
+<code>className</code> — uma classe fixa, duas classes juntas, uma classe que só entra quando o estoque
+acaba — e a ver no painel exatamente o que o React escreveu no HTML.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que o JSX usa <code>className</code> e o HTML usa <code>class</code>.</li>
+  <li>A montar o valor com uma classe fixa, com concatenação e com template string.</li>
+  <li>Como juntar várias classes sem sobrar espaço nem a palavra <code>false</code>.</li>
+  <li>Uma função de duas linhas que resolve o caso para sempre.</li>
+  <li>A ler o atributo <code>class</code> no painel da caixa e no DevTools.</li>
+  <li>Por que uma classe aparece no HTML e mesmo assim não pinta nada.</li>
+  <li>Um padrão de nomes para quando o site crescer.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o selo que não aparece</h2>
+
+<p>A Ana tem um site de padaria feito à mão, com uma folha de estilo de duzentas linhas. Nela existe a
+regra <code>.esgotado</code>, que deixa o texto cinza e riscado. Quando ela passou a lista de pães para
+o React, a regra deixou de funcionar. O pão sem estoque continua preto, bonito e vendável — o que, numa
+padaria, é propaganda enganosa.</p>
+
+<p>O CSS está certo. O que mudou foi o lado do React: no JSX, o atributo que carrega as classes não se
+chama <code>class</code>. Chama-se <code>className</code>. Quem escreve <code>class="esgotado"</code>
+em um componente vê o atributo passar batido ou virar um aviso no console, e a regra
+<code>.esgotado</code> nunca encontra o elemento.</p>
+
+<p>Não é capricho do React. O JSX é JavaScript, e em JavaScript <code>class</code> é uma palavra
+reservada — a que declara classes. Um atributo com esse nome dentro de um objeto literal seria ambíguo,
+então o React escolheu <code>className</code>, que é o nome da propriedade do DOM criada quando o
+navegador não podia usar <code>class</code>. O mesmo aconteceu com <code>for</code>, que virou
+<code>htmlFor</code> nos rótulos de formulário.</p>
+
+<p>Com o nome certo no lugar, o assunto desta aula começa de verdade: <code>className</code> é uma
+<strong>string</strong>, e quase todo problema com classes vem de esquecer isso. Não é um objeto, não é
+uma lista, não é uma função. É texto — e, como todo texto em JSX, pode ser montado com uma conta antes
+de ir para a tela.</p>
+
+<h2>2. className é uma string</h2>
+
+<p>O valor de <code>className</code> vai direto para o atributo <code>class</code> do elemento. Se você
+escrever <code>className="preco destaque"</code>, o HTML gerado tem
+<code>class="preco destaque"</code> e as duas regras de CSS valem ao mesmo tempo. Se escrever
+<code>className="preco"</code>, só a primeira vale. O navegador não sabe nem se importa de onde veio o
+texto: pode ser uma string fixa, uma variável, uma conta com <code>+</code> ou um template com crase.</p>
+
+<dl class="anatomy">
+<dt>className</dt>
+<dd>A prop do JSX que preenche o atributo <code>class</code> do elemento. Recebe texto.</dd>
+<dt>class</dt>
+<dd>O nome do mesmo atributo no HTML puro. Em JSX é <code>className</code>, porque
+<code>class</code> já significa outra coisa em JavaScript.</dd>
+<dt>CSS</dt>
+<dd>A folha onde cada classe ganha aparência: cor, tamanho, margem. O React não aplica estilo
+nenhum sozinho; ele só escreve o atributo.</dd>
+<dt>seletor</dt>
+<dd>O trecho do CSS que acha os elementos: <code>.preco</code> pega quem tem a classe
+<code>preco</code>.</dd>
+<dt>classe condicional</dt>
+<dd>Uma classe que entra ou sai conforme um estado. É o que transforma "pão" em "pão esgotado".</dd>
+</dl>
+
+<p>A tabela abaixo é o mapa dos valores que você vai escrever e do que sai do outro lado. Vale conferir
+cada linha no painel das caixas: o painel mostra o HTML gerado, com o atributo
+<code>class</code> e tudo.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No JSX</th><th>No HTML gerado</th><th>O que acontece</th></tr>
+<tr><td><code>className="preco"</code></td><td><code>class="preco"</code></td><td>a regra <code>.preco</code> se aplica</td></tr>
+<tr><td><code>className="preco destaque"</code></td><td><code>class="preco destaque"</code></td><td>as duas regras se aplicam</td></tr>
+<tr><td><code>className={ativo &amp;&amp; "destaque"}</code></td><td><code>class="destaque"</code> ou nenhum <code>class</code></td><td>com <code>false</code> o React omite o atributo</td></tr>
+<tr><td><code>className={"preco " + (ativo &amp;&amp; "destaque")}</code></td><td><code>class="preco false"</code></td><td>a string recebe a palavra <code>false</code></td></tr>
+<tr><td><code>className={{ preco: true }}</code></td><td><code>class="[object Object]"</code></td><td>objeto não é texto: virou lixo</td></tr>
+<tr><td><code>className={["a", "b"].join(" ")}</code></td><td><code>class="a b"</code></td><td>a lista foi colada com espaço</td></tr>
+</table>
+</div>
+
+<p>Repare na terceira e na quarta linha: são quase iguais e se comportam de forma oposta. Quando o
+<code>&amp;&amp;</code> está sozinho dentro das chaves, o React recebe <code>false</code> e simplesmente
+não escreve o atributo. Quando o <code>&amp;&amp;</code> está no meio de uma concatenação, o
+<code>false</code> vira texto e entra na string. É a fonte do <code>class="preco false"</code> que
+aparece em tanto site por aí, e o assunto da seção 5.</p>
+
+<p>Para ver o valor de verdade, o DevTools é o caminho mais rápido. O console mostra o atributo e a
+lista de classes do elemento, que é o que o CSS enxerga:</p>
+
+<pre class="term">document.querySelector("p").className
+'preco false'
+document.querySelector("p").classList.contains("promocao")
+false</pre>
+
+<h2>3. Uma classe fixa e uma condicional</h2>
+
+<p>O caso mais comum do dia a dia é este: o elemento sempre tem a classe base e ganha uma segunda
+classe quando um estado muda. O preço do pão é sempre <code>preco</code>; quando o balcão está vazio,
+ele também é <code>destaque</code>. Duas classes, uma delas opcional, e a decisão sai do estado que já
+existe.</p>
+
+<p>Note que a conta é feita na renderização, com o estado na mão, e não em um efeito. É o mesmo raciocínio
+da aula anterior: o texto do atributo é um valor derivado — <code>paes === 0</code> decide, e o
+resultado é uma variável comum.</p>
+
+<div class="tryreact" data-goal="attr:p.preco|class=preco destaque;;clique:button;;attr:p.preco|class=preco">
+  <p class="try-task">Quando não há pão no balcão, o preço precisa das classes <code>preco</code> e
+  <code>destaque</code>; com pães, só <code>preco</code>. Monte o <code>className</code> a partir de
+  <code>paes === 0</code>.</p>
+  <pre class="jsx">function App() {
+  const [paes, setPaes] = useState(0);
+
+  return (
+    &lt;div&gt;
+      &lt;p className="preco"&gt;Pão francês — R$ 12,00&lt;/p&gt;
+      &lt;p&gt;{paes} pães no balcão&lt;/p&gt;
+      &lt;button onClick={() =&gt; setPaes(paes + 1)}&gt;Assar mais um&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p class="preco"&gt;Pão francês — R$ 12,00&lt;/p&gt;
+  &lt;p&gt;0 pães no balcão&lt;/p&gt;
+  &lt;button&gt;Assar mais um&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [paes, setPaes] = useState(0);
+  const classes = paes === 0 ? "preco destaque" : "preco";
+
+  return (
+    &lt;div&gt;
+      &lt;p className={classes}&gt;Pão francês — R$ 12,00&lt;/p&gt;
+      &lt;p&gt;{paes} pães no balcão&lt;/p&gt;
+      &lt;button onClick={() =&gt; setPaes(paes + 1)}&gt;Assar mais um&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Na solução, o painel mostra <code>&lt;p class="preco destaque"&gt;</code> antes do clique e
+<code>&lt;p class="preco"&gt;</code> depois. O HTML muda de verdade, e é isso que o CSS lê. A variável
+<code>classes</code> poderia estar dentro do próprio atributo, em uma linha:
+<code>className={paes === 0 ? "preco destaque" : "preco"}</code>. Separar em uma variável com nome é
+melhor quando a condição é comprida, porque dá nome à decisão e deixa o JSX legível.</p>
+
+<p>Duas versões equivalentes que você vai encontrar por aí. A primeira usa template string com crase, e
+serve quando parte do nome da classe vem de uma variável:</p>
+
+<pre class="file" data-file="App.jsx">const classes = `preco ${paes === 0 ? "destaque" : ""}`;
+const classes = `preco tamanho-${tamanho}`;   // "preco tamanho-grande"</pre>
+
+<p>A segunda usa <code>&amp;&amp;</code> para a classe opcional, mas só quando não há classe base:
+<code>className={esgotado &amp;&amp; "esgotado"}</code>. Quando <code>esgotado</code> é
+<code>false</code>, o React não escreve atributo nenhum — o que é o comportamento certo. O perigo é
+misturar os dois estilos na mesma linha, e é ali que nasce o <code>false</code> da próxima seção.</p>
+
+<h2>4. Juntando várias classes</h2>
+
+<p>Quando a lista de classes cresce — uma base, uma de estado, uma de tamanho — a concatenação com
+<code>+</code> fica ilegível e cheia de espaços para acertar. O caminho mais confiável é montar uma
+lista de verdade e colar com <code>join(" ")</code>: o <code>join</code> coloca um espaço entre os itens
+e nenhum no começo nem no fim.</p>
+
+<p>O <code>filter(Boolean)</code> no meio é o que remove os valores falsos — <code>false</code>,
+<code>""</code>, <code>null</code> — antes de colar. Sem ele, a lista com um <code>false</code> dentro
+viraria <code>"item false"</code>, exatamente o problema que estamos tentando evitar.</p>
+
+<div class="tryreact" data-goal="conta:li.item=3;;conta:li.item--caro=2">
+  <p class="try-task">A lista tem três pães, e os que custam mais de R$ 20 precisam também da classe
+  <code>item--caro</code>. Monte o <code>className</code> de cada <code>li</code> com a classe base
+  <code>item</code> mais a condicional.</p>
+  <pre class="jsx">const precos = [12, 24, 30];
+
+function App() {
+  return (
+    &lt;ul&gt;
+      {precos.map((preco) =&gt; (
+        &lt;li key={preco} className="item"&gt;{"R$ " + preco + ",00"}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul&gt;
+  &lt;li class="item"&gt;R$ 12,00&lt;/li&gt;
+  &lt;li class="item"&gt;R$ 24,00&lt;/li&gt;
+  &lt;li class="item"&gt;R$ 30,00&lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">const precos = [12, 24, 30];
+
+function App() {
+  return (
+    &lt;ul&gt;
+      {precos.map((preco) =&gt; (
+        &lt;li key={preco} className={"item" + (preco &gt; 20 ? " item--caro" : "")}&gt;
+          {"R$ " + preco + ",00"}
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois da solução, o painel mostra três <code>li</code> com <code>class="item"</code>,
+<code>class="item item--caro"</code> e <code>class="item item--caro"</code>. A conta
+<code>preco &gt; 20</code> decide, e o espaço do começo da segunda classe é o que separa os dois nomes.
+Esquecer esse espaço é o erro de digitação mais comum aqui: <code>"itemitem--caro"</code> é uma classe
+só, que não existe no CSS, e o sintoma é "a classe não funciona".</p>
+
+<p>A versão com lista é mais fácil de ler quando há três ou mais classes:
+<code>className={["item", preco &gt; 20 &amp;&amp; "item--caro"].filter(Boolean).join(" ")}</code>. Ela
+não precisa de espaço manual, aceita quantos itens você quiser e ignora os falsos. Depois de escrever
+essa linha três vezes, vale extrair uma função — e ela cabe em duas linhas:</p>
+
+<pre class="file" data-file="App.jsx">function classes(...nomes) {
+  return nomes.filter(Boolean).join(" ");
+}
+
+&lt;p className={classes("preco", esgotado &amp;&amp; "esgotado")}&gt;Pão francês&lt;/p&gt;;</pre>
+
+<p>O <code>...nomes</code> é o operador de descanso: ele junta todos os argumentos em uma lista. A
+função recebe quantos nomes você passar, descarta os falsos e devolve o texto pronto. Bibliotecas como
+<code>clsx</code> e <code>classnames</code> fazem exatamente isso e são populares em projetos grandes,
+mas para começar a sua versão de duas linhas resolve — e você entende cada pedaço dela.</p>
+
+<h2>5. O "false" que entrou na classe</h2>
+
+<p>Este é o bug que mais aparece em código de quem está começando, e ele é silencioso: a página não
+quebra, o console não reclama, e o atributo fica com uma classe a mais que não existe em CSS nenhum.
+A causa é sempre a mesma: uma concatenação em que o <code>&amp;&amp;</code> devolve
+<code>false</code> em vez de string vazia.</p>
+
+<p><code>"preco " + (promocao &amp;&amp; "promocao")</code> parece uma boa ideia. Quando
+<code>promocao</code> é <code>true</code>, o parêntese vale <code>"promocao"</code> e o resultado é
+<code>"preco promocao"</code>. Quando é <code>false</code>, o parêntese vale o booleano
+<code>false</code>, e somar texto com booleano transforma o booleano em texto: o resultado é
+<code>"preco false"</code>. O React escreve o atributo sem pensar duas vezes.</p>
+
+<div class="tryreact" data-goal="attr:p|class=preco;;clique:button;;attr:p|class=preco promocao">
+  <p class="try-task">O <code>className</code> está montado com <code>&amp;&amp;</code> dentro de uma
+  concatenação, então fora da promoção ele vira <code>class="preco false"</code>. Corrija para que o
+  atributo seja <code>preco</code> ou <code>preco promocao</code>.</p>
+  <pre class="jsx">function App() {
+  const [promocao, setPromocao] = useState(false);
+
+  return (
+    &lt;div&gt;
+      &lt;p className={"preco " + (promocao &amp;&amp; "promocao")}&gt;Pão francês — R$ 12,00&lt;/p&gt;
+      &lt;button onClick={() =&gt; setPromocao(!promocao)}&gt;Promoção&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p class="preco false"&gt;Pão francês — R$ 12,00&lt;/p&gt;
+  &lt;button&gt;Promoção&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [promocao, setPromocao] = useState(false);
+
+  return (
+    &lt;div&gt;
+      &lt;p className={"preco" + (promocao ? " promocao" : "")}&gt;Pão francês — R$ 12,00&lt;/p&gt;
+      &lt;button onClick={() =&gt; setPromocao(!promocao)}&gt;Promoção&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Repare no painel do código inicial: <code>&lt;p class="preco false"&gt;</code>. Essa palavra
+<code>false</code> é o booleano que virou texto. O navegador aceita, o CSS ignora, e o atributo fica
+sujo para sempre. Depois do clique a classe <code>promocao</code> entra e o visual até funciona — o que
+esconde o problema enquanto a promoção está ligada. Desligou, o <code>false</code> volta.</p>
+
+<p>Há três correções, todas boas. A primeira é trocar o <code>&amp;&amp;</code> por um ternário que
+devolve espaço mais a classe, ou string vazia. A segunda é a lista com <code>filter(Boolean)</code>, que
+descarta o booleano antes de colar. A terceira é a função <code>classes(...)</code> da seção anterior.
+O que não funciona é deixar o booleano entrar na concatenação e esperar que o React o remova: ele
+remove apenas quando o valor inteiro do <code>className</code> é <code>false</code>.</p>
+
+<p>E o caso do objeto? <code>className={{ preco: true }}</code> vira
+<code>class="[object Object]"</code>, porque o navegador converteu o objeto em texto do jeito dele. Esse
+formato é o mesmo que aparece quando você esquece de chamar uma função:
+<code>className={meuEstilo}</code> em vez de <code>className={meuEstilo()}</code>. Se você vir
+<code>[object Object]</code> em um atributo, a causa é sempre essa: um objeto onde o React esperava
+texto.</p>
+
+<h2>6. Nomes que escalam</h2>
+
+<p>Classe é texto livre, e é por isso que a bagunça cresce rápido. A Ana começou com
+<code>preco</code>, <code>preco2</code>, <code>precoVermelho</code> e, três semanas depois, não sabia
+qual delas estava em uso. O remédio é combinar um padrão de nomes antes que o site tenha cinquenta
+classes. Não é regra do React, é acordo de time — e o mais usado é o BEM, que separa bloco, elemento e
+modificador.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Peça</th><th>Como se escreve</th><th>Para que serve</th></tr>
+<tr><td>bloco</td><td><code>cartao</code></td><td>o componente inteiro</td></tr>
+<tr><td>elemento</td><td><code>cartao__titulo</code></td><td>uma parte de dentro do bloco</td></tr>
+<tr><td>modificador</td><td><code>cartao--destaque</code></td><td>uma variação do mesmo bloco</td></tr>
+<tr><td>estado</td><td><code>esta-aberto</code></td><td>algo que muda com a interação</td></tr>
+</table>
+</div>
+
+<p>Com esse acordo, o <code>className</code> do card fica
+<code>classes("cartao", destaque &amp;&amp; "cartao--destaque")</code>, e qualquer pessoa do time sabe
+que <code>cartao--destaque</code> é uma variação do bloco <code>cartao</code>, não um componente novo.
+O traço duplo e o sublinhado duplo são só convenção: o CSS trata <code>cartao--destaque</code> como um
+nome único, com dois hifens no meio. A vantagem é que o nome carrega a estrutura, e a busca no editor
+acha todos os usos.</p>
+
+<p>Quando o projeto chega ao Vite, no Nível 3, aparece outra ferramenta: os <strong>CSS Modules</strong>.
+O arquivo <code>Cartao.module.css</code> exporta nomes de classe que o build renomeia para evitar
+colisão, e você escreve <code>className={estilos.cartao}</code>. A ideia é a mesma desta aula — uma
+string no atributo —, mas o nome passa a ser local ao componente. Até lá, o padrão de nomes resolve, e
+você não precisa de nenhuma ferramenta extra.</p>
+
+<h2>7. Por que a classe não fez nada</h2>
+
+<p>De vez em quando o painel mostra <code>class="destaque"</code> e o elemento continua sem estilo. O
+problema saiu do React e foi para o CSS, e vale ter um roteiro de conferência em vez de mexer no código
+às cegas. O console ajuda: <code>getComputedStyle</code> diz o valor que o navegador aplicou de
+verdade.</p>
+
+<pre class="term">getComputedStyle(document.querySelector(".preco")).color
+'rgb(17, 17, 17)'
+document.styleSheets.length
+1</pre>
+
+<p>A primeira linha mostra a cor final do elemento. Se ela não é a que a sua regra pede, alguma outra
+regra venceu, ou a sua não chegou. A segunda conta quantas folhas de estilo o documento carregou: zero
+significa que o arquivo de CSS não veio — import errado, caminho errado, ou, no caso das caixas deste
+guia, nenhum CSS carregado de propósito.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você vê</th><th>Causa provável</th><th>O que fazer</th></tr>
+<tr><td><code>class</code> certo no painel e nenhum estilo</td><td>a folha de CSS não carregou</td><td>conferir o <code>import "./App.css"</code> no projeto, ou o <code>link</code> no HTML</td></tr>
+<tr><td>estilo parcial: cor muda, tamanho não</td><td>outra regra mais específica venceu</td><td>ver no DevTools qual regra está riscada</td></tr>
+<tr><td>nada muda quando o estado muda</td><td>a condição nunca fica verdadeira</td><td>mostrar o estado na tela e conferir o valor</td></tr>
+<tr><td><code>class="item false"</code></td><td><code>&amp;&amp;</code> dentro de concatenação</td><td>ternário com string vazia, ou <code>classes(...)</code></td></tr>
+<tr><td><code>class="[object Object]"</code></td><td>objeto no <code>className</code></td><td>passar uma string, chamando a função se houver uma</td></tr>
+</table>
+</div>
+
+<p>Vale dizer o óbvio que economiza meia hora: a caixa desta página não carrega o CSS do site. Ela roda
+o componente em um quadro isolado, com o estilo básico do navegador, e mostra o HTML gerado no painel.
+É por isso que as missões aqui conferem o <strong>atributo</strong> e a <strong>quantidade</strong> de
+elementos com cada classe, e não a cor. No projeto de verdade, com a folha carregada, o mesmo
+<code>class</code> que aparece no painel é o que pinta a tela.</p>
+
+<h2>8. className no resto do HTML</h2>
+
+<p>O <code>className</code> não é exclusividade de <code>div</code> e <code>p</code>. Todo elemento que
+aceita <code>class</code> no HTML aceita <code>className</code> no JSX: <code>ul</code>,
+<code>li</code>, <code>button</code>, <code>input</code>, <code>form</code>, <code>table</code> e até
+os elementos de SVG, como <code>svg</code> e <code>path</code>. A regra é a mesma: texto, com os nomes
+separados por espaço.</p>
+
+<p>Os vizinhos de sempre continuam valendo dentro do JSX. <code>for</code> vira <code>htmlFor</code> nos
+rótulos; <code>tabindex</code> vira <code>tabIndex</code>; <code>readonly</code> vira
+<code>readOnly</code>. E há uma diferença que confunde: atributos personalizados com
+<code>data-</code> e <code>aria-</code> mantêm o nome exato, com hífen e tudo, porque o React não os
+converte. Então <code>data-cy="preco"</code> e <code>aria-label="Preço do pão"</code> funcionam como
+no HTML.</p>
+
+<p>Uma dúvida frequente: dá para usar <code>class</code> no React 19? O atributo até chega ao HTML em
+muitos casos, mas não conte com isso. O JSX foi desenhado para <code>className</code>, as ferramentas
+esperam <code>className</code>, e a diferença de comportamento entre versões não vale a economia de
+quatro letras. Quando o código vem de um HTML antigo colado no JSX, a primeira coisa a fazer é trocar
+todos os <code>class=</code> por <code>className=</code>.</p>
+
+<p>Por último: classe não é o único jeito de estilizar, e as duas ferramentas têm papéis diferentes. A
+classe é o lugar do estilo que pertence ao desenho do site — o card, o botão, a tabela — e que deve
+estar na folha de CSS, reaproveitável e cacheada. O atributo <code>style</code>, que vem na próxima
+aula, é para valores que nascem do estado e mudam a cada renderização: a largura de uma barra de
+progresso, a cor escolhida pela pessoa. Misturar os dois sem critério é o que transforma CSS em
+JavaScript e JavaScript em CSS.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o botão que deveria ficar cinza e continua azul</h3>
+<p>A Ana escreveu <code>className={desabilitado &amp;&amp; "botao-cinza"}</code> e o botão ficou azul. Ao
+desabilitar, o atributo aparecia certo: <code>class="botao-cinza"</code>. O problema era que a classe
+base tinha sumido — o botão perdeu a classe <code>botao</code> e ganhou só a de estado. Quando a classe
+condicional é um acréscimo, a base tem de estar sempre na string:
+<code>className={"botao" + (desabilitado ? " botao-cinza" : "")}</code>, ou com a função
+<code>classes</code>.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a promoção aparece em todos os pães</h3>
+<p>Ela escreveu a condição uma vez, no componente da lista, e passou o resultado para todos os itens. O
+preço de cada pão precisa da sua própria condição, calculada dentro do <code>map</code>, com os dados
+daquele item. Regra geral: a classe condicional é decidida no lugar onde o dado daquele elemento está —
+não no pai, que não sabe qual pão está em promoção.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: a classe certa, o CSS certo, e nada muda</h3>
+<p>Ela conferiu o painel: <code>class="esgotado"</code>. Conferiu o CSS: <code>.esgotado</code> existe.
+O problema estava em outra regra, mais específica, que também pintava aquele parágrafo — o DevTools
+mostra a regra vencedora e a riscada. O React fez a parte dele; o resto foi briga de especificidade no
+CSS, e a solução foi ajustar o seletor, não o componente.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Qual é o valor que <code>className</code> espera?</p>
+<label><input type="radio" name="q1"> um objeto com as classes ligadas e desligadas</label>
+<label><input type="radio" name="q1"> uma string com os nomes separados por espaço</label>
+<label><input type="radio" name="q1"> uma lista de classes, como no CSS</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que sai de <code>className={"preco " + (promocao &amp;&amp; "promocao")}</code> quando <code>promocao</code> é <code>false</code>?</p>
+<label><input type="radio" name="q2"> <code>class="preco"</code>, porque o React descarta o falso</label>
+<label><input type="radio" name="q2"> um erro no console</label>
+<label><input type="radio" name="q2"> <code>class="preco false"</code>, porque o booleano virou texto</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. A classe aparece no painel, mas o elemento continua sem estilo. O que conferir primeiro?</p>
+<label><input type="radio" name="q3"> se a folha de CSS carregou e se outra regra não está vencendo</label>
+<label><input type="radio" name="q3"> se o componente tem um <code>useState</code></label>
+<label><input type="radio" name="q3"> se o <code>className</code> está dentro de um <code>useEffect</code></label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o preço com as duas classes</h2>
+<p>Complete as duas linhas. Na primeira, o parágrafo recebe a classe pelo atributo certo do JSX. Na
+segunda, as classes são montadas a partir de uma lista, coladas com o método que separa os nomes por
+espaço:</p>
+<div class="ex-code">&lt;p <input aria-label="resposta 1" data-answer="className" placeholder="...">="preco"&gt;Pão francês&lt;/p&gt;
+&lt;p className={["preco", "destaque"].<input aria-label="resposta 2" data-answer="join" placeholder="...">(" ")}&gt;Pão de queijo&lt;/p&gt;</div>
+<p class="ex-dica">Dica: a primeira resposta é o nome que o JSX usa no lugar de <code>class</code>. A
+segunda é o método que transforma uma lista em texto, com o separador que você mandar entre os
+parênteses. Sem ele, a lista viraria uma string só, com vírgulas.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p><code>className</code> é uma string e vira o atributo <code>class</code> do elemento. Uma classe é
+texto, duas classes são dois textos separados por espaço, e a decisão de incluir uma delas sai do
+estado, calculada na renderização. Concatenação com <code>+</code> funciona, mas exige cuidado com
+espaços; lista com <code>filter(Boolean).join(" ")</code> é mais segura; a função
+<code>classes(...)</code> de duas linhas deixa o JSX limpo.</p>
+
+<p>O erro que você vai reconhecer para sempre é o <code>false</code> dentro da string. O React remove o
+atributo quando o valor inteiro é <code>false</code>, mas não remove um booleano que já virou texto no
+meio de uma concatenação. Objeto no <code>className</code> também vira lixo:
+<code>[object Object]</code>. Os dois aparecem no painel do guia, e é para isso que ele serve — olhar o
+HTML gerado é mais rápido do que adivinhar.</p>
+
+<p>E quando o atributo está certo e o estilo não vem, o problema é do CSS: folha que não carregou, regra
+mais específica vencendo, nome com typo. Aqui as caixas não carregam o CSS do site, então as missões
+conferem atributo e quantidade — no projeto de verdade, é o mesmo <code>class</code> que pinta a tela.
+Guardar essa separação ajuda: o React escreve o nome, o CSS decide a aparência, e cada um tem o seu
+lugar de depuração.</p>
+
+<p>Falta o outro lado da estilização: valores que nascem do estado e não cabem em uma folha de estilo.
+É o assunto da próxima aula, e ele combina com esta — classe para o que é do desenho, estilo inline para
+o que é do dado.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>No JSX é <code>className</code>; no HTML gerado vira <code>class</code>.</li>
+<li>O valor é uma string com nomes separados por espaço.</li>
+<li>Classe condicional: ternário com <code>" "</code> ou string vazia, nunca <code>&amp;&amp;</code> dentro de concatenação.</li>
+<li>Várias classes: <code>["a", cond &amp;&amp; "b"].filter(Boolean).join(" ")</code>.</li>
+<li>Uma função <code>classes(...nomes)</code> resolve o caso para sempre.</li>
+<li><code>className={cond &amp;&amp; "x"}</code> sozinho é seguro: com falso, o atributo nem aparece.</li>
+<li>Objeto no <code>className</code> vira <code>[object Object]</code>.</li>
+<li>Classe no HTML e estilo ausente é problema de CSS, não de React.</li>
+<li>Nomes com padrão (<code>cartao__titulo</code>, <code>cartao--destaque</code>) evitam colisão.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

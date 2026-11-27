@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Select | Guia React</title>
+<meta name="description" content="O select controlado no React: value no select, options com valor, a opção vazia para começar sem escolha, opções vindas de uma lista com map e o lugar do selected.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Select</span></h1>
+<p class="intro">No pedido da padaria, o cliente precisa escolher entre retirar no balcão e receber em
+casa. São poucas opções, sempre as mesmas, e só uma pode valer por vez — o caso perfeito para o
+<code>select</code>, aquela listinha que abre com uma setinha. A Ana já sabe ligar um campo ao estado, mas
+o <code>select</code> guarda o valor num lugar diferente: não no campo, e sim na opção escolhida. Nesta
+aula ela aprende a ler esse valor, criar uma opção vazia para o campo começar sem escolha e gerar as
+opções a partir de uma lista.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como o <code>select</code> e as <code>option</code> se organizam.</li>
+  <li>Por que o <code>value</code> fica no <code>select</code> e não em cada opção.</li>
+  <li>Como ligar a escolha ao estado com <code>value</code> e <code>onChange</code>.</li>
+  <li>A diferença entre o valor guardado e o texto que aparece na lista.</li>
+  <li>Como usar uma opção vazia para o campo começar sem escolha.</li>
+  <li>Como gerar as opções a partir de uma lista com <code>map</code> e <code>key</code>.</li>
+  <li>O que fazer com o <code>selected</code> do HTML antigo e com <code>defaultValue</code>.</li>
+</ul>
+</div>
+
+<h2>1. A cena: uma escolha entre poucas opções</h2>
+
+<p>A padaria entrega de bicicleta no bairro e atende no balcão. No site, o cliente escolhe: retirar no
+balcão ou receber em casa. A Ana poderia usar dois <code>checkbox</code>, mas aí o cliente poderia marcar
+os dois — e não faz sentido retirar e receber ao mesmo tempo. Poderia usar um campo de texto, mas aí
+alguém escreveria "retirada", "Retirada" ou "vou buscar", e ela teria de adivinhar. O
+<code>select</code> resolve as duas coisas: mostra só as opções que existem e deixa marcar uma.</p>
+
+<p>O elemento é uma caixa fechada. Fechada, ela mostra a opção escolhida; aberta, mostra a lista. Quem
+abre é o navegador, não o React, e é por isso que a lista muda de aparência em cada sistema: no celular
+vira uma rodinha, no computador vira um menu. O que o React controla é <strong>qual opção está
+escolhida</strong>, e isso vem do estado.</p>
+
+<p>No começo, a Ana achou que o <code>select</code> seria só mais um campo com <code>value</code> e
+<code>onChange</code>. É quase isso, com uma pegadinha: o texto que aparece na tela (o rótulo da opção) não
+é o valor guardado. Quem guarda é o atributo <code>value</code> da <code>option</code>. Separar os dois é o
+que permite exibir "Retirar no balcão" e guardar <code>"retirada"</code> — um texto curto e previsível
+para o código usar.</p>
+
+<h2>2. As peças do select</h2>
+
+<p>O <code>select</code> é o pai; cada <code>option</code> é uma escolha. O React trata o conjunto como um
+campo só: você escuta a mudança no <code>select</code>, não em cada opção. As peças têm nomes que voltam
+na documentação:</p>
+
+<dl class="anatomy">
+<dt><code>select</code></dt>
+<dd>A caixa de escolha. Recebe <code>value</code> (o valor escolhido), <code>onChange</code> e os atributos
+comuns de campo, como <code>id</code> e <code>name</code>.</dd>
+<dt><code>option</code></dt>
+<dd>Cada escolha da lista. O atributo <code>value</code> é o que vai para o estado; o texto entre as tags é
+o que aparece na tela.</dd>
+<dt>rótulo</dt>
+<dd>O texto visível da opção: "Retirar no balcão". Serve para o olho; não é o valor guardado.</dd>
+<dt>opção vazia</dt>
+<dd>Uma <code>option</code> com <code>value=""</code> e texto "Escolha…". Serve para o campo começar sem
+escolha e para detectar que a pessoa ainda não decidiu.</dd>
+<dt><code>map</code></dt>
+<dd>O jeito de transformar uma lista de dados em uma lista de <code>option</code>, cada uma com a sua
+<code>key</code>.</dd>
+</dl>
+
+<p>A primeira consequência prática é que o <code>value</code> do <code>select</code> precisa casar com o
+<code>value</code> de alguma opção. Se o estado vale <code>"entrega"</code> e nenhuma opção tem esse valor,
+o navegador mostra a primeira da lista e você fica com a impressão de que o estado não funciona. Não é
+bug: é um valor órfão. O console do navegador chega a avisar em modo de desenvolvimento, mas o sintoma
+visível é a escolha "voltando" para o começo.</p>
+
+<p>O segundo detalhe é a leitura do valor. Como o evento acontece no <code>select</code>,
+<code>e.target.value</code> entrega o <code>value</code> da opção escolhida — e não o texto dela. É por
+isso que a Ana planeja os valores com calma: <code>"retirada"</code> e <code>"entrega"</code> são fáceis de
+comparar e de mandar para o servidor depois.</p>
+
+<h2>3. O select controlado</h2>
+
+<p>Ligar o <code>select</code> ao estado é o mesmo par de sempre, com uma diferença: o
+<code>value</code> vai no <code>select</code>, e não em cada <code>option</code>. O componente abaixo já
+tem o estado e já tem um botão que muda a escolha por código — o que falta é o campo obedecer:</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Você escolheu: entrega">
+  <p class="try-task">O <code>select</code> está solto e o parágrafo mostra sempre "retirada". Ligue o
+  campo ao estado com <code>value={entrega}</code> e <code>onChange</code> e mostre
+  <code>Você escolheu: {entrega}</code>. Depois clique em <strong>Quero entrega</strong>.</p>
+  <pre class="jsx">function App() {
+  const [entrega, setEntrega] = useState("retirada");
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="entrega"&gt;Como você quer receber?&lt;/label&gt;
+      &lt;select id="entrega"&gt;
+        &lt;option value="retirada"&gt;Retirar no balcão&lt;/option&gt;
+        &lt;option value="entrega"&gt;Entrega em casa&lt;/option&gt;
+      &lt;/select&gt;
+      &lt;button onClick={() =&gt; setEntrega("entrega")}&gt;Quero entrega&lt;/button&gt;
+      &lt;p&gt;Você escolheu: retirada&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="entrega"&gt;Como você quer receber?&lt;/label&gt;
+  &lt;select id="entrega"&gt;
+    &lt;option value="retirada"&gt;Retirar no balcão&lt;/option&gt;
+    &lt;option value="entrega"&gt;Entrega em casa&lt;/option&gt;
+  &lt;/select&gt;
+  &lt;button&gt;Quero entrega&lt;/button&gt;
+  &lt;p&gt;Você escolheu: retirada&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [entrega, setEntrega] = useState("retirada");
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="entrega"&gt;Como você quer receber?&lt;/label&gt;
+      &lt;select
+        id="entrega"
+        value={entrega}
+        onChange={(e) =&gt; setEntrega(e.target.value)}
+      &gt;
+        &lt;option value="retirada"&gt;Retirar no balcão&lt;/option&gt;
+        &lt;option value="entrega"&gt;Entrega em casa&lt;/option&gt;
+      &lt;/select&gt;
+      &lt;button onClick={() =&gt; setEntrega("entrega")}&gt;Quero entrega&lt;/button&gt;
+      &lt;p&gt;Você escolheu: {entrega}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Na prévia, escolha uma opção na setinha e veja o parágrafo mudar junto. O botão faz o mesmo caminho por
+dentro: chama <code>setEntrega("entrega")</code> e o <code>select</code> se atualiza porque o
+<code>value</code> dele vem do estado. É a prova mais clara de quem manda no campo — o estado, não o
+clique. Se você ligar só o <code>select</code> e deixar o parágrafo fixo, a escolha muda na caixa e o
+texto não acompanha; se ligar só o parágrafo, o texto muda e a caixa fica na opção antiga.</p>
+
+<p>Repare também no que <strong>não</strong> aparece no painel: nenhuma opção fica com o atributo
+<code>selected</code>. O React aplica a escolha como propriedade do elemento, do mesmo jeito que faz com o
+valor de um <code>input</code>. O painel mostra a estrutura; a opção marcada é estado vivo. Por isso a
+conferência de um <code>select</code> controlado se faz pelo texto que depende dele, não pelo HTML.</p>
+
+<h2>4. O valor guardado não é o rótulo</h2>
+
+<p>Essa separação entre valor e rótulo é o que dá força ao <code>select</code>. A tabela abaixo mostra as
+combinações que você vai encontrar, com o que entra no estado em cada uma:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você escreveu</th><th>O que aparece na lista</th><th>O que vai para o estado</th></tr>
+<tr><td><code>&lt;option value="retirada"&gt;Retirar no balcão&lt;/option&gt;</code></td><td>Retirar no balcão</td><td><code>"retirada"</code></td></tr>
+<tr><td><code>&lt;option value="entrega"&gt;Entrega em casa&lt;/option&gt;</code></td><td>Entrega em casa</td><td><code>"entrega"</code></td></tr>
+<tr><td><code>&lt;option value=""&gt;Escolha…&lt;/option&gt;</code></td><td>Escolha…</td><td><code>""</code> (string vazia)</td></tr>
+<tr><td><code>&lt;option&gt;Pão de queijo&lt;/option&gt;</code></td><td>Pão de queijo</td><td>o próprio texto "Pão de queijo"</td></tr>
+</table>
+</div>
+
+<p>A última linha é legal e perigosa. Quando a <code>option</code> não tem <code>value</code>, o navegador
+usa o texto como valor. Funciona, mas amarra o dado ao rótulo: no dia em que você trocar "Pão de queijo"
+por "Pão de queijo quentinho", todo código que comparava com o texto antigo para de funcionar. Para listas
+pequenas e fixas, tudo bem; para dados que vêm de uma lista, dê um <code>value</code> próprio — um id, um
+código, uma palavra curta — e deixe o rótulo só para a tela.</p>
+
+<p>No console, dá para ver os dois lados da escolha — o que aparece e o que é guardado:</p>
+
+<pre class="term">e.target.value: "retirada"
+typeof e.target.value: string
+e.target.selectedOptions[0].text: "Retirar no balcão"</pre>
+
+<p>O mesmo cuidado vale para preço. Se a opção guarda o preço, o estado recebe texto
+(<code>"12.50"</code>) e você converte com <code>Number()</code> antes de somar, como fez no campo
+numérico. Uma alternativa é guardar o id do produto e procurar o preço na lista; é o caminho que a aula de
+listas segue. Por enquanto, a regra é: o valor é o dado que você quer no código, o rótulo é o que o
+cliente lê.</p>
+
+<h2>5. A opção vazia: o campo que começa sem escolha</h2>
+
+<p>Um <code>select</code> sem <code>value</code> inicial mostra a primeira opção, e isso pode enganar: o
+cliente abre o site e vê "Retirar no balcão" marcado sem ter escolhido nada. Pior: se a primeira opção for
+"Centro", o frete do Centro aparece antes de o cliente dizer onde mora. A solução é uma opção vazia no
+começo e um estado inicial vazio. Aí o campo começa pedindo uma escolha e o código sabe que
+<code>""</code> significa "ainda não decidiu".</p>
+
+<p>A Ana usa isso no frete: o centro é grátis (ela mesma entrega de bicicleta), os outros bairros pagam
+R$ 9. Enquanto o cliente não escolher, o site não deve mostrar preço nenhum — deve pedir a escolha.</p>
+
+<div class="tryreact" data-goal="texto:Escolha o bairro para ver o frete;;conta:option=4">
+  <p class="try-task">Enquanto o bairro estiver vazio, mostre <code>Escolha o bairro para ver o frete</code>.
+  Quando for <code>centro</code>, mostre <code>Frete: R$ 0</code>; nos outros, <code>Frete: R$ 9</code>.</p>
+  <pre class="jsx">function App() {
+  const [bairro, setBairro] = useState("");
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="bairro"&gt;Bairro da entrega&lt;/label&gt;
+      &lt;select
+        id="bairro"
+        value={bairro}
+        onChange={(e) =&gt; setBairro(e.target.value)}
+      &gt;
+        &lt;option value=""&gt;Escolha o bairro&lt;/option&gt;
+        &lt;option value="centro"&gt;Centro&lt;/option&gt;
+        &lt;option value="jardim"&gt;Jardim&lt;/option&gt;
+        &lt;option value="vila"&gt;Vila Nova&lt;/option&gt;
+      &lt;/select&gt;
+      &lt;p&gt;Frete: R$ 9&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="bairro"&gt;Bairro da entrega&lt;/label&gt;
+  &lt;select id="bairro"&gt;
+    &lt;option value=""&gt;Escolha o bairro&lt;/option&gt;
+    &lt;option value="centro"&gt;Centro&lt;/option&gt;
+    &lt;option value="jardim"&gt;Jardim&lt;/option&gt;
+    &lt;option value="vila"&gt;Vila Nova&lt;/option&gt;
+  &lt;/select&gt;
+  &lt;p&gt;Frete: R$ 9&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [bairro, setBairro] = useState("");
+  const frete = bairro === "centro" ? "R$ 0" : "R$ 9";
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="bairro"&gt;Bairro da entrega&lt;/label&gt;
+      &lt;select
+        id="bairro"
+        value={bairro}
+        onChange={(e) =&gt; setBairro(e.target.value)}
+      &gt;
+        &lt;option value=""&gt;Escolha o bairro&lt;/option&gt;
+        &lt;option value="centro"&gt;Centro&lt;/option&gt;
+        &lt;option value="jardim"&gt;Jardim&lt;/option&gt;
+        &lt;option value="vila"&gt;Vila Nova&lt;/option&gt;
+      &lt;/select&gt;
+      &lt;p&gt;
+        {bairro === ""
+          ? "Escolha o bairro para ver o frete"
+          : "Frete: " + frete}
+      &lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A expressão dentro das chaves é um <code>if</code> de uma linha: condição, interrogação, valor se
+verdadeiro, dois-pontos, valor se falso. Ela aparece tanto no <code>frete</code> quanto no parágrafo. Se
+preferir, dá para escrever com <code>if</code> normal antes do <code>return</code>, guardando o texto numa
+variável. O importante é que a mensagem e o preço venham do mesmo estado — assim nunca aparece "R$ 9" com
+o campo vazio.</p>
+
+<p>Escolha o Centro na prévia e o texto muda para "Frete: R$ 0". Volte para "Escolha o bairro" e a
+mensagem volta. Esse vaivém é o teste que pega a maioria dos bugs de <code>select</code>: o estado
+inicial, a opção vazia e a condição precisam combinar. Quando um dos três está errado, o site mostra frete
+para quem não escolheu nada ou esconde o valor de quem escolheu.</p>
+
+<h2>6. Opções que vêm de uma lista</h2>
+
+<p>Enquanto são duas ou três opções, escrever cada <code>option</code> na mão é razoável. Quando a vitrine
+tem cinco sabores — e amanhã pode ter oito —, vale gerar as opções a partir de uma lista com
+<code>map</code>. Cada item vira uma <code>option</code>, e o <code>key</code> diz ao React qual item é
+qual quando a lista muda.</p>
+
+<div class="tryreact" data-goal="conta:option=5;;texto:5 sabores na vitrine">
+  <p class="try-task">A lista <code>sabores</code> tem cinco itens, mas só dois viraram opção. Gere todas
+  com <code>map</code>, dando <code>key</code> e <code>value</code> iguais ao sabor, e mostre
+  <code>{sabores.length} sabores na vitrine</code>.</p>
+  <pre class="jsx">const sabores = ["Pão francês", "Pão de queijo", "Croissant", "Brioche", "Sonho"];
+
+function App() {
+  const [sabor, setSabor] = useState("Pão francês");
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="sabor"&gt;Sabor&lt;/label&gt;
+      &lt;select
+        id="sabor"
+        value={sabor}
+        onChange={(e) =&gt; setSabor(e.target.value)}
+      &gt;
+        &lt;option value="Pão francês"&gt;Pão francês&lt;/option&gt;
+        &lt;option value="Pão de queijo"&gt;Pão de queijo&lt;/option&gt;
+      &lt;/select&gt;
+      &lt;p&gt;Escolhido: {sabor}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="sabor"&gt;Sabor&lt;/label&gt;
+  &lt;select id="sabor"&gt;
+    &lt;option value="Pão francês"&gt;Pão francês&lt;/option&gt;
+    &lt;option value="Pão de queijo"&gt;Pão de queijo&lt;/option&gt;
+  &lt;/select&gt;
+  &lt;p&gt;Escolhido: Pão francês&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const sabores = ["Pão francês", "Pão de queijo", "Croissant", "Brioche", "Sonho"];
+
+function App() {
+  const [sabor, setSabor] = useState("Pão francês");
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="sabor"&gt;Sabor&lt;/label&gt;
+      &lt;select
+        id="sabor"
+        value={sabor}
+        onChange={(e) =&gt; setSabor(e.target.value)}
+      &gt;
+        {sabores.map((s) =&gt; (
+          &lt;option key={s} value={s}&gt;{s}&lt;/option&gt;
+        ))}
+      &lt;/select&gt;
+      &lt;p&gt;Escolhido: {sabor}&lt;/p&gt;
+      &lt;p&gt;{sabores.length} sabores na vitrine&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Uma conferida rápida no console mostra a lista e o valor escolhido:</p>
+
+<pre class="term">sabores.length: 5
+sabor: "Pão francês"
+typeof sabor: string</pre>
+
+<p>Rode e conte as opções no painel: são cinco, na ordem da lista. O <code>value</code> e o rótulo são o
+mesmo texto aqui, porque o sabor já é um nome curto e único. Numa lista de produtos de verdade, o valor
+seria o código do produto e o rótulo seria o nome com o preço: <code>value={produto.id}</code> e
+<code>{produto.nome}</code> entre as tags.</p>
+
+<p>Sobre o <code>key</code>: ele não aparece no HTML e não é uma prop que o componente recebe; é uma
+identidade para o React saber o que mudou entre um desenho e outro. Usar o próprio texto funciona quando
+os itens são únicos — dois "Pão francês" na lista dariam duas chaves iguais e o React reclamaria no
+console. Se você já tem um id, use o id. A aula da <code>key</code> cobre os detalhes, e vale reler depois
+de mexer com listas de verdade.</p>
+
+<h2>7. O selected do HTML antigo e o defaultValue</h2>
+
+<p>Quem vem do HTML escreve <code>&lt;option selected&gt;</code> para marcar a escolha inicial. No React
+isso é o caminho errado: quem diz qual opção está marcada é o <code>value</code> do <code>select</code>.
+Se você deixar <code>selected</code> em uma opção e também passar <code>value</code>, os dois brigam e o
+React avisa no console em desenvolvimento. A regra é simples: <strong>um dono só</strong>, o estado.</p>
+
+<p>Existe uma exceção para campo não controlado: <code>defaultValue="entrega"</code> faz o
+<code>select</code> começar naquela opção, e a partir dali o navegador cuida da escolha. É o equivalente do
+texto entre as tags do <code>textarea</code>: serve para não controlar. Se você precisa acompanhar a
+escolha — e quase sempre precisa —, fique com <code>useState</code> + <code>value</code>. A diferença entre
+os dois caminhos tem aula própria mais adiante, e o resumo é: controlado quando você quer saber, não
+controlado quando o valor só vai ser lido no envio.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No HTML antigo</th><th>No React controlado</th><th>Por quê</th></tr>
+<tr><td><code>&lt;option selected&gt;</code></td><td><code>value={forma}</code> no <code>select</code></td><td>um dono só para a escolha: o estado</td></tr>
+<tr><td>primeira opção marcada por acaso</td><td><code>useState("pix")</code></td><td>o valor inicial vem do estado, não da ordem</td></tr>
+<tr><td><code>defaultSelected</code></td><td><code>defaultValue="pix"</code></td><td>campo não controlado, só com valor de partida</td></tr>
+<tr><td><code>onchange="pegar()"</code></td><td><code>onChange={(e) =&gt; setForma(e.target.value)}</code></td><td>o evento do React e o texto novo na mesma função</td></tr>
+<tr><td><code>&lt;option disabled&gt;</code></td><td><code>&lt;option disabled&gt;</code></td><td>igual nos dois: escolha visível e indisponível</td></tr>
+</table>
+</div>
+
+<p>Um caso em que <code>defaultValue</code> aparece com naturalidade é o formulário de edição, que já vem
+preenchido com o pedido do cliente. Mesmo ali, se a tela mostra um resumo que muda enquanto a pessoa
+escolhe, o controlado ganha. O critério é sempre o mesmo: a tela depende do valor agora? Então estado.</p>
+
+<p>Vale conhecer também o <code>disabled</code> na <code>option</code>, que serve para mostrar uma escolha
+indisponível — "Sonho: esgotado" — sem tirá-la da lista. E o <code>name</code> no <code>select</code>, que
+identifica o campo no envio do formulário, assunto da aula de envio. Nenhum dos dois muda o mecanismo de
+estado.</p>
+
+<h2>8. Um select que muda o resto da tela</h2>
+
+<p>O poder do <code>select</code> aparece quando ele decide o que os outros campos fazem. A forma de
+pagamento é o exemplo clássico: Pix mostra a chave, cartão mostra a maquininha, dinheiro mostra o campo de
+troco. Cada escolha liga um pedaço diferente da tela, e tudo isso sai de um único estado.</p>
+
+<pre class="file" data-file="Pagamento.jsx">function Pagamento() {
+  const [forma, setForma] = useState("pix");
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="forma"&gt;Forma de pagamento&lt;/label&gt;
+      &lt;select
+        id="forma"
+        value={forma}
+        onChange={(e) =&gt; setForma(e.target.value)}
+      &gt;
+        &lt;option value="pix"&gt;Pix&lt;/option&gt;
+        &lt;option value="cartao"&gt;Cartão na entrega&lt;/option&gt;
+        &lt;option value="dinheiro"&gt;Dinheiro&lt;/option&gt;
+      &lt;/select&gt;
+
+      {forma === "pix" &amp;&amp; &lt;p&gt;Chave Pix: ana@loja.test&lt;/p&gt;}
+      {forma === "cartao" &amp;&amp; &lt;p&gt;Leve a maquininha&lt;/p&gt;}
+      {forma === "dinheiro" &amp;&amp; &lt;p&gt;Separe o troco, por favor&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>O <code>&amp;&amp;</code> é o "e" lógico: se a condição for verdadeira, o React desenha o elemento da
+direita; se for falsa, não desenha nada. É a mesma renderização condicional que você já viu, aplicada a
+três casos exclusivos. Como só uma forma pode valer por vez, só um parágrafo aparece por vez — e o
+<code>select</code> é o interruptor.</p>
+
+<p>Se a lista de formas crescer, dá para guardar um objeto por forma e mostrar o detalhe com
+<code>formas.find(...)</code>. A ideia continua: um estado, uma escolha, o resto derivado. O que você não
+quer é um estado para o select e outro para o texto que ele deveria determinar — dois donos para o mesmo
+dado é o começo de uma tela que se contradiz.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: a escolha volta para a primeira opção</h3>
+<p>A Ana mudava o estado para <code>"entrega"</code> e a caixa insistia em mostrar "Retirar no balcão".
+Havia uma opção com o rótulo "Entrega em casa", mas o <code>value</code> estava escrito
+<code>"Entrega"</code>, com maiúscula. O <code>select</code> procura uma opção com valor exatamente igual
+a <code>"entrega"</code>, não acha e cai na primeira. Valor é texto exato: maiúscula, acento e espaço
+contam.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o preço do frete aparece antes da escolha</h3>
+<p>O campo começava na primeira opção ("Centro") e o texto já mostrava "Frete: R$ 0" para quem nunca
+escolheu nada. A correção foi a opção vazia com <code>value=""</code> e o estado começando em
+<code>""</code>. Agora o site pede a escolha, e o código distingue "não decidiu" de "escolheu o Centro".
+Sem a opção vazia, não existe esse estado intermediário.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: as opções vêm de uma lista e a escolha some</h3>
+<p>Ela passou a gerar as opções com <code>map</code> e a escolha inicial parou de aparecer. O
+<code>useState</code> guardava "Pão francês" e a lista tinha exatamente esse texto — mas um item era a
+string <code>"Pão francês"</code> e o outro vinha de um objeto, com a propriedade <code>nome</code>. O
+valor guardado precisa ser do mesmo tipo e conteúdo do <code>value</code> da opção. Quando a lista é de
+objetos, guarde o id e compare ids.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Onde fica o <code>value</code> de um <code>select</code> controlado?</p>
+<label><input type="radio" name="q1"> em cada <code>option</code>, com o atributo <code>selected</code></label>
+<label><input type="radio" name="q1"> no próprio <code>select</code>, junto com o <code>onChange</code></label>
+<label><input type="radio" name="q1"> no <code>label</code> que aponta para o campo</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que o estado recebe quando o cliente escolhe uma opção "Entrega em casa" com <code>value="entrega"</code>?</p>
+<label><input type="radio" name="q2"> o texto "Entrega em casa", porque é o que aparece</label>
+<label><input type="radio" name="q2"> o número da posição da opção na lista</label>
+<label><input type="radio" name="q2"> o texto "entrega", que é o valor da opção</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Para que serve uma <code>option</code> com <code>value=""</code> no começo da lista?</p>
+<label><input type="radio" name="q3"> para o campo começar sem escolha e o código saber que ninguém decidiu</label>
+<label><input type="radio" name="q3"> para o navegador não mostrar a setinha do select</label>
+<label><input type="radio" name="q3"> para impedir que o cliente escolha as outras opções</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o valor da opção</h2>
+<p>O <code>select</code> guarda o valor da opção escolhida. Na opção abaixo, o rótulo é "Retirar no
+balcão" e o estado deve receber <code>"retirada"</code>. Complete o atributo que falta, escrevendo só a
+palavra que o valor deve ter:</p>
+<div class="ex-code">&lt;option <input aria-label="resposta 1" data-answer="value" placeholder="...">="retirada"&gt;Retirar no balcão&lt;/option&gt;</div>
+<p class="ex-dica">Dica: é o atributo que o <code>select</code> lê para saber qual opção está marcada. Sem
+ele, o navegador usaria o texto "Retirar no balcão" como valor — e aí o estado receberia a frase
+inteira.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O <code>select</code> é a caixa de escolha única: um pai <code>select</code> com <code>value</code> e
+<code>onChange</code>, e várias <code>option</code> com o valor que interessa ao código. O estado guarda o
+<code>value</code> da opção escolhida, não o rótulo. Para começar sem escolha, use uma opção com
+<code>value=""</code> e o estado inicial vazio; para listas maiores, gere as opções com
+<code>map</code> e dê uma <code>key</code> estável a cada uma.</p>
+
+<p>O <code>selected</code> do HTML antigo não se usa: o dono da escolha é o estado. <code>defaultValue</code>
+existe para o caso não controlado, e o critério para escolher entre os dois é sempre o mesmo — a tela
+depende do valor agora? Se sim, estado; se o valor só vai ser lido no envio, <code>defaultValue</code>
+resolve. E cuidado com valores órfãos: o <code>value</code> do select precisa casar exatamente com o
+<code>value</code> de alguma opção, letra por letra.</p>
+
+<p>O formulário da padaria já tem campo curto (<a href="input-controlado.html">input controlado</a>),
+campo longo (<a href="textarea.html">textarea</a>) e escolha única. Falta o caso em que a resposta
+é sim ou não, e o caso em que várias respostas podem valer ao mesmo tempo — o <a href="checkbox.html">checkbox</a>, que
+guarda um booleano em vez de um texto. A próxima parada é essa, e a primeira surpresa vai ser o
+<code>e.target.checked</code>, que não existe nos campos que você viu até aqui.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>value</code> fica no <code>select</code>; <code>value</code> de cada <code>option</code> é o dado.</li>
+<li>O rótulo é o texto entre as tags; o valor é o atributo <code>value</code>.</li>
+<li>O valor precisa casar exatamente com uma das opções; senão a primeira aparece.</li>
+<li><code>&lt;option value=""&gt;</code> cria o estado "ainda não escolheu".</li>
+<li><code>onChange</code> no <code>select</code> entrega <code>e.target.value</code>.</li>
+<li><code>map</code> + <code>key</code> geram as opções a partir de uma lista.</li>
+<li>Não use <code>selected</code> no JSX controlado; o estado é o dono.</li>
+<li><code>defaultValue</code> é para campo não controlado.</li>
+<li><code>option</code> sem <code>value</code> usa o texto como valor — evite.</li>
+<li>Preço vindo de opção é texto: converta com <code>Number()</code>.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

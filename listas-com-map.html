@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Listas com map | Guia React</title>
+<meta name="description" content="Listas com map no React: transformar um array em elementos, a expressão entre chaves, o return que falta e o que mostrar quando a lista está vazia.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Listas com <span class="hl">map</span></h1>
+<p class="intro">A vitrine da Ana tem quatro pães hoje, e ela digitou os quatro à mão: um <code>&lt;li&gt;</code>
+por linha, com o nome copiado e colado. Na sexta-feira chegaram dois pães novos, e ela esqueceu de
+acrescentar um deles — a vitrine ficou um dia inteiro sem o croissant, e ninguém entendeu por quê. O
+problema não é a digitação: a lista de pães já existe em algum lugar, num array, e a tela deveria ser
+consequência dela. Nesta aula ela conhece o <code>map</code>, a ferramenta que transforma um array de
+dados numa lista de elementos.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que o <code>map</code> faz com um array, sem React no meio.</li>
+  <li>Como escrever <code>{lista.map(...)}</code> dentro do JSX.</li>
+  <li>Como cada item vira um <code>&lt;li&gt;</code> — e como vira um cartão com nome e preço.</li>
+  <li>Por que a função com chaves esconde o resultado e deixa a lista vazia.</li>
+  <li>O que fazer com lista vazia, com a contagem e com o número zero.</li>
+  <li>O primeiro contato com a <code>key</code>, que ganha aula própria depois desta.</li>
+  <li>As mensagens de erro que aparecem quando o <code>map</code> é escrito no lugar errado.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a vitrine escrita à mão</h2>
+
+<p>O componente da vitrine da padaria está assim:</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  return (
+    &lt;ul className="vitrine"&gt;
+      &lt;li&gt;Pão francês&lt;/li&gt;
+      &lt;li&gt;Brioche&lt;/li&gt;
+      &lt;li&gt;Sonho&lt;/li&gt;
+      &lt;li&gt;Pão de queijo&lt;/li&gt;
+    &lt;/ul&gt;
+  );
+}</pre>
+
+<p>Quatro linhas quase idênticas. Funciona, e por isso mesmo engana. A Ana copiou a primeira linha e colou
+três vezes, trocando só o texto. Quando o pão do dia muda, ela edita o componente. Quando um pão acaba, ela
+edita o componente. Quando entra um pão novo, ela precisa lembrar de editar o componente — e foi
+exatamente esse lembrete que falhou no dia do croissant.</p>
+
+<p>O que a Ana tem de verdade é um dado: a lista dos pães da vitrine. Num arquivo de JavaScript, essa lista
+se escreve assim:</p>
+
+<pre class="file" data-file="dados.js">const paes = ["Pão francês", "Brioche", "Sonho", "Pão de queijo", "Croissant"];</pre>
+
+<p>Uma linha, cinco pães, e a ordem é a do array. Se a tela fosse desenhada a partir desse array, o
+croissant apareceria sozinho no dia em que entrou — sem ninguém editar JSX. O trabalho, então, é um só:
+pegar cada item do array e transformá-lo num <code>&lt;li&gt;</code>. Quem faz esse trabalho é o
+<code>map</code>, e ele não tem nada de React.</p>
+
+<h2>2. O map, sem React no meio</h2>
+
+<p><code>map</code> é um método de array. Ele percorre o array e devolve um array <strong>novo</strong>, do
+mesmo tamanho, em que cada posição é o resultado da função que você entregou, aplicada ao item daquela
+posição. A função que você entrega é chamada de <em>callback</em>, e é escrita quase sempre como arrow
+function:</p>
+
+<pre class="file" data-file="sem-react.js">const precos = [1.2, 4.5, 3.0];
+
+const comAumento = precos.map((preco) =&gt; preco + 0.3);
+
+console.log(comAumento);</pre>
+
+<p>Três coisas aconteceram. O <code>map</code> pegou o <code>1.2</code>, aplicou a função e guardou
+<code>1.5</code>. Depois o <code>4.5</code>, guardou <code>4.8</code>. Depois o <code>3.0</code>, guardou
+<code>3.3</code>. O array <code>precos</code> continua exatamente como estava; o que mudou foi o array
+novo, <code>comAumento</code>. Essa parte de “não mexer no original” vale a pena guardar: no React, o array
+de dados costuma ser a fonte da verdade, e estragar ele no meio da renderização é uma fonte clássica de
+bug.</p>
+
+<p>Três propriedades do <code>map</code> explicam todo o resto da aula. Primeira: ele devolve sempre um
+array do mesmo tamanho do original — cinco itens entram, cinco saem. Segunda: o que sai é o que a função
+devolveu, item por item; se a função não devolve nada, o array novo fica cheio de <code>undefined</code>,
+sem erro nenhum. Terceira: ele só existe em array — em objeto não há <code>map</code>, e isso rende uma das
+mensagens de erro mais confusas para quem está começando.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método</th><th>O que devolve</th><th>Serve para montar lista no JSX?</th></tr>
+<tr><td><code>map</code></td><td>array novo, do mesmo tamanho, com cada item transformado</td><td>sim: é o método das listas</td></tr>
+<tr><td><code>forEach</code></td><td><code>undefined</code> — ele só executa a função, não junta resultado</td><td>não: o JSX recebe <code>undefined</code> e não desenha nada</td></tr>
+<tr><td><code>filter</code></td><td>array novo só com os itens aprovados pela função</td><td>sim, e costuma vir antes do <code>map</code></td></tr>
+<tr><td><code>find</code></td><td>um item só, o primeiro aprovado</td><td>não para listas: é para achar um item</td></tr>
+<tr><td><code>Object.keys(objeto)</code></td><td>array com os nomes das chaves</td><td>sim: é o jeito de percorrer objeto</td></tr>
+</table>
+</div>
+
+<p>A linha do <code>forEach</code> merece um comentário, porque é a confusão mais comum de quem vem de
+tutoriais antigos: <code>forEach</code> serve para <em>fazer</em> algo com cada item (imprimir, somar,
+chamar uma API), não para <em>devolver</em> algo. Lista na tela é devolver, então é <code>map</code>.</p>
+
+<h2>3. Cada item vira JSX</h2>
+
+<p>Com o <code>map</code> na mão, o componente fica assim:</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  return (
+    &lt;ul className="vitrine"&gt;
+      {paes.map((pao) =&gt; &lt;li&gt;{pao}&lt;/li&gt;)}
+    &lt;/ul&gt;
+  );
+}</pre>
+
+<p>Vale ler essa linha por partes, porque ela concentra a sintaxe toda:</p>
+
+<ul>
+<li>As chaves <code>{</code> e <code>}</code> dizem “aqui dentro é JavaScript, não texto”. Tudo que aparece
+entre elas é uma expressão, e o valor dela é o que o React desenha naquele ponto.</li>
+<li><code>paes.map(...)</code> chama o método no array dos pães. O resultado é um array de elementos
+<code>&lt;li&gt;</code> — e o React sabe desenhar array de elementos.</li>
+<li><code>(pao) =&gt;</code> é a função que recebe cada item, um de cada vez. O nome <code>pao</code> é
+escolha da Ana; podia ser <code>item</code>, <code>nome</code> ou <code>paoDaVez</code>. Ele existe só
+dentro do parêntese e do que vem depois da seta.</li>
+<li><code>&lt;li&gt;{pao}&lt;/li&gt;</code> é o molde que o <code>map</code> repete. O <code>{pao}</code>
+lá dentro é outra expressão, agora para o conteúdo daquele item.</li>
+</ul>
+
+<div class="tryreact" data-goal="conta:.vitrine li=3;;texto:Croissant">
+  <p class="try-task">A vitrine mostra só o primeiro pão, porque alguém escreveu <code>paes[0]</code>.
+  Use o <code>map</code> para desenhar os três — e dê a cada <code>&lt;li&gt;</code> uma
+  <code>key</code> com o próprio nome do pão.</p>
+  <pre class="jsx">const paes = ["Pão francês", "Brioche", "Croissant"];
+
+function App() {
+  return (
+    &lt;ul className="vitrine"&gt;
+      &lt;li&gt;{paes[0]}&lt;/li&gt;
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul class="vitrine"&gt;
+  &lt;li&gt;Pão francês&lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">const paes = ["Pão francês", "Brioche", "Croissant"];
+
+function App() {
+  return (
+    &lt;ul className="vitrine"&gt;
+      {paes.map((pao) =&gt; &lt;li key={pao}&gt;{pao}&lt;/li&gt;)}
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p>O HTML que sai no painel é o mesmo da versão escrita à mão, com uma diferença que muda tudo: agora a
+tela segue o array. Sexto pão no array, sexto <code>&lt;li&gt;</code> na tela. Nenhuma linha do componente
+é editada.</p>
+
+<p>Antes de seguir, um detalhe da função <code>(pao) =&gt; &lt;li&gt;{pao}&lt;/li&gt;</code>: ela não tem
+chaves, não tem <code>return</code> e mesmo assim devolve o <code>&lt;li&gt;</code>. Chama-se retorno
+implícito, e é só uma forma curta de escrever. Guarde essa palavra, porque a próxima seção é justamente
+sobre o que acontece quando a Ana <em>coloca</em> chaves.</p>
+
+<dl class="anatomy">
+<dt>array</dt>
+<dd>A lista de dados — <code>paes</code>, com um texto por posição. O React não desenha array; ele desenha
+o que o <code>map</code> devolve a partir dele.</dd>
+<dt>map</dt>
+<dd>Método de array que percorre os itens e devolve um array novo do mesmo tamanho, com cada item
+transformado pela função que você entrega.</dd>
+<dt>callback</dt>
+<dd>A função entregue ao <code>map</code>: no exemplo, <code>(pao) =&gt; &lt;li&gt;{pao}&lt;/li&gt;</code>.
+Ela roda uma vez para cada item.</dd>
+<dt>retorno implícito</dt>
+<dd>Quando a arrow function não tem chaves, o que vem depois da seta é devolvido automaticamente — sem
+<code>return</code>. Com chaves, o <code>return</code> volta a ser obrigatório.</dd>
+<dt>expressão</dt>
+<dd>Qualquer coisa que produza um valor: <code>paes.map(...)</code>, <code>{pao}</code>,
+<code>pao.preco</code>. Entre chaves, no JSX, só entra expressão.</dd>
+<dt>key</dt>
+<dd>Marca única de cada elemento da lista, para o React saber qual é qual. Não aparece na tela. É o assunto
+da aula seguinte, <a href="a-key.html">A key</a>.</dd>
+</dl>
+
+<h2>4. A lista de objetos: cada pão virou um cartão</h2>
+
+<p>Texto puro resolve vitrine simples. Na padaria, cada pão tem nome e preço, então o array deixa de ser de
+textos e passa a ser de objetos:</p>
+
+<pre class="file" data-file="dados.js">const paes = [
+  { nome: "Pão francês", preco: "R$ 1,20" },
+  { nome: "Brioche", preco: "R$ 4,50" },
+  { nome: "Sonho", preco: "R$ 3,00" }
+];</pre>
+
+<p>Dentro do <code>map</code>, o callback recebe um objeto por vez, e não mais um texto. Então
+<code>{pao}</code> não serve: objeto não é filho válido de elemento. O que vai para a tela é o que você
+escolhe do objeto — <code>{pao.nome}</code>, <code>{pao.preco}</code> — exatamente como se lê prop de
+objeto em <a href="props-com-objetos.html">Props com Objetos</a>.</p>
+
+<div class="tryreact" data-goal="conta:.vitrine li=3;;texto:R$ 4,50">
+  <p class="try-task">A vitrine mostra apenas o primeiro pão, escrito com <code>paes[0]</code>. Troque
+  pela lista inteira: um <code>&lt;li&gt;</code> por pão, com nome, travessão e preço — e
+  <code>key={pao.nome}</code> em cada um.</p>
+  <pre class="jsx">const paes = [
+  { nome: "Pão francês", preco: "R$ 1,20" },
+  { nome: "Brioche", preco: "R$ 4,50" },
+  { nome: "Sonho", preco: "R$ 3,00" }
+];
+
+function App() {
+  return (
+    &lt;ul className="vitrine"&gt;
+      &lt;li&gt;{paes[0].nome} — {paes[0].preco}&lt;/li&gt;
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul class="vitrine"&gt;
+  &lt;li&gt;Pão francês — R$ 1,20&lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">const paes = [
+  { nome: "Pão francês", preco: "R$ 1,20" },
+  { nome: "Brioche", preco: "R$ 4,50" },
+  { nome: "Sonho", preco: "R$ 3,00" }
+];
+
+function App() {
+  return (
+    &lt;ul className="vitrine"&gt;
+      {paes.map((pao) =&gt; &lt;li key={pao.nome}&gt;{pao.nome} — {pao.preco}&lt;/li&gt;)}
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p>O <code>map</code> não mudou: continua transformando cada item no molde que você escreveu. O que mudou
+foi o molde. Dá para ir mais longe e usar uma <code>&lt;div className="cartao"&gt;</code> em vez do
+<code>&lt;li&gt;</code>, com nome, preço e um botão de encomendar dentro — o <code>map</code> não se
+importa com o tamanho do molde.</p>
+
+<p>Com o JSX crescendo, aparecem três lugares onde a mesma lista pode ser escrita. Nenhum é “o certo”;
+todos funcionam, e a escolha depende do tamanho do molde e de quantas vezes ele reaparece:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde fica o map</th><th>Como fica</th><th>Quando usar</th></tr>
+<tr><td>direto no JSX</td><td><code>{paes.map((pao) =&gt; &lt;li key={pao.nome}&gt;{pao.nome}&lt;/li&gt;)}</code></td><td>molde de uma linha, uma lista só na página</td></tr>
+<tr><td>numa variável antes do <code>return</code></td><td><code>const itens = paes.map(...)</code> e depois <code>{itens}</code></td><td>quando precisa filtrar, ordenar ou contar antes de desenhar</td></tr>
+<tr><td>dentro de um componente</td><td><code>{paes.map((pao) =&gt; &lt;Item key={pao.nome} pao={pao} /&gt;)}</code></td><td>molde com várias linhas, ou reaproveitado em outra página</td></tr>
+</table>
+</div>
+
+<p>A terceira linha é a que mais rende: o componente <code>Item</code> recebe um pão por prop e cuida do
+próprio desenho, e o <code>map</code> só decide quantas vezes ele aparece. Repare que a <code>key</code>
+vai no componente <code>&lt;Item&gt;</code>, não na <code>&lt;div&gt;</code> de dentro dele — quem repete é
+o <code>map</code>, então é o elemento repetido que precisa da marca.</p>
+
+<h2>5. A armadilha do return</h2>
+
+<p>A primeira vez que a Ana precisou de mais de uma linha no molde, ela abriu chaves. Era o que fazia em
+qualquer função JavaScript. O resultado foi uma vitrine em branco:</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  return (
+    &lt;ul className="vitrine"&gt;
+      {paes.map((pao) =&gt; {
+        &lt;li key={pao}&gt;{pao}&lt;/li&gt;;
+      })}
+    &lt;/ul&gt;
+  );
+}</pre>
+
+<p>Nada de erro no painel: a lista simplesmente saiu vazia, como
+<code>&lt;ul class="vitrine"&gt;&lt;/ul&gt;</code>. A explicação está na seção 3. Chaves, numa arrow
+function, significam <em>bloco de código</em> — e bloco de código só devolve o que tem
+<code>return</code>. Sem <code>return</code>, a função devolve <code>undefined</code> para cada item, o
+<code>map</code> devolve um array de <code>undefined</code>, e o React não desenha <code>undefined</code>.
+Não é bug do React: é a regra da linguagem.</p>
+
+<div class="tryreact" data-goal="conta:.vitrine li=2;;texto:Sonho">
+  <p class="try-task">A função do <code>map</code> abre chaves e não devolve nada, então os dois pães
+  sumiram. Faça o <code>map</code> devolver o <code>&lt;li&gt;</code> — troque as chaves por parênteses, ou
+  escreva o <code>return</code>.</p>
+  <pre class="jsx">const paes = ["Pão francês", "Sonho"];
+
+function App() {
+  return (
+    &lt;ul className="vitrine"&gt;
+      {paes.map((pao) =&gt; {
+        &lt;li key={pao}&gt;{pao}&lt;/li&gt;;
+      })}
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul class="vitrine"&gt;&lt;/ul&gt;
+</pre>
+  <pre class="solucao">const paes = ["Pão francês", "Sonho"];
+
+function App() {
+  return (
+    &lt;ul className="vitrine"&gt;
+      {paes.map((pao) =&gt; (
+        &lt;li key={pao}&gt;{pao}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p>As duas saídas são boas e você vai ver as duas em código alheio. A dos parênteses troca chaves por
+parênteses — e parêntese só agrupa, não cria bloco, então o retorno volta a ser implícito. A do
+<code>return</code> mantém as chaves e escreve a palavra:</p>
+
+<pre class="file" data-file="App.jsx">      {paes.map((pao) =&gt; {
+        return &lt;li key={pao}&gt;{pao}&lt;/li&gt;;
+      })}</pre>
+
+<p>Na prática, os parênteses servem para molde de uma expressão só, mesmo que ela ocupe várias linhas
+fisicamente. O <code>return</code> aparece quando há trabalho antes dele: calcular a classe do pão quente,
+formatar o preço, decidir se mostra o botão de encomendar. Aí o corpo cresce e o <code>return</code> fica
+no fim, devolvendo o JSX. Um <code>console.log</code> dentro das chaves, antes do <code>return</code>, é
+uma boa forma de ver o item chegando.</p>
+
+<h2>6. A key que o React pede</h2>
+
+<p>Todos os exemplos até aqui escrevem <code>key={...}</code> no elemento que o <code>map</code> repete. A
+aula inteira é sobre <code>map</code>, então cabe a explicação curta — o assunto completo fica em
+<a href="a-key.html">A key</a>.</p>
+
+<ul>
+<li>A <code>key</code> não vira atributo no HTML e não aparece na tela. É um recado para o React.</li>
+<li>Ela identifica cada elemento da lista, para que o React saiba qual é qual quando a lista muda.</li>
+<li>O valor precisa ser único <em>dentro daquela lista</em>: o nome do pão serve, o preço não (dois pães
+podem custar o mesmo).</li>
+<li>A regra prática desta aula: sempre que o <code>map</code> devolve um elemento por item, dê uma
+<code>key</code> a esse elemento.</li>
+</ul>
+
+<p>Quando a <code>key</code> falta, o painel daqui não acusa nada — a lista aparece igual. O aviso existe,
+mas é do console do navegador de verdade, e o custo dele aparece depois, quando a lista muda e o React
+começa a reaproveitar o elemento errado. Como este guia usa listas que mudam a partir da aula seguinte,
+vale pegar o hábito agora, enquanto o molde é pequeno.</p>
+
+<h2>7. Lista vazia, contagem e o zero</h2>
+
+<p>Array vazio não é erro. O <code>map</code> de um array vazio devolve um array vazio, e o React não
+desenha nada: a <code>&lt;ul&gt;</code> sai com zero <code>&lt;li&gt;</code>. É o comportamento correto —
+mas é feio na tela, então quase sempre a página diz alguma coisa no lugar da lista:</p>
+
+<pre class="file" data-file="App.jsx">const paes = [];
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Vitrine&lt;/h2&gt;
+      &lt;p&gt;{paes.length} pães&lt;/p&gt;
+      {paes.length === 0 &amp;&amp; &lt;p className="aviso"&gt;Nenhum pão na vitrine.&lt;/p&gt;}
+      &lt;ul className="vitrine"&gt;
+        {paes.map((pao) =&gt; &lt;li key={pao}&gt;{pao}&lt;/li&gt;)}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>No painel, esse componente desenha o título, o parágrafo <code>0 pães</code>, o aviso e uma
+<code>&lt;ul class="vitrine"&gt;&lt;/ul&gt;</code> vazia no fim. <code>paes.length</code> é a contagem, e
+está disponível em qualquer array. O <code>&amp;&amp;</code> é a condição curta: se a esquerda for
+verdadeira, desenha a direita. Isso é <a href="renderizacao-condicional.html">renderização condicional</a>,
+e voltaremos lá com calma.</p>
+
+<p>Uma pegadinha dessa contagem: o número <code>0</code> <strong>aparece</strong> na tela. Se a Ana
+escrevesse <code>{paes.length &amp;&amp; &lt;p&gt;Nenhum pão&lt;/p&gt;}</code>, com a lista vazia sairia um
+<code>0</code> solto antes do aviso — porque <code>0</code> é um valor desenhável. Já <code>null</code>,
+<code>false</code> e <code>undefined</code> não desenham nada. Confundir “falso” com “invisível” é a origem
+de um <code>0</code> perdido no meio da página.</p>
+
+<pre class="term">console: quantidade: 3
+console: nomes: ["Pão francês","Brioche","Sonho"]</pre>
+
+<p>Essas duas linhas saíram de um <code>console.log("quantidade:", paes.length)</code> e de um
+<code>console.log("nomes:", paes.map((pao) =&gt; pao.nome))</code> colocados no começo do componente. É um
+bom jeito de conferir a lista antes de culpar o JSX: se o array já vem certo, o problema está no molde; se
+vem vazio, o problema está na origem do dado. E se a lista chega por prop, lembre de
+<a href="props-padrao.html">props padrão</a>: <code>{ paes = [] }</code> evita o erro de percorrer
+<code>undefined</code>.</p>
+
+<h2>8. O que não funciona</h2>
+
+<p>Três tropeços aparecem sempre, e cada um tem uma mensagem própria. O primeiro é de compilação: o molde
+abre <code>&lt;li&gt;</code> e fecha <code>&lt;/ul&gt;</code>. Repare que o erro aponta a linha do
+<code>map</code>, não a linha do <code>&lt;/ul&gt;</code>:</p>
+
+<pre class="file" data-file="App.jsx">      {paes.map((pao) =&gt; &lt;li key={pao}&gt;{pao}&lt;/ul&gt;)}</pre>
+
+<pre class="term">Erro: não compilou: /App.jsx: Expected corresponding JSX closing tag for &lt;li&gt;. (6:44)</pre>
+
+<p>A leitura é literal: “esperava a tag de fechamento correspondente para <code>&lt;li&gt;</code>”. O
+<code>6:44</code> é linha e coluna — linha 6, coluna 44 —, e a linha que começa com <code>&gt;</code> na
+mensagem completa é a que tem o problema. Conserto: fechar <code>&lt;/li&gt;</code> e fechar o
+<code>&lt;/ul&gt;</code> fora do <code>map</code>.</p>
+
+<p>O segundo tropeço não é erro de JSX, é erro de tipo: chamar <code>map</code> em objeto. O componente
+para no meio da renderização, e o painel mostra a mensagem genérica de render vazio:</p>
+
+<pre class="file" data-file="App.jsx">const pao = { nome: "Pão francês", preco: "R$ 1,20" };
+
+function App() {
+  return &lt;ul className="vitrine"&gt;{pao.map((item) =&gt; &lt;li&gt;{item}&lt;/li&gt;)}&lt;/ul&gt;;
+}</pre>
+
+<pre class="term">(o React não desenhou nada: o componente devolveu null?)</pre>
+
+<p>A causa real é <code>pao.map is not a function</code>: objeto não tem <code>map</code>. Para percorrer
+objeto, transforme-o em array primeiro — <code>Object.keys(pao).map((chave) =&gt; ...)</code> — ou percorra
+o array de objetos que veio antes. O terceiro tropeço é o da seção 5: chaves sem <code>return</code>,
+painel com a lista vazia e nenhuma mensagem de erro.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sintoma na tela</th><th>Causa provável</th><th>Conserto</th></tr>
+<tr><td>lista vazia, sem mensagem de erro</td><td>arrow function com chaves e sem <code>return</code></td><td>trocar por parênteses ou escrever <code>return</code></td></tr>
+<tr><td><code>Expected corresponding JSX closing tag</code></td><td>tag aberta e fechada com nomes diferentes dentro do molde</td><td>fechar a mesma tag que abriu</td></tr>
+<tr><td><code>(o React não desenhou nada…)</code></td><td><code>map</code> em objeto, ou item do array sem a propriedade usada</td><td>usar <code>Object.keys</code> ou conferir o nome da propriedade</td></tr>
+<tr><td>o texto <code>undefined</code> em cada linha</td><td><code>{pao}</code> num objeto, ou propriedade que não existe</td><td>escolher <code>{pao.nome}</code></td></tr>
+<tr><td>aviso de <code>key</code> no console do navegador</td><td>elemento repetido pelo <code>map</code> sem <code>key</code></td><td>dar <code>key</code> única ao elemento repetido</td></tr>
+</table>
+</div>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o croissant que não entrou</h3>
+<p>A vitrine tinha quatro pães escritos à mão quando o croissant chegou. A Ana acrescentou o pão ao array
+de dados e esqueceu de editar o componente — a tela ficou uma semana desatualizada. Depois do
+<code>map</code>, o array virou a única fonte: ela acrescenta o croissant no dado e a vitrine o mostra na
+mesma hora, sem tocar no JSX. O trabalho de “manter a tela” deixou de existir.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o preço que mudava em nove lugares</h3>
+<p>O pão de queijo aparecia na vitrine, no carrinho e no recibo do dia — três componentes, cada um com o
+preço digitado. Quando o quilo subiu, a Ana esqueceu o recibo e cobrou um valor diferente do que a vitrine
+anunciava. Agora o preço vive num objeto só, e cada tela o percorre com <code>map</code>: mudou o dado,
+mudaram as três telas.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: a vitrine do fim do dia</h3>
+<p>Depois das seis, a padaria vende quase tudo e às vezes não sobra pão nenhum. Na primeira versão, a
+página ficava com um quadrado branco embaixo do título, e os clientes achavam que o site tinha caído. A
+condição <code>paes.length === 0</code> com a mensagem “Nenhum pão na vitrine” resolveu — e a lista vazia
+continuou sendo desenhada, só que discretamente.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Onde vai a expressão <code>paes.map(...)</code> dentro
+do JSX?</p>
+<label><input type="radio" name="q1"> solta, como texto, entre as tags da lista</label>
+<label><input type="radio" name="q1"> entre chaves, dentro do elemento que vai receber os itens</label>
+<label><input type="radio" name="q1"> fora do <code>return</code>, com <code>document.write</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. A arrow function do <code>map</code> abre chaves e
+escreve <code>&lt;li&gt;{pao}&lt;/li&gt;</code> sem <code>return</code>. O que aparece?</p>
+<label><input type="radio" name="q2"> a lista, normalmente</label>
+<label><input type="radio" name="q2"> um erro de compilação apontando o <code>&lt;li&gt;</code></label>
+<label><input type="radio" name="q2"> nada: a lista fica vazia, porque cada item devolveu <code>undefined</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Qual é o jeito de percorrer um objeto com
+<code>map</code>?</p>
+<label><input type="radio" name="q3"> <code>Object.keys(objeto).map(...)</code>, porque <code>map</code> só existe em array</label>
+<label><input type="radio" name="q3"> <code>objeto.map(...)</code>, que o JavaScript converte sozinho</label>
+<label><input type="radio" name="q3"> <code>objeto.forEach(...)</code>, que devolve um array</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a lista de ingredientes</h2>
+
+<p>O pão recheado tem uma lista de ingredientes que vem num array, e o componente precisa desenhar um
+ingrediente por linha. Complete o espaço com o método que transforma cada item num <code>&lt;li&gt;</code>:</p>
+
+<div class="ex-code">const ingredientes = ["Queijo", "Presunto", "Orégano"];
+
+function App() {
+  return &lt;ul className="ficha"&gt;{ingredientes.<input aria-label="resposta 1" data-answer="map" placeholder="...">((item) =&gt; &lt;li key={item}&gt;{item}&lt;/li&gt;)}&lt;/ul&gt;;
+}</div>
+
+<p class="ex-dica">Dica: é o método que devolve um array novo, do mesmo tamanho do original. Se você
+escrever o método que só executa a função — o das listas de tutorial antigo —, o JSX recebe
+<code>undefined</code> e a lista sai vazia.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Lista na tela é dado transformado. O <code>map</code> percorre o array e devolve um array novo do mesmo
+tamanho, com cada item virado no molde que você escreveu: <code>{paes.map((pao) =&gt; &lt;li key={pao}&gt;{pao}&lt;/li&gt;)}</code>.
+As chaves dizem “aqui é JavaScript”; a arrow recebe um item por vez; o JSX depois da seta é o que se
+repete.</p>
+
+<p>Se o molde ganha mais de uma linha, ou você usa parênteses (retorno implícito) ou usa chaves com
+<code>return</code>. Chaves sem <code>return</code> não dão erro: dão lista vazia. Item repetido pelo
+<code>map</code> pede uma <code>key</code> única — a aula seguinte é sobre ela. E lista vazia é caso
+normal: o <code>map</code> devolve vazio, o React não desenha nada, e a página diz o que fazer no lugar.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>map</code> transforma: entra array, sai array do mesmo tamanho.</li>
+<li><code>forEach</code> não devolve nada; não serve para lista no JSX.</li>
+<li>A expressão vai entre chaves: <code>{lista.map(...)}</code>.</li>
+<li>O molde é o JSX depois da seta: <code>(pao) =&gt; &lt;li&gt;{pao}&lt;/li&gt;</code>.</li>
+<li>Com chaves, <code>return</code> é obrigatório; com parênteses, é implícito.</li>
+<li>Objeto não tem <code>map</code>: use <code>Object.keys(objeto).map(...)</code>.</li>
+<li><code>key</code> vai no elemento repetido, com valor único dentro da lista.</li>
+<li>Lista vazia desenha nada; o <code>0</code> da contagem, esse aparece.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Textarea | Guia React</title>
+<meta name="description" content="O textarea no React: um campo de várias linhas ligado ao estado, o texto que não vai entre as tags, contador de caracteres, maxLength e quebras de linha na prévia.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Textarea</span></h1>
+<p class="intro">O bolo de aniversário da padaria da Ana vem com um recado escrito na cobertura, e o
+cliente precisa de espaço para escrever mais de uma linha: "Parabéns, Ana" numa linha e "com muito
+carinho da família" na outra. O campo de uma linha do cadastro não serve — ele esconde o texto quando
+passa da largura e não aceita Enter. Nesta aula a Ana troca o <code>input</code> pelo
+<code>textarea</code>, aprende onde o texto mora (e onde ele não mora), conta os caracteres e faz a
+prévia respeitar as quebras de linha.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que muda entre um <code>input</code> e um <code>textarea</code>.</li>
+  <li>Como ligar o <code>textarea</code> ao estado com <code>value</code> e <code>onChange</code>.</li>
+  <li>Por que o texto não vai entre as tags no React.</li>
+  <li>Como contar os caracteres e limitar com <code>maxLength</code>.</li>
+  <li>O que acontece com o Enter e onde ficam as quebras de linha.</li>
+  <li>Como mostrar o recado com as linhas certas usando <code>white-space</code>.</li>
+  <li>Como controlar altura com <code>rows</code> e com CSS.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o recado que precisa de linhas</h2>
+
+<p>A padaria vende bolo por encomenda e o cliente escolhe a mensagem escrita na cobertura. A Ana começou
+com um <code>input</code> comum, do mesmo tipo que ela já usa no cadastro. O primeiro cliente escreveu
+"Parabéns, Ana. Com muito carinho, vó Maria e toda a família" — e o campo engoliu a frase numa linha só,
+rolando para a direita, com o começo escondido. Quando ela imprimiu a comanda, o recado saiu cortado.</p>
+
+<p>O problema não é o tamanho do campo, é a tag. Um <code>input</code> é, por definição, uma linha: o Enter
+não cria linha nova e o texto longo escorre para fora da vista. Para várias linhas existe o
+<code>textarea</code>, um elemento próprio, com altura, rolagem interna e quebras de linha de verdade. A
+troca parece pequena no código e muda bastante a experiência de quem escreve.</p>
+
+<p>A boa notícia é que o mecanismo de estado continua o mesmo: <code>value</code> mostrando e
+<code>onChange</code> devolvendo o texto. O <code>textarea</code> tem, porém, duas manias que atrapalham
+quem vem do HTML puro: o valor não é atributo e o texto não vai entre as tags. É sobre isso que a aula
+trata, além do que fazer com as linhas.</p>
+
+<h2>2. O que muda em relação ao input</h2>
+
+<p>No HTML antigo, um <code>textarea</code> recebia o texto inicial entre as tags:
+<code>&lt;textarea&gt;oi&lt;/textarea&gt;</code>. No React isso não funciona como valor; o valor vem do
+estado, e as tags ficam vazias. Guarde essa diferença, porque ela é a origem do erro mais comum da aula.
+As demais peças são parecidas:</p>
+
+<dl class="anatomy">
+<dt><code>textarea</code></dt>
+<dd>A tag de campo com várias linhas. Tem abertura e fechamento — não é uma tag vazia como
+<code>input</code>.</dd>
+<dt><code>rows</code></dt>
+<dd>Quantas linhas de altura o campo mostra de saída. É uma dica de tamanho, não um limite de
+conteúdo.</dd>
+<dt><code>value</code> e <code>onChange</code></dt>
+<dd>O mesmo par do <code>input</code>: o valor vem do estado e cada tecla devolve o texto novo.</dd>
+<dt>quebra de linha</dt>
+<dd>O caractere <code>\n</code> que o Enter insere no texto. Existe no valor, mas não aparece sozinho na
+tela.</dd>
+<dt><code>maxLength</code></dt>
+<dd>O limite de caracteres que o navegador deixa digitar. Conta letra, espaço e quebra de linha.</dd>
+</dl>
+
+<p>Repare que não existe <code>type</code> no <code>textarea</code>. Quem decide que ele é de várias linhas
+é a própria tag. Se você escrever <code>type="text"</code> nele, o atributo é ignorado — e um aviso aparece
+no console em modo de desenvolvimento. Do mesmo jeito, <code>placeholder</code>, <code>maxLength</code>,
+<code>readOnly</code> e <code>disabled</code> funcionam igual aos do <code>input</code>, porque são
+atributos comuns de campo.</p>
+
+<p>A tabela abaixo resume a troca, para você consultar quando estiver em dúvida sobre qual tag usar:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Assunto</th><th><code>input</code></th><th><code>textarea</code></th></tr>
+<tr><td>linhas</td><td>uma só; Enter não quebra</td><td>várias; Enter quebra a linha</td></tr>
+<tr><td>texto inicial</td><td>atributo <code>value</code></td><td>estado no <code>value</code>, tags vazias</td></tr>
+<tr><td>altura</td><td>fixa, definida pelo CSS</td><td><code>rows</code> e CSS; pode ser arrastada</td></tr>
+<tr><td>texto longo</td><td>rola para o lado, escondendo o começo</td><td>quebra linha e cresce para baixo</td></tr>
+<tr><td>Enter</td><td>em formulário, envia</td><td>quebra a linha</td></tr>
+</table>
+</div>
+
+<p>Essa diferença de comportamento no Enter não é detalhe: num formulário de contato, apertar Enter no
+<code>input</code> envia a mensagem, e apertar Enter no <code>textarea</code> só desce uma linha. Quem
+preenche um recado precisa dessa segunda opção, e quem preenche um campo curto agradece a primeira. A tag
+certa dá o comportamento certo de graça.</p>
+
+<h2>3. Ligando o textarea ao estado</h2>
+
+<p>A primeira missão da Ana é a mais direta: pegar o <code>textarea</code> que ela já desenhou e ligá-lo ao
+estado, mostrando o recado embaixo. O componente abaixo tem o campo e o rótulo, mas o parágrafo está fixo
+— do jeito que está, o que o cliente escreve fica só dentro do campo:</p>
+
+<div class="tryreact" data-goal="digite:textarea=Parabéns, Ana;;texto:Recado: Parabéns, Ana">
+  <p class="try-task">O recado não chega ao parágrafo. Crie o estado <code>recado</code>, ligue o
+  <code>textarea</code> com <code>value</code> e <code>onChange</code> e mostre
+  <code>Recado: {recado}</code>.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="recado"&gt;Recado no bolo&lt;/label&gt;
+      &lt;textarea id="recado" rows="3"&gt;&lt;/textarea&gt;
+      &lt;p&gt;Recado: (vazio)&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="recado"&gt;Recado no bolo&lt;/label&gt;
+  &lt;textarea id="recado" rows="3"&gt;&lt;/textarea&gt;
+  &lt;p&gt;Recado: (vazio)&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [recado, setRecado] = useState("");
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="recado"&gt;Recado no bolo&lt;/label&gt;
+      &lt;textarea
+        id="recado"
+        rows="3"
+        value={recado}
+        onChange={(e) =&gt; setRecado(e.target.value)}
+      &gt;&lt;/textarea&gt;
+      &lt;p&gt;Recado: {recado}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Note que o <code>textarea</code> tem fechamento: <code>&lt;/textarea&gt;</code>. Não dá para escrever
+<code>&lt;textarea /&gt;</code> como se faz com o <code>input</code>, porque o React precisa das duas tags
+para montar o elemento direito. As tags ficam vazias — o conteúdo vem do estado. No painel, depois de
+rodar, você vê o campo assim: <code>&lt;textarea rows="3"&gt;&lt;/textarea&gt;</code>. Digite na prévia e
+o parágrafo acompanha.</p>
+
+<p>Esse "digite e acompanhe" é a melhor forma de confirmar que a ligação está completa. Se o parágrafo
+muda mas o campo não acompanha, falta o <code>value</code>. Se o campo aceita texto mas o parágrafo fica
+parado, falta o <code>onChange</code> ou o <code>setRecado</code> não está sendo chamado. Com os dois, o
+recado aparece nos dois lugares ao mesmo tempo.</p>
+
+<h2>4. O erro clássico: texto entre as tags</h2>
+
+<p>Quem aprendeu HTML antes do React escreve isto por reflexo:</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const [recado, setRecado] = useState("Bom dia");
+
+  return (
+    &lt;textarea&gt;{recado}&lt;/textarea&gt;
+  );
+}</pre>
+
+<p>O campo até mostra "Bom dia" na primeira renderização, e é aí que o problema se esconde: ao digitar,
+o texto novo fica no DOM mas o estado não muda, e a ligação quebra. No modo de desenvolvimento, o React
+avisa no console que o conteúdo de um <code>textarea</code> deve vir de <code>value</code> ou de
+<code>defaultValue</code>, e não de filhos. O aviso, em resumo, é este:</p>
+
+<pre class="term">Warning: Use the defaultValue or value props instead of setting children on textarea.</pre>
+
+<p>O conserto é tirar o texto de dentro das tags e colocar no <code>value</code>:
+<code>&lt;textarea value={recado} onChange={...} /&gt;</code> — com as duas tags vazias, mas com o valor
+vindo do estado. Isso vale também para o caso de "começar preenchido": o valor inicial é o
+<code>useState("Bom dia")</code>, não o texto entre as tags.</p>
+
+<p>Há uma exceção: <code>defaultValue</code> serve para um campo não controlado começar com texto. Só que
+aí você abre mão de acompanhar cada tecla, e a conversa de controlado e não controlado tem aula própria
+mais adiante no nível. Para o recado do bolo, controlado é o que interessa: a Ana quer o contador, a
+prévia e a validação de tamanho funcionando juntos.</p>
+
+<h2>5. Contar caracteres e limitar com maxLength</h2>
+
+<p>O bolo tem espaço para 40 caracteres no topo. Passou disso, a confeiteira corta a frase — e a Ana
+prefere avisar antes. Duas coisas resolvem: um contador que mostra quanto já foi digitado e um
+<code>maxLength</code> que impede o excesso no teclado. O contador é só o tamanho do estado, e o tamanho de
+uma string em JavaScript se lê com <code>.length</code>.</p>
+
+<div class="tryreact" data-goal="digite:textarea=Bom dia;;texto:7/40 caracteres;;attr:textarea|maxlength=40">
+  <p class="try-task">Mostre quantos caracteres já foram digitados, no formato <code>7/40 caracteres</code>,
+  e coloque <code>maxLength={40}</code> no campo.</p>
+  <pre class="jsx">function App() {
+  const [recado, setRecado] = useState("");
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="recado"&gt;Recado no bolo (até 40 caracteres)&lt;/label&gt;
+      &lt;textarea
+        id="recado"
+        rows="3"
+        value={recado}
+        onChange={(e) =&gt; setRecado(e.target.value)}
+      &gt;&lt;/textarea&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="recado"&gt;Recado no bolo (até 40 caracteres)&lt;/label&gt;
+  &lt;textarea id="recado" rows="3"&gt;&lt;/textarea&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [recado, setRecado] = useState("");
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="recado"&gt;Recado no bolo (até 40 caracteres)&lt;/label&gt;
+      &lt;textarea
+        id="recado"
+        rows="3"
+        maxLength={40}
+        value={recado}
+        onChange={(e) =&gt; setRecado(e.target.value)}
+      &gt;&lt;/textarea&gt;
+      &lt;p&gt;{recado.length}/40 caracteres&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois do conserto, o painel mostra o atributo <code>maxlength="40"</code> e o
+<code>textarea</code> vazio. Digite "Bom dia" na prévia: são 7 caracteres, incluindo o espaço. O contador é uma conta feita no desenho, não um
+estado novo — se você criasse um <code>useState</code> para o número, teria de lembrar de atualizá-lo em
+todo lugar e um dia esqueceria.</p>
+
+<p>O <code>maxLength</code> é uma trava do navegador, e trava só o que é digitado. Texto colado por código
+(um valor vindo de outro campo, por exemplo) passa por cima dele. Por isso a contagem e a trava de verdade
+também aparecem na validação, mais adiante. Aqui, o par contador + <code>maxLength</code> já resolve a
+experiência de quem escreve: a pessoa vê o limite chegando e não perde o texto que digitou.</p>
+
+<p>Se quiser variar a mensagem conforme o espaço, dá para usar o próprio número:
+<code>{recado.length &gt; 30 ? "falta pouco" : ""}</code>. É a mesma ideia de renderização condicional que
+você já viu, aplicada a uma conta simples. O importante é não transformar cada detalhe da tela num estado
+separado.</p>
+
+<h2>6. As quebras de linha e o white-space</h2>
+
+<p>Agora a mania mais confusa do <code>textarea</code>. Quando o cliente aperta Enter, o texto ganha um
+caractere invisível: <code>\n</code>. Esse caractere existe no valor do estado e você consegue vê-lo em um
+<code>console.log</code>. Mas o HTML trata espaços e quebras de linha como um espaço só na hora de exibir —
+é por isso que a prévia mostra o recado todo grudado, mesmo com o valor certo.</p>
+
+<p>A Ana quer que a comanda mostre o recado do jeito que o cliente escreveu. O componente abaixo guarda duas
+linhas, mas a prévia junta tudo com " / " para contornar o problema:</p>
+
+<div class="tryreact" data-goal="css:#previa|white-space=pre-line">
+  <p class="try-task">A prévia está juntando as linhas com " / ". Troque o <code>join(" / ")</code> por
+  <code>{recado}</code> e acrescente <code>style={{ whiteSpace: "pre-line" }}</code> no parágrafo para as
+  quebras aparecerem.</p>
+  <pre class="jsx">function App() {
+  const [recado, setRecado] = useState("Bom dia\nPão quentinho às 7h");
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="recado"&gt;Recado no bolo&lt;/label&gt;
+      &lt;textarea
+        id="recado"
+        rows="3"
+        value={recado}
+        onChange={(e) =&gt; setRecado(e.target.value)}
+      &gt;&lt;/textarea&gt;
+      &lt;p id="previa"&gt;{recado.split("\n").join(" / ")}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="recado"&gt;Recado no bolo&lt;/label&gt;
+  &lt;textarea id="recado" rows="3"&gt;Bom dia
+Pão quentinho às 7h&lt;/textarea&gt;
+  &lt;p id="previa"&gt;Bom dia / Pão quentinho às 7h&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [recado, setRecado] = useState("Bom dia\nPão quentinho às 7h");
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="recado"&gt;Recado no bolo&lt;/label&gt;
+      &lt;textarea
+        id="recado"
+        rows="3"
+        value={recado}
+        onChange={(e) =&gt; setRecado(e.target.value)}
+      &gt;&lt;/textarea&gt;
+      &lt;p id="previa" style={{ whiteSpace: "pre-line" }}&gt;{recado}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p><code>white-space: "pre-line"</code> diz ao navegador para respeitar as quebras de linha do texto. Sem
+ele, o HTML colapsa as quebras em espaço; com ele, cada <code>\n</code> vira uma linha na tela. Existem
+outros valores: <code>normal</code> (o padrão, que junta tudo), <code>pre</code> (respeita quebras e
+espaços, mas não quebra linha sozinho) e <code>pre-wrap</code> (respeita os dois e ainda quebra quando
+passa da largura). Para recado de bolo, <code>pre-line</code> é o mais equilibrado.</p>
+
+<p>Para ver o que o estado guarda de verdade, um <code>console.log</code> com o valor dividido por
+quebra de linha mostra o texto em pedaços:</p>
+
+<pre class="term">recado.split("\n")
+["Bom dia", "Pão quentinho às 7h"]
+recado.length: 31</pre>
+
+<p>O CSS está escrito ali no próprio JSX, com duas chaves e um objeto, porque é um caso de uma regra só. A
+sintaxe é <code>style={{ whiteSpace: "pre-line" }}</code>: a chave de fora é a expressão do JSX, a de
+dentro é o objeto de estilo, e a propriedade usa o nome em camelCase — <code>whiteSpace</code>, não
+<code>white-space</code>. A aula de estilo inline cobre o assunto com calma; aqui basta saber que essa
+linha é a diferença entre um recado legível e um parágrafo grudado.</p>
+
+<h2>7. Altura, rows e o redimensionamento</h2>
+
+<p>O <code>rows</code> define quantas linhas o campo mostra quando aparece. Não é um limite de conteúdo:
+se a pessoa escrever mais, o campo ganha uma barra de rolagem interna. O padrão do navegador é
+<code>rows="2"</code>, o que costuma ser apertado para um recado; a Ana usa <code>rows="3"</code> ou
+<code>rows="4"</code> e ajusta o resto com CSS.</p>
+
+<p>Por padrão, o canto do <code>textarea</code> pode ser arrastado para aumentar ou diminuir a altura. Isso
+é útil em algumas telas e desastroso em outras: o leitor arrasta sem querer, o formulário desalinha e o
+layout quebra. O CSS <code>resize</code> controla esse comportamento — <code>resize: none</code> desliga a
+alça, <code>resize: vertical</code> deixa só aumentar para baixo. Como isso é estilo, não estado, vai no
+CSS ou no <code>style</code> do componente.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você quer</th><th>Como se faz</th><th>Onde vai</th></tr>
+<tr><td>altura inicial</td><td><code>rows={4}</code></td><td>atributo do JSX</td></tr>
+<tr><td>altura fixa em pixels</td><td><code>height: "120px"</code></td><td>CSS ou <code>style</code></td></tr>
+<tr><td>ocupar a largura da coluna</td><td><code>width: "100%"</code></td><td>CSS ou <code>style</code></td></tr>
+<tr><td>desligar a alça de arrastar</td><td><code>resize: "none"</code></td><td>CSS ou <code>style</code></td></tr>
+<tr><td>manter as quebras de linha</td><td><code>white-space: "pre-line"</code></td><td>CSS ou <code>style</code></td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="Recado.jsx">function Recado() {
+  const [recado, setRecado] = useState("");
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="recado"&gt;Recado no bolo&lt;/label&gt;
+      &lt;textarea
+        id="recado"
+        rows="4"
+        maxLength={40}
+        placeholder="Até 40 caracteres"
+        value={recado}
+        onChange={(e) =&gt; setRecado(e.target.value)}
+        style={{ resize: "vertical", width: "100%" }}
+      &gt;&lt;/textarea&gt;
+      &lt;p&gt;{recado.length}/40 caracteres&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Três decisões aparecem nesse arquivo: a altura inicial com <code>rows</code>, o limite com
+<code>maxLength</code> e a largura com <code>width: "100%"</code>, para o campo acompanhar a coluna em vez
+de ter uma largura fixa em pixels. Em tela de celular, largura fixa é a receita para a página rolar de
+lado — e o guia inteiro é testado a 375 px por causa disso.</p>
+
+<p>Uma tentação comum é tentar fazer o campo crescer sozinho conforme o texto, mexendo na altura a cada
+tecla. Dá para fazer, mas exige medir o conteúdo com <code>useRef</code> e efeito, e a aula de
+<code>useRef</code> é o lugar certo para isso. Para o recado de 40 caracteres, um campo de quatro linhas
+resolve sem nenhum código extra.</p>
+
+<h2>8. Enter, Shift+Enter e o envio</h2>
+
+<p>Dentro do <code>textarea</code>, Enter quebra a linha e Shift+Enter também — os dois funcionam igual,
+porque não existe atalho de envio aqui. Quem envia é o botão, e o envio de formulário tem aula própria,
+logo depois da validação. Por enquanto, vale saber que o recado com quebras de linha vai para o estado do
+mesmo jeito que qualquer texto: uma string com caracteres <code>\n</code> no meio.</p>
+
+<p>Se você quiser impedir Enter em um campo específico — por exemplo, um campo curto que não deve ter
+quebra —, dá para escutar o <code>onKeyDown</code> e chamar <code>e.preventDefault()</code> quando a tecla
+for <code>"Enter"</code>. Isso é exceção, não regra. E é bom lembrar que o <code>textarea</code> não
+valida formato: ele aceita qualquer caractere, inclusive emoji, acento e quebra de linha. Se o recado tem
+limite, quem conta é você.</p>
+
+<p>Também vale saber que o valor do <code>textarea</code> chega no <code>e.target.value</code> como uma
+string normal, com os <code>\n</code> preservados. Se você fizer <code>recado.length</code>, cada quebra de
+linha conta como um caractere. Uma frase de duas linhas com 20 letras cada tem 41 caracteres, não 40 — e
+esse detalhe já estourou mais limite de campo do que qualquer outro.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o campo começa preenchido e não deixa apagar</h3>
+<p>A Ana escreveu o texto entre as tags para o campo começar com "Bom dia" e, na primeira tecla, o texto
+voltou. Era o clássico <code>&lt;textarea&gt;{recado}&lt;/textarea&gt;</code> com um estado que nunca
+mudava. O valor inicial se define no <code>useState</code>; as tags ficam vazias. Depois do conserto, o
+campo começa com o texto e apaga normalmente.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o recado aparece todo grudado na comanda</h3>
+<p>O estado tinha as duas linhas, o campo mostrava as duas linhas e o parágrafo de conferência mostrava
+tudo junto. Não era bug do <code>textarea</code>: o HTML colapsa quebras de linha na exibição. A solução
+foi <code>white-space: "pre-line"</code> no parágrafo. Se a comanda for um <code>pre</code> ou um e-mail,
+o mesmo texto precisa de um tratamento parecido.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o contador passa do limite</h3>
+<p>Ela pôs <code>maxLength={40}</code> e o contador mostrando <code>{recado.length}/40</code>. Um teste
+com texto colado pelo console passou de 40 e o contador mostrou 47/40. O atributo limita a digitação, não
+o valor que entra por código. Se o limite é regra de negócio, valide no envio também — e mostre a mensagem
+antes de cortar o texto do cliente.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Como um <code>textarea</code> controlado recebe o texto?</p>
+<label><input type="radio" name="q1"> entre as tags: <code>&lt;textarea&gt;{recado}&lt;/textarea&gt;</code></label>
+<label><input type="radio" name="q1"> pelo atributo <code>value</code>, com as tags vazias</label>
+<label><input type="radio" name="q1"> pelo atributo <code>type="text"</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que <code>rows="3"</code> faz?</p>
+<label><input type="radio" name="q2"> limita o texto a três linhas</label>
+<label><input type="radio" name="q2"> cria três campos iguais</label>
+<label><input type="radio" name="q2"> mostra três linhas de altura, sem limitar o conteúdo</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Por que o recado com Enter aparece todo junto na prévia?</p>
+<label><input type="radio" name="q3"> o HTML colapsa as quebras de linha; falta <code>white-space: "pre-line"</code></label>
+<label><input type="radio" name="q3"> o <code>textarea</code> apaga as quebras ao digitar</label>
+<label><input type="radio" name="q3"> o estado não aceita o caractere <code>\n</code></label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: fechar a tag</h2>
+<p>O campo abaixo está sem o fechamento e sem o valor vindo do estado. Complete a tag de fechamento,
+escrevendo só o nome do elemento:</p>
+<div class="ex-code">&lt;textarea value={recado} onChange={(e) =&gt; setRecado(e.target.value)}&gt;&lt;/<input aria-label="resposta 1" data-answer="textarea" placeholder="...">&gt;</div>
+<p class="ex-dica">Dica: é o mesmo nome da tag de abertura, em minúsculas. Se você escrever só
+<code>/&gt;</code>, o JSX não compila; o <code>textarea</code> precisa das duas tags, mesmo vazio.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O <code>textarea</code> é o campo de várias linhas, e no React ele é controlado como qualquer outro:
+<code>value</code> vindo do estado e <code>onChange</code> devolvendo o texto. O texto não vai entre as
+tags; as tags ficam vazias e o valor inicial mora no <code>useState</code>. <code>rows</code> dá a altura
+inicial, <code>maxLength</code> trava a digitação e o contador é uma conta com <code>.length</code>.</p>
+
+<p>As quebras de linha do Enter viram <code>\n</code> no valor e não aparecem sozinhas na tela: o HTML
+junta tudo. Para exibir o recado com as linhas certas, use <code>white-space: "pre-line"</code> no
+elemento que mostra o texto. E lembre que cada <code>\n</code> conta como um caractere no limite.</p>
+
+<p>Com isso, o formulário da padaria já tem campo curto e campo longo. Falta a escolha entre opções fixas
+— o sabor do pão, a forma de entrega, o horário da retirada. É o assunto da próxima aula, o
+<a href="select.html">select</a>, que tem uma diferença importante: o valor não fica no campo, fica na
+opção escolhida. O par <code>value</code> e <code>onChange</code> continua o mesmo, mas o lugar de ler o
+valor muda. Se quiser comparar os dois campos lado a lado, a aula do
+<a href="input-controlado.html">input controlado</a> mostra o irmão de uma linha.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>textarea</code> tem abertura e fechamento; não existe <code>&lt;textarea /&gt;</code>.</li>
+<li>O valor vem de <code>value</code>; texto entre as tags não é valor no React.</li>
+<li>O valor inicial se define no <code>useState</code>, não no HTML.</li>
+<li><code>rows</code> é altura inicial, não limite de linhas.</li>
+<li><code>maxLength</code> trava a digitação, mas não o texto colocado por código.</li>
+<li>Contador é <code>{recado.length}</code>, uma conta no render.</li>
+<li>Enter vira <code>\n</code> no estado e conta como caractere.</li>
+<li>Para mostrar as quebras: <code>white-space: "pre-line"</code>.</li>
+<li>No JSX, estilo é <code>style={{ whiteSpace: "pre-line" }}</code>.</li>
+<li><code>resize</code> no CSS controla a alça de redimensionar.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

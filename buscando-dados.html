@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buscando Dados | Guia React</title>
+<meta name="description" content="Buscar dados no React do jeito certo: por que o pedido vive no useEffect, a forma com then, o fetch de verdade com res.json() e pedidos em série ou independentes.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Buscando <span class="hl">Dados</span></h1>
+<p class="intro">Os pães da vitrine da Ana mudam todo dia, e o preço do dia só existe no servidor da
+padaria. Escrever essa lista à mão dentro do componente não resolve: amanhã ela está errada. Nesta aula
+a Ana faz o componente <strong>pedir</strong> os dados — e descobre por que esse pedido não pode ficar no
+meio do render, onde ele vive, como guardar a resposta no estado e como encadear dois pedidos sem
+embolar um com o outro.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que buscar dados é um efeito e não um cálculo do render.</li>
+  <li>A forma básica: um estado para os dados, um efeito com <code>[]</code> e um <code>.then</code>.</li>
+  <li>Como é o <code>fetch</code> de verdade, com <code>resposta.ok</code> e <code>resposta.json()</code>.</li>
+  <li>Como fazer um pedido depender do outro com <code>async</code> e <code>await</code> dentro do efeito.</li>
+  <li>Como disparar dois pedidos independentes sem esperar um pelo outro.</li>
+  <li>Os quatro tropeços: guardar a Promise no estado, esquecer o <code>.json()</code>, usar
+  <code>async</code> na função do efeito e pedir duas vezes sem querer.</li>
+  <li>O que a caixa faz no lugar da internet — e por que o resultado aparece no painel.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o preço que muda todo dia</h2>
+
+<p>A vitrine da Ana tem quatro pães, e o preço de cada um muda quase toda semana. Enquanto eram dois
+pães e o preço era fixo, ela escrevia à mão:</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  return (
+    &lt;ul&gt;
+      &lt;li&gt;Pão francês — 2 reais&lt;/li&gt;
+      &lt;li&gt;Croissant — 4 reais&lt;/li&gt;
+    &lt;/ul&gt;
+  );
+}</pre>
+
+<p>Funcionou por três semanas. Depois veio o quarto pão, a promoção de terça, o aumento da farinha. Ela
+mudava o preço no site, mas o site não é o lugar onde o preço mora: o preço mora no sistema da padaria,
+que fica em um servidor. O site só deve <strong>mostrar</strong> o que o servidor diz. E para saber o que
+o servidor diz, o componente precisa perguntar.</p>
+
+<p>Perguntar é uma ação com o mundo de fora, então já sabemos em qual faixa ela cai: é um efeito. O
+componente desenha o que tem (uma lista vazia, no começo), e depois de montado pede os dados; quando a
+resposta chega, ele guarda no estado e desenha de novo, agora com os pães. É o mesmo caminho que você viu
+na aula do <code>useEffect</code>, com uma diferença importante: a resposta não chega na hora. Leva
+tempo, e o componente tem de viver com isso.</p>
+
+<p>Essa demora é a fonte de quase toda a confusão daqui para frente. Quem programa em outras linguagens
+está acostumado a escrever uma linha que busca e devolve na mesma frase. No navegador não é assim: o
+pedido sai, o JavaScript continua trabalhando, e a resposta chega depois, numa função que você entrega
+para ser chamada quando ela chegar. Essa função é o <code>.then</code>, ou o código depois do
+<code>await</code>.</p>
+
+<h2>2. Por que o pedido não pode ficar no render</h2>
+
+<p>O lugar mais intuitivo para o pedido seria antes do <code>return</code>, junto dos cálculos. E é
+exatamente o lugar errado. O render precisa ser uma função pura: dado o mesmo estado, devolver o mesmo
+JSX. Se o pedido estiver ali, três problemas aparecem de uma vez.</p>
+
+<p>Primeiro, o render roda muitas vezes. Cada mudança de estado, cada mudança de prop, cada clique que
+atualiza algo faz o componente ser chamado de novo — e cada chamada dispararia outro pedido. Segundo, no
+modo de desenvolvimento o React chama o componente duas vezes de propósito; dois pedidos sem motivo.
+Terceiro, o pedido não devolve nada na hora: você não pode escrever <code>const lista = buscar()</code> e
+usar <code>lista</code> no JSX, porque naquele instante <code>lista</code> ainda é uma promessa, não uma
+lista.</p>
+
+<p>Existe um jeito de pedir dados sem efeito, que é o React moderno com componentes de servidor, onde o
+componente roda no servidor e pode esperar. Esse jeito é de outro nível e de outro tipo de projeto. No
+navegador, com o React rodando no cliente — que é o caso deste guia e da padaria —, a regra é: pedido
+vai no efeito.</p>
+
+<h2>3. A forma básica: estado, efeito e <code>.then</code></h2>
+
+<p>Toda busca no React tem a mesma anatomia: um estado para guardar o resultado, um efeito com
+<code>[]</code> para sair uma vez só, e uma função que espera a resposta para chamar o
+<code>set</code>. Veja a lista de peças antes do código:</p>
+
+<dl class="anatomy">
+<dt>estado dos dados</dt>
+<dd>Onde a resposta vai morar: <code>const [paes, setPaes] = useState([])</code>. Comece com uma lista
+vazia (ou <code>null</code>, quando "nada ainda" é diferente de "lista vazia").</dd>
+<dt>pedido</dt>
+<dd>A chamada que sai para o servidor. Nesta caixa, uma função <code>buscarPaes()</code> que devolve uma
+Promise; no projeto de verdade, o <code>fetch</code>.</dd>
+<dt>Promise</dt>
+<dd>O objeto que representa "ainda vai chegar". Ele não tem a lista dentro; tem a promessa de que um dia
+terá.</dd>
+<dt><code>.then</code></dt>
+<dd>A função que você entrega para rodar quando a resposta chegar: <code>.then((lista) =&gt;
+setPaes(lista))</code>.</dd>
+<dt>efeito com <code>[]</code></dt>
+<dd>O que faz o pedido sair uma vez, na montagem, e não a cada render.</dd>
+</dl>
+
+<p>Na caixa, a função <code>buscarPaes</code> simula o servidor: ela devolve uma Promise que se resolve
+10 milissegundos depois com dois pães. Esse atraso pequeno é de propósito — assim o painel mostra o
+resultado sem você esperar. O efeito já chama a função, mas joga o resultado fora. A missão é guardar.</p>
+
+<div class="tryreact" data-goal="texto:Pães na vitrine: 2">
+  <p class="try-task">O efeito chama <code>buscarPaes()</code> e descarta a resposta. Use o
+  <code>.then</code> para guardar a lista no estado, de modo que o contador mostre 2.</p>
+  <pre class="jsx">function buscarPaes() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok(["pão francês", "croissant"]), 10);
+  });
+}
+
+function App() {
+  const [paes, setPaes] = useState([]);
+
+  useEffect(() =&gt; {
+    buscarPaes();
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pães na vitrine: {paes.length}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Pães na vitrine: 0&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscarPaes() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok(["pão francês", "croissant"]), 10);
+  });
+}
+
+function App() {
+  const [paes, setPaes] = useState([]);
+
+  useEffect(() =&gt; {
+    buscarPaes().then((lista) =&gt; setPaes(lista));
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pães na vitrine: {paes.length}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Duas coisas aconteceram. Na montagem, o componente desenhou com a lista vazia e o efeito saiu pedindo
+os pães. Quando a resposta chegou, o <code>.then</code> rodou, chamou <code>setPaes</code> e o React
+desenhou de novo, agora com dois itens. O painel mostra o segundo desenho: o estado depois que tudo
+sossegou.</p>
+
+<p>Repare no <code>[]</code>. Sem ele, o efeito rodaria depois de todo render e cada execução chamaria
+<code>setPaes</code> — que provoca outro render, que pede de novo, num laço de pedidos. É a mesma
+armadilha da aula de dependências, agora com um custo a mais: além de travar, cada volta seria uma
+requisição de verdade no servidor da Ana.</p>
+
+<p>Se você colocar um <code>console.log</code> dentro do <code>.then</code>, o console do navegador
+mostra a lista já convertida — repare que a mensagem aparece <em>depois</em> de a página estar na tela:</p>
+
+<pre class="term">carreguei a lista: (2) ['pão francês', 'croissant']</pre>
+
+<h2>4. O <code>fetch</code> de verdade e o <code>res.json()</code></h2>
+
+<p>No projeto da padaria, a função <code>buscarPaes</code> não existe: quem faz o pedido é o
+<code>fetch</code>, uma função do navegador. Ela recebe uma URL e devolve uma Promise que se resolve com
+a <strong>resposta</strong> — não com os dados. A resposta é um objeto com status, cabeçalhos e um corpo,
+e o corpo só vira JavaScript quando você pede, com <code>.json()</code>. São dois passos, dois
+<code>await</code>:</p>
+
+<pre class="file" data-file="App.jsx">useEffect(() =&gt; {
+  async function carregar() {
+    const resposta = await fetch("https://loja.test/api/paes");
+    if (!resposta.ok) {
+      throw new Error("o servidor respondeu " + resposta.status);
+    }
+    const lista = await resposta.json();
+    setPaes(lista);
+  }
+
+  carregar();
+}, []);</pre>
+
+<p>A conferência do <code>resposta.ok</code> não é preciosismo. O <code>fetch</code> só rejeita a Promise
+quando o pedido não sai — sem rede, endereço que não existe, servidor fora do ar. Se o servidor
+responder "404 página não encontrada" ou "500 deu problema aqui dentro", a Promise se resolve
+normalmente, com <code>ok: false</code>. Quem escreve <code>resposta.json()</code> sem conferir acaba
+com um erro estranho de leitura de JSON em vez da mensagem que o servidor mandou.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pedaço</th><th>O que é</th><th>O que devolve</th></tr>
+<tr><td><code>fetch(url)</code></td><td>o pedido em si</td><td>Promise com a resposta (status, cabeçalhos, corpo)</td></tr>
+<tr><td><code>resposta.ok</code></td><td>se o status está entre 200 e 299</td><td>verdadeiro ou falso</td></tr>
+<tr><td><code>resposta.status</code></td><td>o código do servidor</td><td>200, 404, 500…</td></tr>
+<tr><td><code>resposta.json()</code></td><td>a leitura do corpo como JSON</td><td>Promise com o array ou objeto</td></tr>
+<tr><td><code>resposta.json()</code> duas vezes</td><td>o corpo já foi consumido</td><td>erro: "body already read"</td></tr>
+</table>
+</div>
+
+<p>O mesmo pedido escrito com <code>.then</code>, que é a forma da caixa anterior, fica assim: dois
+<code>.then</code> em fila, um para a resposta e outro para os dados. As duas formas funcionam; o
+<code>async</code>/<code>await</code> costuma ser mais fácil de ler quando há mais de um pedido.</p>
+
+<pre class="file" data-file="App.jsx">useEffect(() =&gt; {
+  fetch("https://loja.test/api/paes")
+    .then((resposta) =&gt; resposta.json())
+    .then((lista) =&gt; setPaes(lista));
+}, []);</pre>
+
+<h2>5. Um pedido depois do outro: <code>await</code> dentro do efeito</h2>
+
+<p>Às vezes o segundo pedido precisa de um dado do primeiro. A Ana quer o horário do forno, mas o
+endereço do forno depende do identificador da padaria que veio na primeira resposta. Não dá para disparar
+os dois ao mesmo tempo: um depende do outro. Aí entra o <code>await</code>, e com ele a regra que você já
+conhece: a função <code>async</code> fica <strong>dentro</strong> do efeito.</p>
+
+<div class="tryreact" data-goal="texto:Horário: forno ligado às 5h;;texto:Pães: pão francês, croissant">
+  <p class="try-task">O efeito já busca os pães. Depois dela, faça a segunda busca com
+  <code>await buscarHorario()</code> e guarde o resultado em <code>horario</code>.</p>
+  <pre class="jsx">function buscarPaes() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok(["pão francês", "croissant"]), 10);
+  });
+}
+
+function buscarHorario() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok("forno ligado às 5h"), 10);
+  });
+}
+
+function App() {
+  const [paes, setPaes] = useState([]);
+  const [horario, setHorario] = useState("");
+
+  useEffect(() =&gt; {
+    async function carregar() {
+      const lista = await buscarPaes();
+      setPaes(lista);
+    }
+    carregar();
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Pães: {paes.join(", ")}&lt;/p&gt;
+      &lt;p&gt;Horário: {horario}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Pães: pão francês, croissant&lt;/p&gt;
+  &lt;p&gt;Horário:&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscarPaes() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok(["pão francês", "croissant"]), 10);
+  });
+}
+
+function buscarHorario() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok("forno ligado às 5h"), 10);
+  });
+}
+
+function App() {
+  const [paes, setPaes] = useState([]);
+  const [horario, setHorario] = useState("");
+
+  useEffect(() =&gt; {
+    async function carregar() {
+      const lista = await buscarPaes();
+      setPaes(lista);
+      const hora = await buscarHorario();
+      setHorario(hora);
+    }
+    carregar();
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Pães: {paes.join(", ")}&lt;/p&gt;
+      &lt;p&gt;Horário: {horario}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A função <code>carregar</code> é declarada dentro do efeito e chamada logo em seguida. Ela pode usar
+<code>await</code> porque é <code>async</code>; o efeito em si não é, e devolve <code>undefined</code>,
+que é o que o React espera. Se você escrever <code>useEffect(async () =&gt; { ... })</code>, o React
+avisa que a função devolveu uma Promise — e o aviso não é o pior: você perde o lugar natural para a
+limpeza, que é a aula depois da próxima.</p>
+
+<p>Note também que <code>setPaes</code> é chamado antes do segundo <code>await</code>. Isso não é
+detalhe: cada <code>set</code> dispara um render, e os dois valores aparecem na tela em momentos
+diferentes. Primeiro a lista de pães, depois o horário. Em uma tela com muitos dados, esse efeito
+"picado" é visível — e é o motivo de a próxima aula existir.</p>
+
+<h2>6. Dois pedidos independentes</h2>
+
+<p>Quando um pedido não depende do outro, não há por que esperar. A Ana quer os pães e as promoções do
+dia, e o segundo pedido não usa nada do primeiro. Nesse caso cada pedido segue a sua vida, com o seu
+próprio <code>.then</code> (ou com um <code>Promise.all</code>, que dispara os dois e espera os dois).</p>
+
+<div class="tryreact" data-goal="texto:Promoções do dia: 2">
+  <p class="try-task">O efeito só busca os pães. Faça também o pedido das promoções, no mesmo efeito,
+  para o contador mostrar 2.</p>
+  <pre class="jsx">function buscarPaes() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok(["pão francês", "croissant"]), 10);
+  });
+}
+
+function buscarPromocoes() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok(["pão de queijo", "café coado"]), 10);
+  });
+}
+
+function App() {
+  const [paes, setPaes] = useState([]);
+  const [promocoes, setPromocoes] = useState([]);
+
+  useEffect(() =&gt; {
+    buscarPaes().then((lista) =&gt; setPaes(lista));
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Pães na vitrine: {paes.length}&lt;/p&gt;
+      &lt;p&gt;Promoções do dia: {promocoes.length}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Pães na vitrine: 2&lt;/p&gt;
+  &lt;p&gt;Promoções do dia: 0&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function buscarPaes() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok(["pão francês", "croissant"]), 10);
+  });
+}
+
+function buscarPromocoes() {
+  return new Promise((ok) =&gt; {
+    setTimeout(() =&gt; ok(["pão de queijo", "café coado"]), 10);
+  });
+}
+
+function App() {
+  const [paes, setPaes] = useState([]);
+  const [promocoes, setPromocoes] = useState([]);
+
+  useEffect(() =&gt; {
+    buscarPaes().then((lista) =&gt; setPaes(lista));
+    buscarPromocoes().then((lista) =&gt; setPromocoes(lista));
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Pães na vitrine: {paes.length}&lt;/p&gt;
+      &lt;p&gt;Promoções do dia: {promocoes.length}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Os dois pedidos saem praticamente juntos, e cada um atualiza o seu estado quando a resposta chega. Não
+importa a ordem em que chegam: cada <code>set</code> mexe em uma parte diferente da tela. Esse é o
+arranjo mais comum em uma tela de verdade — três ou quatro pedidos independentes no mesmo efeito, cada
+um com o seu <code>set</code>.</p>
+
+<p>Se você precisar dos dois resultados juntos para fazer uma conta, aí vale o <code>Promise.all</code>:
+ele recebe um array de Promises e devolve uma Promise com um array de resultados, na mesma ordem. É o
+mesmo raciocínio de "dois pedidos, uma espera só", com a diferença de que o código depois do
+<code>await</code> roda uma vez, quando os dois chegaram.</p>
+
+<h2>7. Os quatro tropeços de quem busca dados</h2>
+
+<p>O primeiro é guardar a Promise no estado. <code>const dados = buscarPaes(); setPaes(dados)</code>
+parece certo e não é: <code>dados</code> é o objeto que promete, não a lista. O sintoma é uma tela que
+mostra "undefined" ou quebra ao tentar <code>.map</code>. A correção é sempre esperar: um
+<code>await</code> ou um <code>.then</code>.</p>
+
+<p>O segundo é esquecer o <code>.json()</code>. Você faz o <code>fetch</code>, guarda o resultado no
+estado e a tela mostra um objeto cheio de coisas estranhas. O corpo da resposta é um fluxo de bytes que
+só vira lista depois da leitura; sem ela, você está guardando a embalagem.</p>
+
+<p>O terceiro é o <code>useEffect(async () =&gt; { ... })</code>. Funciona, com um aviso no console, e
+deixa o código sem o lugar natural da limpeza. A forma certa é a da seção 5: uma função
+<code>async</code> dentro do efeito e uma chamada logo depois. O quarto é pedir duas vezes sem querer, e
+o sintoma dele engana. Os quatro, com sintoma e conserto, cabem em uma tabela de consulta rápida:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você vê</th><th>Provável causa</th><th>O conserto</th></tr>
+<tr><td>a tela mostra <code>undefined</code> ou quebra no <code>.map</code></td><td>a Promise foi guardada no estado em vez dos dados</td><td>espere com <code>.then</code> ou <code>await</code> antes do <code>set</code></td></tr>
+<tr><td>o estado guarda um objeto com status e cabeçalhos</td><td>faltou <code>resposta.json()</code></td><td>leia o corpo antes de guardar</td></tr>
+<tr><td>aviso sobre uma função que devolveu Promise</td><td><code>useEffect(async () =&gt; …)</code></td><td>crie a função <code>async</code> dentro do efeito e chame</td></tr>
+<tr><td>dois pedidos iguais no painel de rede</td><td><code>StrictMode</code> no desenvolvimento</td><td>nada a fazer no desenvolvimento; no código, cancele o pedido antigo na limpeza</td></tr>
+</table>
+</div>
+
+<p>O quarto tropeço merece um parágrafo à parte, porque o sintoma engana. No modo de
+desenvolvimento, o <code>StrictMode</code> monta, desmonta e monta de novo cada componente para revelar
+efeitos que não sabem se limpar. Com um <code>fetch</code> no efeito, isso significa dois pedidos no
+painel de rede — e, em produção, um pedido só. Se a sua API cobra por requisição ou registra cada acesso,
+vale saber que o número que você vê no desenvolvimento é o dobro. O conserto de verdade é a limpeza:
+cancelar o pedido que não interessa mais, o que a aula de cleanup mostra com o
+<code>AbortController</code> e com uma variável de controle.</p>
+
+<pre class="term">GET https://loja.test/api/paes net::ERR_NAME_NOT_RESOLVED
+TypeError: Failed to fetch
+    at carregar (App.jsx:12:26)</pre>
+
+<p>Essa é a cara de um pedido que não saiu. <code>fetch</code> rejeita a Promise e o erro só aparece se
+você tratar — no código acima, ninguém tratou, e o React registra o erro no console enquanto a tela fica
+no estado anterior. Tratar esse caso é a aula seguinte, "Carregando e Erro".</p>
+
+<h2>8. Como a caixa simula a internet</h2>
+
+<p>As caixas deste guia rodam dentro de um quadro isolado, sem rede: não há servidor da padaria para
+responder. Por isso as funções <code>buscarPaes</code>, <code>buscarHorario</code> e
+<code>buscarPromocoes</code> existem nos exemplos — elas fazem o papel do <code>fetch</code>, devolvendo
+uma Promise que se resolve depois de alguns milissegundos com uma lista fixa.</p>
+
+<p>O desenho é o mesmo do <code>fetch</code> em um ponto essencial: a resposta não está disponível na
+hora. Quando você troca a função simulada por <code>fetch("https://loja.test/api/paes")</code>, nada mais
+muda no componente: o estado, o efeito, o <code>set</code> e o <code>.then</code> continuam iguais. É por
+isso que vale aprender com a simulação — o formato do código é o formato de verdade.</p>
+
+<p>E é por isso também que os atrasos são pequenos: 10 milissegundos. O painel espera um instante depois
+de montar o componente e mostra o resultado; se a simulação demorasse três segundos, o painel mostraria a
+tela vazia, que é o que o seu navegador mostra enquanto a resposta não chega. Na próxima aula esse
+intervalo vazio ganha um nome e um tratamento: é o estado de carregando.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o componente aparece antes dos dados</h3>
+<p>É o esperado, não um bug. Todo componente que busca dados passa por um instante com a lista vazia. O
+que muda de um projeto para outro é o que se mostra nesse instante: nada, um "carregando…", ou um
+esqueleto cinza do tamanho do conteúdo. Deixar a tela em branco é aceitável em um site pequeno; em uma
+tela cheia, o leitor acha que a página quebrou.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: os dados chegam e a tela não atualiza</h3>
+<p>Quase sempre a causa é uma referência perdida: a lista chegou, mas o <code>set</code> foi chamado em
+uma variável que não é o estado, ou o estado foi declarado no componente de baixo e atualizado no de
+cima. Outra causa comum é o efeito com <code>[]</code> que roda antes de a URL estar pronta — quando o
+endereço depende de uma prop, ele precisa estar no array de dependências.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o pedido que responde fora de ordem</h3>
+<p>A Ana busca pelo termo "pão" e logo depois muda para "queijo". Dois pedidos saem, e o do "pão" pode
+voltar depois do "queijo" — a tela mostraria o resultado antigo. Isso se chama corrida, e o conserto é a
+limpeza do efeito: marcar que aquele pedido não interessa mais quando um novo começa. Guarde o nome; a
+aula de cleanup resolve com poucas linhas.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="1"><p class="mc-q">1. Onde vai o pedido de dados?</p>
+<label><input type="radio" name="q1"> dentro de um <code>useEffect</code>, depois do render</label>
+<label><input type="radio" name="q1"> antes do <code>return</code>, junto dos cálculos</label>
+<label><input type="radio" name="q1"> dentro do JSX, com chaves</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que o <code>fetch</code> devolve?</p>
+<label><input type="radio" name="q2"> a lista de dados pronta</label>
+<label><input type="radio" name="q2"> o texto do HTML do servidor</label>
+<label><input type="radio" name="q2"> uma Promise com a resposta, que ainda precisa de <code>.json()</code></label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. Para que serve o <code>[]</code> no efeito que busca os dados?</p>
+<label><input type="radio" name="q3"> para o React guardar a resposta em cache</label>
+<label><input type="radio" name="q3"> para o pedido sair uma vez só, na montagem</label>
+<label><input type="radio" name="q3"> para o pedido ser mais rápido</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a busca da promoção</h2>
+<p>Complete o efeito para guardar no estado o resultado da busca de promoções:</p>
+<div class="ex-code">useEffect(() =&gt; { buscarPromocoes().<input aria-label="resposta 1" data-answer="then" placeholder="...">((lista) =&gt; setPromocoes(lista)); }, []);</div>
+<p class="ex-dica">Dica: é o método que recebe a função a ser chamada quando a Promise se resolver. Sem
+ele, a lista nunca chega ao estado.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Buscar dados é um efeito: o componente desenha o que tem, o efeito pede, a resposta chega e o
+<code>set</code> provoca um novo desenho. O pedido vive dentro de um <code>useEffect</code> com
+<code>[]</code> quando deve sair uma vez só, e nunca no corpo do componente — o corpo roda muitas vezes e
+não pode esperar nada.</p>
+
+<p>Com <code>.then</code> ou com <code>await</code> dentro de uma função <code>async</code> declarada no
+efeito, o resultado sempre passa por um <code>set</code>. No projeto de verdade, o
+<code>fetch</code> exige dois passos: a resposta, depois o <code>.json()</code>, com uma conferência de
+<code>resposta.ok</code> no meio. Dois pedidos independentes saem juntos; dois pedidos em série esperam
+um pelo outro.</p>
+
+<p>E o intervalo entre pedir e receber é parte do problema, não um acidente: a tela precisa dizer o que
+está acontecendo nesse meio-tempo, e precisa saber o que fazer quando a resposta é um erro. É exatamente
+o assunto da próxima aula.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Pedido de dados é efeito: <code>useEffect(() =&gt; { ... }, [])</code>.</li>
+<li>O resultado mora em um estado, e só entra nele por <code>set</code>.</li>
+<li><code>fetch(url)</code> devolve a resposta; <code>resposta.json()</code> devolve os dados.</li>
+<li>Confira <code>resposta.ok</code>: erro 404 ou 500 não rejeita a Promise.</li>
+<li>Promise no estado é bug: espere com <code>.then</code> ou <code>await</code>.</li>
+<li><code>async</code> vai na função de dentro do efeito, não no <code>useEffect</code>.</li>
+<li>Pedidos independentes: cada um com o seu <code>set</code>, sem esperar o outro.</li>
+<li>Pedido que depende do anterior: <code>await</code> em sequência, na mesma função.</li>
+<li>No desenvolvimento o efeito roda duas vezes e os pedidos também.</li>
+<li>Enquanto a resposta não chega, a tela mostra o estado anterior ou um aviso.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

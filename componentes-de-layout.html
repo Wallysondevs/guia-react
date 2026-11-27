@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Componentes de Layout | Guia React</title>
+<meta name="description" content="Componentes de layout no React: a moldura da página escrita uma vez, o miolo por children, menu e rodapé por slots e os marcos semânticos no lugar certo.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Componentes de <span class="hl">Layout</span></h1>
+<p class="intro">Toda tela do site da Ana tem a mesma moldura: o topo com o nome da padaria, o menu
+lateral, a área do conteúdo e o rodapé com o endereço. Ela escreveu essa moldura três vezes, uma por
+tela, e na semana passada o menu lateral ficou mais estreito em duas e largo na terceira. Nesta aula ela
+escreve a moldura uma vez só — um componente de layout — e deixa o miolo mudar de tela para tela.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um componente de layout e por que ele não é CSS.</li>
+  <li>Como a moldura recebe o miolo por <code>children</code>.</li>
+  <li>Como reservar o menu e outras áreas com props de slot.</li>
+  <li>Por que a moldura fica por fora da troca de telas.</li>
+  <li>Os marcos semânticos — <code>header</code>, <code>nav</code>, <code>main</code>, <code>aside</code> — e o que eles dizem.</li>
+  <li>Quantos layouts um site precisa ter.</li>
+  <li>Como ler no painel a diferença entre moldura e conteúdo.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a mesma moldura em três telas</h2>
+
+<p>A padaria tem três telas: a inicial, a lista de pães e o contato. As três começam com o nome da
+padaria em cima, têm o menu à esquerda, um rodapé com o endereço e o telefone, e no meio o conteúdo
+daquele assunto. A Ana montou cada tela copiando a anterior, então a moldura existe três vezes no
+projeto, escrita com pequenas diferenças que ninguém pediu.</p>
+
+<p>Essa moldura é exatamente o tipo de coisa que não muda de tela para tela. O assunto muda; a moldura
+não. Quando um pedaço da tela tem essa propriedade — é igual em todas e só o miolo varia —, ele é
+candidato natural a componente. Não por elegância: por manutenção. Uma moldura escrita uma vez garante
+que as três telas tenham o mesmo menu, o mesmo rodapé e o mesmo espaço.</p>
+
+<p>E aqui vale separar duas coisas que costumam andar juntas na cabeça de quem começa. O componente de
+layout não é CSS. Ele não decide cor nem largura; ele decide <strong>estrutura</strong> — o que vem antes
+do quê, o que fica dentro do quê, quais áreas existem. O CSS continua sendo CSS, aplicado por classe. Um
+layout sem CSS é uma página feia e correta; um CSS sem estrutura é uma página bonita e impossível de
+manter.</p>
+
+<h2>2. A moldura e o miolo</h2>
+
+<p>Um componente de layout é um componente como qualquer outro, com um detalhe: ele recebe o conteúdo por
+<code>children</code> e o coloca no lugar certo. Quem usa não precisa saber onde o miolo vai cair; só
+precisa saber que ele cai.</p>
+
+<dl class="anatomy">
+<dt>layout</dt>
+<dd>O componente que desenha a moldura de uma página: topo, menu, área de conteúdo, rodapé.</dd>
+<dt>moldura</dt>
+<dd>A parte igual em todas as telas. Fica no layout e é escrita uma vez.</dd>
+<dt>miolo</dt>
+<dd>O conteúdo da tela, recebido por <code>children</code> e colocado dentro do <code>main</code>.</dd>
+<dt>slot</dt>
+<dd>Um lugar com nome, reservado por prop: <code>menu={&lt;Menu /&gt;}</code>. Serve para áreas que não
+são o miolo.</dd>
+<dt>marcos semânticos</dt>
+<dd>As tags que dizem o papel de cada área: <code>header</code>, <code>nav</code>, <code>main</code>,
+<code>aside</code>, <code>footer</code>. Leitor de tela e buscador usam isso.</dd>
+<dt>tela</dt>
+<dd>O componente de página, que monta o layout e passa o miolo. Uma tela por assunto da navegação.</dd>
+</dl>
+
+<p>O layout não precisa saber quantas telas existem. Ele recebe um miolo e desenha. A tela não precisa
+saber como a moldura é feita por dentro. Ela passa o miolo e confia. Essa ignorância mútua é o que
+permite mudar o rodapé sem tocar em nenhuma tela.</p>
+
+<h2>3. A moldura envolve o miolo</h2>
+
+<p>Na caixa abaixo o <code>Layout</code> já está pronto: ele desenha o topo, a área principal e o
+rodapé, e coloca o que receber dentro do <code>main</code>. O <code>App</code> tem o conteúdo da tela de
+pães, mas o deixou solto — fora da moldura, sem topo e sem rodapé.</p>
+
+<div class="tryreact" data-goal="conta:main=1;;conta:header=1;;texto:Rua das Flores, 12">
+  <p class="try-task">Envolva o título e o parágrafo com
+  <code>&lt;Layout&gt;</code> e <code>&lt;/Layout&gt;</code>, em vez da <code>div</code>, e clique em
+  Rodar.</p>
+  <pre class="jsx">function Layout({ children }) {
+  return (
+    &lt;div className="moldura"&gt;
+      &lt;header className="topo"&gt;
+        &lt;strong&gt;Padaria da Ana&lt;/strong&gt;
+      &lt;/header&gt;
+      &lt;main className="miolo"&gt;{children}&lt;/main&gt;
+      &lt;footer className="pe"&gt;Rua das Flores, 12&lt;/footer&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Pães de hoje&lt;/h1&gt;
+      &lt;p&gt;Pão francês, pão de queijo e baguete.&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Pães de hoje&lt;/h1&gt;
+  &lt;p&gt;Pão francês, pão de queijo e baguete.&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Layout({ children }) {
+  return (
+    &lt;div className="moldura"&gt;
+      &lt;header className="topo"&gt;
+        &lt;strong&gt;Padaria da Ana&lt;/strong&gt;
+      &lt;/header&gt;
+      &lt;main className="miolo"&gt;{children}&lt;/main&gt;
+      &lt;footer className="pe"&gt;Rua das Flores, 12&lt;/footer&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;Layout&gt;
+      &lt;h1&gt;Pães de hoje&lt;/h1&gt;
+      &lt;p&gt;Pão francês, pão de queijo e baguete.&lt;/p&gt;
+    &lt;/Layout&gt;
+  );
+}</pre>
+</div>
+
+<p>Leia o painel como quem lê uma caixa dentro da outra. O <code>div.moldura</code> contém o
+<code>header</code>, o <code>main</code> e o <code>footer</code>; dentro do <code>main</code> está o
+miolo da tela, que o <code>App</code> entregou. A tela não escreveu o topo nem o endereço; ela só
+escreveu o que é dela.</p>
+
+<p>Se você trocar a moldura por uma com menu lateral, todas as telas que a usam ganham o menu de graça.
+Se você mudar o endereço da padaria, muda num lugar só. E o mais importante: nada do miolo precisa
+carregar prop de layout. Não existe <code>mostrarRodape</code> nem <code>corDoMenu</code> chegando ao
+conteúdo: o <code>App</code> escolhe a moldura e entrega o que é da tela.</p>
+
+<p>Um detalhe que aparece na primeira vez que você faz isso: o miolo pode ser uma tela inteira. Nada
+impede que o <code>App</code> entregue ao layout um componente de página que já contém título, lista e
+formulário. O layout não liga para o tamanho do que recebe; ele só posiciona. É por isso que a mesma
+moldura serve para uma tela de três linhas e para uma nota fiscal de trezentas.</p>
+
+<h2>4. Dois lugares, dois canais</h2>
+
+<p>O miolo resolve o conteúdo principal, mas a moldura costuma ter mais de uma área. No site da Ana, o
+menu é o mesmo em todas as telas e não é conteúdo da tela; é parte da moldura. Se ele ficar fixo dentro
+do <code>Layout</code>, a tela não pode trocar o item ativo — e é justamente o item ativo que muda.</p>
+
+<p>A solução é a mesma da aula de <a href="composicao.html">Composição</a>: reservar um lugar com nome
+por prop. O <code>Layout</code> declara <code>menu</code> e desenha <code>{menu}</code> dentro do
+<code>aside</code>. Quem chama decide qual menu passar.</p>
+
+<div class="tryreact" data-goal="conta:nav a=3;;texto:Contato">
+  <p class="try-task">O <code>Layout</code> tem um lugar para o menu que ninguém preencheu. Passe
+  <code>menu={&lt;Menu /&gt;}</code> e clique em Rodar.</p>
+  <pre class="jsx">function Menu() {
+  return (
+    &lt;nav&gt;
+      &lt;a href="#"&gt;Início&lt;/a&gt;
+      &lt;a href="#"&gt;Pães&lt;/a&gt;
+      &lt;a href="#"&gt;Contato&lt;/a&gt;
+    &lt;/nav&gt;
+  );
+}
+
+function Layout({ titulo, menu, children }) {
+  return (
+    &lt;div className="moldura"&gt;
+      &lt;header&gt;
+        &lt;h1&gt;{titulo}&lt;/h1&gt;
+      &lt;/header&gt;
+      &lt;aside&gt;{menu}&lt;/aside&gt;
+      &lt;main&gt;{children}&lt;/main&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;Layout titulo="Padaria da Ana"&gt;
+      &lt;p&gt;Pão quentinho a partir das 6h.&lt;/p&gt;
+    &lt;/Layout&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div class="moldura"&gt;
+  &lt;header&gt;
+    &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;/header&gt;
+  &lt;aside&gt;&lt;/aside&gt;
+  &lt;main&gt;
+    &lt;p&gt;Pão quentinho a partir das 6h.&lt;/p&gt;
+  &lt;/main&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Menu() {
+  return (
+    &lt;nav&gt;
+      &lt;a href="#"&gt;Início&lt;/a&gt;
+      &lt;a href="#"&gt;Pães&lt;/a&gt;
+      &lt;a href="#"&gt;Contato&lt;/a&gt;
+    &lt;/nav&gt;
+  );
+}
+
+function Layout({ titulo, menu, children }) {
+  return (
+    &lt;div className="moldura"&gt;
+      &lt;header&gt;
+        &lt;h1&gt;{titulo}&lt;/h1&gt;
+      &lt;/header&gt;
+      &lt;aside&gt;{menu}&lt;/aside&gt;
+      &lt;main&gt;{children}&lt;/main&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;Layout titulo="Padaria da Ana" menu={&lt;Menu /&gt;}&gt;
+      &lt;p&gt;Pão quentinho a partir das 6h.&lt;/p&gt;
+    &lt;/Layout&gt;
+  );
+}</pre>
+</div>
+
+<p>Repare que o <code>Layout</code> não importa o <code>Menu</code> e não sabe que ele existe. Ele só
+reserva o lugar. Isso permite que a tela de pães passe um menu com “Pães” em destaque e a de contato
+passe o mesmo menu com outro item ativo — sem duplicar a moldura e sem prop de configuração.</p>
+
+<p>A diferença entre <code>children</code> e slot continua valendo aqui: o miolo é o conteúdo principal,
+que ocupa o lugar grande; o menu é uma área com papel próprio. Se a moldura tivesse três áreas de
+conteúdo, seriam três slots com nome — e <code>children</code> para a principal. Um layout com cinco
+props de conteúdo é normal; um layout com vinte é sinal de que ele virou a página inteira.</p>
+
+<p>Se o menu é sempre o mesmo, você pode perguntar: por que não deixar fixo dentro do layout? Pode,
+e para um site de uma pessoa é até razoável. O problema aparece quando uma tela precisa de outro menu —
+o da conta, por exemplo — e aí o layout ganha a prop <code>menuDaConta</code>, depois
+<code>menuSemRodape</code>, e a lista cresce. Receber o menu pronto evita a escada de props: quem sabe
+qual menu usar é a tela, não a moldura.</p>
+
+<p>Vale também dar nome ao <code>nav</code>. Uma página pode ter mais de uma navegação — o menu
+principal, um sumário lateral, os links do rodapé. O atributo <code>aria-label="Menu principal"</code>
+diz qual é qual para quem usa leitor de tela, e é uma linha de código que resolve uma confusão real.</p>
+
+<h2>5. O que o layout recebe, no console</h2>
+
+<p>Uma forma de enxergar a diferença entre moldura e miolo é logar as props que o layout recebe. O miolo
+nem aparece como prop nomeada — ele está dentro de <code>children</code>:</p>
+
+<pre class="file" data-file="Layout.jsx">function Layout(props) {
+  console.log("Layout recebeu: " + Object.keys(props).join(", "));
+  return (
+    &lt;div className="moldura"&gt;
+      &lt;aside&gt;{props.menu}&lt;/aside&gt;
+      &lt;main&gt;{props.children}&lt;/main&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Com o menu passado e uma tela de cada vez, o console mostra:</p>
+
+<pre class="term">Layout recebeu: titulo, menu, children
+Layout recebeu: titulo, children</pre>
+
+<p>A primeira linha é a versão completa; a segunda é uma tela que esqueceu o menu. Repare que
+<code>children</code> está na lista como qualquer outra prop — é um nome reservado, mas o mecanismo é o
+mesmo. Isso ajuda a entender por que o layout não precisa de uma prop para o conteúdo principal: ele já
+chega ali, sem nome escolhido por você.</p>
+
+<h2>6. Os marcos semânticos</h2>
+
+<p>Até aqui usamos <code>header</code>, <code>main</code>, <code>aside</code> e <code>footer</code> sem
+explicar por que não usar <code>div</code> em tudo. A resposta é acessibilidade e leitura: essas tags
+dizem o papel de cada área, e quem navega com leitor de tela pode pular direto para o conteúdo principal
+em vez de ouvir a página inteira.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tag</th><th>Papel</th><th>No layout da Ana</th></tr>
+<tr><td><code>header</code></td><td>cabeçalho de uma página ou de uma seção</td><td>nome da padaria e horário</td></tr>
+<tr><td><code>nav</code></td><td>conjunto de links de navegação</td><td>o menu com Início, Pães, Contato</td></tr>
+<tr><td><code>main</code></td><td>o conteúdo principal, um por página</td><td>o miolo que vem por <code>children</code></td></tr>
+<tr><td><code>aside</code></td><td>conteúdo lateral, relacionado mas secundário</td><td>o menu lateral e os avisos</td></tr>
+<tr><td><code>footer</code></td><td>rodapé com endereço, contato, direitos</td><td>Rua das Flores, 12</td></tr>
+</table>
+</div>
+
+<p>Uma regra prática: um <code>main</code> por página. Se você colocar dois, o leitor de tela não sabe
+qual é o principal, e a marcação perde o sentido. O layout é o lugar natural para garantir isso, porque é
+ele que desenha o <code>main</code> — as telas só entregam o miolo.</p>
+
+<p>O resto pode continuar sendo <code>div</code>. Uma caixa que só existe para o CSS não precisa de tag
+semântica nenhuma; forçar significado em tudo deixa a marcação mentirosa. Use <code>div</code> quando não
+há papel, e a tag certa quando há.</p>
+
+<h2>7. A moldura fica por fora da troca de telas</h2>
+
+<p>Agora o erro que aparece quando o site começa a ter navegação. A Ana colocou o <code>Layout</code>
+dentro de cada tela, e no botão de trocar de tela a segunda opção ficou sem moldura — sem topo, sem
+rodapé, como se fosse outro site. Quem decide a moldura não é a tela; é quem troca as telas.</p>
+
+<div class="tryreact" data-goal="clique:button;;conta:header=1;;texto:Fale com a Ana pelo balcão">
+  <p class="try-task">Clique em “Ir para o contato”: a segunda tela aparece sem o topo, porque o
+  <code>Layout</code> está dentro de um dos lados da condição. Coloque o <code>Layout</code> por fora,
+  envolvendo as duas telas.</p>
+  <pre class="jsx">function Layout({ titulo, children }) {
+  return (
+    &lt;div className="moldura"&gt;
+      &lt;header&gt;
+        &lt;h1&gt;{titulo}&lt;/h1&gt;
+      &lt;/header&gt;
+      &lt;main&gt;{children}&lt;/main&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const [tela, setTela] = useState("paes");
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={() =&gt; setTela(tela === "paes" ? "contato" : "paes")}&gt;
+        Ir para o contato
+      &lt;/button&gt;
+      {tela === "paes" ? (
+        &lt;Layout titulo="Pães"&gt;
+          &lt;p&gt;Pão francês e pão de queijo.&lt;/p&gt;
+        &lt;/Layout&gt;
+      ) : (
+        &lt;div&gt;
+          &lt;h1&gt;Contato&lt;/h1&gt;
+          &lt;p&gt;Fale com a Ana pelo balcão.&lt;/p&gt;
+        &lt;/div&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Ir para o contato&lt;/button&gt;
+  &lt;div class="moldura"&gt;
+    &lt;header&gt;
+      &lt;h1&gt;Pães&lt;/h1&gt;
+    &lt;/header&gt;
+    &lt;main&gt;
+      &lt;p&gt;Pão francês e pão de queijo.&lt;/p&gt;
+    &lt;/main&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Layout({ titulo, children }) {
+  return (
+    &lt;div className="moldura"&gt;
+      &lt;header&gt;
+        &lt;h1&gt;{titulo}&lt;/h1&gt;
+      &lt;/header&gt;
+      &lt;main&gt;{children}&lt;/main&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const [tela, setTela] = useState("paes");
+  const noContato = tela === "contato";
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={() =&gt; setTela(noContato ? "paes" : "contato")}&gt;
+        Ir para o contato
+      &lt;/button&gt;
+      &lt;Layout titulo={noContato ? "Contato" : "Pães"}&gt;
+        {noContato ? (
+          &lt;p&gt;Fale com a Ana pelo balcão.&lt;/p&gt;
+        ) : (
+          &lt;p&gt;Pão francês e pão de queijo.&lt;/p&gt;
+        )}
+      &lt;/Layout&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A diferença é de uma linha de raciocínio: o <code>Layout</code> subiu para fora do <code>if</code>. O
+que varia agora é só o miolo e o título; a moldura é a mesma nos dois casos. O painel mostra isso
+claramente — depois do clique, o <code>header</code> continua ali, com outro título, e dentro do
+<code>main</code> está o texto do contato.</p>
+
+<p>Uma dúvida justa: se o layout está sempre no mesmo lugar, ele é desenhado de novo a cada troca de
+tela? Sim — e isso não é problema. Com um log no layout, dá para ver as três trocas de uma sessão:</p>
+
+<pre class="file" data-file="Layout.jsx">function Layout({ titulo, children }) {
+  console.log("moldura desenhada para: " + titulo);
+  return (
+    &lt;div className="moldura"&gt;
+      &lt;header&gt;&lt;h1&gt;{titulo}&lt;/h1&gt;&lt;/header&gt;
+      &lt;main&gt;{children}&lt;/main&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<pre class="term">moldura desenhada para: Pães
+moldura desenhada para: Contato
+moldura desenhada para: Pães</pre>
+
+<p>O que se repete é a <strong>definição</strong> da moldura, não o elemento do HTML. Como o
+<code>Layout</code> é o mesmo componente nos dois casos, o React reaproveita o que já está na tela e
+troca apenas o que mudou. É por isso que o menu não pisca quando você navega num site bem feito.</p>
+
+<p>Essa é a regra de ouro dos layouts: <strong>moldura por fora, conteúdo por dentro</strong>. Se você
+precisa repetir o layout em cada ramo de uma condição, o layout está no lugar errado. E se a moldura
+muda muito de uma tela para outra — topo diferente, menu diferente, rodapé diferente —, provavelmente são
+dois layouts, não um layout com dez props.</p>
+
+<p>Num projeto de verdade com várias telas, quem troca o conteúdo não é um <code>useState</code> com
+duas opções: é o roteador, que lê o endereço do navegador e escolhe o componente. A regra continua
+idêntica — o layout fica por fora do roteador, e cada tela é o miolo que entra. Você vai ver isso no Nível
+3; por enquanto, o <code>useState</code> da caixa serve para provar a mesma ideia com uma peça que você já
+conhece.</p>
+
+<h2>8. Quantos layouts um site precisa</h2>
+
+<p>Não existe número certo, mas existe um padrão que aparece em quase todo projeto: um layout para o site
+público e outro para a área administrativa. Eles compartilham a marca e o rodapé e diferem no menu e na
+largura. Quando a diferença é essa, separar os dois é mais honesto do que encher um único layout de
+condições.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Layout</th><th>O que tem</th><th>Telas</th></tr>
+<tr><td><code>LayoutDoSite</code></td><td>topo com a marca, menu público, rodapé</td><td>inicial, pães, contato</td></tr>
+<tr><td><code>LayoutDaConta</code></td><td>topo do cliente, menu de pedidos, sem rodapé</td><td>perfil, encomendas, histórico</td></tr>
+<tr><td><code>LayoutDeLeitura</code></td><td>só uma coluna estreita e o título</td><td>nota fiscal, política de troca</td></tr>
+</table>
+</div>
+
+<p>Três layouts para nove telas é uma proporção saudável. O que não funciona é um layout por tela: aí
+você pagou o custo de abstrair e não ganhou nada. E o contrário, um layout para tudo, acaba com a moldura
+cheia de <code>if</code> e de props booleanas, do tipo <code>mostrarMenu</code>,
+<code>mostrarRodape</code>, <code>menuEscuro</code>.</p>
+
+<p>Há um caso que engana: o site que muda de layout no celular. Se a diferença é só de CSS — o menu
+lateral vira uma faixa no topo, a fonte diminui —, continua sendo um layout só, com media query. Se a
+diferença é de estrutura — no celular some o menu e aparece uma barra inferior com ícones —, são dois
+layouts, e o componente escolhe qual desenhar a partir da largura da tela. Confundir os dois casos é o que
+gera layout com <code>if</code> de CSS dentro.</p>
+
+<p>Uma saída intermediária que vale conhecer: dois layouts que usam um terceiro por dentro. O
+<code>LayoutDoSite</code> e o <code>LayoutDaConta</code> podem compartilhar um <code>Moldura</code> que
+cuida do topo e da largura, cada um acrescentando o seu menu. É composição de novo — layouts também
+compõem.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o rodapé que sumiu numa tela</h3>
+<p>A tela de contato foi criada antes do layout existir e nunca ganhou a moldura. O usuário navegava,
+clicava em “Contato” e o rodapé desaparecia — parecia outro site. A correção foi mover o
+<code>Layout</code> para o componente que escolhe a tela, e não para dentro de cada tela. Uma linha, três
+telas consertadas.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o layout com sete booleanos</h3>
+<p>O <code>Layout</code> da Ana chegou a receber <code>mostrarMenu</code>, <code>menuGrande</code>,
+<code>comRodape</code>, <code>semTopo</code>. Cada tela nova pedia uma combinação diferente e o
+componente virou uma tabela de decisões. A solução foi dividir: um layout para o site, um para a conta, e
+o menu sempre recebido por slot, com o conteúdo certo de cada caso.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o menu que não sabia qual item destacar</h3>
+<p>Com o menu fixo dentro do layout, todas as telas mostravam “Início” em negrito. Passando o menu por
+prop, cada tela escolhe o componente de menu com o item ativo — sem duplicar a moldura e sem o layout
+precisar saber em que tela está. Detalhe de arquitetura que economiza uma prop condicional.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que um componente de layout faz?</p>
+<label><input type="radio" name="q1"> guarda o CSS de todas as telas</label>
+<label><input type="radio" name="q1"> desenha a moldura comum e coloca o miolo no lugar certo</label>
+<label><input type="radio" name="q1"> escolhe qual tela aparece a cada clique</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Onde o <code>Layout</code> deve ficar quando há troca de telas?</p>
+<label><input type="radio" name="q2"> dentro de cada tela, para cada uma ter o seu</label>
+<label><input type="radio" name="q2"> dentro do botão que troca de tela</label>
+<label><input type="radio" name="q2"> por fora da condição, envolvendo as telas que ele veste</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Por que usar <code>main</code> em vez de <code>div</code> para o miolo?</p>
+<label><input type="radio" name="q3"> porque a tag diz o papel da área e ajuda quem navega com leitor de tela</label>
+<label><input type="radio" name="q3"> porque o React não desenha <code>div</code> dentro de componente</label>
+<label><input type="radio" name="q3"> porque <code>main</code> já vem com estilo aplicado</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: entregue o miolo</h2>
+<p>O <code>Layout</code> precisa mostrar o conteúdo que a tela escreveu entre as tags. Complete a linha
+que coloca esse conteúdo dentro do <code>main</code>.</p>
+<div class="ex-code">&lt;main&gt;{<input aria-label="resposta 1" data-answer="children|props.children" placeholder="...">}&lt;/main&gt;</div>
+<p class="ex-dica">Dica: é a mesma prop que você usou na aula de composição. Sem ela no <code>main</code>,
+a tela entrega o conteúdo e o layout não mostra.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Componente de layout é a moldura escrita uma vez: topo, menu, área de conteúdo, rodapé. Ele recebe o
+miolo por <code>children</code>, coloca no <code>main</code> e não sabe o que há dentro. As outras áreas
+da moldura viram slots — props que recebem pedaço de tela, como <code>menu={&lt;Menu /&gt;}</code>.</p>
+
+<p>A regra que evita a maior parte dos problemas: moldura por fora, conteúdo por dentro. Quem troca de
+tela é que decide o layout; a tela entrega só o que é dela. Se a moldura precisa ser repetida em cada
+ramo de um <code>if</code>, ela está no lugar errado. E se a moldura muda demais entre telas, são dois
+layouts — não um layout com dez props.</p>
+
+<p>As tags semânticas completam o desenho: <code>header</code>, <code>nav</code>, <code>main</code>,
+<code>aside</code> e <code>footer</code> dizem o papel de cada área, e isso é o que permite a um leitor
+de tela pular direto para o conteúdo. Na próxima aula o assunto é o outro lado da moeda: como decidir a
+hora de quebrar um componente em pedaços — inclusive o layout — em
+<a href="quando-quebrar-em-componentes.html">Quando Quebrar em Componentes</a>.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Layout é a moldura comum; o miolo chega por <code>children</code>.</li>
+<li>Layout decide estrutura; CSS decide aparência. Não misture os papéis.</li>
+<li>Áreas com papel próprio viram slots: <code>menu={&lt;Menu /&gt;}</code>.</li>
+<li>Moldura por fora da troca de telas; conteúdo por dentro.</li>
+<li>Use os marcos semânticos: <code>header</code>, <code>nav</code>, <code>main</code>, <code>aside</code>, <code>footer</code>.</li>
+<li>Um <code>main</code> por página — e quem garante é o layout.</li>
+<li>Um layout por tipo de tela; layout por tela é custo sem ganho.</li>
+<li>Layout com muitos booleanos é sinal de que são dois layouts.</li>
+<li>Layouts também compõem: dois layouts podem usar uma moldura em comum.</li>
+<li>Para ver moldura e miolo separados, logue as props do layout: <code>children</code> está na lista.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

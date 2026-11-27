@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O useEffect | Guia React</title>
+<meta name="description" content="O useEffect explicado do zero: o que é um efeito, como declarar o primeiro, por que ele roda depois do render, o que não fazer dentro dele e os três formatos do array.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O <span class="hl">useEffect</span></h1>
+<p class="intro">A Ana já sabe desenhar a tela: os componentes dela mostram os pães, os preços e o horário.
+Mas nem tudo na vida da padaria é desenho. O título da aba do navegador, a linha que aparece no console,
+o pedido que vai para o servidor e o relógio do forno acontecem <strong>fora</strong> da tela — e o React
+não tem onde colocar isso dentro do <code>return</code>. Nesta aula ela conhece o
+<code>useEffect</code>, o gancho que roda código depois que o React desenhou a página, e vê no painel
+da caixa a hora exata em que isso acontece.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um efeito e por que ele não pode ficar no meio do render.</li>
+  <li>Como se declara o primeiro <code>useEffect</code> e o que significa cada pedaço dele.</li>
+  <li>A ordem das coisas: primeiro o React desenha, depois o efeito roda.</li>
+  <li>Que o efeito pode mudar o estado — e que isso pede um segundo render.</li>
+  <li>Por que um efeito por assunto deixa o componente mais fácil de ler.</li>
+  <li>O que não fazer dentro do efeito: função <code>async</code> direto, efeito dentro de
+  <code>if</code>, cálculo que cabia no render.</li>
+  <li>Os três formatos do array de dependências, só para reconhecer (a próxima aula é sobre eles).</li>
+</ul>
+</div>
+
+<h2>1. A cena: o que não é desenho</h2>
+
+<p>A Ana tem um componente que mostra a vitrine: os pães do dia, o preço e o horário de funcionamento.
+Isso funciona. Mas ela quer mais três coisas, e nenhuma delas é "desenhar um pedaço da tela". Primeira:
+o título da aba do navegador deve dizer quantos pães estão na vitrine, para ela ver isso de longe,
+com a aba minimizada. Segunda: ela quer uma linha no console dizendo "a tela apareceu", para conferir
+que a página carregou. Terceira: ela quer buscar no servidor os preços atualizados, porque o preço de
+hoje não está escrito no código.</p>
+
+<p>Repare no que essas três coisas têm em comum: elas não devolvem JSX. O título da aba é um objeto do
+navegador, o console é uma ferramenta do navegador, o servidor está em outro computador. Nenhuma delas
+cabe dentro do <code>return</code> do componente, que só sabe devolver elementos. E se você tentar
+colocar o <code>console.log</code> no corpo da função, antes do <code>return</code>, ele até aparece —
+mas aparece em um momento errado, e possivelmente mais de uma vez, como você vai ver daqui a pouco.</p>
+
+<p>A ideia central desta aula é essa separação. Um componente tem duas faixas de trabalho. Na primeira
+faixa ele <strong>desenha</strong>: olha para as props e o estado e devolve JSX. Na segunda faixa ele
+<strong>conversa com o mundo de fora</strong>: escreve no console, muda o título da aba, pede dados,
+liga um timer. A primeira faixa é o render. A segunda é o efeito. O React separa as duas de propósito,
+e a ferramenta que declara a segunda faixa se chama <code>useEffect</code>.</p>
+
+<p>O nome é literal: <em>use effect</em>, "use o efeito". Você diz ao React "olha, quando a tela já
+estiver montada, roda esta função para mim". O React guarda essa função e a chama no momento certo,
+depois do desenho. Você não chama a função do efeito — quem chama é o React.</p>
+
+<h2>2. O que é um efeito, na prática</h2>
+
+<p>Vamos combinar o vocabulário antes do código, porque ele volta em toda a aula. Efeito é qualquer
+coisa que o componente faz e que não é devolver JSX. O nome técnico é <strong>efeito colateral</strong>
+— um efeito que "escapa" do valor devolvido. Escrever no console é um efeito colateral. Mudar o título
+da aba é um efeito colateral. Pedir dados a um servidor é um efeito colateral. Até ligar um
+<code>setInterval</code> é um efeito colateral.</p>
+
+<dl class="anatomy">
+<dt>efeito</dt>
+<dd>Qualquer ação do componente que não é devolver JSX: console, título da aba, pedido de dados,
+listener, timer. O React chama de efeito colateral.</dd>
+<dt>função de efeito</dt>
+<dd>A função que você entrega ao <code>useEffect</code> e que o React chama depois do render:
+<code>() =&gt; { console.log("oi"); }</code>.</dd>
+<dt>montagem</dt>
+<dd>O momento em que o componente entra na página pela primeira vez. É aí que o primeiro efeito roda.</dd>
+<dt>dependências</dt>
+<dd>O segundo argumento do <code>useEffect</code>, o array que decide se o efeito roda de novo. Sem
+array, roda a cada render; com <code>[]</code>, roda só na montagem.</dd>
+<dt>render</dt>
+<dd>O trabalho de chamar o componente e transformar o JSX em elementos. É a faixa pura, que só
+calcula e devolve.</dd>
+</dl>
+
+<p>Uma comparação que costuma ajudar: o render é o desenho da vitrine; o efeito é o que a Ana faz
+depois de pendurar a placa — ligar as luzes, abrir a porta, avisar no grupo da família que o pão saiu.
+Se ela fizer essas coisas <em>enquanto</em> desenha a vitrine, atrapalha o desenho e faz tudo duas
+vezes. Por isso o React divide: primeiro o desenho inteiro fica pronto, depois as ações acontecem.</p>
+
+<p>E por que o React não deixa você simplesmente escrever o código no corpo do componente? Porque o
+React pode chamar a função do componente muitas vezes: uma vez para a primeira pintura, outra quando o
+estado muda, e no modo de desenvolvimento ele chama cada componente <strong>duas vezes</strong> para
+pegar erros. Se o pedido ao servidor estivesse no corpo, você faria dois pedidos sem querer. Se o
+<code>console.log</code> estivesse no corpo, apareceriam duas linhas. O efeito existe para você dizer
+"isso aqui é ação, rode quando fizer sentido".</p>
+
+<h2>3. A primeira declaração</h2>
+
+<p>O <code>useEffect</code> já está no escopo das caixas deste guia, igual ao <code>useState</code>
+(no projeto de verdade ele vem de um <code>import</code>, que o preparador do arquivo resolve). A
+declaração tem sempre a mesma forma: um <code>useEffect(</code>, uma função, uma vírgula e o array de
+dependências. Nesta primeira caixa o componente tem só o desenho.</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const [paes, setPaes] = useState(3);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pães saindo do forno: {paes}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Três lugares onde o efeito <strong>não</strong> vai. Ele não vai depois do <code>return</code>
+(código depois do <code>return</code> nunca roda). Ele não vai dentro de um <code>if</code>, nem dentro
+de um laço — o React precisa que todos os hooks sejam chamados na mesma ordem em todo render, e um
+efeito que às vezes é chamado e às vezes não quebra essa contagem. E ele não vai dentro de outra
+função que não seja o componente.</p>
+
+<p>O lugar certo é o começo do componente, junto com os <code>useState</code>: primeiro os estados,
+depois os efeitos, e por último o <code>return</code> com o JSX. Essa ordem é convenção, não regra do
+React, mas ela deixa o componente legível: quem lê vê primeiro o que o componente guarda, depois o que
+ele faz, e por fim o que ele mostra.</p>
+
+<p>Um detalhe de sintaxe que confunde: você passa uma <strong>função</strong> para o
+<code>useEffect</code>, não o resultado dela. <code>useEffect(console.log("oi"))</code> está errado —
+isso chama o <code>console.log</code> na hora e passa <code>undefined</code> para o hook. O certo é
+embrulhar: <code>useEffect(() =&gt; { console.log("oi"); })</code>. A seta e as chaves adiam a execução
+para o React.</p>
+
+<h2>4. O efeito roda depois do render</h2>
+
+<p>Chegou a hora de ver a coisa funcionando. A missão é escrever o efeito que registra no console a
+frase combinada. Repare no painel: as linhas de HTML aparecem primeiro e a linha
+<code>console:</code> vem depois. Não é coincidência de ordenação, é a ordem real de execução.</p>
+
+<div class="tryreact" data-goal="console:a tela apareceu;;texto:Pães saindo do forno: 3">
+  <p class="try-task">Escreva um <code>useEffect</code> que registra no console a frase
+  <strong>a tela apareceu: hora de mostrar o pão</strong>. Não mexa no que já está escrito e clique em
+  Rodar.</p>
+  <pre class="jsx">function App() {
+  const [paes, setPaes] = useState(3);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pães saindo do forno: {paes}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Pães saindo do forno: 3&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [paes, setPaes] = useState(3);
+
+  useEffect(() =&gt; {
+    console.log("a tela apareceu: hora de mostrar o pão");
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pães saindo do forno: {paes}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra duas coisas: o HTML que o React gerou e o que o seu código escreveu no console. A
+linha do console vem depois porque o efeito roda depois. Se você tivesse escrito o mesmo
+<code>console.log</code> no corpo do componente, antes do <code>return</code>, ele apareceria no mesmo
+lugar do painel — mas teria rodado <em>antes</em> de o React montar o HTML, e rodaria de novo a cada
+render. A frase é a mesma; o momento não é.</p>
+
+<p>No navegador de verdade, o mesmo código aparece assim na aba <em>Console</em> do DevTools, aberta com
+<code>F12</code> — e note que a ordem é a mesma do painel:</p>
+
+<pre class="term">a tela apareceu: hora de mostrar o pão</pre>
+
+<p>Esse "depois" tem um nome: o React executa os efeitos depois de pintar a tela. Isso significa que a
+página já está visível quando a sua função roda. A consequência prática é boa: dentro do efeito você
+pode medir a tela, ler o tamanho de um elemento, consultar o navegador — tudo já está lá. A consequência
+prática é ruim para quem espera outra coisa: você não pode contar com o efeito para "preparar" dados
+que o <code>return</code> vai usar <em>na mesma pintura</em>, porque o render já aconteceu quando ele
+roda.</p>
+
+<p>O segundo argumento que escrevemos ali, o <code>[]</code>, diz "rode este efeito uma vez só, na
+montagem". Sem ele, o efeito rodaria depois de <em>todo</em> render. A aula inteira sobre isso é a
+próxima, mas guarde desde já a regra prática: um efeito que só faz sentido na entrada do componente
+leva <code>[]</code>.</p>
+
+<h2>5. O efeito pode mudar o estado</h2>
+
+<p>Agora o passo que confunde muita gente: dentro do efeito, a Ana vai chamar o
+<code>setPromocao</code>, do mesmo <code>useState</code> que ela já conhece. Pode? Pode. É inclusive o
+jeito normal de guardar no estado algo que só chegou depois — porque o render só pode desenhar o que ele
+já sabe, e o efeito é quem descobre as coisas novas.</p>
+
+<p>A sequência fica assim: o React chama o componente, o componente devolve o JSX, o React monta a
+tela, o efeito roda e chama <code>setPromocao</code>. O estado mudou, então o React chama o componente
+<strong>de novo</strong> — um segundo render, agora com a promoção preenchida. É por isso que você vê a
+frase final no painel e não a tela vazia: o painel mostra o resultado depois de tudo sossegar.</p>
+
+<div class="tryreact" data-goal="texto:Promoção do dia: pão de queijo pela metade do preço;;html:&lt;p&gt;Promoção do dia: pão de queijo">
+  <p class="try-task">O componente guarda a promoção, mas ninguém a preenche. Escreva um efeito que
+  roda uma vez e define a promoção como <strong>pão de queijo pela metade do preço</strong>.</p>
+  <pre class="jsx">function App() {
+  const [promocao, setPromocao] = useState("");
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Promoção do dia: {promocao}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Promoção do dia:&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [promocao, setPromocao] = useState("");
+
+  useEffect(() =&gt; {
+    setPromocao("pão de queijo pela metade do preço");
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Promoção do dia: {promocao}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Duas coisas importantes nesse exemplo. A primeira é que o efeito tem <code>[]</code>. Sem o array,
+ele rodaria depois de todo render, e cada execução chamaria <code>setPromocao</code>, que causaria outro
+render, que chamaria o efeito de novo, e assim para sempre. O React trava esse laço com um erro
+("Maximum update depth exceeded") depois de algumas dezenas de tentativas. A receita para não cair
+nele: se o efeito muda um estado, pergunte-se <em>quando</em> ele deve rodar — e escreva isso no array.
+O assunto volta na próxima aula, com calma.</p>
+
+<p>A segunda é que existe um caminho mais curto. Se a promoção é sempre a mesma, ela nem precisa de
+estado: pode ser uma constante calculada no render, e aí não há efeito nenhum. Efeito é para o que vem
+de fora ou depende do tempo; o que é fixo cabe numa variável. O guia tem uma aula só sobre essa
+pergunta — <a href="quando-nao-usar-efeito.html">Quando Não Usar Efeito</a> —, mas vale guardar o
+instinto: quanto menos efeito, melhor.</p>
+
+<h2>6. Um efeito por assunto</h2>
+
+<p>Quando a Ana começou, ela escreveu tudo em um efeito só: registrava os preços, registrava os pães e
+preenchia o aviso. Funcionou, e ficou ilegível. A recomendação do React é uma por assunto: um efeito
+para os preços, outro para os pães, outro para o aviso. Assim, quando um deles mudar, você sabe qual
+mexeu.</p>
+
+<p>Os efeitos de um mesmo componente rodam na ordem em que você os escreveu, de cima para baixo. Não
+é uma garantia de que dá para construir lógica em cima — quem garante dependência entre efeitos é o
+código, não a ordem —, mas ajuda a ler o console. Se a saída aparece na ordem contrária da que você
+esperava, provavelmente o efeito está em outro lugar do componente.</p>
+
+<div class="tryreact" data-goal="texto:hoje tem pão de queijo até as 10h;;console:carreguei o aviso;;console:carreguei os preços">
+  <p class="try-task">Já existe um efeito para os preços. Escreva um <strong>segundo</strong> efeito, que
+  roda uma vez, registra no console <strong>carreguei o aviso</strong> e define o aviso como
+  <strong>hoje tem pão de queijo até as 10h</strong>.</p>
+  <pre class="jsx">function App() {
+  const [paes, setPaes] = useState(["pão francês", "pão de queijo"]);
+  const [aviso, setAviso] = useState("");
+
+  useEffect(() =&gt; {
+    console.log("carreguei os preços");
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;ul&gt;
+        {paes.map((p) =&gt; (
+          &lt;li key={p}&gt;{p}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;&lt;/p&gt;
+  &lt;ul&gt;
+    &lt;li&gt;pão francês&lt;/li&gt;
+    &lt;li&gt;pão de queijo&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+console: carreguei os preços
+</pre>
+  <pre class="solucao">function App() {
+  const [paes, setPaes] = useState(["pão francês", "pão de queijo"]);
+  const [aviso, setAviso] = useState("");
+
+  useEffect(() =&gt; {
+    console.log("carreguei os preços");
+  }, []);
+
+  useEffect(() =&gt; {
+    console.log("carreguei o aviso");
+    setAviso("hoje tem pão de queijo até as 10h");
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+      &lt;ul&gt;
+        {paes.map((p) =&gt; (
+          &lt;li key={p}&gt;{p}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Repare que o painel mostra as duas linhas de console na ordem em que os efeitos foram declarados:
+primeiro os preços, depois o aviso. E repare também que o parágrafo do aviso aparece vazio no começo do
+código e preenchido depois da missão cumprida — é o segundo render fazendo seu trabalho.</p>
+
+<p>Um componente com vários efeitos pequenos é mais fácil de manter do que um com um efeito enorme. É a
+mesma ideia de separar o cabeçalho em um componente: dividir para conseguir mexer em uma parte sem
+derrubar as outras. Se um efeito precisa de três estados diferentes para trabalhar, provavelmente ele
+está fazendo três coisas — e o nome dele, se você tivesse de escrever um, sairia com "e" no meio.</p>
+
+<h2>7. O que não fazer dentro do efeito</h2>
+
+<p>Quatro tropeços aparecem quase sempre, e o primeiro é tentar usar <code>await</code> direto na
+função do efeito. Não dá: uma função que usa <code>await</code> precisa ser <code>async</code>, e uma
+função <code>async</code> sempre devolve uma Promise. O React espera que a função do efeito devolva
+<strong>ou nada, ou uma função de limpeza</strong> — e uma Promise não é nenhuma das duas. Ele avisa no
+console:</p>
+
+<pre class="term">Warning: An effect function must not return anything besides a function,
+which is used for clean-up. You returned: [object Promise].</pre>
+
+<p>A saída é criar uma função <code>async</code> <em>dentro</em> do efeito e chamá-la na hora. A função
+de fora continua devolvendo nada, o React fica satisfeito e o <code>await</code> acontece lá dentro:</p>
+
+<pre class="file" data-file="App.jsx">useEffect(() =&gt; {
+  async function carregar() {
+    const resposta = await fetch("https://loja.test/paes");
+    const lista = await resposta.json();
+    setPaes(lista);
+  }
+
+  carregar();
+}, []);</pre>
+
+<p>O segundo tropeço é esquecer que o efeito roda depois: quem tenta ler o valor de um estado dentro do
+efeito e usá-lo no <code>return</code> da mesma execução não vê o valor novo, porque o render já passou.
+O terceiro é colocar o efeito dentro de um <code>if</code> ou de um <code>for</code>. O React conta os
+hooks pela ordem das chamadas; se em um render o efeito é chamado e no outro não, a contagem desanda e o
+erro aparece como "Rendered fewer hooks than expected". O quarto é o laço infinito da seção anterior.</p>
+
+<p>Há ainda um tropeço mais silencioso: usar efeito para calcular o que daria para calcular no render.
+Se o total é <code>preco * quantidade</code> e os dois valores já estão no estado, escrever
+<code>const total = preco * quantidade</code> resolve — sem estado, sem efeito, sem segundo render. Um
+efeito que só copia um valor para outro estado é uma fonte de tela desatualizada: por um instante, o
+total antigo aparece junto do preço novo.</p>
+
+<h2>8. O array de dependências, em três formatos</h2>
+
+<p>Já que ele decide quando o efeito roda, vale conhecer os três formatos. Nesta aula, apenas reconheça;
+os detalhes, as armadilhas e o que fazer com objetos e funções são a aula seguinte, chamada
+<a href="dependencias.html">As Dependências</a>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Como você escreve</th><th>Quando o efeito roda</th><th>Quando faz sentido</th></tr>
+<tr><td><code>useEffect(funcao)</code></td><td>depois de todo render</td><td>quando o efeito precisa acompanhar cada mudança — e, nesse caso, ele não deve mudar estado</td></tr>
+<tr><td><code>useEffect(funcao, [])</code></td><td>só na montagem</td><td>carregar dados uma vez, registrar um aviso de entrada, preparar algo que não depende de nada</td></tr>
+<tr><td><code>useEffect(funcao, [a, b])</code></td><td>na montagem e sempre que <code>a</code> ou <code>b</code> mudar</td><td>recalcular quando um valor específico muda: o preço, o bairro, o termo da busca</td></tr>
+</table>
+</div>
+
+<p>O array não é uma lista de "quando eu quero que rode"; é uma lista de <strong>tudo o que o efeito
+lê</strong> de fora da própria função. Se o efeito lê <code>preco</code>, <code>preco</code> tem de
+estar no array. Se lê <code>preco</code> e <code>quantidade</code>, os dois. O React não consegue
+adivinhar isso sozinho (o JavaScript não deixa ele olhar dentro da função), então a responsabilidade é
+sua — e o ESLint do projeto reclama quando você esquece, com o aviso
+<code>react-hooks/exhaustive-deps</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sintoma</th><th>Provável causa</th><th>O que fazer</th></tr>
+<tr><td>a tela mostra um valor velho</td><td>falta uma dependência no array</td><td>acrescente ao array o valor que o efeito lê</td></tr>
+<tr><td>o efeito roda sem parar</td><td>efeito sem array que muda um estado</td><td>declare o array, ou tire o estado desnecessário</td></tr>
+<tr><td>o console mostra tudo duas vezes</td><td>modo de desenvolvimento, com StrictMode</td><td>nada: é de propósito, e o certo é o efeito saber se limpar</td></tr>
+</table>
+</div>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o console mostra tudo duas vezes</h3>
+<p>Com o projeto criado pelo Vite, o <code>StrictMode</code> monta, desmonta e monta de novo cada
+componente no modo de desenvolvimento, justamente para revelar efeitos que não sabem se limpar. O
+resultado é o seu <code>console.log</code> aparecendo duas vezes. Não é bug do seu código e não acontece
+na versão publicada. Nas caixas deste guia não há <code>StrictMode</code>, então você vê cada linha uma
+vez só.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o efeito parece não rodar</h3>
+<p>A Ana escreveu o <code>useEffect</code> e não viu nada no console. Na maioria das vezes o componente
+nem chegou a aparecer na tela: o efeito só roda depois da montagem, e um componente que ficou dentro de
+um <code>if</code> falso nunca monta. A outra causa comum é o erro em outro lugar do componente — se o
+render quebra, a montagem não termina e o efeito não roda. Nesse caso o console do navegador mostra o
+erro vermelho antes de qualquer linha sua.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o efeito que trava a página</h3>
+<p>O clássico. A Ana escreveu <code>useEffect(() =&gt; { setTotal(total + 1); })</code> — sem array. Cada
+execução muda o estado, cada mudança de estado pede um render, cada render pede o efeito. O navegador
+fica lento e o React para com "Maximum update depth exceeded". O conserto é decidir quando o efeito deve
+rodar e escrever isso no array; se não houver resposta, o efeito provavelmente não devia existir.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Quando o efeito roda?</p>
+<label><input type="radio" name="q1"> antes do render, para preparar os dados</label>
+<label><input type="radio" name="q1"> depois que o React desenhou a tela</label>
+<label><input type="radio" name="q1"> no lugar do <code>return</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que significa <code>useEffect(funcao, [])</code>?</p>
+<label><input type="radio" name="q2"> o efeito roda toda vez que o array muda</label>
+<label><input type="radio" name="q2"> o efeito não roda nunca</label>
+<label><input type="radio" name="q2"> o efeito roda uma vez, quando o componente monta</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Por que não se passa uma função <code>async</code> direto para o <code>useEffect</code>?</p>
+<label><input type="radio" name="q3"> porque ela devolve uma Promise, e o React espera nada ou uma função de limpeza</label>
+<label><input type="radio" name="q3"> porque o React não entende <code>await</code></label>
+<label><input type="radio" name="q3"> porque <code>async</code> deixa a página mais lenta</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o rodapé com a hora</h2>
+<p>A Ana quer que o rodapé diga a hora em que a página foi montada. Complete o código: qual é o segundo
+argumento que faz o efeito rodar uma vez só?</p>
+<div class="ex-code">useEffect(() =&gt; { console.log("montei"); }, <input aria-label="resposta 1" data-answer="[]" placeholder="...">);</div>
+<p class="ex-dica">Dica: é um array vazio — um par de colchetes, sem nada dentro. Sem ele, o efeito
+rodaria depois de todo render.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Um componente tem duas faixas de trabalho: o render, que calcula e devolve JSX, e o efeito, que
+conversa com o mundo de fora. O <code>useEffect</code> declara a segunda faixa; o React chama a sua
+função depois de montar a tela, nunca durante o render. Se você precisa do console, do título da aba, de
+um pedido ao servidor ou de um timer, é para lá que o código vai.</p>
+
+<p>O efeito pode mudar o estado. Quando muda, o React faz um segundo render com o valor novo — e é por
+isso que o painel das caixas mostra o resultado final. O que ele não pode é mudar um estado que ele
+mesmo observa em cada render sem um array de dependências, porque isso vira um laço. O array é a parte
+que decide: sem ele, o efeito roda sempre; com <code>[]</code>, roda uma vez na montagem; com valores
+dentro, roda quando algum deles muda.</p>
+
+<p>E a regra de organização: um efeito por assunto, todos no começo do componente, antes do
+<code>return</code>, nunca dentro de um <code>if</code>. Se um efeito só copia um valor que já estava
+disponível no render, ele provavelmente não devia existir. O caminho para escrever cada vez menos efeito
+é justamente entender quando um efeito é necessário — e é o que as próximas aulas destrincham.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Efeito é tudo o que o componente faz fora do <code>return</code>: console, título, dados, timer.</li>
+<li><code>useEffect(() =&gt; { ... }, [])</code> roda uma vez, depois da montagem.</li>
+<li>O efeito roda <strong>depois</strong> do render: a tela já está pintada quando ele começa.</li>
+<li>Mudar estado dentro do efeito provoca um segundo render — e o painel mostra o resultado dele.</li>
+<li>Sem array, o efeito roda depois de todo render; sem array e mudando estado, vira laço.</li>
+<li>Um efeito por assunto; todos antes do <code>return</code>; nunca dentro de <code>if</code>.</li>
+<li>Função <code>async</code> não vai direto no <code>useEffect</code>: crie uma dentro e chame.</li>
+<li>O array lista o que o efeito <strong>lê</strong>: se lê dois valores, os dois entram.</li>
+<li>No modo de desenvolvimento, o <code>StrictMode</code> roda o efeito duas vezes de propósito.</li>
+<li>Se o efeito só copia um valor que o render já tinha, não use efeito.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

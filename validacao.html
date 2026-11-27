@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Validação | Guia React</title>
+<meta name="description" content="Validação de formulário no React: trim para o campo vazio, mensagens por campo, vários erros juntos, formato de e-mail e telefone e o botão que só libera no fim.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Validação</span></h1>
+<p class="intro">A Ana recebeu uma encomenda com o nome em branco e o telefone "1". O site deixou passar,
+porque até agora ele aceitava qualquer coisa que o cliente digitasse — inclusive nada. Validar é conferir
+o que chegou antes de seguir, e mostrar o motivo quando algo não serve. Nesta aula ela coloca regras no
+formulário da padaria: nome que não seja só espaço, telefone com dígitos suficientes, e-mail com arroba e
+ponto, mensagens no lugar certo e um botão que só registra o pedido quando está tudo certo.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é validar e por que o campo vazio não é o único problema.</li>
+  <li>Como usar <code>trim()</code> para não aceitar só espaços.</li>
+  <li>Como mostrar a mensagem de erro no lugar certo.</li>
+  <li>Como validar vários campos e mostrar vários erros de uma vez.</li>
+  <li>Como conferir formato de e-mail e telefone sem regex gigante.</li>
+  <li>Quando validar: no envio, ao sair do campo ou enquanto digita.</li>
+  <li>Quando o botão desabilitado ajuda — e quando atrapalha.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o pedido que chegou vazio</h2>
+
+<p>A padaria recebeu uma encomenda com o nome em branco, o telefone "1" e o recado "quero". A Ana tentou
+ligar, não conseguiu, e o bolo ficou pronto sem ninguém para buscar. O site tinha feito o que mandaram:
+pegou o que estava nos campos e mostrou "Encomenda registrada". Nenhum campo estava errado do ponto de
+vista do navegador — todos eram <code>input</code> de texto comuns. O problema é que ninguém tinha dito o
+que era um pedido válido.</p>
+
+<p>Validar é isso: escrever as regras do que serve e conferir cada campo antes de seguir. Três perguntas
+resolvem a maioria dos formulários. O campo está preenchido de verdade? Tem o formato esperado? Faz sentido
+junto com os outros? O nome em branco falha na primeira, o telefone "1" falha na segunda, e um pedido de
+entrega sem endereço falha na terceira.</p>
+
+<p>Existe uma diferença entre validar e formatar. Formatar é transformar o texto — tirar parênteses do
+telefone, deixar o nome em maiúsculas. Validar é decidir se o texto serve. As duas coisas trabalham
+juntas, mas em lugares diferentes: a formatação acontece no <code>onChange</code>, a validação acontece na
+hora de enviar (e, se você quiser, também enquanto digita).</p>
+
+<h2>2. O campo vazio que não está vazio</h2>
+
+<p>O primeiro problema é mais sutil do que parece. Para o JavaScript, uma string com um espaço não é vazia:
+<code>" "</code> tem tamanho 1 e passa em qualquer teste de "tem algo aqui?". O cliente aperta a barra de
+espaço, o campo parece preenchido, e a encomenda sai sem nome. A função que resolve isso é
+<code>trim()</code>, que remove os espaços do começo e do fim — e só eles: o espaço entre "Ana" e "Maria"
+continua lá.</p>
+
+<dl class="anatomy">
+<dt>validação</dt>
+<dd>O conjunto de regras que decide se o formulário pode seguir. Fica numa função ou numa conta feita no
+render.</dd>
+<dt><code>trim()</code></dt>
+<dd>Remove os espaços das pontas de uma string. <code>" Ana ".trim()</code> vira <code>"Ana"</code>.</dd>
+<dt>regra</dt>
+<dd>Uma condição booleana sobre o campo: <code>nome.trim() !== ""</code>,
+<code>telefone.length &gt;= 8</code>, <code>email.includes("@")</code>.</dd>
+<dt>mensagem</dt>
+<dd>O texto que explica o problema ao cliente. Aparece perto do campo e só quando faz sentido.</dd>
+<dt>pode enviar</dt>
+<dd>Uma conta que junta todas as regras: <code>!semNome &amp;&amp; !semTelefone</code>. Se for verdadeira,
+o pedido segue.</dd>
+</dl>
+
+<p>Repare que nenhuma peça nova de estado é necessária. As regras são contas feitas a partir dos valores
+que você já guarda. Guardar o resultado da validação num <code>useState</code> separado é tentador e vira
+fonte de bug: o estado do erro e o estado do campo saem de sincronia, e a tela mostra "inválido" para um
+campo que já foi corrigido. Calcule no render.</p>
+
+<p>No console, o <code>trim()</code> mostra o que faz com os espaços das pontas:</p>
+
+<pre class="term">nome: " Ana "
+nome.trim(): "Ana"
+nome.trim().length: 3</pre>
+
+<p>A única coisa que precisa de estado é a decisão de mostrar ou não a mensagem. E mesmo essa pode ser
+derivada: "mostre o erro se o cliente já tentou enviar". Um booleano <code>enviado</code> resolve todos
+os campos de uma vez.</p>
+
+<h2>3. A primeira regra: o nome tem que existir</h2>
+
+<p>O componente abaixo aceita qualquer coisa e mostra "Encomenda registrada" sempre que o botão é clicado.
+A missão é conferir o nome antes e trocar a mensagem de sucesso por um erro quando o campo estiver vazio
+ou só com espaços:</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Digite o nome;;digite:input=Maria;;texto:Encomenda registrada para Maria">
+  <p class="try-task">O pedido vazio passa. Marque <code>enviado</code>, calcule
+  <code>nome.trim() === ""</code> e mostre <code>Digite o nome</code> quando o campo estiver vazio. Com um
+  nome, mostre <code>Encomenda registrada para {nome}</code>.</p>
+  <pre class="jsx">function App() {
+  const [nome, setNome] = useState("");
+  const [enviado, setEnviado] = useState(false);
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        type="text"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;button onClick={() =&gt; setEnviado(true)}&gt;Encomendar&lt;/button&gt;
+      {enviado &amp;&amp; &lt;p&gt;Encomenda registrada&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="nome"&gt;Nome&lt;/label&gt;
+  &lt;input id="nome" type="text" value=""&gt;
+  &lt;button&gt;Encomendar&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nome, setNome] = useState("");
+  const [enviado, setEnviado] = useState(false);
+  const semNome = nome.trim() === "";
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        type="text"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;button onClick={() =&gt; setEnviado(true)}&gt;Encomendar&lt;/button&gt;
+      {enviado &amp;&amp; semNome &amp;&amp; &lt;p&gt;Digite o nome&lt;/p&gt;}
+      {enviado &amp;&amp; !semNome &amp;&amp; (
+        &lt;p&gt;Encomenda registrada para {nome}&lt;/p&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em Encomendar com o campo vazio: aparece "Digite o nome". Digite "Maria" e a mensagem de erro
+some sozinha, porque <code>semNome</code> virou falso e <code>enviado</code> continua verdadeiro — a pessoa
+já tentou, então o formulário volta a mostrar o resultado da tentativa. Esse comportamento é o que se
+espera de um formulário moderno: errar, corrigir, seguir, sem precisar clicar em Encomendar outra vez.</p>
+
+<p>Repare que a ordem dos <code>&amp;&amp;</code> importa. <code>enviado &amp;&amp; semNome &amp;&amp;</code>
+lê como "se já tentou e o nome está vazio, mostre o erro". Sem o <code>enviado</code> na frente, o erro
+apareceria na primeira visita, antes de a pessoa digitar qualquer coisa — o que é hostil e faz o formulário
+parecer quebrado.</p>
+
+<p>Esse padrão de três partes — um valor no estado, uma regra calculada e uma mensagem condicionada —
+repete em todo campo. Mude a regra e o texto, e o resto do código é igual. Por isso vale entender uma vez
+com calma em vez de copiar cinco blocos diferentes.</p>
+
+<h2>4. Onde a mensagem deve aparecer</h2>
+
+<p>A escolha preguiçosa é <code>alert("Digite o nome")</code>. Funciona e é ruim: interrompe, aparece
+longe do campo, some no próximo clique e o leitor de tela repete a página inteira. A mensagem deve ficar
+perto do campo a que se refere, dentro do fluxo da página, e desaparecer quando o problema some.</p>
+
+<p>Três detalhes fazem a mensagem funcionar para todo mundo:</p>
+
+<p>O primeiro é o lugar: logo depois do campo, antes do próximo. Se o erro está embaixo de outro campo, o
+cliente não sabe qual corrigir. O segundo é o papel: um parágrafo com <code>role="alert"</code> faz o
+leitor de tela anunciar o texto assim que ele aparece. O terceiro é o estado do campo:
+<code>aria-invalid={semNome}</code> avisa que o valor não está aceito, e o CSS pode pintar a borda de
+vermelho a partir daí.</p>
+
+<pre class="file" data-file="CampoNome.jsx">function CampoNome() {
+  const [nome, setNome] = useState("");
+  const [enviado, setEnviado] = useState(false);
+  const semNome = nome.trim() === "";
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        type="text"
+        value={nome}
+        aria-invalid={semNome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      {enviado &amp;&amp; semNome &amp;&amp; (
+        &lt;p role="alert"&gt;Digite o nome&lt;/p&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Não é obrigatório usar <code>role="alert"</code> em todo erro; em formulários longos, o excesso de
+anúncios atrapalha. O mínimo é a mensagem existir em texto, perto do campo, e o campo continuar focável
+para a correção. A aula de formulário acessível entra nos detalhes de leitor de tela e de foco; aqui, o
+hábito de não usar <code>alert()</code> já é meio caminho.</p>
+
+<p>Um cuidado de redação: a mensagem deve dizer o que fazer, não só o que está errado. "Digite o nome" é
+melhor que "Campo inválido"; "Informe o telefone com DDD" é melhor que "Erro". O cliente está no meio de
+uma compra — a mensagem é instrução, não sentença.</p>
+
+<h2>5. Vários campos, vários erros</h2>
+
+<p>Validar um campo é fácil; o difícil é validar quatro sem transformar o componente numa escada de
+<code>if</code>. O jeito que escala é calcular um booleano por regra, no começo do componente, e usá-los
+nas mensagens e no "pode enviar". Nada de estado extra, nada de efeito: só contas.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Informe o nome;;texto:Informe o telefone com DDD;;digite:input#nome=Ana;;digite:input#telefone=999998888;;texto:Encomenda registrada para Ana">
+  <p class="try-task">O formulário registra o pedido com nome e telefone vazios. Crie uma regra para cada
+  campo — nome sem espaços e telefone com pelo menos 8 dígitos — mostre as duas mensagens juntas e só
+  registre quando as duas passarem.</p>
+  <pre class="jsx">function App() {
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [enviado, setEnviado] = useState(false);
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        type="text"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;label htmlFor="telefone"&gt;Telefone&lt;/label&gt;
+      &lt;input
+        id="telefone"
+        type="tel"
+        value={telefone}
+        onChange={(e) =&gt; setTelefone(e.target.value)}
+      /&gt;
+      &lt;button onClick={() =&gt; setEnviado(true)}&gt;Encomendar&lt;/button&gt;
+      {enviado &amp;&amp; &lt;p&gt;Encomenda registrada&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="nome"&gt;Nome&lt;/label&gt;
+  &lt;input id="nome" type="text" value=""&gt;
+  &lt;label for="telefone"&gt;Telefone&lt;/label&gt;
+  &lt;input id="telefone" type="tel" value=""&gt;
+  &lt;button&gt;Encomendar&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [enviado, setEnviado] = useState(false);
+  const semNome = nome.trim() === "";
+  const semTelefone = telefone.replace(/\D/g, "").length &lt; 8;
+  const podeEnviar = !semNome &amp;&amp; !semTelefone;
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        type="text"
+        value={nome}
+        aria-invalid={semNome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;label htmlFor="telefone"&gt;Telefone&lt;/label&gt;
+      &lt;input
+        id="telefone"
+        type="tel"
+        value={telefone}
+        aria-invalid={semTelefone}
+        onChange={(e) =&gt; setTelefone(e.target.value)}
+      /&gt;
+      &lt;button onClick={() =&gt; setEnviado(true)}&gt;Encomendar&lt;/button&gt;
+      {enviado &amp;&amp; semNome &amp;&amp; &lt;p role="alert"&gt;Informe o nome&lt;/p&gt;}
+      {enviado &amp;&amp; semTelefone &amp;&amp; (
+        &lt;p role="alert"&gt;Informe o telefone com DDD&lt;/p&gt;
+      )}
+      {enviado &amp;&amp; podeEnviar &amp;&amp; (
+        &lt;p&gt;Encomenda registrada para {nome}&lt;/p&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em Encomendar sem preencher nada: as duas mensagens aparecem juntas, e a de sucesso não. Preencha
+nome e telefone e as duas somem; o registro aparece. Se você preencher só o nome, a mensagem do telefone
+continua e o pedido não segue — é o comportamento certo: o cliente vê tudo o que falta de uma vez, em vez
+de corrigir um campo por clique.</p>
+
+<p>O <code>replace(/\D/g, "")</code> antes do <code>length</code> é o que faz "99999-8888" contar oito
+dígitos, e não dez caracteres. Sem ele, um telefone com máscara passaria no teste com menos números do que
+o necessário. A mesma ideia vale para CPF, CEP e qualquer campo com pontuação: limpe antes de contar.</p>
+
+<p>Note também que <code>podeEnviar</code> é a única regra que o botão precisa consultar. Se amanhã a Ana
+quiser exigir o bairro, ela acrescenta um booleano e ajusta essa linha — as mensagens continuam cada uma
+no seu campo. Um booleano por regra é mais fácil de ler do que uma condição gigante dentro do
+<code>onClick</code>.</p>
+
+<h2>6. Formato: e-mail e telefone</h2>
+
+<p>Preenchido não é o mesmo que válido. "ana" está preenchido e não é e-mail. "1" está preenchido e não é
+telefone. Para o formato, comece com as regras mais simples que resolvem o caso real; uma expressão
+regular gigante costuma reprovar endereços válidos e não protege de nada.</p>
+
+<p>Para e-mail, o teste mínimo é ter arroba e um ponto no endereço:
+<code>email.includes("@") &amp;&amp; email.includes(".")</code>. Não é perfeito — "a@b." passa —, mas pega o
+erro comum de quem esquece a arroba. Se o cadastro é crítico, a conferência de verdade é mandar um e-mail
+de confirmação, e isso é assunto de servidor, não de componente.</p>
+
+<div class="tryreact" data-goal="digite:input=ana@;;clique:button;;texto:Informe um e-mail com arroba;;digite:input=ana@loja.test;;texto:Pedido enviado para ana@loja.test">
+  <p class="try-task">O e-mail é aceito sem conferência. Exija arroba e ponto no endereço, mostre
+  <code>Informe um e-mail com arroba</code> quando faltar e só envie quando o formato passar.</p>
+  <pre class="jsx">function App() {
+  const [email, setEmail] = useState("");
+  const [enviado, setEnviado] = useState(false);
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="email"&gt;E-mail&lt;/label&gt;
+      &lt;input
+        id="email"
+        type="email"
+        value={email}
+        onChange={(e) =&gt; setEmail(e.target.value)}
+      /&gt;
+      &lt;button onClick={() =&gt; setEnviado(true)}&gt;Encomendar&lt;/button&gt;
+      {enviado &amp;&amp; &lt;p&gt;Pedido enviado para {email}&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="email"&gt;E-mail&lt;/label&gt;
+  &lt;input id="email" type="email" value=""&gt;
+  &lt;button&gt;Encomendar&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [email, setEmail] = useState("");
+  const [enviado, setEnviado] = useState(false);
+  const emailOk = email.includes("@") &amp;&amp; email.includes(".");
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="email"&gt;E-mail&lt;/label&gt;
+      &lt;input
+        id="email"
+        type="email"
+        value={email}
+        aria-invalid={!emailOk}
+        onChange={(e) =&gt; setEmail(e.target.value)}
+      /&gt;
+      &lt;button onClick={() =&gt; setEnviado(true)}&gt;Encomendar&lt;/button&gt;
+      {enviado &amp;&amp; !emailOk &amp;&amp; (
+        &lt;p role="alert"&gt;Informe um e-mail com arroba&lt;/p&gt;
+      )}
+      {enviado &amp;&amp; emailOk &amp;&amp; (
+        &lt;p&gt;Pedido enviado para {email}&lt;/p&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Digite "ana@" e clique: o erro aparece. Complete para "ana@loja.test" e o pedido segue, sem clique
+extra. Note que o campo é <code>type="email"</code>: isso melhora o teclado no celular, mas não substitui
+a conferência — o tipo só valida no envio de um <code>form</code>, e a sua regra vale em qualquer
+lugar.</p>
+
+<p>Para telefone, a regra de tamanho resolve a maioria dos casos. Conte os dígitos depois de limpar a
+máscara e exija um mínimo — oito é o número local, onze com DDD. Se quiser conferir o DDD, compare os dois
+primeiros dígitos com uma lista; se quiser conferir operadora, desista: quem sabe disso é o serviço de
+mensagem, não o formulário.</p>
+
+<p>Juntando as regras desta aula, o mapa do formulário fica assim:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Campo</th><th>Regra</th><th>Mensagem</th></tr>
+<tr><td>nome</td><td><code>nome.trim() !== ""</code></td><td>Informe o nome</td></tr>
+<tr><td>telefone</td><td>dígitos depois do <code>replace</code> com pelo menos 8</td><td>Informe o telefone com DDD</td></tr>
+<tr><td>e-mail</td><td><code>email.includes("@") &amp;&amp; email.includes(".")</code></td><td>Informe um e-mail com arroba</td></tr>
+<tr><td>recado do bolo</td><td><code>recado.length &lt;= 40</code></td><td>O recado passa de 40 caracteres</td></tr>
+<tr><td>tamanho da camiseta</td><td><code>tamanho !== ""</code></td><td>Escolha o tamanho</td></tr>
+</table>
+</div>
+
+<p>Uma tentação comum é validar com expressões regulares enormes copiadas de um fórum. Elas costumam
+reprovar endereços válidos — e-mails com ponto no nome, telefones internacionais — e dão manutenção
+terrível. Comece simples, com <code>includes</code>, <code>length</code> e <code>trim</code>, e só
+complique quando aparecer um caso real que a regra simples deixa passar.</p>
+
+<h2>7. Quando validar: no envio, ao sair ou enquanto digita</h2>
+
+<p>Existem três momentos possíveis, e cada um tem um custo. Validar enquanto digita é imediato e pode ser
+cruel: a pessoa começa a escrever o e-mail e vê "e-mail inválido" na segunda letra. Validar no envio é
+paciente e concentra a correção no fim. Validar ao sair do campo é o meio-termo mais usado em formulários
+de compra.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Quando</th><th>Como se faz</th><th>Bom para</th><th>Cuidado</th></tr>
+<tr><td>ao enviar</td><td>valida dentro do <code>onClick</code> ou no <code>onSubmit</code></td><td>formulário curto; uma decisão só</td><td>a pessoa erra tudo e descobre no fim</td></tr>
+<tr><td>ao sair do campo</td><td><code>onBlur</code> marca o campo como "tocado"</td><td>formulário médio; erro no momento certo</td><td>quem usa teclado pode nunca sair do campo</td></tr>
+<tr><td>enquanto digita</td><td>regra calculada no render, sempre visível</td><td>campos com máscara, contador, busca</td><td>erro na primeira letra é hostil</td></tr>
+</table>
+</div>
+
+<p>A escolha prática é combinar: mostrar o erro no envio e, depois da primeira tentativa, manter a
+mensagem atualizada a cada tecla. É o que os componentes desta aula fazem com o <code>enviado</code>:
+antes do clique, nada aparece; depois, o erro acompanha a digitação e some quando a pessoa corrige. Uma
+variável <code>tocado</code> por campo faz o mesmo para o <code>onBlur</code>, sem mudar a estrutura.</p>
+
+<p>O botão desabilitado entra aqui. A ideia é tentadora: se o formulário é inválido, deixe o botão cinza.
+O problema é que um botão desabilitado não recebe clique nem foco, então o cliente não descobre o que
+falta — ele clica, nada acontece, e ele vai embora. Se você usar <code>disabled</code>, mostre as
+mensagens desde o começo, para o motivo estar visível. Caso contrário, deixe o botão ativo e valide no
+clique, que é o caminho desta aula.</p>
+
+<h2>8. O resumo do pedido e o envio</h2>
+
+<p>Com as regras no lugar, o resumo do pedido fica fácil: ele só aparece quando <code>podeEnviar</code> é
+verdadeiro. E o envio de verdade — mandar os dados para o servidor, limpar o formulário, mostrar
+"obrigado" — é o assunto da próxima aula. Aqui, o "envio" é só uma mensagem na tela, mas a estrutura já é a
+que você vai usar com rede.</p>
+
+<pre class="file" data-file="Encomenda.jsx">function Encomenda() {
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [enviado, setEnviado] = useState(false);
+  const semNome = nome.trim() === "";
+  const semTelefone = telefone.replace(/\D/g, "").length &lt; 8;
+  const podeEnviar = !semNome &amp;&amp; !semTelefone;
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Nome&lt;/label&gt;
+      &lt;input
+        id="nome"
+        value={nome}
+        aria-invalid={semNome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      {enviado &amp;&amp; semNome &amp;&amp; &lt;p role="alert"&gt;Informe o nome&lt;/p&gt;}
+
+      &lt;label htmlFor="telefone"&gt;Telefone&lt;/label&gt;
+      &lt;input
+        id="telefone"
+        value={telefone}
+        aria-invalid={semTelefone}
+        onChange={(e) =&gt; setTelefone(e.target.value)}
+      /&gt;
+      {enviado &amp;&amp; semTelefone &amp;&amp; (
+        &lt;p role="alert"&gt;Informe o telefone com DDD&lt;/p&gt;
+      )}
+
+      &lt;button onClick={() =&gt; setEnviado(true)}&gt;Encomendar&lt;/button&gt;
+
+      {enviado &amp;&amp; podeEnviar &amp;&amp; (
+        &lt;p&gt;Encomenda registrada para {nome}&lt;/p&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Se você fosse mandar isso para o servidor, o clique viraria uma função assíncrona: confere, monta um
+objeto com os valores, chama a API e trata a resposta. A validação continua igual, feita antes da chamada.
+O que muda é o que acontece depois do "pode enviar" — e é aí que entram carregamento, erro de rede e
+limpeza do formulário.</p>
+
+<p>Se você registrar o pedido no console antes de mandar, vê exatamente o que passou na validação:</p>
+
+<pre class="term">pedido: {"nome":"Ana","telefone":"999998888","email":"ana@loja.test"}</pre>
+
+<p>Uma decisão que vale tomar cedo: o que fazer com o texto depois do envio. Limpar os campos com
+<code>setNome("")</code> e <code>setTelefone("")</code> é comum em formulários de contato. Manter os
+valores é comum em pedidos, para a pessoa conferir o que mandou. Não existe certo universal; existe o que
+faz sentido para o seu cliente. Só não deixe o formulário com cara de "enviado" e os campos ainda
+preenchidos sem explicar o que aconteceu.</p>
+
+<p>Por último, um lembrete de segurança: validação no navegador é conveniência, não proteção. Qualquer
+pessoa consegue mandar um pedido sem passar pela sua tela. O servidor precisa conferir de novo — sempre.
+O que você faz aqui melhora a experiência de quem preenche; a integridade dos dados é trabalho do outro
+lado da rede.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o nome só com espaços passou</h3>
+<p>A Ana validou com <code>nome === ""</code> e uma encomenda entrou com o nome " ". A comparação com
+string vazia não pega espaços; <code>nome.trim() === ""</code> pega. O mesmo cuidado vale para o recado do
+bolo e para o endereço. Sempre que a regra é "está preenchido?", o <code>trim()</code> entra antes da
+comparação.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o erro aparece antes de a pessoa digitar</h3>
+<p>Ela mostrou o erro direto, sem condicionar ao <code>enviado</code>, e o formulário abriu com três
+mensagens vermelhas. Quem chega pela primeira vez leva um susto e às vezes desiste. A condição
+<code>enviado &amp;&amp; ...</code> resolve: o erro só aparece depois de uma tentativa. Se quiser mostrar
+antes, espere a pessoa sair do campo com <code>onBlur</code>.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o botão desabilitado esconde o motivo</h3>
+<p>O botão ficou cinza porque o formulário era inválido, mas nenhuma mensagem explicava o que faltava. O
+cliente clicou várias vezes, não aconteceu nada e ele fechou a página. Se o botão vai ficar desabilitado,
+as mensagens precisam estar visíveis desde o início — ou o botão fica ativo e o erro aparece no clique,
+que é o padrão mais amigável.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Por que validar o nome com <code>nome === ""</code> não basta?</p>
+<label><input type="radio" name="q1"> porque aspas vazias não existem em JavaScript</label>
+<label><input type="radio" name="q1"> porque um espaço conta como texto e passa na comparação; <code>trim()</code> resolve</label>
+<label><input type="radio" name="q1"> porque o <code>input</code> sempre devolve um número</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Quando a mensagem de erro deve aparecer?</p>
+<label><input type="radio" name="q2"> sempre, desde o primeiro segundo na página</label>
+<label><input type="radio" name="q2"> só depois que o servidor responder</label>
+<label><input type="radio" name="q2"> depois de a pessoa tentar enviar, ou depois de sair do campo</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que significa <code>podeEnviar</code> num formulário validado?</p>
+<label><input type="radio" name="q3"> uma conta com todas as regras juntas, feita no render a partir do estado</label>
+<label><input type="radio" name="q3"> um <code>useState</code> que precisa ser atualizado em cada campo</label>
+<label><input type="radio" name="q3"> o retorno do <code>alert()</code> depois da validação</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: limpar antes de contar</h2>
+<p>A regra do telefone precisa contar só os dígitos. Complete a expressão que remove tudo o que não é
+dígito, escrevendo só a expressão regular que falta (sem as barras):</p>
+<div class="ex-code">const digitos = telefone.replace(/<input aria-label="resposta 1" data-answer="\D" placeholder="...">/g, "");</div>
+<p class="ex-dica">Dica: <code>\d</code> é dígito e <code>\D</code> é o contrário — qualquer coisa que não
+seja dígito. O <code>g</code> faz a troca valer para todas as ocorrências, não só a primeira.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Validar é escrever as regras do que serve e conferir antes de seguir. O campo vazio engana: use
+<code>trim()</code> antes de comparar com <code>""</code>. Formato se confere com regras simples —
+<code>includes("@")</code> para e-mail, contagem de dígitos para telefone — antes de partir para expressões
+regulares complicadas. As regras são contas feitas no render, não estados novos, e <code>podeEnviar</code>
+junta todas elas.</p>
+
+<p>A mensagem fica perto do campo, aparece depois da primeira tentativa e some quando o problema é
+corrigido. Um booleano <code>enviado</code> comanda a exibição; <code>role="alert"</code> e
+<code>aria-invalid</code> melhoram a leitura por leitores de tela. Evite <code>alert()</code> e evite o
+botão desabilitado sem explicação. E lembre: a validação do navegador é conveniência — o servidor confere
+de novo.</p>
+
+<p>Com isso, o formulário da padaria está completo: campos de texto, textarea, select, checkbox, radio e
+validação. O próximo passo é o envio de verdade, com <code>form</code>, <code>onSubmit</code> e a conversa
+com o servidor — a aula de <a href="envio-de-formulario.html">envio de formulário</a> segue daqui. Se
+quiser revisar a parte de acessibilidade das mensagens, a aula de
+<a href="formulario-acessivel.html">formulário acessível</a> aprofunda o assunto.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Validar é conferir antes de seguir; formatar é transformar o texto.</li>
+<li><code>nome.trim() === ""</code> pega o campo vazio e o só com espaços.</li>
+<li>Regras são contas no render: <code>semNome</code>, <code>semTelefone</code>, <code>podeEnviar</code>.</li>
+<li>Um booleano <code>enviado</code> decide quando o erro aparece.</li>
+<li>A mensagem fica perto do campo e diz o que fazer.</li>
+<li><code>role="alert"</code> anuncia o erro; <code>aria-invalid</code> marca o campo.</li>
+<li>Vários erros aparecem juntos; o sucesso só quando todos passam.</li>
+<li>E-mail: <code>includes("@") &amp;&amp; includes(".")</code> já pega o erro comum.</li>
+<li>Telefone: limpe a máscara e conte os dígitos.</li>
+<li>Botão desabilitado sem mensagem esconde o motivo; prefira validar no clique.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Props com Objetos | Guia React</title>
+<meta name="description" content="Passar um objeto como prop no React: as duas chaves do objeto literal, como ler props.pao.nome, o objeto que vem de uma variável e o espalhamento com três pontos.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Props com <span class="hl">Objetos</span></h1>
+<p class="intro">O cartão da Ana já recebe o nome e o preço por props, e isso resolveu metade do
+problema. A outra metade apareceu quando ela quis mostrar também a descrição, a validade e se o pão é
+integral: a chamada virou uma linha comprida, com cinco atributos, repetida para cada pão da vitrine.
+Pior, quando um pão ganhou um campo novo, ela teve de editar todas as chamadas. Nesta aula ela manda
+<strong>um objeto</strong> no lugar de cinco props soltas — e aprende a ler os valores que estão dentro
+dele.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como passar um objeto como uma única prop, e por que aparecem duas chaves.</li>
+  <li>Como ler valores dentro do objeto: <code>props.pao.nome</code>.</li>
+  <li>A diferença entre passar um objeto escrito na hora e passar um objeto que já existe numa variável.</li>
+  <li>Como o objeto aparece no console, com as chaves aninhadas.</li>
+  <li>O que os três pontos fazem: <code>&lt;Cartao {...pao} /&gt;</code>.</li>
+  <li>Por que o mesmo objeto chega em todos os cartões e por que não se altera.</li>
+  <li>Os tropeços de quem esquece uma chave ou lê no nível errado.</li>
+</ul>
+</div>
+
+<h2>1. A cena: cinco props para o mesmo pão</h2>
+
+<p>O cartão da vitrine cresceu. Além do nome e do preço, que chegaram por props na
+<a href="props.html">aula anterior</a>, a Ana quis mostrar a descrição, o peso e se o pão é integral. A
+chamada ficou assim:</p>
+
+<pre class="file" data-file="App.jsx">&lt;Cartao
+  nome="Pão de queijo"
+  preco="R$ 3,50"
+  descricao="Assado na hora, com queijo da serra"
+  peso="80 g"
+  integral={false}
+/&gt;</pre>
+
+<p>Funciona. Mas repare no que aconteceu: cinco atributos para descrever <em>um</em> pão, repetidos em
+cada cartão da vitrine. Quando ela resolveu acrescentar “sem lactose”, precisou abrir todas as chamadas
+do site. E cada chamada é uma oportunidade de errar o nome de uma chave.</p>
+
+<p>O dado já andava junto: nome, preço e descrição são todos do mesmo pão. O JavaScript tem uma caixa
+feita para isso — o <strong>objeto</strong> —, e o React aceita essa caixa como prop. Em vez de cinco
+atributos soltos, um atributo só, com tudo dentro. A diferença parece cosmética e não é: o objeto pode
+ser montado em outro lugar, guardado numa variável, vindo de uma lista, e a chamada continua curta.</p>
+
+<p>Um aviso antes de seguir: nesta aula você vai ver chaves duplas, parênteses e três pontinhos. Nada
+disso é invenção do React — é JavaScript comum. A boa notícia é que são só três ideias, e cada uma tem a
+sua seção.</p>
+
+<h2>2. As peças: objeto, chave e caminho</h2>
+
+<p>Um objeto é uma lista de pares: um nome e um valor. Em JavaScript, escreve-se entre chaves, com
+dois-pontos entre o nome e o valor e vírgula entre os pares. O nome é a <strong>chave</strong>. Para
+chegar ao valor, usa-se o ponto: <code>pao.nome</code>.</p>
+
+<dl class="anatomy">
+<dt>objeto</dt>
+<dd>Uma caixa com pares de chave e valor: <code>{ nome: "Pão", preco: "R$ 1,20" }</code>. Serve para
+agrupar dados que descrevem a mesma coisa.</dd>
+<dt>chave</dt>
+<dd>O nome de um campo do objeto: <code>nome</code>, <code>preco</code>. No console aparece entre
+aspas, mas no código se escreve sem aspas.</dd>
+<dt>literal</dt>
+<dd>O objeto escrito na hora, com as chaves e os valores na mão — em oposição ao objeto que vem de uma
+variável.</dd>
+<dt>caminho</dt>
+<dd>A sequência de pontos até o valor: <code>props.pao.nome</code> quer dizer “dentro de props, o
+campo pao; dentro dele, o campo nome”.</dd>
+<dt>espalhar</dt>
+<dd>Usar <code>...</code> para abrir um objeto em pedaços: <code>{...pao}</code> entrega cada chave como
+uma prop separada.</dd>
+</dl>
+
+<p>Com esse vocabulário, a chamada da Ana fica curta e o componente recebe tudo de uma vez. O preço é que
+a leitura dentro do componente fica com um ponto a mais: não é mais <code>props.nome</code>, é
+<code>props.pao.nome</code>. Um nível a mais de profundidade, e é aí que a maioria dos iniciantes se
+perde.</p>
+
+<h2>3. O objeto literal e as duas chaves</h2>
+
+<p>Vamos escrever o objeto na própria chamada. Repare nas chaves duplas — e na explicação logo abaixo,
+porque elas são a parte que mais confunde:</p>
+
+<div class="tryreact" data-goal="texto:R$ 1,20;;html:&lt;p&gt;R$ 1,20&lt;/p&gt;">
+  <p class="try-task">O objeto <code>pao</code> só tem o nome, então o preço sai vazio. Acrescente
+  <code>preco: "R$ 1,20"</code> dentro do objeto e clique em Rodar.</p>
+  <pre class="jsx">function Cartao(props) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{props.pao.nome}&lt;/h2&gt;
+      &lt;p&gt;{props.pao.preco}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return &lt;Cartao pao={{ nome: "Pão francês" }} /&gt;;
+}</pre>
+  <pre class="out">
+&lt;div class="cartao"&gt;
+  &lt;h2&gt;Pão francês&lt;/h2&gt;
+  &lt;p&gt;&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Cartao(props) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{props.pao.nome}&lt;/h2&gt;
+      &lt;p&gt;{props.pao.preco}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return &lt;Cartao pao={{ nome: "Pão francês", preco: "R$ 1,20" }} /&gt;;
+}</pre>
+</div>
+
+<p>As duas chaves não são um enfeite: são duas coisas diferentes. A de fora é a porta do JSX — a mesma
+que você usa para mostrar um valor, <code>{props.nome}</code>. A de dentro é o objeto em si, escrito em
+JavaScript. Se você usar só uma, o código nem compila: o compilador entende que ali começa um bloco e
+reclama do dois-pontos. Na seção 9 tem a mensagem exata.</p>
+
+<p>Da mesma forma que no caso de uma prop só, o valor pode misturar texto e outros tipos: nome e preço
+como texto, <code>integral: false</code> como booleano, <code>peso: 80</code> como número. O que muda é
+que agora todos viajam juntos, dentro de <code>props.pao</code>. E se um deles faltar, o valor é
+<code>undefined</code> — que no JSX aparece como nada, um espaço em branco.</p>
+
+<h2>4. Ler dentro do objeto</h2>
+
+<p>Cada ponto é um passo para dentro. O componente recebe <code>props</code>, que é um objeto; dentro
+dele, a chave <code>pao</code> guarda outro objeto; dentro desse, as chaves do pão. Errar o caminho é o
+equivalente a procurar o preço na gaveta errada: o valor não existe e a tela fica vazia.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No componente</th><th>O que aparece</th><th>Por quê</th></tr>
+<tr><td><code>{props.pao.nome}</code></td><td>Pão francês</td><td>o caminho completo até o texto</td></tr>
+<tr><td><code>{props.pao.preco}</code></td><td>R$ 1,20</td><td>outra chave do mesmo objeto</td></tr>
+<tr><td><code>{props.pao}</code></td><td>nada, e o React reclama no console</td><td>objeto não é filho válido no JSX</td></tr>
+<tr><td><code>{props.nome}</code></td><td>nada</td><td>falta um nível: <code>nome</code> está dentro de <code>pao</code></td></tr>
+<tr><td><code>{props.pao.validade}</code></td><td>nada</td><td>a chave não foi passada: vale <code>undefined</code></td></tr>
+<tr><td><code>{props.pao.peso} g</code></td><td>80 g</td><td>número com texto em volta, no mesmo JSX</td></tr>
+</table>
+</div>
+
+<p>A terceira linha merece atenção, porque o sintoma é estranho: a tela não mostra o objeto, mostra
+nada. O React só sabe desenhar texto, número e elementos; um objeto não é nenhum dos três. No
+navegador, a mensagem <em>Objects are not valid as a React child</em> aparece no console do DevTools e
+aponta o componente. Aqui no painel, o trecho simplesmente fica vazio.</p>
+
+<p>A quarta linha é o erro mais comum de todos: quando se passa um objeto, todo valor está um nível
+abaixo. <code>props.nome</code> procura <code>nome</code> no primeiro nível, onde só existe
+<code>pao</code>. Se você acabou de transformar cinco props em um objeto, essa é a linha que precisa
+revisar em cada ponto do componente.</p>
+
+<p>O caminho pode ter mais de dois pontos, e a lógica é sempre a mesma: cada ponto é uma camada que
+você abre. Se a página passasse <code>pedido={{ pao: { nome: "Pão francês" }, quantidade: 2 }}</code>, a
+leitura seria <code>props.pedido.pao.nome</code> e <code>props.pedido.quantidade</code>. Funciona, e ao
+mesmo tempo é um sinal de alerta: quando o caminho chega a três níveis, o componente fica difícil de ler
+e de usar. Na prática, agrupar em um nível resolve quase tudo; se você precisou de dois, vale perguntar
+se o componente não deveria receber só a parte que ele usa.</p>
+
+<h2>5. O objeto que vem de uma variável</h2>
+
+<p>Escrever o objeto na chamada serve para dois ou três cartões. Quando o dado já existe numa variável —
+porque veio de uma lista, de um arquivo, de um cálculo —, você passa a variável. Note que o atributo e a
+variável podem ter o mesmo nome sem confusão: o da esquerda é o nome da prop, o da direita é o valor.</p>
+
+<div class="tryreact" data-goal="texto:Pão de queijo;;html:&lt;h2&gt;Pão de queijo&lt;/h2&gt;">
+  <p class="try-task">O objeto <code>pao</code> está pronto na variável, mas a chamada não passa nada.
+  Entregue-o na prop <code>pao</code>, escrevendo <code>pao={pao}</code>.</p>
+  <pre class="jsx">function Cartao(props) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{props.pao.nome}&lt;/h2&gt;
+      &lt;p&gt;{props.pao.preco}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const pao = { nome: "Pão de queijo", preco: "R$ 3,50" };
+  return &lt;Cartao /&gt;;
+}</pre>
+  <pre class="out">
+(o React não desenhou nada: o componente devolveu null?)
+</pre>
+  <pre class="solucao">function Cartao(props) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{props.pao.nome}&lt;/h2&gt;
+      &lt;p&gt;{props.pao.preco}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const pao = { nome: "Pão de queijo", preco: "R$ 3,50" };
+  return &lt;Cartao pao={pao} /&gt;;
+}</pre>
+</div>
+
+<p>Esse é o formato que você vai ver em código de verdade. O objeto nasce antes do <code>return</code>, a
+chamada fica curta, e a página pode montar o objeto como quiser — inclusive a partir de dados que o
+navegador buscou na rede. O componente não sabe nem se importa de onde veio: ele recebe uma caixa com
+<code>nome</code> e <code>preco</code> e desenha.</p>
+
+<p>Uma vantagem prática de ter o objeto numa variável: você pode usá-lo em mais de um lugar. Dois
+cartões com o mesmo <code>pao={pao}</code> mostram o mesmo pão, o que faz sentido num destaque “pão do
+dia” repetido em duas seções. O objeto é o mesmo; o React chama o componente uma vez por cartão.</p>
+
+<h2>6. O que chega, de verdade</h2>
+
+<p>Quando o assunto é objeto, o console deixa de ser luxo e passa a ser necessidade. Imprimir
+<code>props</code> mostra a estrutura completa, com as chaves aninhadas — e é assim que você descobre se
+o problema é o nome da prop ou o nome da chave dentro dela.</p>
+
+<pre class="file" data-file="App.jsx">function Cartao(props) {
+  console.log(props);
+  return &lt;h2&gt;{props.pao.nome}&lt;/h2&gt;;
+}</pre>
+
+<pre class="term">console: {"pao":{"nome":"Pão francês","preco":"R$ 1,20"}}</pre>
+
+<p>Leia de fora para dentro: o objeto de props tem <strong>uma</strong> chave, <code>pao</code>. O valor
+dessa chave é outro objeto, com duas chaves: <code>nome</code> e <code>preco</code>. É exatamente o
+caminho que o componente percorre com os pontos. Se você passasse também <code>destaque</code> na
+chamada, ele apareceria no primeiro nível, ao lado de <code>pao</code>, e não dentro.</p>
+
+<p>Compare com o que você viu na aula de props: lá, o objeto tinha as chaves no primeiro nível
+(<code>{"nome":...,"preco":...}</code>). Aqui há um nível a mais. Guardar essa diferença na cabeça
+resolve a maior parte dos cartões em branco: o erro nunca é “o React perdeu o dado”, é “o caminho está
+errado”.</p>
+
+<p>Quando o objeto tem muitas chaves, imprimir tudo vira parede de texto. Aí vale imprimir só o pedaço
+que interessa: <code>console.log(props.pao)</code> mostra o objeto do pão, e
+<code>console.log(props.pao.preco)</code> mostra o valor final. Comece pelo valor que devia aparecer na
+tela; se sair <code>undefined</code>, suba um nível por vez até achar onde a chave deixa de existir. É
+uma busca curta e sempre termina.</p>
+
+<h2>7. Espalhar com três pontos</h2>
+
+<p>Existe um atalho quando o objeto tem exatamente as chaves que o componente espera como props
+separadas. Os três pontos, chamados de <em>spread</em>, abrem o objeto e entregam cada chave como um
+atributo. <code>&lt;Cartao {...pao} /&gt;</code> é o mesmo que
+<code>&lt;Cartao nome={pao.nome} preco={pao.preco} /&gt;</code>.</p>
+
+<div class="tryreact" data-goal="texto:Pão francês;;texto:R$ 1,20">
+  <p class="try-task">O componente espera as props <code>nome</code> e <code>preco</code> soltas, mas a
+  chamada mandou o objeto inteiro dentro de <code>pao</code>. Espalhe o objeto com
+  <code>{...pao}</code> para o cartão aparecer.</p>
+  <pre class="jsx">function Cartao(props) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{props.nome}&lt;/h2&gt;
+      &lt;p&gt;{props.preco}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const pao = { nome: "Pão francês", preco: "R$ 1,20" };
+  return &lt;Cartao pao={pao} /&gt;;
+}</pre>
+  <pre class="out">
+&lt;div class="cartao"&gt;
+  &lt;h2&gt;&lt;/h2&gt;
+  &lt;p&gt;&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Cartao(props) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{props.nome}&lt;/h2&gt;
+      &lt;p&gt;{props.preco}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  const pao = { nome: "Pão francês", preco: "R$ 1,20" };
+  return &lt;Cartao {...pao} /&gt;;
+}</pre>
+</div>
+
+<p>Depois da correção, as props chegam no primeiro nível: <code>props.nome</code> funciona de novo. Repare
+que o componente não mudou — quem mudou foi a forma de entregar. Os dois estilos são legítimos e a
+escolha é de contrato: se o componente diz “eu quero um pão”, passe <code>pao={pao}</code>; se ele diz
+“eu quero nome e preço”, espalhe.</p>
+
+<p>Um cuidado com o espalhamento: ele passa <strong>todas</strong> as chaves, inclusive as que o
+componente não usa. Num objeto de dez campos, o componente recebe dez props e ignora oito. Isso não
+quebra nada, mas dificulta descobrir o que ele realmente precisa quando você lê a chamada. Use
+espalhamento quando o objeto foi feito para aquela chamada; use a prop única quando o objeto é um dado
+maior, com vida própria.</p>
+
+<h2>8. O objeto é o mesmo, não uma cópia</h2>
+
+<p>Há um detalhe do JavaScript que aparece em projeto grande: quando você passa <code>pao={pao}</code>,
+o componente recebe o <em>mesmo</em> objeto, não uma cópia. Se dois cartões usam o mesmo objeto, os dois
+apontam para a mesma caixa. Alterar um campo em um lugar aparece no outro.</p>
+
+<p>É por isso que a regra da aula anterior continua valendo, agora com mais força: não altere o objeto
+que chegou por prop. Quem altera um objeto compartilhado não consegue prever quem mais vai ver a
+mudança. No React, o costume é criar um objeto novo quando algo muda, em vez de mexer no antigo — assim
+cada renderização recebe um retrato diferente e o React consegue perceber a diferença.</p>
+
+<p>Na prática, para esta aula, basta uma disciplina: leia com pontos, mostre no JSX, e não escreva no
+objeto. Quando você precisar de um valor derivado — o preço com desconto, o peso em quilos —, calcule
+numa variável antes do <code>return</code> e mostre a variável. O objeto que veio de fora fica intacto do
+começo ao fim do componente.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<p>Dois erros dominam esta aula: o número de chaves e o nível do caminho. O primeiro é de sintaxe e
+impede o código de rodar; o segundo passa despercebido e deixa a tela vazia. A tabela reúne os casos, e
+os cenários contam como cada um apareceu na padaria.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você escreveu</th><th>O que acontece</th><th>O conserto</th></tr>
+<tr><td><code>pao={ nome: "Pão" }</code></td><td>não compila: <em>Unexpected token</em></td><td><code>pao={{ nome: "Pão" }}</code></td></tr>
+<tr><td><code>{props.pao}</code> dentro do JSX</td><td>tela vazia; objeto não é filho válido</td><td><code>{props.pao.nome}</code></td></tr>
+<tr><td><code>{props.nome}</code> com objeto</td><td>vazio: falta o nível <code>pao</code></td><td><code>{props.pao.nome}</code></td></tr>
+<tr><td><code>preço: "R$ 2"</code> (com acento)</td><td>chave diferente; o valor não é encontrado</td><td><code>preco</code>, sem acento</td></tr>
+<tr><td><code>pao={null}</code></td><td>erro ao ler <code>.nome</code> de nada</td><td>garanta o objeto antes de ler</td></tr>
+<tr><td><code>{...pao}</code> com <code>pao</code> indefinido</td><td>nada é passado, e nenhum erro aparece</td><td>confira se o objeto existe</td></tr>
+</table>
+</div>
+
+<pre class="term">/App.jsx: Unexpected token, expected "}" (6:27)</pre>
+
+<p>Essa é a mensagem do primeiro caso: uma chave só. O compilador leu <code>pao={</code> e começou um
+bloco, encontrou <code>nome:</code> e não soube o que fazer. A linha e a coluna apontam para o
+dois-pontos, que é onde o problema realmente está. Quem já viu essa mensagem uma vez não erra mais: se
+aparecer <em>Unexpected token</em> logo depois de uma chave, olhe se não faltou a segunda.</p>
+
+<div class="cenario">
+<h3>Cenário 1: o cartão sem preço</h3>
+<p>A Ana passou <code>pao={{ nome: "Pão francês" }}</code> e o preço saiu vazio. O componente pedia
+<code>props.pao.preco</code>, e a chave <code>preco</code> não existia no objeto. O React não reclama de
+chave faltando: o valor é <code>undefined</code> e o JSX desenha nada. O conserto é acrescentar a chave —
+e, no dia a dia, conferir com <code>console.log(props)</code>.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o objeto que não devia ir para a tela</h3>
+<p>Com pressa, ela escreveu <code>&lt;p&gt;{props.pao}&lt;/p&gt;</code> para “ver o que tinha dentro”. A
+tela ficou vazia e o console do navegador avisou que objeto não é filho válido. Para espiar o conteúdo, o
+lugar certo é o console; para mostrar na tela, é preciso escolher uma chave:
+<code>{props.pao.nome}</code>.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o espalhamento que não espalhou nada</h3>
+<p>Ela escreveu <code>&lt;Cartao {...pao} /&gt;</code> e o cartão veio em branco. O objeto existia, mas
+com outro nome — <code>const paoDoDia = {...}</code> —, e <code>pao</code> valia
+<code>undefined</code>. Espalhar <code>undefined</code> não dá erro: simplesmente não passa prop nenhuma.
+O sintoma é idêntico ao de uma prop com nome errado, e é por isso que o console é o primeiro passo.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. Por que a chamada
+<code>&lt;Cartao pao={{ nome: "Pão" }} /&gt;</code> tem chaves duplas?</p>
+<label><input type="radio" name="q1"> porque o objeto precisa de duas camadas de proteção</label>
+<label><input type="radio" name="q1"> porque o React exige um objeto dentro de outro</label>
+<label><input type="radio" name="q1"> a de fora abre o JavaScript no JSX; a de dentro é o objeto</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">2. O componente recebe <code>pao={{ nome: "Pão" }}</code>.
+Como mostrar o nome?</p>
+<label><input type="radio" name="q2"> <code>{props.pao.nome}</code></label>
+<label><input type="radio" name="q2"> <code>{props.nome}</code></label>
+<label><input type="radio" name="q2"> <code>{props.pao}</code></label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. O que <code>&lt;Cartao {...pao} /&gt;</code> faz?</p>
+<label><input type="radio" name="q3"> passa uma prop chamada <code>pao</code> com o objeto inteiro</label>
+<label><input type="radio" name="q3"> entrega cada chave do objeto como uma prop separada</label>
+<label><input type="radio" name="q3"> copia o objeto para dentro do componente</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o objeto do dia</h2>
+<p>O componente <code>Cartao</code> lê <code>props.pao.nome</code> e <code>props.pao.preco</code>. Crie a
+variável <code>pao</code> com o nome “Brioche” e o preço “R$ 4,00” e passe-a na chamada. Depois
+responda: qual é a chave que guarda o nome dentro do objeto?</p>
+<div class="ex-code">function App() { const pao = { nome: "Brioche", <input aria-label="resposta 1" data-answer="preco" placeholder="...">: "R$ 4,00" }; return &lt;Cartao pao={pao} /&gt;; }</div>
+<p class="ex-dica">Dica: o componente pede <code>props.pao.preco</code>. A chave tem de se chamar
+exatamente assim, sem acento e sem maiúscula.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Quando os dados descrevem a mesma coisa, agrupe-os num objeto e passe uma prop só:
+<code>pao={{ nome: "Pão francês", preco: "R$ 1,20" }}</code>. As chaves de fora abrem o JavaScript; as
+de dentro criam o objeto. Para ler, siga o caminho com pontos: <code>props.pao.nome</code> — um nível a
+mais do que na aula anterior, e é esse nível que a maioria esquece.</p>
+
+<p>O objeto pode vir de uma variável, e é assim que ele aparece em projeto de verdade. O console mostra
+a estrutura aninhada e é o melhor amigo do diagnóstico. E os três pontos, <code>{...pao}</code>, abrem o
+objeto em props separadas, o que serve quando o componente espera os campos soltos.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Objeto como prop: <code>pao={{ chave: "valor" }}</code> — duas chaves, dois papéis.</li>
+<li>Ler um nível abaixo: <code>props.pao.nome</code>.</li>
+<li>Objeto não vai para a tela; escolha uma chave para mostrar.</li>
+<li>Objeto de variável: <code>const pao = {…}</code> e <code>pao={pao}</code>.</li>
+<li>Espalhar: <code>{...pao}</code> entrega cada chave como prop separada.</li>
+<li>O objeto é compartilhado, não copiado: não altere o que veio por prop.</li>
+<li>Chave faltando vale <code>undefined</code> e aparece como nada — sem erro.</li>
+<li>Faltou uma chave na chamada? <em>Unexpected token, expected “}”</em>.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

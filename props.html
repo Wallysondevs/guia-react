@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Props | Guia React</title>
+<meta name="description" content="Props no React: os atributos que viram um objeto dentro do componente, como ler props.nome, a diferença entre texto e chaves e os tropeços de nome.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>As <span class="hl">Props</span></h1>
+<p class="intro">A Ana já tem um componente <code>Cartao</code> que desenha um pão com nome e preço. Só
+que o cartão está com o nome escrito dentro dele, no código: “Pão francês”, “R$ 1,20”. Para mostrar o
+pão de queijo, ela copiou o componente inteiro e trocou as palavras — três vezes. Quando o preço do
+pão francês subiu, ela corrigiu dois cartões e esqueceu o terceiro, e o site passou a mentir. Nesta
+aula ela aprende a mandar os dados de fora para dentro: as <strong>props</strong>. Um componente, vários
+pães.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que são props: os dados que o componente recebe na hora da chamada.</li>
+  <li>Como o atributo que você escreve vira uma chave dentro do objeto <code>props</code>.</li>
+  <li>Como ler esses valores no JSX com <code>{props.nome}</code>.</li>
+  <li>A diferença entre passar texto com aspas e passar JavaScript com chaves.</li>
+  <li>Como o mesmo componente desenha cartões diferentes.</li>
+  <li>Por que props são somente leitura e quem manda no valor é quem chama.</li>
+  <li>Como achar o problema quando a prop chega vazia.</li>
+</ul>
+</div>
+
+<h2>1. A cena: três cartões copiados</h2>
+
+<p>A vitrine da padaria tem três pães. O componente que a Ana escreveu é este, e ele funciona — para um
+pão só:</p>
+
+<pre class="file" data-file="App.jsx">function Cartao() {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;Pão francês&lt;/h2&gt;
+      &lt;p&gt;R$ 1,20&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Para o segundo pão, ela copiou o componente e trocou as duas palavras. Para o terceiro, copiou de
+novo. O site ficou pronto e a vida seguiu — até o dia em que o quilo da farinha subiu e ela precisou
+mudar todos os preços. Foi aí que o problema apareceu: três cópias do mesmo código, três lugares para
+editar, e uma garantia zero de que ela não esqueceria nenhum.</p>
+
+<p>A ideia que resolve isso é a mesma que a aula anterior já plantou: componente é função. E função
+aceita <strong>argumento</strong>. Em vez de escrever o nome do pão dentro do componente, você deixa um
+espaço vazio e manda o nome na hora de chamar. Esse espaço, no React, tem nome: <strong>props</strong>,
+abreviação de <em>properties</em>, propriedades.</p>
+
+<p>Vale dizer o que muda no seu dia a dia: um componente com props desenha <em>qualquer</em> pão, e o
+texto que aparece vem sempre de fora. Quem sabe o nome e o preço é a página, não o cartão. O cartão só
+sabe o formato — onde fica o título, onde fica o preço, como é a borda. É a separação entre a forma e o
+conteúdo, e é ela que permite reaproveitar.</p>
+
+<h2>2. O atributo que vira objeto</h2>
+
+<p>Quando você escreve <code>&lt;Cartao nome="Pão francês" /&gt;</code>, o React faz duas coisas antes
+de chamar a sua função. Primeiro, junta todos os atributos num objeto. Segundo, passa esse objeto como
+o primeiro argumento da função. Ou seja: o que você escreveu como atributo chega do outro lado como
+propriedade de um objeto.</p>
+
+<pre class="file" data-file="App.jsx">function Cartao(props) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{props.nome}&lt;/h2&gt;
+      &lt;p&gt;{props.preco}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return &lt;Cartao nome="Pão francês" preco="R$ 1,20" /&gt;;
+}</pre>
+
+<p>O parâmetro <code>props</code> é esse objeto. Se a chamada tem dois atributos, o objeto tem duas
+chaves. Com um atributo, uma chave. Sem nenhum, um objeto vazio — e é por isso que um componente que lê
+<code>props.nome</code> sem receber nada mostra um espaço em branco em vez de explodir.</p>
+
+<dl class="anatomy">
+<dt>prop</dt>
+<dd>Um dado que entra no componente. O nome vem de <em>property</em>, propriedade; no dia a dia, todo
+mundo fala “as props” no plural.</dd>
+<dt>atributo</dt>
+<dd>O que você escreve na chamada, no formato <code>nome="valor"</code> ou
+<code>nome={valor}</code>. <code>nome</code> é o nome do atributo, não da tag.</dd>
+<dt>objeto props</dt>
+<dd>O pacote que o React monta com todos os atributos daquela chamada e entrega como primeiro
+argumento: <code>{ nome: "Pão francês", preco: "R$ 1,20" }</code>.</dd>
+<dt>chave</dt>
+<dd>O nome de uma propriedade dentro do objeto. O atributo <code>nome</code> vira a chave
+<code>nome</code>; para ler, <code>props.nome</code>.</dd>
+<dt>somente leitura</dt>
+<dd>A regra de ouro: o componente lê as props, mas não as altera. Quem manda no valor é sempre quem
+chama.</dd>
+</dl>
+
+<p>Repare que o componente mudou muito pouco: saiu o texto fixo, entrou <code>{props.nome}</code>. As
+chaves <code>{ }</code> são a porta entre o JSX e o JavaScript — o mesmo recurso da aula de expressões.
+Dentro delas você escreve código; fora delas, texto comum. Se você esquecer as chaves e escrever
+<code>props.nome</code> direto, a tela mostra a palavra “props.nome”, porque sem chaves aquilo é só
+texto.</p>
+
+<h2>3. A primeira prop</h2>
+
+<p>Vamos ao primeiro caso de verdade. O componente já está pronto para receber um nome, mas a chamada
+está vazia:</p>
+
+<div class="tryreact" data-goal="texto:Pão francês;;html:&lt;h2&gt;Pão francês&lt;/h2&gt;">
+  <p class="try-task">A chamada <code>&lt;Cartao /&gt;</code> não manda nada, então o título sai vazio.
+  Passe a prop <code>nome</code> com o texto <strong>Pão francês</strong> e clique em Rodar.</p>
+  <pre class="jsx">function Cartao(props) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{props.nome}&lt;/h2&gt;
+      &lt;p&gt;R$ 1,20&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return &lt;Cartao /&gt;;
+}</pre>
+  <pre class="out">
+&lt;div class="cartao"&gt;
+  &lt;h2&gt;&lt;/h2&gt;
+  &lt;p&gt;R$ 1,20&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Cartao(props) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{props.nome}&lt;/h2&gt;
+      &lt;p&gt;R$ 1,20&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return &lt;Cartao nome="Pão francês" /&gt;;
+}</pre>
+</div>
+
+<p>Antes de rodar, o painel mostra o <code>h2</code> vazio. Depois, mostra o título com o texto. Nada
+mais mudou no componente: o mesmo código, uma informação a mais na chamada. É o gesto que você vai
+repetir mil vezes — o componente declara o que precisa, a página entrega.</p>
+
+<p>Um detalhe de vocabulário que ajuda a conversar com outras pessoas: quando o componente declara
+<code>props</code>, ele está dizendo “eu aceito dados”; quando a página passa <code>nome</code>, está
+dizendo “aqui está um deles”. O nome da prop é um contrato. Se um lado escreve <code>nome</code> e o
+outro lê <code>titulo</code>, não há erro nenhum na tela — só um espaço em branco, que é o pior tipo de
+bug. Voltamos a isso na seção 9.</p>
+
+<h2>4. Texto entre aspas, JavaScript entre chaves</h2>
+
+<p>Todo atributo em JSX aceita duas formas de valor, e a diferença importa. Com aspas, o valor é
+<strong>texto</strong>, sempre — mesmo que pareça número. Com chaves, o valor é
+<strong>JavaScript</strong>: pode ser número, conta, variável, resultado de função. A tabela mostra o que
+chega em <code>props</code> em cada caso.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na chamada</th><th>O que chega em props</th><th>Por quê</th></tr>
+<tr><td><code>&lt;Cartao nome="Pão francês" /&gt;</code></td><td><code>props.nome</code> é o texto <code>"Pão francês"</code></td><td>aspas delimitam texto</td></tr>
+<tr><td><code>&lt;Cartao preco={3.5} /&gt;</code></td><td><code>props.preco</code> é o número <code>3.5</code></td><td>chaves entregam o valor como está</td></tr>
+<tr><td><code>&lt;Cartao preco={2 * 1.75} /&gt;</code></td><td><code>props.preco</code> é <code>3.5</code></td><td>a conta é feita antes da chamada</td></tr>
+<tr><td><code>&lt;Cartao nome={pao.nome} /&gt;</code></td><td>o valor que estiver na variável</td><td>chaves leem variáveis</td></tr>
+<tr><td><code>&lt;Cartao destaque /&gt;</code></td><td><code>props.destaque</code> é <code>true</code></td><td>atributo sem valor vale verdadeiro</td></tr>
+<tr><td><code>&lt;Cartao preco="3.5" /&gt;</code></td><td><code>props.preco</code> é o texto <code>"3.5"</code></td><td>aspas nunca produzem número</td></tr>
+</table>
+</div>
+
+<p>Por que isso é problema? Porque texto e número se comportam diferente. Com o número <code>3.5</code>
+você consegue somar, multiplicar, formatar com duas casas. Com o texto <code>"3.5"</code>, a soma vira
+concatenação: <code>"3.5" + 1</code> dá <code>"3.51"</code>, e não <code>4.5</code>. Numa calculadora
+de encomenda, esse detalhe é a diferença entre cobrar certo e cobrar errado.</p>
+
+<p>A regra prática é curta: texto entre aspas, todo o resto entre chaves. Preço em reais já formatado
+(“R$ 1,20”) é texto e vai entre aspas. Quantidade, peso, desconto, qualquer coisa que você queira
+calcular, vai entre chaves. E quando o valor vem de uma variável — <code>pao.nome</code> —, chaves
+sempre, mesmo que o conteúdo seja texto.</p>
+
+<h2>5. O objeto props inteiro</h2>
+
+<p>Você não precisa adivinhar o que chegou. O objeto <code>props</code> é um objeto comum e pode ser
+impresso no console. É o jeito mais rápido de descobrir por que uma prop não aparece: você vê a lista de
+chaves, com os valores, exatamente como o React montou.</p>
+
+<pre class="file" data-file="App.jsx">function Cartao(props) {
+  console.log(props);
+  return &lt;h2&gt;{props.nome}&lt;/h2&gt;;
+}</pre>
+
+<p>Ao rodar esse componente com dois atributos, o painel mostra o HTML e, embaixo, a linha do console
+com o objeto. Os números entre chaves são a forma como um objeto é escrito em texto:</p>
+
+<pre class="term">console: {"nome":"Pão francês","preco":"R$ 1,20"}</pre>
+
+<p>Leia com calma: duas chaves, <code>nome</code> e <code>preco</code>, cada uma com o seu valor entre
+aspas porque os dois são texto. Se você tivesse passado <code>preco={1.2}</code>, a linha sairia com
+<code>1.2</code> sem aspas — a diferença entre texto e número aparece até aqui. No DevTools do
+navegador, o mesmo objeto aparece com um triângulo para abrir e inspecionar; no painel do guia, ele vem
+achatado numa linha só.</p>
+
+<p>Há um segundo uso para esse truque, mais direto: imprimir as chaves que chegaram. Se o objeto vier
+vazio, a chamada não passou nada; se vier com uma chave estranha, você descobre o erro de digitação na
+hora. Nesta página, a caixa 3 usa justamente esse raciocínio para achar um cartão em branco.</p>
+
+<h2>6. O mesmo componente, dois cartões</h2>
+
+<p>Chegou a hora do motivo de tudo. Com props, o mesmo <code>Cartao</code> desenha pães diferentes, sem
+copiar código nenhum. A página chama o componente duas vezes, cada chamada com os seus valores, e o
+React roda a função duas vezes.</p>
+
+<div class="tryreact" data-goal="conta:.cartao=2;;texto:Pão de queijo;;texto:R$ 3,50">
+  <p class="try-task">A vitrine só tem um pão. Acrescente um segundo <code>&lt;Cartao /&gt;</code> com
+  <code>nome="Pão de queijo"</code> e <code>preco="R$ 3,50"</code>, para a vitrine ficar com dois
+  cartões.</p>
+  <pre class="jsx">function Cartao(props) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{props.nome}&lt;/h2&gt;
+      &lt;p&gt;{props.preco}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Cartao nome="Pão francês" preco="R$ 1,20" /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;div class="cartao"&gt;
+    &lt;h2&gt;Pão francês&lt;/h2&gt;
+    &lt;p&gt;R$ 1,20&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Cartao(props) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{props.nome}&lt;/h2&gt;
+      &lt;p&gt;{props.preco}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Cartao nome="Pão francês" preco="R$ 1,20" /&gt;
+      &lt;Cartao nome="Pão de queijo" preco="R$ 3,50" /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel passa a mostrar dois <code>div</code> com a classe <code>cartao</code>, cada um com o seu
+título e o seu preço. Uma função, duas telas. Agora imagine vinte pães: a página fica com vinte linhas
+de chamada, e o componente continua com sete linhas. Mudar o desenho do cartão — a borda, a cor, o
+espaçamento — é mudar um lugar só.</p>
+
+<p>É importante entender o que o React faz aqui, porque explica quase todo o resto. Ele não guarda um
+“cartão” na memória: ele chama a função <code>Cartao</code> uma vez para cada uso, com o objeto de props
+daquele uso. Duas chamadas, dois objetos diferentes, dois resultados diferentes. Se a sua função tem
+efeitos colaterais — um <code>console.log</code>, por exemplo —, eles acontecem uma vez por chamada, e
+isso é normal, não é bug.</p>
+
+<h2>7. Props são somente leitura</h2>
+
+<p>Uma regra que parece burocracia e é o que segura projetos grandes: dentro do componente, você
+<strong>não altera</strong> as props. Lê, usa, mostra — mas não escreve. O valor pertence a quem
+chamou.</p>
+
+<p>O motivo é de organização. Se cada componente pudesse reescrever os dados que recebe, o valor na tela
+deixaria de corresponder ao valor guardado na página, e ninguém conseguiria responder “qual é o preço
+verdadeiro?”. Pior: quando a página fosse desenhada de novo — e ela é, a cada mudança de estado —, o
+componente receberia outra vez o valor original e a sua alteração sumiria, criando aquele tipo de bug que
+aparece, desaparece e ninguém consegue reproduzir.</p>
+
+<p>No modo de desenvolvimento do React, esse objeto chega protegido, e a tentativa de escrever nele
+reclama no console. Mesmo quando a alteração passa em silêncio, ela não volta para quem chamou: o dado
+original continua intacto do lado de lá, e a próxima renderização desfaz o que você fez. Por isso a
+frase que resume tudo: <strong>props descem, nunca sobem</strong>. Quem quer mudar um valor precisa de
+estado, e o estado mora em quem é dono do dado.</p>
+
+<p>Na prática, isso muda como você pensa a tela. Se o botão “+” da encomenda precisa aumentar a
+quantidade, o número não pode morar numa prop alterada pelo botão: ele mora no pai, e o pai passa o valor
+por prop junto com uma função para pedir a mudança. Essa função também é uma prop, e é o assunto de
+<a href="props-com-objetos.html">Props com Objetos</a> mais adiante.</p>
+
+<h2>8. Quem manda no valor é quem chama</h2>
+
+<p>Da regra acima sai uma consequência que vale guardar em letra grande: o componente não escolhe o seu
+conteúdo. Se o cartão mostra “Pão francês”, é porque a página escreveu “Pão francês” na chamada. Trocar o
+texto do cartão, então, é editar a página — e não o componente.</p>
+
+<p>Isso tem um efeito prático delicioso quando o dado vem de outro lugar. Se a lista de pães está numa
+variável, a chamada fica <code>&lt;Cartao nome={pao.nome} preco={pao.preco} /&gt;</code>, e o cartão
+acompanha qualquer mudança na lista sem saber que a lista existe. O componente não precisa conhecer a
+padaria, o banco de dados nem o horário: ele precisa de um nome e de um preço, e alguém entrega.</p>
+
+<p>É por isso que nomear bem as props economiza tempo. <code>nome</code> e <code>preco</code> dizem o
+que o componente espera. <code>dado1</code> e <code>dado2</code> dizem que quem escreveu tinha pressa.
+Quando o componente é seu e o uso é de outra pessoa — ou de você mesma daqui a dois meses —, o nome da
+prop é a documentação que ninguém esquece de atualizar, porque está no código que roda.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<p>O cartão em branco é o sintoma mais comum de quem está começando com props, e quase sempre a causa é
+o nome. Veja o caso: o componente lê <code>props.nome</code>, mas a página passou
+<code>titulo</code>. Nenhum erro aparece — o React entende que <code>props.nome</code> simplesmente não
+existe e desenha um título vazio.</p>
+
+<div class="tryreact" data-goal="texto:Pão francês;;html:&lt;h2&gt;Pão francês&lt;/h2&gt;">
+  <p class="try-task">O cartão aparece sem título: o componente lê <code>props.nome</code>, mas a chamada
+  passou <code>titulo</code>. Acerte a chamada para o nome aparecer.</p>
+  <pre class="jsx">function Cartao(props) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{props.nome}&lt;/h2&gt;
+      &lt;p&gt;R$ 1,20&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return &lt;Cartao titulo="Pão francês" /&gt;;
+}</pre>
+  <pre class="out">
+&lt;div class="cartao"&gt;
+  &lt;h2&gt;&lt;/h2&gt;
+  &lt;p&gt;R$ 1,20&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Cartao(props) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{props.nome}&lt;/h2&gt;
+      &lt;p&gt;R$ 1,20&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return &lt;Cartao nome="Pão francês" /&gt;;
+}</pre>
+</div>
+
+<p>A correção pode ser dos dois lados: trocar <code>titulo</code> por <code>nome</code> na chamada, como
+na solução, ou trocar <code>props.nome</code> por <code>props.titulo</code> no componente. O importante é
+os dois lados usarem a mesma palavra. E note que não houve erro: o React não tem como saber que você
+queria outra coisa — para ele, faltou uma prop e pronto.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você escreveu</th><th>O que acontece</th><th>O conserto</th></tr>
+<tr><td><code>&lt;Cartao titulo="Pão" /&gt;</code> com <code>props.nome</code></td><td>título vazio, sem erro</td><td>use o mesmo nome nos dois lados</td></tr>
+<tr><td><code>nome-do-pao="Pão"</code></td><td>chega como chave <code>"nome-do-pao"</code>; <code>props.nome</code> é <code>undefined</code></td><td>prefira camelCase: <code>nomePao</code></td></tr>
+<tr><td><code>props.nome-do-pao</code></td><td>o JavaScript lê como conta de menos</td><td><code>props["nome-do-pao"]</code></td></tr>
+<tr><td><code>nome=Pão</code></td><td>não compila: valor sem aspas</td><td><code>nome="Pão"</code></td></tr>
+<tr><td><code>preco="3.5"</code> e depois somar</td><td>texto cola em vez de somar</td><td><code>preco={3.5}</code></td></tr>
+<tr><td><code>{props.nome}</code> escrito fora do JSX</td><td>aparece o texto <code>{props.nome}</code></td><td>chaves só valem dentro do JSX</td></tr>
+</table>
+</div>
+
+<div class="cenario">
+<h3>Cenário 1: o cartão em branco</h3>
+<p>A Ana chamou <code>&lt;Cartao nome="Pão francês" /&gt;</code> e o título não apareceu. O componente,
+porém, lia <code>props.titulo</code>. Nomes diferentes, tela vazia, console limpo. O conserto foi abrir o
+componente e conferir, letra por letra, o nome que ele lê. É o primeiro lugar para olhar sempre que uma
+prop “não chega”.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o número que virou texto</h3>
+<p>Ela passou <code>preco="3.5"</code>, com aspas, e o cálculo da encomenda deu errado: três pães
+custaram “3.53.53.5”. Com aspas o valor é texto, e texto soma colando. Trocou para
+<code>preco={3.5}</code>, sem aspas, e a conta passou a funcionar. Sempre que o valor for usado em conta,
+chaves.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o aviso de atributo sem aspas</h3>
+<p>Com pressa, ela escreveu <code>&lt;Cartao nome=Pão francês /&gt;</code>. O código nem compila: o
+compilador do JSX não aceita valor solto depois do sinal de igual. A mensagem fala em expressão ou texto
+entre aspas, e aponta a linha. Conserto: <code>nome="Pão francês"</code>, ou
+<code>nome={"Pão francês"}</code>, se o valor vier de uma variável.</p>
+</div>
+
+<pre class="term">console: nome: undefined
+/App.jsx: JSX value should be either an expression or a quoted JSX text. (6:22)</pre>
+
+<p>As duas linhas contam histórias diferentes, e reconhecer qual é qual economiza tempo. A primeira é do
+seu código rodando: você imprimiu uma prop que não existe, e o valor saiu <code>undefined</code> — a
+palavra que o JavaScript usa para “não existe”. A segunda é do compilador, antes de qualquer coisa rodar:
+o JSX está mal escrito e nem vira JavaScript.</p>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. De onde vêm os valores de <code>props.nome</code>?</p>
+<label><input type="radio" name="q1"> de uma variável global chamada <code>nome</code></label>
+<label><input type="radio" name="q1"> do atributo <code>nome</code> escrito na chamada do componente</label>
+<label><input type="radio" name="q1"> do estado interno do componente</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Qual chamada manda o número 3.5, e não o texto?</p>
+<label><input type="radio" name="q2"> <code>&lt;Cartao preco=3.5 /&gt;</code></label>
+<label><input type="radio" name="q2"> <code>&lt;Cartao preco="3.5" /&gt;</code></label>
+<label><input type="radio" name="q2"> <code>&lt;Cartao preco={3.5} /&gt;</code></label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que o componente pode fazer com as props?</p>
+<label><input type="radio" name="q3"> ler e mostrar; alterar, não</label>
+<label><input type="radio" name="q3"> ler, alterar e guardar para a próxima renderização</label>
+<label><input type="radio" name="q3"> só alterar, porque quem chama não vê</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a etiqueta de promoção</h2>
+<p>Crie um componente <code>Etiqueta</code> que recebe as props <code>texto</code> e <code>cor</code> e
+devolve um parágrafo com a classe vinda de <code>cor</code>. Depois responda: qual é o nome da primeira
+prop que o componente lê?</p>
+<div class="ex-code">function Etiqueta(props) { return &lt;p className={props.<input aria-label="resposta 1" data-answer="cor" placeholder="...">}&gt;{props.texto}&lt;/p&gt;; }</div>
+<p class="ex-dica">Dica: o componente recebe dois atributos — <code>texto="Promoção"</code> e
+<code>cor="vermelho"</code>. A prop que vira classe é a que muda a aparência.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Props são os dados que entram num componente. Você escreve como atributos na chamada, o React junta
+tudo num objeto e entrega como primeiro argumento da função; dentro do componente, você lê com
+<code>props.nome</code> e mostra com <code>{props.nome}</code>. Texto vai entre aspas, todo o resto entre
+chaves.</p>
+
+<p>Com props, um componente serve para muitos conteúdos: cada chamada é uma execução da função, com o
+seu próprio objeto. E o valor pertence a quem chama — o componente lê, mas não altera. Quando uma prop
+não aparece, o suspeito número um é o nome: o atributo e a leitura precisam usar exatamente a mesma
+palavra.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Atributo na chamada vira chave no objeto <code>props</code>: <code>nome="Pão"</code> →
+<code>props.nome</code>.</li>
+<li>O componente recebe <code>props</code> como primeiro parâmetro: <code>function Cartao(props)</code>.</li>
+<li>Para mostrar, chaves: <code>&lt;h2&gt;{props.nome}&lt;/h2&gt;</code>.</li>
+<li>Aspas entregam texto; chaves entregam JavaScript (número, conta, variável).</li>
+<li>Uma chamada por cartão: duas chamadas, dois objetos, dois resultados.</li>
+<li>Props são somente leitura; quem manda no valor é quem chama.</li>
+<li>Prop que “não chega” quase sempre é nome diferente nos dois lados.</li>
+<li><code>console.log(props)</code> mostra as chaves que chegaram — o primeiro passo do diagnóstico.</li>
+<li>Valor sem aspas não compila: <code>nome=Pão</code> é erro de sintaxe.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

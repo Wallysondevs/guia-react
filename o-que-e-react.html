@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O que é React | Guia React</title>
+<meta name="description" content="O que é React e por que ele existe: componentes, JSX, a ideia de descrever a tela em vez de montá-la à mão, onde ele roda e o que ele não faz.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O que é <span class="hl">React</span></h1>
+
+<p class="intro">A Ana tem um site de padaria com três páginas escritas à mão: a inicial, a lista de
+pães e o contato. Funciona. Só que cada página repete o mesmo cabeçalho, e quando o horário de sábado
+mudou ela editou três arquivos, esqueceu um e passou duas semanas com o site se contradizendo. Nesta
+primeira aula ela não vai instalar nada nem escrever código complicado: vai entender o que é React, que
+problema ele resolve e por que tanta gente usa. As caixas rodam React de verdade, então você já pode
+mexer no código e ver o resultado na hora.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é React, em uma frase que caiba na cabeça.</li>
+  <li>Que problema ele resolve (e qual ele <em>não</em> resolve).</li>
+  <li>O que é um componente e por que ele muda a forma de escrever a tela.</li>
+  <li>A diferença entre montar a tela passo a passo e descrever o resultado.</li>
+  <li>O que é JSX, essa escrita que parece HTML.</li>
+  <li>O que o painel das caixas mostra e de onde vem aquele HTML.</li>
+  <li>Onde o React roda e onde ele não é necessário.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o horário em três arquivos</h2>
+
+<p>A Ana está com o notebook na mesa da padaria, entre uma fornada e outra. No site dela, o topo de
+cada página tem o nome da padaria, o horário e uma frase de aviso. As três páginas foram escritas
+copiando e colando esse topo. É rápido de fazer e é uma armadilha: no dia em que o horário mudou, ela
+abriu <code>index.html</code>, trocou, salvou; abriu <code>paes.html</code>, trocou, salvou; esqueceu
+<code>contato.html</code>.</p>
+
+<p>O problema não é digitação. O problema é que a mesma informação existe em três lugares, e nada no
+site avisa quando os três discordam. Quem programa chama isso de <strong>duplicação</strong>, e é a
+fonte da maior parte dos erros chatos: não os difíceis, mas os bobos, que ficam meses no ar.</p>
+
+<p>Todo o resto desta aula é uma resposta a essa cena. O React nasceu para permitir escrever o topo
+<em>uma vez</em> e usá-lo em quantas páginas quiser. E, como consequência, ele acaba mudando um pouco
+a forma de pensar: em vez de você mandar o navegador trocar um pedaço de texto, você descreve como a
+tela deve ficar e deixa que ele descubra o que precisa mudar.</p>
+
+<h2>2. O que é React, em uma frase</h2>
+
+<p>React é uma <strong>biblioteca de JavaScript para montar telas</strong>. Biblioteca, aqui, quer dizer
+um conjunto de funções prontas que você chama no seu código — não é um programa que você instala e
+abre, nem uma linguagem nova. É código JavaScript, do mesmo jeito que o seu.</p>
+
+<p>A versão que este guia usa é a <strong>React 19</strong>, a atual. Ela é mantida pela Meta e por uma
+comunidade grande, é de código aberto e roda no navegador de qualquer pessoa. Você não paga nada e não
+precisa de servidor para começar.</p>
+
+<p>A frase inteira, então: React é uma biblioteca que recebe <strong>componentes</strong> — pedaços de
+tela descritos no código — e cuida de transformá-los nos elementos que o navegador sabe desenhar. O
+trabalho chato de criar elemento por elemento, dizer onde cada um entra e trocar o que mudou fica com
+ele. O trabalho de decidir o que a tela mostra fica com você.</p>
+
+<p>Vale saber de onde vem o nome. A ideia original era <em>reagir</em> a mudanças: quando os dados
+mudam, a tela reage. Essa é a diferença central em relação ao jeito antigo, em que você mesmo tinha de
+lembrar de atualizar cada pedacinho da página depois de cada mudança.</p>
+
+<h2>3. Um pedaço de tela com nome: o componente</h2>
+
+<p>Pense no topo da padaria. Ele tem um nome, um horário e um aviso. É um pedaço de tela que faz
+sentido sozinho. No React, esse pedaço ganha um nome: vira um <strong>componente</strong>. Em vez de
+copiar o HTML três vezes, você escreve uma função chamada <code>Cabecalho</code> e usa essa função nas
+três páginas.</p>
+
+<p>Componente, na prática, é uma função que devolve o que deve aparecer. Não é classe, não é arquivo
+especial, não tem configuração: é função. Essa simplicidade é a razão de o React ter pegado tanto — e é
+o assunto da aula seguinte, quando você escreve o primeiro.</p>
+
+<dl class="anatomy">
+<dt>componente</dt>
+<dd>Uma função que devolve um pedaço de tela. O nome começa com maiúscula: <code>Cabecalho</code>,
+<code>ListaDePaes</code>.</dd>
+<dt>JSX</dt>
+<dd>A escrita parecida com HTML usada dentro do JavaScript: <code>&lt;h1&gt;Padaria&lt;/h1&gt;</code>.
+O React transforma isso em código de verdade.</dd>
+<dt>DOM</dt>
+<dd>A árvore de elementos que o navegador desenha na tela. É o alvo final do React: ele cria e atualiza
+esses elementos por você.</dd>
+<dt>renderizar</dt>
+<dd>O ato de transformar o componente em elementos na página. Quando você clica em Rodar, é isso que
+acontece.</dd>
+<dt>props</dt>
+<dd>Os dados que um componente recebe de fora, como o horário que muda de página para página. Tem aula
+própria mais adiante.</dd>
+</dl>
+
+<p>Repare que o componente resolve a cena da Ana de um jeito que o HTML não resolve: o horário passa a
+existir em um lugar só. Mudar o sábado vira mudar uma linha. E, como o componente é código, ele pode
+decidir coisas — mostrar "fechado" quando são oito da noite, por exemplo —, o que o HTML copiado nunca
+vai saber fazer.</p>
+
+<div class="tryreact" data-goal="conta:header=2;;conta:h1=2">
+  <p class="try-task">O componente <code>Cabecalho</code> já existe e aparece na primeira página. Na
+  segunda, o topo foi copiado à mão e ficou sem título. Troque a cópia por
+  <code>&lt;Cabecalho /&gt;</code> e veja o HTML sair igual nos dois lugares.</p>
+  <pre class="jsx">function Cabecalho() {
+  return (
+    &lt;header&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    &lt;/header&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Cabecalho /&gt;
+      &lt;main&gt;
+        &lt;h2&gt;Contato&lt;/h2&gt;
+        &lt;p&gt;Rua do Trigo, 12&lt;/p&gt;
+      &lt;/main&gt;
+      &lt;main&gt;
+        &lt;h2&gt;Encomendas&lt;/h2&gt;
+        &lt;p&gt;Padaria da Ana&lt;/p&gt;
+        &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+      &lt;/main&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;header&gt;
+    &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+    &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+  &lt;/header&gt;
+  &lt;main&gt;
+    &lt;h2&gt;Contato&lt;/h2&gt;
+    &lt;p&gt;Rua do Trigo, 12&lt;/p&gt;
+  &lt;/main&gt;
+  &lt;main&gt;
+    &lt;h2&gt;Encomendas&lt;/h2&gt;
+    &lt;p&gt;Padaria da Ana&lt;/p&gt;
+    &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+  &lt;/main&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Cabecalho() {
+  return (
+    &lt;header&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    &lt;/header&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Cabecalho /&gt;
+      &lt;main&gt;
+        &lt;h2&gt;Contato&lt;/h2&gt;
+        &lt;p&gt;Rua do Trigo, 12&lt;/p&gt;
+      &lt;/main&gt;
+      &lt;main&gt;
+        &lt;h2&gt;Encomendas&lt;/h2&gt;
+        &lt;Cabecalho /&gt;
+      &lt;/main&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra dois blocos <code>&lt;header&gt;</code> idênticos no HTML final, e nenhum
+<code>&lt;header&gt;</code> escrito à mão: os dois vieram da mesma função. Isso é reúso de verdade,
+diferente de copiar e colar. Se amanhã o horário mudar, muda a função, e as duas cópias mudam junto.</p>
+
+<p>E tem um detalhe que você já deve ter notado no código acima: escrevemos
+<code>&lt;Cabecalho /&gt;</code> como se fosse uma tag. O React entende que aquilo é o seu componente,
+não uma tag do HTML, por causa da letra maiúscula. Minúsculo seria uma tag desconhecida; maiúsculo é o
+seu pedaço de tela entrando ali.</p>
+
+<h2>4. A ideia que muda tudo: descrever em vez de mandar</h2>
+
+<p>Existem duas formas de chegar a uma tela. A primeira é a que o site da Ana usa hoje: você escreve
+cada elemento, na ordem, e depois, se algo muda, procura o elemento na página e troca. A segunda é a do
+React: você descreve <em>como a tela deve ficar</em> para os dados que tem, e o React se encarrega de
+chegar lá.</p>
+
+<p>A primeira forma tem nome: <strong>imperativa</strong>, do jeito que você dá ordens, passo a passo.
+A segunda é a <strong>declarativa</strong>, do jeito que você declara o resultado. O exemplo clássico é
+uma lista de compras: no modo imperativo você diz "pegue o papel, escreva pão, escreva queijo, risque o
+que já tem"; no declarativo você entrega a lista pronta e pronto.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Em HTML puro</th><th>Em React</th></tr>
+<tr><td>Mostrar o mesmo topo em três páginas</td><td>copiar e colar o bloco nas três</td><td>um componente usado três vezes</td></tr>
+<tr><td>Mudar o horário de funcionamento</td><td>editar três arquivos e torcer</td><td>editar uma função</td></tr>
+<tr><td>Acrescentar um pão à lista</td><td>escrever mais um <code>&lt;li&gt;</code> à mão</td><td>acrescentar o pão na lista de dados</td></tr>
+<tr><td>Atualizar a tela depois de um clique</td><td>achar o elemento e trocar o texto dele</td><td>mudar o dado; o React atualiza</td></tr>
+<tr><td>Mostrar uma mensagem quando não há pão</td><td>uma condição no JavaScript, mexendo no DOM</td><td>uma condição dentro da descrição da tela</td></tr>
+</table>
+</div>
+
+<p>Essa mudança de postura é o que se chama de <strong>programação declarativa</strong>, e ela assusta um
+pouco no começo porque parece mágica. Não é: por baixo, o React faz exatamente o trabalho braçal que
+você fazia. A diferença é que ele faz isso sempre igual, sem esquecer um canto da tela, e você escreve
+só a parte que decide.</p>
+
+<p>Tem uma consequência prática que vale guardar desde já: no React, você quase nunca mexe no HTML
+diretamente. Nada de <code>document.querySelector</code> para trocar um texto. Você muda o dado e
+descreve a tela de novo — e o React calcula a diferença. Essa regra vale para todo o guia.</p>
+
+<h2>5. A tela é o resultado, não o arquivo</h2>
+
+<p>Aqui está a mudança de cabeça mais importante da aula. Em HTML puro, o arquivo é a tela: o que está
+escrito é o que aparece. Em React, o arquivo é a <em>receita</em>; a tela é o que sai dela depois que o
+React executa o componente.</p>
+
+<p>Por isso o painel das caixas mostra o HTML gerado, e não o seu código. Ele é a prova do que o
+navegador recebeu. Vamos mexer no texto e ver o HTML acompanhar:</p>
+
+<div class="tryreact" data-goal="texto:Aberto das 6h às 19h">
+  <p class="try-task">O sábado agora fecha às 19h. Troque o horário do parágrafo e clique em Rodar
+  para ver o HTML gerado mudar.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 19h&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois de rodar, o painel mostra exatamente isto:</p>
+
+<pre class="term">&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Aberto das 6h às 19h&lt;/p&gt;
+&lt;/div&gt;</pre>
+
+<p>Repare que o painel não mostra o seu código, e sim o resultado dele. Se você apagar o
+<code>&lt;div&gt;</code> de fora, o painel vai reclamar de elementos adjacentes; se você trocar
+<code>&lt;h1&gt;</code> por <code>&lt;h2&gt;</code>, o painel acompanha. O painel é um espelho do DOM, e
+é assim que você vai descobrir o que o React realmente fez — não pelo que você achou que escreveu.</p>
+
+<p>Essa separação entre receita e bolo é o que permite ao React atualizar só o que mudou. Quando o dado
+muda, ele compara a descrição nova com a antiga e mexe na página apenas nas diferenças. Você não precisa
+saber como; precisa saber que é por isso que a tela não pisca inteira a cada clique.</p>
+
+<h2>6. Descrever uma lista inteira</h2>
+
+<p>Uma lista é o melhor exemplo de por que descrever é melhor do que mandar. No HTML puro, seis pães
+são seis <code>&lt;li&gt;</code> escritos à mão, e cada pão novo é mais um bloco copiado. No React, a
+lista inteira é a descrição de <em>uma</em> repetição.</p>
+
+<p>Nesta primeira aula você ainda não vai escrever a repetição — ela tem aula própria, quando falarmos
+de listas e de <code>map</code>. Mas já dá para sentir o gosto: acrescente um pão ao código e veja o
+painel ganhar uma linha. É literalmente isso que vai acontecer na tela do site.</p>
+
+<div class="tryreact" data-goal="conta:li=3;;texto:Sonho de creme">
+  <p class="try-task">A lista tem dois pães. Acrescente um terceiro,
+  <strong>Sonho de creme</strong>, do mesmo jeito que os outros, e rode.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;ul&gt;
+      &lt;li&gt;Pão francês&lt;/li&gt;
+      &lt;li&gt;Pão de queijo&lt;/li&gt;
+    &lt;/ul&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;ul&gt;
+  &lt;li&gt;Pão francês&lt;/li&gt;
+  &lt;li&gt;Pão de queijo&lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+  <pre class="solucao">function App() {
+  return (
+    &lt;ul&gt;
+      &lt;li&gt;Pão francês&lt;/li&gt;
+      &lt;li&gt;Pão de queijo&lt;/li&gt;
+      &lt;li&gt;Sonho de creme&lt;/li&gt;
+    &lt;/ul&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel agora tem três <code>&lt;li&gt;</code>, nesta ordem:</p>
+
+<pre class="term">&lt;ul&gt;
+  &lt;li&gt;Pão francês&lt;/li&gt;
+  &lt;li&gt;Pão de queijo&lt;/li&gt;
+  &lt;li&gt;Sonho de creme&lt;/li&gt;
+&lt;/ul&gt;</pre>
+
+<p>Nada de especial, e é aí que está o ponto: no React
+você vai aprender a escrever a lista <em>uma vez</em>, a partir de uma lista de dados, e o número de
+itens na tela passa a ser consequência do que está nos dados. Se a padaria criar um pão novo, é uma
+linha na lista de dados — a tela se ajusta.</p>
+
+<p>Esse é o mesmo raciocínio do cabeçalho, um passo adiante: primeiro você aprendeu a dar nome a um
+pedaço fixo, agora a descrever um pedaço que se repete. Componentes fazem as duas coisas, e é por isso
+que a biblioteca inteira cabe em uma ideia só.</p>
+
+<h2>7. Onde o React roda</h2>
+
+<p>React roda no navegador, como qualquer JavaScript. O site que a Ana já tem poderia ganhar um pedaço
+em React sem ser reescrito inteiro — dá para colocar um componente em uma página HTML comum e ir
+conversando. É assim que muita gente entra: primeiro um trecho, depois outro.</p>
+
+<p>Também roda fora do navegador. Com <strong>React Native</strong>, o mesmo jeito de escrever componentes
+vira aplicativo de celular; com renderização no servidor, o React pode gerar o HTML antes de a página
+chegar ao navegador, o que ajuda no primeiro carregamento. São assuntos de níveis mais adiante, mas vale
+saber que existem porque explicam por que o React aparece em tantos lugares diferentes.</p>
+
+<p>Aqui no guia, todas as caixas rodam do mesmo jeito: seu componente é transformado em JavaScript,
+executado com o React 19 de verdade e montado em um pedacinho de página dentro de um quadro isolado. O
+painel lê o que apareceu naquele quadro. É o mesmo caminho de um site real, só que sem servidor e sem
+instalação — e é por isso que você pode aprender React antes de aprender a montar um projeto.</p>
+
+<h2>8. O React não é tudo: o que ele não faz</h2>
+
+<p>Uma das maiores fontes de confusão de quem começa é esperar do React coisas que ele não faz. Ele é
+uma biblioteca, não um pacote completo. Esta tabela separa as responsabilidades:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Assunto</th><th>É do React?</th><th>Quem cuida</th></tr>
+<tr><td>Montar e atualizar a tela</td><td>sim</td><td><code>react</code> e <code>react-dom</code></td></tr>
+<tr><td>Aparência: cor, espaço, tamanho</td><td>não</td><td>CSS, ou Tailwind se você quiser</td></tr>
+<tr><td>Endereços e páginas do site</td><td>não</td><td>biblioteca de rotas, como o React Router</td></tr>
+<tr><td>Buscar dados de um servidor</td><td>não</td><td><code>fetch</code>, ou uma biblioteca de dados</td></tr>
+<tr><td>Guardar dados que mudam na tela</td><td>sim</td><td>estado, com <code>useState</code></td></tr>
+<tr><td>Lógica de JavaScript puro</td><td>não</td><td>o próprio JavaScript</td></tr>
+<tr><td>Testes automatizados</td><td>não</td><td>ferramentas de teste</td></tr>
+</table>
+</div>
+
+<p>Duas linhas dessa tabela merecem comentário. A primeira é o CSS: o React não tem opinião sobre
+aparência. Ele cria os elementos e coloca as classes; o desenho continua sendo CSS. Quem promete
+"React deixa bonito" está vendendo outra coisa.</p>
+
+<p>A segunda é o roteamento. Um site de três páginas em React normalmente continua sendo um site com
+endereços diferentes — e quem cuida disso é uma biblioteca separada ou, em projetos pequenos, um
+controle manual do que mostrar. O React sozinho não sabe o que é "/contato".</p>
+
+<p>E há o que ele não substitui: você ainda vai precisar de HTML para saber quais elementos existem, de
+CSS para o desenho e de JavaScript para a lógica. O React é uma camada em cima disso, não um atalho que
+dispensa as outras.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: "vou ter que jogar meu site fora?"</h3>
+<p>Não. O React entra por partes: uma página, um trecho, um formulário. A Ana poderia começar só pelo
+cabeçalho — o resto do site continuaria HTML comum. Reescrever tudo é uma decisão de projeto, não uma
+exigência da biblioteca. Na prática, quem tem um site que funciona raramente ganha algo reescrevendo por
+reescrever.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: "site de padaria precisa de React?"</h3>
+<p>Depende do que o site faz. Se é só uma vitrine com horário e endereço, HTML e CSS resolvem, e ponto.
+O React começa a valer a pena quando a página reage: carrinho de encomendas, lista que filtra, formulário
+que valida enquanto a pessoa digita, painel de pedidos do dia. A pergunta certa não é "é moderno?", e
+sim "tem coisa mudando na tela sozinha?".</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: "preciso saber JavaScript antes?"</h3>
+<p>Precisa do básico: variáveis, funções, listas e objetos. O React usa essas quatro coisas o tempo
+todo, e o guia introduz cada uma conforme elas aparecem. Mas não espere dominar JavaScript inteiro para
+começar: o caminho contrário — aprender React e JavaScript juntos, com exemplos concretos — funciona
+bem melhor para quem está começando.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Em uma frase, o que é React?</p>
+<label><input type="radio" name="q1"> uma linguagem de programação nova, parecida com HTML</label>
+<label><input type="radio" name="q1"> uma biblioteca de JavaScript para montar telas com componentes</label>
+<label><input type="radio" name="q1"> um programa que você instala para desenhar páginas</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Qual é a vantagem de um componente em relação a
+copiar o HTML?</p>
+<label><input type="radio" name="q2"> o componente deixa a página mais rápida para carregar</label>
+<label><input type="radio" name="q2"> o componente tem uma aparência melhor por padrão</label>
+<label><input type="radio" name="q2"> o pedaço de tela passa a existir em um lugar só, e muda para todos os usos</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O painel das caixas mostra o quê?</p>
+<label><input type="radio" name="q3"> o HTML que o React gerou, mais o que o código escreveu no console</label>
+<label><input type="radio" name="q3"> o código que você digitou, formatado</label>
+<label><input type="radio" name="q3"> a lista de erros do JavaScript</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o nome do componente</h2>
+<p>Todo componente deste guia é uma função com nome maiúsculo que devolve a tela. Complete o nome do
+componente que o motor chama sozinho quando você clica em Rodar:</p>
+<div class="ex-code">function <input aria-label="resposta 1" data-answer="App" placeholder="...">() { return &lt;h1&gt;Padaria da Ana&lt;/h1&gt;; }</div>
+<p class="ex-dica">Dica: são três letras, começando com maiúscula. É o mesmo nome que aparece em todos
+os exemplos do guia — e o motor procura exatamente por ele.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>React é uma biblioteca de JavaScript para montar telas. Ela não substitui HTML, CSS nem JavaScript:
+é uma camada em cima deles, que organiza a tela em <strong>componentes</strong> — pedaços com nome, que
+podem ser usados quantas vezes você quiser. O componente é uma função que devolve JSX, e o React
+transforma esse JSX nos elementos que o navegador desenha.</p>
+
+<p>A ideia que sustenta tudo é a passagem de "mandar" para "descrever". Em vez de procurar elementos na
+página e trocar o que mudou, você escreve como a tela deve ficar para os dados que tem. Quando os dados
+mudam, o React compara a descrição nova com a anterior e atualiza só o que é diferente. É por isso que a
+palavra-chave do React é <em>reagir</em>.</p>
+
+<p>O painel das caixas mostra o HTML gerado, e não o seu código. Isso é proposital: no React, o arquivo
+é a receita e a tela é o bolo. Ler o HTML gerado é como você confere o que realmente aconteceu — e vai
+ser o seu hábito em toda aula deste guia.</p>
+
+<p>Por último, o bom senso: React não é obrigatório. Um site parado, com horário e endereço, vive bem
+sem ele. Ele entra quando a tela precisa reagir — e aí economiza o trabalho que você faria a mão,
+lembrando de cada canto da página que mudou. A próxima aula mostra o caminho que o componente percorre
+até virar tela.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>React é biblioteca de JavaScript para interfaces, não uma linguagem nova.</li>
+<li>Componente é uma função com nome maiúsculo que devolve um pedaço de tela.</li>
+<li>Um componente usado em três lugares existe uma vez só no código.</li>
+<li>Declarativo é descrever o resultado; imperativo é mandar passo a passo.</li>
+<li>O painel mostra o HTML gerado, mais as linhas de <code>console</code>.</li>
+<li>Sem <code>document.querySelector</code>: você muda o dado e o React atualiza a tela.</li>
+<li>React não cuida de CSS, de rotas nem de buscar dados: cada assunto tem sua ferramenta.</li>
+<li>Um site estático não precisa de React; uma tela que reage, sim.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

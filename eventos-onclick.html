@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eventos e onClick | Guia React</title>
+<meta name="description" content="Eventos em React: como o onClick recebe uma função, por que os parênteses quebram tudo, como passar argumentos com uma seta e o que vem no objeto do evento.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Eventos e <span class="hl">onClick</span></h1>
+<p class="intro">O botão da Ana existe, o texto muda quando o estado muda, e mesmo assim o clique não faz
+nada. Falta o fio que liga o navegador ao componente: o evento. Nesta aula ela entende o que o
+<code>onClick</code> espera receber, por que os parênteses são a pegadinha número um do React, como passar
+um argumento para o manipulador e o que vem dentro do objeto do evento.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um evento e quem o dispara.</li>
+  <li>Por que <code>onClick={somar}</code> funciona e <code>onClick={somar()}</code> não.</li>
+  <li>Como passar um argumento para o manipulador dentro de uma lista.</li>
+  <li>O que é o objeto do evento: <code>type</code>, <code>target</code>,
+  <code>preventDefault</code>.</li>
+  <li>Quais eventos existem além do clique.</li>
+  <li>Por que um <code>div</code> clicável não substitui um <code>button</code>.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o botão que não faz nada</h2>
+
+<p>A placa do site da Ana já vira: o estado <code>aberto</code> está lá, o texto muda quando ele muda. O
+que falta é o clique chegar até a função. Ela escreveu o botão, escreveu a função, e o botão continua
+inerte — como uma campainha instalada mas não ligada no fio.</p>
+
+<p>Ligar esse fio é o assunto desta aula. No React, a ligação é um atributo que começa com
+<code>on</code>: <code>onClick</code>, <code>onChange</code>, <code>onSubmit</code>. Você escolhe o evento
+pelo nome do atributo e entrega uma função. O React se encarrega de conversar com o navegador, ouvir o
+evento e chamar a sua função na hora certa.</p>
+
+<p>Parece simples, e é. A confusão toda mora em uma pergunta de sintaxe: o que exatamente vai entre as
+chaves? Uma função ou o resultado de uma chamada? A diferença são dois parênteses, e ela muda o
+comportamento do componente inteiro.</p>
+
+<h2>2. O que é um evento</h2>
+
+<p>Um evento é um aviso do navegador de que algo aconteceu: o leitor clicou, digitou, enviou um
+formulário, apertou uma tecla, passou o mouse, saiu do campo. Cada tipo de acontecimento tem um nome, e o
+React usa versões com <code>on</code> na frente para dizer "escute este aqui".</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Atributo no JSX</th><th>Dispara quando</th><th>Onde costuma aparecer</th></tr>
+<tr><td><code>onClick</code></td><td>o elemento é clicado</td><td>botões, links, cartões</td></tr>
+<tr><td><code>onChange</code></td><td>o valor de um campo muda</td><td>inputs, selects, checkboxes</td></tr>
+<tr><td><code>onSubmit</code></td><td>um formulário é enviado</td><td>formulários</td></tr>
+<tr><td><code>onKeyDown</code></td><td>uma tecla é pressionada</td><td>campos de busca, atalhos</td></tr>
+<tr><td><code>onFocus</code> / <code>onBlur</code></td><td>o campo recebe ou perde o foco</td><td>validação, dicas</td></tr>
+<tr><td><code>onMouseEnter</code></td><td>o mouse entra no elemento</td><td>menus, cartões</td></tr>
+</table>
+</div>
+
+<p>O <code>onClick</code> é o mais usado e o melhor para aprender, porque o efeito é imediato e visível.
+Mas tudo o que vale para ele vale para os outros: o atributo recebe uma função, o React chama essa função
+quando o evento acontece, e o que a função fizer com o estado é o que muda a tela.</p>
+
+<p>Por baixo, o React não coloca um ouvinte em cada botão. Ele escuta os eventos lá na raiz da aplicação
+e, quando um deles acontece, descobre qual elemento da sua árvore foi o alvo e chama o manipulador
+correspondente. O objeto que chega ao seu código é um embrulho do evento do navegador, com as mesmas
+informações que você usaria no JavaScript puro. Você não precisa saber disso para usar
+<code>onClick</code>, mas vale saber que o comportamento é o mesmo de sempre: clicou, disparou,
+subiu pela árvore até alguém escutar.</p>
+
+<dl class="anatomy">
+<dt>evento</dt>
+<dd>O aviso de que algo aconteceu no navegador: um clique, uma tecla, um envio de formulário.</dd>
+<dt>manipulador</dt>
+<dd>A função que você escreve para reagir ao evento: <code>somar</code>, <code>fechar</code>,
+<code>registrar</code>.</dd>
+<dt>ouvinte</dt>
+<dd>O React, no meio do caminho: ele registra o ouvinte no elemento e chama o seu manipulador.</dd>
+<dt>objeto do evento</dt>
+<dd>O que o React passa para o manipulador: <code>type</code>, <code>target</code>,
+<code>preventDefault</code> e mais.</dd>
+<dt>callback</dt>
+<dd>Uma função entregue para ser chamada depois, por outra pessoa. O manipulador é um callback.</dd>
+</dl>
+
+<h2>3. onClick recebe uma função</h2>
+
+<p>Esta é a frase que resolve metade dos bugs de iniciante: <code>onClick</code> recebe uma
+<strong>função</strong>, não o resultado dela. Você entrega a função ao React e ele a chama quando o
+clique acontecer. Se você entregar o resultado, o React não tem o que chamar depois — e a função já
+rodou, cedo demais, durante o desenho.</p>
+
+<div class="tryreact" data-goal="clique:button.mais;;clique:button.mais;;texto:Total: 2;;clique:button.zerar;;texto:Total: 0">
+  <p class="try-task">Os dois botões estão desligados: nenhum tem <code>onClick</code>. Ligue o
+  <code>+</code> ao manipulador <code>somar</code> e o botão "Zerar" ao manipulador <code>zerar</code>,
+  entregando a função (sem parênteses).</p>
+  <pre class="jsx">function App() {
+  const [total, setTotal] = useState(0);
+
+  function somar() {
+    setTotal((atual) =&gt; atual + 1);
+  }
+
+  function zerar() {
+    setTotal(0);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Total: {total}&lt;/p&gt;
+      &lt;button className="mais"&gt;+&lt;/button&gt;
+      &lt;button className="zerar"&gt;Zerar&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Total: 0&lt;/p&gt;
+  &lt;button class="mais"&gt;+&lt;/button&gt;
+  &lt;button class="zerar"&gt;Zerar&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [total, setTotal] = useState(0);
+
+  function somar() {
+    setTotal((atual) =&gt; atual + 1);
+  }
+
+  function zerar() {
+    setTotal(0);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Total: {total}&lt;/p&gt;
+      &lt;button className="mais" onClick={somar}&gt;+&lt;/button&gt;
+      &lt;button className="zerar" onClick={zerar}&gt;Zerar&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Sem <code>onClick</code>, o botão é um enfeite: existe, recebe clique, não avisa ninguém. Com
+<code>onClick={somar}</code>, você entrega a referência da função — o nome dela, sem chamar. O React
+guarda essa referência e a executa no clique. Repare que a função <code>somar</code> não recebe
+parâmetro nenhum: ela só precisa do estado, que já está no escopo.</p>
+
+<p>Também funciona declarar a função na hora, dentro do atributo:</p>
+
+<pre class="file" data-file="Placa.jsx">&lt;button onClick={() =&gt; setAberto(!aberto)}&gt;Virar a placa&lt;/button&gt;</pre>
+
+<p>Aqui a seta cria uma função nova a cada desenho, e é essa função que o React chama no clique. A conta
+<code>!aberto</code> só acontece quando alguém clica — não no desenho. É a forma mais comum quando a
+função tem uma linha e não é usada em outro lugar.</p>
+
+<h2>4. O erro dos parênteses</h2>
+
+<p>O tropeço clássico é escrever <code>onClick={somar()}</code>. Com os parênteses, você não está
+entregando a função: está chamando ela naquele instante, durante o desenho, e entregando o que ela
+devolver. Como <code>somar</code> não devolve nada, o atributo recebe <code>undefined</code>, e o React
+não tem o que chamar no clique.</p>
+
+<pre class="file" data-file="Errado.jsx">function somar() {
+  setTotal(total + 1);
+}
+
+&lt;button onClick={somar()}&gt;+&lt;/button&gt;</pre>
+
+<p>No caso acima o estrago é maior: <code>somar()</code> roda durante o desenho e chama o setter. O React
+desenha de novo, roda o componente, chama <code>somar()</code> outra vez, e assim por diante. O
+componente não termina de desenhar, e a tela fica vazia. É por isso que esse erro assusta: não aparece
+mensagem nenhuma na página, só um buraco onde o componente deveria estar.</p>
+
+<p>Dá para flagrar o erro com uma linha de log. O código abaixo tem um manipulador que só escreve no
+console, e mesmo assim a linha aparece antes de qualquer clique:</p>
+
+<pre class="file" data-file="Errado.jsx">function avisar() {
+  console.log("avisar rodou no desenho");
+}
+
+&lt;button onClick={avisar()}&gt;Avisar&lt;/button&gt;</pre>
+
+<pre class="term">avisar rodou no desenho</pre>
+
+<p>Se você vir uma linha dessas ao abrir a página, sem ter clicado em nada, o culpado está encontrado:
+algum <code>onClick</code> do projeto está com parênteses. O log não é um efeito colateral inofensivo —
+é a prova de que a função rodou na hora errada.</p>
+
+<p>Há um caso em que os parênteses são legítimos: quando a função <em>devolve</em> outra função. Isso é
+usado em bibliotecas e em padrões avançados, e o nome é "currying" — não é o que você quer aqui. Para
+quem está começando, a regra é simples: dentro do <code>onClick</code>, ou vai o nome da função sem
+parênteses, ou vai uma seta que a chama.</p>
+
+<h2>5. Passar argumentos para o manipulador</h2>
+
+<p>Uma função sem parâmetros resolve o botão único. Quando são vários botões e cada um precisa dizer algo
+diferente para a mesma função — o pão escolhido, o item removido, o passo do formulário —, o caminho é
+embrulhar a chamada numa seta.</p>
+
+<div class="tryreact" data-goal="clique:li:nth-child(2) button;;texto:Pedido: broa">
+  <p class="try-task">Todos os botões pedem "pão francês", porque o argumento está escrito à mão. Faça
+  cada botão pedir o seu próprio pão, usando o valor de <code>p</code> dentro de uma seta.</p>
+  <pre class="jsx">function App() {
+  const [pedido, setPedido] = useState("nenhum");
+  const paes = ["pão francês", "broa", "croissant"];
+
+  function pedir(nome) {
+    setPedido(nome);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pedido: {pedido}&lt;/p&gt;
+      &lt;ul&gt;
+        {paes.map((p) =&gt; (
+          &lt;li key={p}&gt;
+            &lt;button onClick={() =&gt; pedir("pão francês")}&gt;{p}&lt;/button&gt;
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Pedido: nenhum&lt;/p&gt;
+  &lt;ul&gt;
+    &lt;li&gt;
+      &lt;button&gt;pão francês&lt;/button&gt;
+    &lt;/li&gt;
+    &lt;li&gt;
+      &lt;button&gt;broa&lt;/button&gt;
+    &lt;/li&gt;
+    &lt;li&gt;
+      &lt;button&gt;croissant&lt;/button&gt;
+    &lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [pedido, setPedido] = useState("nenhum");
+  const paes = ["pão francês", "broa", "croissant"];
+
+  function pedir(nome) {
+    setPedido(nome);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pedido: {pedido}&lt;/p&gt;
+      &lt;ul&gt;
+        {paes.map((p) =&gt; (
+          &lt;li key={p}&gt;
+            &lt;button onClick={() =&gt; pedir(p)}&gt;{p}&lt;/button&gt;
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A seta existe para <em>adiar</em> a chamada. Sem ela, <code>pedir(p)</code> rodaria no desenho, uma vez
+para cada pão, e o último a rodar venceria — além de chamar o setter durante o desenho, o que trava o
+componente. Com ela, cada botão guarda uma função que só chama <code>pedir</code> quando aquele botão for
+clicado, com o <code>p</code> daquele item.</p>
+
+<p>Repare que o <code>key={p}</code> continua ali: são assuntos diferentes. A key é a identidade do item
+para o React; a seta é o que permite cada botão carregar o seu argumento. Um não substitui o outro, e os
+dois aparecem juntos em quase toda lista de botões.</p>
+
+<h2>6. O objeto do evento</h2>
+
+<p>Quando o React chama o seu manipulador, ele passa um argumento: o objeto do evento. É um objeto cheio
+de informação sobre o que aconteceu, e três propriedades resolvem quase tudo no dia a dia.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Propriedade</th><th>O que tem</th><th>Para que serve</th></tr>
+<tr><td><code>evento.type</code></td><td>o nome do evento: <code>"click"</code>, <code>"change"</code></td><td>descobrir o que aconteceu quando o mesmo manipulador serve a vários eventos</td></tr>
+<tr><td><code>evento.target</code></td><td>o elemento que disparou</td><td>saber qual botão foi clicado, ler o valor de um campo</td></tr>
+<tr><td><code>evento.preventDefault()</code></td><td>a função que cancela o comportamento padrão</td><td>evitar que um formulário recarregue a página, que um link navegue</td></tr>
+</table>
+</div>
+
+<div class="tryreact" data-goal="clique:button:nth-of-type(2);;texto:Último clique: Abrir">
+  <p class="try-task">Os botões não têm manipulador. Ligue os dois ao mesmo <code>registrar</code>, que
+  descobre qual foi clicado pelo texto do alvo: depois de clicar em "Abrir", o painel precisa mostrar
+  <strong>Último clique: Abrir</strong>.</p>
+  <pre class="jsx">function App() {
+  const [ultimo, setUltimo] = useState("nenhum");
+
+  function registrar(evento) {
+    setUltimo(evento.target.textContent);
+    console.log("tipo: " + evento.type + ", alvo: " + evento.target.textContent);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Último clique: {ultimo}&lt;/p&gt;
+      &lt;button&gt;Fechar&lt;/button&gt;
+      &lt;button&gt;Abrir&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Último clique: nenhum&lt;/p&gt;
+  &lt;button&gt;Fechar&lt;/button&gt;
+  &lt;button&gt;Abrir&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [ultimo, setUltimo] = useState("nenhum");
+
+  function registrar(evento) {
+    setUltimo(evento.target.textContent);
+    console.log("tipo: " + evento.type + ", alvo: " + evento.target.textContent);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Último clique: {ultimo}&lt;/p&gt;
+      &lt;button onClick={registrar}&gt;Fechar&lt;/button&gt;
+      &lt;button onClick={registrar}&gt;Abrir&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Um manipulador, dois botões, e nenhum argumento escrito à mão: quem diz qual foi o botão é o próprio
+evento. No console do navegador, depois do clique em "Abrir", aparece a linha que o código escreveu:</p>
+
+<pre class="term">tipo: click, alvo: Abrir</pre>
+
+<p><code>evento.type</code> confirma que foi um clique; <code>evento.target</code> é o elemento que
+recebeu o clique, e <code>textContent</code> é o texto dele. O mesmo manipulador poderia ler
+<code>evento.target.value</code> se fosse um campo de texto, ou <code>evento.target.id</code> se você
+preferisse identificar cada botão por id.</p>
+
+<p>O <code>preventDefault</code> merece um exemplo próprio, porque é o que salva os formulários. Quando um
+formulário é enviado, o navegador recarrega a página por padrão — e no React isso apaga todo o estado.
+Chamar <code>evento.preventDefault()</code> no início do manipulador cancela esse comportamento e deixa
+você cuidar do envio:</p>
+
+<pre class="file" data-file="Formulario.jsx">function Formulario() {
+  function enviar(evento) {
+    evento.preventDefault();
+    console.log("enviado sem recarregar a página");
+  }
+
+  return (
+    &lt;form onSubmit={enviar}&gt;
+      &lt;input name="cliente" /&gt;
+      &lt;button type="submit"&gt;Enviar&lt;/button&gt;
+    &lt;/form&gt;
+  );
+}</pre>
+
+<p>A mesma ideia vale para links: um <code>&lt;a href="#"&gt;</code> com <code>onClick</code> precisa de
+<code>preventDefault</code> se você não quiser que a página pule para o topo. Quando o assunto é
+formulário de verdade, com campos controlados e validação, há aulas próprias no Nível 2 — aqui basta
+reconhecer a chamada quando ela aparecer.</p>
+
+<h2>7. Um botão de verdade, não uma div</h2>
+
+<p>É comum ver <code>&lt;div onClick={...}&gt;</code> por aí. Funciona no mouse e falha em todo o resto:
+não recebe foco pelo <code>Tab</code>, não é acionada pelo <code>Enter</code> nem pelo espaço, não é
+anunciada como botão pelo leitor de tela. O elemento <code>button</code> já vem com tudo isso pronto, e
+o React só acrescenta o <code>onClick</code>.</p>
+
+<pre class="file" data-file="Placa.jsx">&lt;button type="button" onClick={virar}&gt;Virar a placa&lt;/button&gt;</pre>
+
+<p>O <code>type="button"</code> evita um acidente clássico: dentro de um formulário, um botão sem tipo é
+tratado como <code>submit</code> e envia o formulário quando clicado. Se a intenção era só virar a placa,
+o formulário é enviado sem querer e a página recarrega. Escrever o tipo é barato e evita uma tarde de
+depuração.</p>
+
+<p>Dois atributos que combinam com botão: <code>disabled</code>, que desliga o clique e o foco, e
+<code>aria-pressed</code>, que diz ao leitor de tela se o botão está ligado ou desligado — útil para
+botões de alternar, como o da placa. Nenhum dos dois substitui a lógica: o <code>disabled</code> precisa
+refletir o estado, e o <code>aria-pressed</code> também.</p>
+
+<pre class="file" data-file="Placa.jsx">&lt;button
+  type="button"
+  onClick={virar}
+  aria-pressed={aberto}
+  disabled={carregando}
+&gt;
+  {aberto ? "Fechar a loja" : "Abrir a loja"}
+&lt;/button&gt;</pre>
+
+<p>Se por algum motivo você precisar de um elemento que não é botão, o mínimo é dar a ele
+<code>role="button"</code>, <code>tabIndex={0}</code> e um manipulador de teclado para o
+<code>Enter</code>. É mais código do que usar o botão. Na prática, use o botão.</p>
+
+<h2>8. Nomes de manipulador que ajudam</h2>
+
+<p>A convenção da comunidade é começar o nome com <code>handle</code> quando ele é passado como atributo
+e descrever a ação: <code>handleClick</code>, <code>handleSubmit</code>, <code>handleChange</code>. Em
+português, nomes como <code>virar</code>, <code>somar</code>, <code>enviar</code> e
+<code>registrar</code> dizem a mesma coisa e são mais legíveis para quem está começando. O importante é
+que o nome diga o que acontece, não o que foi clicado.</p>
+
+<pre class="file" data-file="Botoes.jsx">function App() {
+  const [aberto, setAberto] = useState(true);
+
+  function virar() {
+    setAberto((atual) =&gt; !atual);
+  }
+
+  return (
+    &lt;button onClick={virar}&gt;
+      {aberto ? "Fechar a loja" : "Abrir a loja"}
+    &lt;/button&gt;
+  );
+}</pre>
+
+<p>Nomes assim também ajudam a separar responsabilidades. <code>virar</code> não sabe nada sobre
+botões; ela só troca um booleano. Quem decide que ela será chamada no clique é o <code>onClick</code>.
+No dia em que o mesmo <code>virar</code> precisar rodar depois de um envio de formulário, ele continua
+servindo — porque não está preso ao clique.</p>
+
+<p>Repare que o texto do botão muda com o estado, e a função é a mesma. Um botão que diz o que vai fazer
+— "Fechar a loja" quando está aberto — é mais claro do que um botão fixo "Alternar", e o leitor de tela
+agradece. O <code>onClick</code> não sabe nem se importa com o texto; ele só chama a função.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o clique que roda duas vezes</h3>
+<p>Ela escreveu <code>onClick={() =&gt; somar()}</code> dentro de um <code>map</code> e o contador subia
+dois por clique. O culpado era o botão dentro de outro elemento com <code>onClick</code>: o clique subia
+pela árvore e disparava os dois. O conserto foi
+<code>evento.stopPropagation()</code> no manipulador interno — ou, melhor, repensar a estrutura para não
+ter dois cliques no mesmo caminho.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o formulário que recarregava</h3>
+<p>O botão de enviar recarregava a página e o estado voltava a zero. Faltava
+<code>evento.preventDefault()</code> no início do manipulador de <code>onSubmit</code>. É um erro que
+parece do React e é do navegador: formulário enviado recarrega, a menos que alguém cancele o padrão.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o botão que só funcionava no mouse</h3>
+<p>O cartão de produto era uma <code>div</code> com <code>onClick</code>. No mouse, abria; no teclado,
+nada. A troca por <code>button</code> resolveu foco, <code>Enter</code>, espaço e leitura por leitor de
+tela de uma vez. Quando o elemento é acionável, o elemento certo é o botão.</p>
+</div>
+
+<p>Os três cenários têm uma coisa em comum: o React estava fazendo exatamente o que foi escrito, e o
+problema estava no que o navegador faz por padrão ou no elemento escolhido. Antes de culpar o
+<code>onClick</code>, vale perguntar: quem mais está ouvindo esse clique? O elemento é o certo? O
+comportamento padrão foi cancelado? Três perguntas resolvem quase tudo.</p>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que <code>onClick</code> espera receber?</p>
+<label><input type="radio" name="q1"> o resultado da função</label>
+<label><input type="radio" name="q1"> uma função, para o React chamar no clique</label>
+<label><input type="radio" name="q1"> o nome do evento em texto</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que <code>onClick={somar()}</code> é um problema?</p>
+<label><input type="radio" name="q2"> porque o React proíbe parênteses em atributos</label>
+<label><input type="radio" name="q2"> porque falta uma key no botão</label>
+<label><input type="radio" name="q2"> porque a função roda no desenho e o clique fica sem manipulador</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Para que serve o <code>preventDefault</code>?</p>
+<label><input type="radio" name="q3"> para cancelar o comportamento padrão do navegador</label>
+<label><input type="radio" name="q3"> para impedir que o estado mude</label>
+<label><input type="radio" name="q3"> para o React chamar o manipulador antes do clique</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: ligando o botão</h2>
+<p>Complete o atributo do botão para que o clique chame a função <code>virar</code>, sem chamá-la durante
+o desenho:</p>
+<div class="ex-code">&lt;button onClick={<input aria-label="resposta 1" data-answer="virar" placeholder="...">}&gt;Virar&lt;/button&gt;</div>
+<p class="ex-dica">Dica: só o nome da função, sem parênteses. Com <code>()</code>, ela roda no desenho e o
+atributo recebe o que ela devolve — em geral, <code>undefined</code>.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Evento é o aviso de que algo aconteceu; manipulador é a função que reage. No React, a ligação é um
+atributo com <code>on</code> na frente, e ele recebe sempre uma função. <code>onClick={somar}</code>
+entrega a referência; <code>onClick={() =&gt; somar()}</code> entrega uma função que chama. As duas
+funcionam. <code>onClick={somar()}</code> chama na hora do desenho — e é o erro que deixa o botão inerte
+ou o componente em branco.</p>
+
+<p>Para passar um argumento, embrulhe a chamada numa seta: <code>onClick={() =&gt; pedir(p)}</code>. A
+seta adia a chamada até o clique e leva junto o valor daquele item. O React entrega ao manipulador o
+objeto do evento, com <code>type</code>, <code>target</code> e <code>preventDefault</code> — o suficiente
+para saber o que aconteceu e para impedir que o navegador faça o que faria por conta própria, como
+recarregar o formulário.</p>
+
+<p>E o conselho que vale para todo o resto do guia: use <code>button</code> para o que é clicável. O
+elemento certo já traz teclado e leitor de tela; o React só acrescenta o comportamento. Com estado,
+condição, lista e evento, você já tem as quatro peças de qualquer tela interativa — e é hora de juntá-las
+numa entrada de texto controlada, que é o assunto da próxima aula.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Evento é aviso; manipulador é a função que reage a ele.</li>
+<li><code>onClick</code> recebe função: <code>onClick={somar}</code>, não <code>onClick={somar()}</code>.</li>
+<li>Parênteses chamam na hora do desenho: o clique fica sem manipulador.</li>
+<li>Seta para passar argumento: <code>onClick={() =&gt; pedir(p)}</code>.</li>
+<li>Um manipulador pode servir a vários botões: use <code>evento.target</code>.</li>
+<li><code>evento.preventDefault()</code> cancela o padrão do navegador (formulário, link).</li>
+<li><code>onChange</code>, <code>onSubmit</code>, <code>onKeyDown</code> seguem a mesma regra.</li>
+<li>Use <code>button</code>, não <code>div</code> clicável: teclado e leitor de tela agradecem.</li>
+<li><code>type="button"</code> evita envio acidental de formulário.</li>
+<li>Nome do manipulador diz o que acontece: <code>virar</code>, <code>enviar</code>, <code>somar</code>.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

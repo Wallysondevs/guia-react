@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O localStorage | Guia React</title>
+<meta name="description" content="O localStorage na prática: gravar e ler com setItem e getItem, ler na criação do useState, gravar dentro do useEffect, guardar objetos com JSON e evitar as armadilhas.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O <span class="hl">localStorage</span></h1>
+<p class="intro">A Ana anotou três encomendas no painel da padaria, atualizou a página para conferir o
+preço do pão de queijo e as três encomendas desapareceram. O estado do React mora na memória da
+página: recarregou, sumiu. Nesta aula ela guarda as anotações no <code>localStorage</code> — a memória
+do próprio navegador — e aprende a ler de volta quando a página abre. Sem servidor, sem banco, sem
+instalar nada: o mesmo navegador que roda as caixas desta página guarda os dados.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que o <code>localStorage</code> guarda e por quanto tempo.</li>
+  <li>A gravar e ler com <code>setItem</code> e <code>getItem</code>, e a ver o ida e volta no painel.</li>
+  <li>Por que ler dentro do <code>useState</code> precisa ser com uma função.</li>
+  <li>O lugar certo de gravar: dentro de um <code>useEffect</code>.</li>
+  <li>Como guardar um objeto inteiro com <code>JSON.stringify</code> e <code>JSON.parse</code>.</li>
+  <li>O que fazer quando o dado guardado está quebrado.</li>
+  <li>Os limites: 5 MB, uma origem por vez, e o valor que volta sempre como texto.</li>
+</ul>
+</div>
+
+<h2>1. As três encomendas que sumiram</h2>
+
+<p>A cena é banal e acontece com todo mundo. A Ana está no balcão, o notebook aberto na página de
+encomendas, e o cliente pergunta se o pão de queijo já saiu. Ela aperta F5 para atualizar. O painel
+volta em branco. As três encomendas que ela tinha digitado — Clara, 20 pães; Seu Joaquim, 2 tortas;
+mercado da esquina, 40 pães — evaporaram.</p>
+
+<p>Não é um bug do React, é o comportamento normal de qualquer página. O estado que você guarda com
+<code>useState</code> vive na memória daquela aba. Atualizar a página é jogar a memória fora e começar
+de novo: o navegador monta o HTML outra vez, o React roda os componentes outra vez e
+<code>useState</code> devolve o valor inicial outra vez. Se você quer que a anotação sobreviva ao F5,
+precisa guardá-la em algum lugar que não seja a memória da aba.</p>
+
+<p>Existem três lugares possíveis. O primeiro é um banco de dados no servidor, que é o que uma loja
+grande faz — mas exige back-end, login e internet. O segundo é o <code>localStorage</code>, uma
+gavetinha que o navegador oferece para cada site. O terceiro é a memória da aba mesmo, que é o
+<code>useState</code> que ela já usa. Para uma padaria que quer lembrar "as anotações do dia neste
+computador", a gavetinha do navegador resolve, e é dela que esta aula trata.</p>
+
+<p>Vale uma advertência desde já: gavetinha do navegador não é banco de dados. Ela serve para
+preferências, rascunhos, o tema claro ou escuro, o carrinho de quem ainda não fez login. Não serve
+para dados de outra pessoa, não serve para senha e não serve quando o número precisa bater entre dois
+computadores. Guardar o que é local é diferente de guardar o que é de todos, e saber a diferença
+resolve metade dos problemas de quem está começando.</p>
+
+<h2>2. O que é o localStorage, na prática</h2>
+
+<p>O <code>localStorage</code> é um objeto que o navegador coloca à disposição de toda página. Ele
+funciona como um armário de etiquetas: você escolhe um nome de <strong>chave</strong>, pendura um
+<strong>valor</strong> nela e depois pede o valor pelo nome. As duas operações que fazem tudo
+acontecer são <code>setItem</code> (pendurar) e <code>getItem</code> (pegar).</p>
+
+<dl class="anatomy">
+<dt>localStorage</dt>
+<dd>A memória do navegador para o site atual. Fica no disco, sobrevive a fechar a aba e a desligar o
+computador.</dd>
+<dt>chave</dt>
+<dd>O nome com que você etiqueta o dado: <code>"aviso-do-dia"</code>, <code>"tema"</code>,
+<code>"carrinho"</code>. É texto, e é o que você usa para achar o valor depois.</dd>
+<dt>valor</dt>
+<dd>O que fica pendurado na chave. <strong>Sempre texto.</strong> Um número, um objeto ou uma lista
+precisam ser convertidos antes de entrar.</dd>
+<dt>origem</dt>
+<dd>O endereço do site: protocolo, domínio e porta. Cada origem tem o seu armário, e um site não
+enxerga a gaveta do outro.</dd>
+<dt>JSON</dt>
+<dd>O formato de texto que representa objetos e listas. É a ponte entre o seu objeto JavaScript e o
+texto que o <code>localStorage</code> aceita.</dd>
+</dl>
+
+<p>Além de <code>setItem</code> e <code>getItem</code>, o armário tem mais três comandos que você vai
+usar cedo ou tarde. Vale conhecer todos de uma vez, porque a diferença entre eles decide se um dado
+some para sempre ou só é substituído.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Comando</th><th>O que faz</th><th>O que devolve</th></tr>
+<tr><td><code>localStorage.setItem("chave", "valor")</code></td><td>grava, ou sobrescreve se a chave já existia</td><td>nada</td></tr>
+<tr><td><code>localStorage.getItem("chave")</code></td><td>lê o que está pendurado naquela chave</td><td>o texto, ou <code>null</code> se a chave não existe</td></tr>
+<tr><td><code>localStorage.removeItem("chave")</code></td><td>apaga só aquela chave</td><td>nada</td></tr>
+<tr><td><code>localStorage.clear()</code></td><td>apaga <strong>todas</strong> as chaves do site</td><td>nada</td></tr>
+<tr><td><code>localStorage.length</code></td><td>conta quantas chaves o site guardou</td><td>um número</td></tr>
+</table>
+</div>
+
+<p>Para ver o armário com os próprios olhos, abra o site, aperte <code>F12</code> e procure a aba
+<em>Application</em> (no Firefox, <em>Storage</em>). No menu da esquerda, em
+<em>Local Storage</em>, aparece o endereço do site e, à direita, a lista de chaves e valores. É a mesma
+lista que o seu código vê. Quando a Ana diz "não sei onde isso foi parar", a resposta está ali, em
+duas colunas.</p>
+
+<h2>3. Gravar e ler: o ida e volta</h2>
+
+<p>Antes de misturar com React, vale ver o mecanismo puro. Uma linha grava, outra linha lê. No console
+do navegador isso fica assim:</p>
+
+<pre class="term">localStorage.setItem("aviso-do-dia", "Pão quentinho às 6h")
+undefined
+localStorage.getItem("aviso-do-dia")
+'Pão quentinho às 6h'
+localStorage.getItem("pao-que-nao-existe")
+null</pre>
+
+<p>Duas coisas para reparar. <code>setItem</code> devolve <code>undefined</code> — ele não retorna o
+que gravou, só grava. E <code>getItem</code> devolve <code>null</code> quando a chave não existe; não
+devolve <code>undefined</code>, não dá erro, não avisa. Esse <code>null</code> é a origem de metade dos
+bugs de persistência: quem esquece de tratá-lo acaba mostrando a palavra "null" na tela ou somando
+<code>null + 1</code> e vendo <code>1</code> onde esperava <code>11</code>.</p>
+
+<p>Agora o mesmo ida e volta dentro de um componente. O botão da Ana guarda o aviso do dia e mostra o
+que voltou da leitura. Na solução, o texto na tela vem do <code>getItem</code>, e não do texto que o
+botão tinha escrito à mão: é assim que você prova, olhando a tela, que o dado realmente entrou no
+armário.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:guardado: Pão quentinho às 6h">
+  <p class="try-task">O botão só troca o texto na memória e a tela mostra "nada guardado" antes do
+  clique. Faça ele gravar <code>Pão quentinho às 6h</code> na chave <code>aviso-do-dia</code> e mostrar
+  <code>guardado: …</code> com o valor que o <code>getItem</code> devolveu.</p>
+  <pre class="jsx">function App() {
+  const [aviso, setAviso] = useState("nada guardado");
+
+  function guardar() {
+    setAviso("Pão quentinho às 6h");
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={guardar}&gt;Guardar o aviso&lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Guardar o aviso&lt;/button&gt;
+  &lt;p&gt;nada guardado&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [aviso, setAviso] = useState("nada guardado");
+
+  function guardar() {
+    localStorage.setItem("aviso-do-dia", "Pão quentinho às 6h");
+    setAviso("guardado: " + localStorage.getItem("aviso-do-dia"));
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={guardar}&gt;Guardar o aviso&lt;/button&gt;
+      &lt;p&gt;{aviso}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em <strong>Ver solução</strong> e depois em <strong>Rodar</strong>: o painel passa a mostrar
+<code>guardado: Pão quentinho às 6h</code>. Agora clique em <strong>Rodar</strong> outra vez. A tela
+volta para "nada guardado" — porque o componente não lê o armário quando nasce — mas o valor continua
+lá. Na aba <em>Application</em> do DevTools, a chave <code>aviso-do-dia</code> segue pendurada. É
+exatamente esse descompasso que a próxima seção resolve.</p>
+
+<h2>4. Lendo na hora certa: a função dentro do useState</h2>
+
+<p>O objetivo agora é que a tela já nasça com o valor guardado. A tentação é ler durante a renderização:</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const [aviso, setAviso] = useState(localStorage.getItem("aviso-do-dia"));
+  return &lt;p&gt;{aviso}&lt;/p&gt;;
+}</pre>
+
+<p>Funciona no primeiro carregamento e cria um problema silencioso: o
+<code>localStorage.getItem(...)</code> é executado a cada renderização, não só na primeira. Cada
+re-render lê o disco de novo, e o React fica sem saber que aquele valor pode mudar por fora dele. Pior:
+o valor lido no primeiro render vira o estado inicial e nunca mais é atualizado, então a leitura extra
+não serve para nada além de gastar tempo. A documentação do React chama isso de efeito colateral
+durante a renderização, e a regra é curta: renderizar tem de ser puro.</p>
+
+<p>O jeito certo é entregar uma <strong>função</strong> ao <code>useState</code>. O React chama essa
+função uma única vez, quando o componente é criado, e usa o retorno como valor inicial. Nas
+renderizações seguintes ela nem é chamada.</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const [aviso, setAviso] = useState(function () {
+    return localStorage.getItem("aviso-do-dia") || "nenhum aviso hoje";
+  });
+  return &lt;p&gt;{aviso}&lt;/p&gt;;
+}</pre>
+
+<p>O <code>|| "nenhum aviso hoje"</code> é o tratamento do <code>null</code> que apareceu na seção 3:
+se a chave não existe, o estado começa com um texto amigável em vez de <code>null</code>. Duas versões
+mais curtas da mesma ideia, para você reconhecer quando encontrar por aí:</p>
+
+<pre class="file" data-file="App.jsx">const [aviso, setAviso] = useState(() =&gt; localStorage.getItem("aviso-do-dia") || "");
+const [pedidos, setPedidos] = useState(() =&gt; Number(localStorage.getItem("pedidos")) || 0);</pre>
+
+<p>A seta <code>=&gt;</code> é só uma função escrita de forma curta. O detalhe que importa é o
+parêntese: <code>useState(() =&gt; ...)</code> passa a função, <code>useState(localStorage.getItem(…))</code>
+passa o resultado da leitura. O React olha para os dois e trata de forma diferente — a função é
+chamada por ele, na hora dele.</p>
+
+<p>Para sentir a diferença na caixa, use a solução da seção anterior, clique em Rodar e depois em
+Rodar de novo: o valor que estava no armário continua lá, mas o componente sempre começa do zero.
+Acrescente a leitura preguiçosa na solução e rode outra vez: agora a tela nasce com o aviso guardado.
+Rodar de novo, nesta caixa, é o equivalente a recarregar a página.</p>
+
+<h2>5. Escrevendo na hora certa: o useEffect</h2>
+
+<p>Falta o outro lado: gravar sempre que o valor mudar. A tentação, de novo, é gravar no meio da
+renderização — logo depois do <code>useState</code>, uma linha
+<code>localStorage.setItem("aviso", aviso)</code>. O problema é o mesmo de ler ali: a renderização
+passa a ter efeito colateral. Com o StrictMode do React 19, que roda o componente duas vezes de
+propósito para revelar esse tipo de coisa, você gravaria duas vezes por mudança e ficaria caçando um
+bug que não existe.</p>
+
+<p>O lugar certo é o <code>useEffect</code>, que você já conhece: ele roda <em>depois</em> que o React
+desenhou a tela. O componente devolve o JSX, o React atualiza o HTML, e só então o efeito executa. A
+lista de dependências diz quando: <code>[aviso]</code> significa "roda quando o aviso mudar".</p>
+
+<div class="tryreact" data-goal="digite:input=Clara;;clique:button;;texto:no armário: Clara">
+  <p class="try-task">O nome digitado some quando a página recarrega, e o botão diz "vazio" porque
+  ninguém lê o armário. Acrescente um <code>useEffect</code> que grave o nome na chave
+  <code>cliente-do-dia</code> a cada mudança, e faça o botão mostrar o que o
+  <code>getItem</code> devolveu: <code>no armário: Clara</code>.</p>
+  <pre class="jsx">function App() {
+  const [nome, setNome] = useState("");
+  const [memoria, setMemoria] = useState("no armário: vazio");
+
+  function conferir() {
+    setMemoria("no armário: vazio");
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;input value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+      &lt;button onClick={conferir}&gt;Conferir o armário&lt;/button&gt;
+      &lt;p&gt;Cliente do dia: {nome || "ninguém ainda"}&lt;/p&gt;
+      &lt;p&gt;{memoria}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input value=""&gt;
+  &lt;button&gt;Conferir o armário&lt;/button&gt;
+  &lt;p&gt;Cliente do dia: ninguém ainda&lt;/p&gt;
+  &lt;p&gt;no armário: vazio&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nome, setNome] = useState("");
+  const [memoria, setMemoria] = useState("no armário: vazio");
+
+  useEffect(() =&gt; {
+    localStorage.setItem("cliente-do-dia", nome);
+  }, [nome]);
+
+  function conferir() {
+    setMemoria("no armário: " + (localStorage.getItem("cliente-do-dia") || "vazio"));
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;input value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+      &lt;button onClick={conferir}&gt;Conferir o armário&lt;/button&gt;
+      &lt;p&gt;Cliente do dia: {nome || "ninguém ainda"}&lt;/p&gt;
+      &lt;p&gt;{memoria}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois de rodar a solução, digitar "Clara" e clicar em Conferir, o painel mostra as duas linhas: o
+nome na tela e <code>no armário: Clara</code>. A ordem importa e explica o efeito: o React primeiro
+redesenha com o nome novo, depois roda o efeito que grava, e só quando você clica é que o botão lê o
+armário. Se o efeito não estivesse ali, o botão diria "vazio" — exatamente o que o código inicial faz,
+porque ninguém gravou nada.</p>
+
+<p>Se você quiser espiar as gravações, ponha um <code>console.log</code> dentro do efeito: ele aparece
+no painel como <code>console: …</code> na primeira execução, com o estado inicial. A primeira linha
+sempre assusta, porque o armário é sincronizado com o valor vazio antes de você digitar. É correto: no
+primeiro instante, o que está na tela é o estado inicial.</p>
+
+<p>Repare também que o efeito roda a cada mudança de letra, porque cada tecla muda o estado. Para um
+nome de dez letras são dez gravações. É barato no <code>localStorage</code> e seria caro numa rede; se
+o valor for grande, vale gravar só no <code>blur</code> do campo ou com um atraso. O que não vale é
+tirar o efeito e voltar a gravar durante a renderização.</p>
+
+<h2>6. Objetos: JSON.stringify e JSON.parse</h2>
+
+<p>O armário só aceita texto. Se você mandar um objeto, ele não reclama: converte para
+<code>"[object Object]"</code> e guarda isso. Quando você lê de volta, recebe a string
+<code>[object Object]</code> e perde os dados. É um dos erros mais comuns e um dos mais silenciosos.</p>
+
+<p>A solução é converter você mesmo, com <code>JSON.stringify</code> na entrada e <code>JSON.parse</code>
+na saída. Os dois nomes assustam, o trabalho é simples: <code>stringify</code> transforma o objeto em
+texto, <code>parse</code> faz o caminho de volta.</p>
+
+<pre class="file" data-file="App.jsx">const pedido = { nome: "Clara", pao: "pão de queijo", quantidade: 20 };
+
+localStorage.setItem("pedido", JSON.stringify(pedido));
+// no armário: {"nome":"Clara","pao":"pão de queijo","quantidade":20}
+
+const lido = JSON.parse(localStorage.getItem("pedido"));
+// no código: o objeto de volta, com as três propriedades
+console.log(lido.quantidade); // 20, um número</pre>
+
+<p>Agora a mesma ideia dentro de um componente com dois campos. O botão grava o objeto inteiro e
+mostra o resumo montado a partir do que foi lido do armário — não das variáveis de estado. Se a chave
+estiver vazia, o <code>JSON.parse</code> devolve <code>null</code> e o resumo nem chega a ser montado; é
+o primeiro tropeço do parágrafo depois da caixa.</p>
+
+<div class="tryreact" data-goal="digite:input[name=nome]=Clara;;digite:input[name=pao]=pão de queijo;;clique:button;;texto:Clara quer pão de queijo">
+  <p class="try-task">O botão hoje só mostra o nome. Faça ele gravar um objeto
+  <code>{ nome, pao }</code> na chave <code>pedido</code> com <code>JSON.stringify</code> e mostrar
+  <code>Clara quer pão de queijo</code> lendo de volta com <code>JSON.parse</code>.</p>
+  <pre class="jsx">function App() {
+  const [nome, setNome] = useState("");
+  const [pao, setPao] = useState("");
+  const [resumo, setResumo] = useState("");
+
+  function salvar() {
+    setResumo(nome);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;input name="nome" value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+      &lt;input name="pao" value={pao} onChange={(e) =&gt; setPao(e.target.value)} /&gt;
+      &lt;button onClick={salvar}&gt;Salvar o pedido&lt;/button&gt;
+      &lt;p&gt;{resumo}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input value="" name="nome"&gt;
+  &lt;input value="" name="pao"&gt;
+  &lt;button&gt;Salvar o pedido&lt;/button&gt;
+  &lt;p&gt;&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nome, setNome] = useState("");
+  const [pao, setPao] = useState("");
+  const [resumo, setResumo] = useState("");
+
+  function salvar() {
+    localStorage.setItem("pedido", JSON.stringify({ nome: nome, pao: pao }));
+    const guardado = JSON.parse(localStorage.getItem("pedido"));
+    setResumo(guardado.nome + " quer " + guardado.pao);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;input name="nome" value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+      &lt;input name="pao" value={pao} onChange={(e) =&gt; setPao(e.target.value)} /&gt;
+      &lt;button onClick={salvar}&gt;Salvar o pedido&lt;/button&gt;
+      &lt;p&gt;{resumo}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Duas armadilhas moram nesse trecho curto. A primeira: <code>JSON.parse(null)</code> devolve
+<code>null</code>, e ler <code>guardado.nome</code> de <code>null</code> estoura com "Cannot read
+properties of null". Na solução isso não acontece porque o <code>setItem</code> roda antes; num
+carregamento normal aconteceria. A segunda: o objeto lido é uma <strong>cópia</strong> nova, feita do
+texto. Mexer em <code>guardado</code> não muda nada do que está na tela, e mexer no estado não muda o
+armário. São dois mundos separados, ligados só quando você chama <code>setItem</code>.</p>
+
+<p>Quando o componente precisa nascer com o objeto, junte as duas técnicas: a função no
+<code>useState</code> e o <code>JSON.parse</code> com um valor de reserva. O
+<code>|| "[]"</code> no fim garante que a lista exista mesmo na primeira visita.</p>
+
+<pre class="file" data-file="App.jsx">const [encomendas, setEncomendas] = useState(() =&gt; {
+  return JSON.parse(localStorage.getItem("encomendas") || "[]");
+});</pre>
+
+<h2>7. Quando o que está guardado está quebrado</h2>
+
+<p>Existe um cenário que pega todo mundo: a Ana guardou o objeto do pedido em uma versão do site, mudou
+o formato na semana seguinte, e o navegador de um cliente ainda tem o formato antigo. O
+<code>JSON.parse</code> recebe um texto que não entende e estoura. A página quebra antes de desenhar
+qualquer coisa, e o cliente vê a tela branca.</p>
+
+<pre class="term">Uncaught SyntaxError: Unexpected token 'o', "ovos" is not valid JSON
+    at JSON.parse (&lt;anonymous&gt;)
+    at App (App.jsx:4:20)</pre>
+
+<p>A mensagem é literal: o texto guardado era <code>ovos</code>, e <code>JSON.parse</code> esperava
+aspas em volta. Repare que o erro aponta o arquivo e a linha — é o mesmo tipo de pista que o painel
+das caixas mostra. E repare também que ele não aconteceria se o valor tivesse sido gravado com
+<code>JSON.stringify</code>: o armário teria <code>"ovos"</code>, com aspas, e a leitura funcionaria.</p>
+
+<p>A defesa é não confiar no que vem de fora, nem quando "de fora" é o seu próprio site de ontem. Um
+<code>try</code>/<code>catch</code> em volta da leitura resolve, e uma função pequena evita repetir o
+código em cada componente:</p>
+
+<pre class="file" data-file="App.jsx">function lerJSON(chave, reserva) {
+  try {
+    const texto = localStorage.getItem(chave);
+    return texto === null ? reserva : JSON.parse(texto);
+  } catch (erro) {
+    console.log("dado quebrado na chave " + chave + ": " + erro.message);
+    return reserva;
+  }
+}
+
+const [encomendas, setEncomendas] = useState(() =&gt; lerJSON("encomendas", []));</pre>
+
+<p>O <code>catch</code> faz duas coisas: devolve o valor de reserva — a página continua de pé — e
+escreve no console o nome da chave estragada, para você não ficar no escuro. Em um caso desses, a
+decisão prática é apagar a chave velha: <code>localStorage.removeItem("encomendas")</code>, ou trocar
+o nome dela para <code>encomendas-v2</code>. Trocar o nome é o mais limpo quando o formato mudou: o
+dado antigo fica onde está, sem atrapalhar, e o novo começa do zero.</p>
+
+<p>Uma variante do mesmo problema é o valor existir mas ser <em>do tipo errado</em>. A Ana esperava uma
+lista e encontrou um objeto, porque a versão anterior guardava uma coisa só. O <code>JSON.parse</code>
+nem reclama: devolve o objeto, e o <code>.map</code> quebra mais adiante. Conferir o tipo depois da
+leitura — <code>Array.isArray(...)</code>, ou um <code>typeof</code> — custa uma linha e transforma um
+erro confuso em um valor de reserva.</p>
+
+<h2>8. Os limites do localStorage</h2>
+
+<p>O armário é pequeno, é local e é sincrônico — três características que explicam quase todos os
+tropeços. Pequeno: cerca de 5 MB por origem, o que dá muita preferência e pouca foto. Local: o que a
+Ana guarda no notebook dela não aparece no celular, e o que o Chrome guarda não aparece no Firefox.
+Sincrônico: cada <code>getItem</code> e <code>setItem</code> bloqueia a página enquanto o navegador
+mexe no disco; para um texto curto é instantâneo, para um megabyte de JSON em um laço é engasgo.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que aconteceu</th><th>O que apareceu</th><th>O conserto</th></tr>
+<tr><td>guardou <code>10</code> e somou <code>1</code></td><td><code>"101"</code> na tela</td><td><code>Number(localStorage.getItem(…))</code> na leitura</td></tr>
+<tr><td>guardou 2 MB de fotos</td><td>erro de cota no <code>setItem</code></td><td>guardar só o necessário; arquivos grandes vão para o IndexedDB</td></tr>
+<tr><td>testou no notebook e no celular</td><td>o dado não veio junto</td><td>cada navegador tem o seu armário; sincronizar exige servidor</td></tr>
+<tr><td>mudou o formato do dado guardado</td><td><code>JSON.parse</code> estourou na abertura</td><td><code>try</code>/<code>catch</code> e uma chave nova com versão</td></tr>
+</table>
+</div>
+
+<p>A primeira linha da tabela merece atenção especial, porque é a que mais engana. O
+<code>localStorage</code> não tem tipos: tudo é texto. Guardar <code>10</code> e ler devolve
+<code>"10"</code>. Com o sinal de mais, <code>"10" + 1</code> vira <code>"101"</code> — concatenação,
+não soma. Por isso toda leitura de número precisa de <code>Number(...)</code> ou de
+<code>parseInt(..., 10)</code>, e toda leitura de booleano precisa de comparação explícita, porque a
+string <code>"false"</code> é verdadeira em JavaScript.</p>
+
+<p>Há também o problema do endereço. O armário é separado por origem, e origem inclui a porta: o site
+em <code>http://localhost:5173</code> tem um armário diferente do site publicado em
+<code>http://loja.test</code>. Quem testa o carrinho no projeto local e não vê os dados no site
+publicado não encontrou um bug — encontrou dois armários. E, no navegador em modo anônimo, o armário
+existe mas é jogado fora quando a janela fecha; em alguns navegadores, o simples acesso ao
+<code>localStorage</code> lança erro quando o site está bloqueado nas preferências. Código que grava
+dinheiro, pedido ou qualquer coisa importante precisa de <code>try</code>/<code>catch</code> também no
+<code>setItem</code>.</p>
+
+<p>Por último: não coloque ali nada que não possa ser lido por outra pessoa. O
+<code>localStorage</code> é texto puro no disco do visitante, visível no DevTools em dois cliques.
+Token de sessão com validade longa, senha, dado de cartão e informação de saúde não entram. A regra
+prática: se você não mostraria aquele dado no console da página, ele não mora aqui.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o total virou "101"</h3>
+<p>A Ana guardou o número de pães e somou um na leitura. A tela mostrou <code>101</code> em vez de
+<code>11</code>. Não é o React, é a string: <code>getItem</code> devolve texto, e texto com sinal de
+mais concatena. O conserto é uma conversão na fronteira — <code>Number(...)</code> no
+<code>useState</code> ou <code>parseInt(..., 10)</code> —, e não espalhar <code>Number</code> por todo
+lado depois. Converta onde o dado entra no estado e o resto do componente trabalha com números.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o painel da Ana está vazio em outra máquina</h3>
+<p>Ela anotou as encomendas no notebook do balcão, abriu o mesmo site no computador de casa e não
+achou nada. O <code>localStorage</code> é do navegador, não da conta: cada máquina tem a sua gaveta. Se
+as encomendas precisam aparecer nos dois lugares, elas precisam ir para o servidor — o
+<code>localStorage</code> fica sendo o rascunho local. Saber qual dado é de um computador e qual é de
+todos é decisão de projeto, e ela vem antes da linha de código.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: a gravação aparecia duas vezes no DevTools</h3>
+<p>Ela colocou o <code>setItem</code> no corpo do componente e, em desenvolvimento, viu a chave ser
+gravada duas vezes a cada mudança. O StrictMode do React 19 roda o componente duas vezes de propósito
+para revelar efeito colateral na renderização. A correção não é desligar o StrictMode: é mover o
+<code>setItem</code> para dentro de um <code>useEffect</code>, onde ele roda uma vez por mudança de
+verdade. O aviso era legítimo.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que o <code>getItem</code> devolve quando a chave não existe?</p>
+<label><input type="radio" name="q1"> uma string vazia</label>
+<label><input type="radio" name="q1"> <code>null</code></label>
+<label><input type="radio" name="q1"> um erro que quebra a página</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que ler o <code>localStorage</code> só na primeira renderização?</p>
+<label><input type="radio" name="q2"> porque o <code>localStorage</code> apaga o valor depois do primeiro acesso</label>
+<label><input type="radio" name="q2"> porque o React proíbe ler dados fora do JSX</label>
+<label><input type="radio" name="q2"> porque ler a cada renderização gasta tempo e torna a renderização impura</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Onde fica o lugar certo de gravar o estado no <code>localStorage</code>?</p>
+<label><input type="radio" name="q3"> dentro de um <code>useEffect</code> que depende daquele valor</label>
+<label><input type="radio" name="q3"> no corpo do componente, logo depois do <code>useState</code></label>
+<label><input type="radio" name="q3"> dentro do <code>return</code>, junto com o JSX</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: as duas leituras</h2>
+<p>A Ana guardou o pão do dia e o total de pães. Complete as duas linhas: a primeira lê a chave
+<code>pao-do-dia</code>, a segunda transforma o texto guardado em número para poder somar.</p>
+<div class="ex-code">const [pao, setPao] = useState(() =&gt; localStorage.<input aria-label="resposta 1" data-answer="getItem" placeholder="...">("pao-do-dia") || "nenhum");
+const total = <input aria-label="resposta 2" data-answer="Number|parseInt" placeholder="...">(localStorage.getItem("total")) + 1;</div>
+<p class="ex-dica">Dica: a leitura é o par do <code>setItem</code>, e a conversão é a mesma que você
+usa para transformar texto em número em qualquer lugar do JavaScript. Sem a conversão, o
+<code>+ 1</code> cola um dígito no fim em vez de somar.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O <code>localStorage</code> é a gaveta do navegador para o site atual: chave e valor, ambos texto,
+cerca de 5 MB por origem, sobrevivendo ao F5 e ao desligamento. <code>setItem</code> grava,
+<code>getItem</code> lê e devolve <code>null</code> quando não há nada, <code>removeItem</code> apaga
+uma chave e <code>clear</code> apaga todas. O padrão que resolve a maioria dos casos tem três partes:
+ler com uma função dentro do <code>useState</code>, gravar dentro de um <code>useEffect</code> que
+depende do valor, e converter números na entrada do estado com <code>Number</code>.</p>
+
+<p>Para objetos e listas, <code>JSON.stringify</code> na ida e <code>JSON.parse</code> na volta, com
+<code>try</code>/<code>catch</code> na leitura porque o dado guardado pode ser de uma versão antiga do
+seu próprio site. E lembre do que a gaveta não faz: não sincroniza entre máquinas, não aceita arquivo
+grande, não protege segredo. Ela é memória local, e memória local tem hora e lugar.</p>
+
+<p>Vale reparar no que a Ana ganhou com poucas linhas. O aviso digitado no balcão continua lá depois do
+F5; o nome do cliente do dia volta preenchido; o pedido em rascunho não se perde quando a internet
+oscila. Nada disso precisou de servidor. É o tipo de melhoria pequena que muda a sensação de uso de um
+site — e que só funciona porque o código respeita duas regras: ler uma vez, na criação do estado, e
+gravar depois, no efeito.</p>
+
+<p>Se você guardar uma ideia só desta aula, guarde esta: o estado do React é a memória de trabalho, o
+<code>localStorage</code> é o caderno. A tela mostra o que está na memória; o caderno serve para
+reabrir o que estava escrito. Misturar os dois — ler o caderno a cada renderização, escrever no caderno
+durante a renderização — é o que transforma uma solução simples em um bug difícil de achar.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>localStorage</code> guarda texto por origem, e sobrevive ao recarregar a página.</li>
+<li><code>setItem</code> grava, <code>getItem</code> lê (ou devolve <code>null</code>), <code>removeItem</code> apaga uma chave.</li>
+<li>Leia na criação do estado: <code>useState(() =&gt; localStorage.getItem("x") || "")</code>.</li>
+<li>Grave depois da tela: <code>useEffect(() =&gt; localStorage.setItem("x", valor), [valor])</code>.</li>
+<li>Nunca grave nem leia no corpo do componente: renderização é pura.</li>
+<li>Objetos e listas: <code>JSON.stringify</code> para entrar, <code>JSON.parse</code> para sair.</li>
+<li>O valor volta como texto: <code>Number(...)</code> antes de somar.</li>
+<li>Leitura de JSON vai em <code>try</code>/<code>catch</code> com valor de reserva.</li>
+<li>Mudou o formato do dado? Troque a chave: <code>encomendas-v2</code>.</li>
+<li>Nada de senha, token longo ou dado pessoal no armário do navegador.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quando Quebrar em Componentes | Guia React</title>
+<meta name="description" content="Quando quebrar um componente em partes menores: repetição, nome próprio, motivos de mudança e tamanho, com os sinais de abstração cedo demais para evitar.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Quando Quebrar em <span class="hl">Componentes</span></h1>
+<p class="intro">A Ana já viveu os dois extremos. No primeiro projeto, um <code>App.jsx</code> de
+seiscentas linhas fazia tudo: topo, lista, carrinho, formulário. No segundo, empolgada, quebrou tanto que
+um botão virou três arquivos e um cartão passou a precisar de sete props para funcionar. Nesta aula ela
+encontra o meio: os sinais que dizem a hora de quebrar, e os sinais que dizem para parar.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O critério que resolve quase toda decisão: o que faz esta parte mudar?</li>
+  <li>A regra de três, e por que a segunda cópia ainda pode ser cópia.</li>
+  <li>Como o nome de uma seção da tela vira o nome de um componente.</li>
+  <li>Quando o tamanho do arquivo é sintoma e quando é só consequência.</li>
+  <li>Por que um componente com sete props está pedindo para ser dividido.</li>
+  <li>Os sinais de que você quebrou cedo demais — e como voltar atrás.</li>
+  <li>O custo real de quebrar: a fiação entre as peças.</li>
+</ul>
+</div>
+
+<h2>1. A cena: os dois exageros</h2>
+
+<p>O primeiro projeto da Ana tinha um arquivo com tudo dentro. Cabeçalho, lista de pães, carrinho,
+formulário de encomenda, rodapé — seiscentas linhas na mesma função. Funcionava. O problema era que
+qualquer mudança exigia atravessar assuntos que não tinham nada a ver com ela, e um erro de digitação no
+meio derrubava a tela inteira.</p>
+
+<p>A reação foi quebrar. Ela criou um componente para o botão, um para o ícone do botão, um para o texto
+do botão. Criou um <code>Cartao</code> que recebia sete props para dar conta das variações. O código
+ficou “organizado” e ficou pior: para entender o clique do botão, era preciso abrir quatro arquivos, e
+cada um só repassava dados para o próximo.</p>
+
+<p>Nenhum dos dois extremos é uma questão de gosto. Existe um critério, e ele cabe numa pergunta. O
+resto desta aula é aprender a fazer essa pergunta no momento certo — e a reconhecer quando você já
+passou do ponto.</p>
+
+<h2>2. O critério em uma frase</h2>
+
+<p>Pergunte: <strong>o que faz esta parte da tela mudar?</strong> Se a resposta for diferente da resposta
+para o resto do componente, você achou um corte. Se for a mesma, você achou barulho.</p>
+
+<p>Um exemplo concreto. No <code>App</code> da Ana, o cabeçalho muda quando a padaria muda de nome ou de
+horário. A lista muda quando chega pão novo. O rodapé muda quando o endereço ou o telefone mudam. Três
+motivos de mudança, três componentes. Já o ícone do botão e o texto do botão mudam pelo mesmo motivo —
+o botão — e separá-los não ajuda ninguém.</p>
+
+<dl class="anatomy">
+<dt>responsabilidade</dt>
+<dd>Um motivo para o componente mudar. Um componente com três responsabilidades muda por três motivos
+diferentes.</dd>
+<dt>coesão</dt>
+<dd>As partes de dentro pertencem ao mesmo assunto. Alta coesão quer dizer que faz sentido ler tudo
+junto.</dd>
+<dt>regra de três</dt>
+<dd>A primeira vez você escreve, a segunda copia, a terceira extrai. Antes da terceira, a cópia ainda
+sai mais barata.</dd>
+<dt>abstração prematura</dt>
+<dd>Criar um componente antes de entender o que ele faz. O resultado é um componente com props demais e
+nome de menos.</dd>
+<dt>fiação</dt>
+<dd>As props que ligam as peças: o valor que desce, a função que sobe. Quebrar aumenta a fiação.</dd>
+</dl>
+
+<p>Repare que “tamanho” não aparece na lista. Ele entra depois, como sintoma: um componente que não cabe
+numa tela de leitura quase sempre tem mais de uma responsabilidade dentro. Mas o contrário não é
+verdade — um componente de trinta linhas pode ter três assuntos, e um de duzentas linhas pode ter um só.
+Contar linhas é o começo da conversa, não o argumento.</p>
+
+<h2>3. Sinal 1: a terceira repetição</h2>
+
+<p>O sinal mais fácil de reconhecer é a cópia. Você escreveu o mesmo bloco, mudou duas palavras e colou
+em outro lugar. A tentação é extrair na hora. Vale resistir uma vez: a segunda cópia ainda pode ser
+cópia, porque você talvez ainda não saiba qual é a parte que varia.</p>
+
+<p>Na terceira, o padrão aparece. Aí você já viu três usos, sabe o que muda e o que fica, e o componente
+nasce com a assinatura certa — duas ou três props, não dez. É por isso que a regra se chama regra de
+três e não regra de dois.</p>
+
+<p>Existe uma exceção legítima: quando o bloco repetido é grande e obviamente igual, como o rodapé com
+endereço e telefone. Aí não há dúvida sobre o que varia — não varia nada. Extrair na segunda é seguro.
+O que nunca vale é extrair antes de ter um segundo uso: aí você está adivinhando o futuro.</p>
+
+<p>Existe uma repetição que engana: a que está na aparência e não na estrutura. Três botões com a
+mesma classe não pedem três componentes; pedem uma classe. Dois cartões com a mesma moldura, mas conteúdos
+diferentes, pedem um componente com <code>children</code>. Antes de extrair, pergunte o que exatamente se
+repete — se a resposta é “o CSS”, o corte é no CSS.</p>
+
+<h2>4. Sinal 2: a parte tem nome</h2>
+
+<p>Outro sinal confiável: você consegue dar nome à parte sem usar “e”. “Cabeçalho” é um nome.
+“ListaDePaes” é um nome. “TopoEListaEFormulario” é um sintoma.</p>
+
+<p>Nome próprio costuma vir de um lugar específico: a pessoa que pediu a tela usa esse nome. A Ana fala
+“o rodapé”, “o carrinho”, “a lista de pães”. Se ela fala, o código pode falar também. E quando a seção
+tem nome, ela costuma ter um motivo de mudança só — as duas coisas andam juntas.</p>
+
+<p>Na caixa abaixo, o <code>App</code> tem o topo da página e três linhas soltas no fim, todas com a
+classe <code>endereco</code>. Essas três linhas são o rodapé. Elas mudam juntas, por um motivo só, e a
+Ana já chama esse conjunto pelo nome.</p>
+
+<div class="tryreact" data-goal="conta:footer=1;;conta:.endereco=3;;texto:Telefone: 5555-1234">
+  <p class="try-task">Extraia um componente <code>Rodape</code> que devolve um
+  <code>&lt;footer&gt;</code> com as três linhas de endereço, e troque as três no <code>App</code> por
+  <code>&lt;Rodape /&gt;</code>.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pão quentinho a partir das 6h.&lt;/p&gt;
+      &lt;p className="endereco"&gt;Rua das Flores, 12&lt;/p&gt;
+      &lt;p className="endereco"&gt;Aberto de segunda a sábado&lt;/p&gt;
+      &lt;p className="endereco"&gt;Telefone: 5555-1234&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Pão quentinho a partir das 6h.&lt;/p&gt;
+  &lt;p class="endereco"&gt;Rua das Flores, 12&lt;/p&gt;
+  &lt;p class="endereco"&gt;Aberto de segunda a sábado&lt;/p&gt;
+  &lt;p class="endereco"&gt;Telefone: 5555-1234&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Rodape() {
+  return (
+    &lt;footer&gt;
+      &lt;p className="endereco"&gt;Rua das Flores, 12&lt;/p&gt;
+      &lt;p className="endereco"&gt;Aberto de segunda a sábado&lt;/p&gt;
+      &lt;p className="endereco"&gt;Telefone: 5555-1234&lt;/p&gt;
+    &lt;/footer&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pão quentinho a partir das 6h.&lt;/p&gt;
+      &lt;Rodape /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra a mesma informação de antes, agora dentro de um <code>footer</code>. Isso é o que um
+bom corte faz: o resultado visível não muda, e o código passa a ter um lugar para o assunto. No dia em
+que o telefone mudar, você abre o <code>Rodape</code> e não precisa procurar entre as linhas do topo.</p>
+
+<p>Repare que o componente não recebeu nenhuma prop. Ele tem um conteúdo fixo e um assunto só — e isso é
+perfeitamente normal. Nem todo componente precisa ser configurável; componente não é função genérica,
+é pedaço de tela com nome.</p>
+
+<h2>5. Sinal 3: motivos diferentes para mudar</h2>
+
+<p>O terceiro sinal é o mais conceitual e o mais útil. Pergunte por que aquele trecho mudaria. Se as
+respostas forem de naturezas diferentes — uma é “o layout do site mudou”, outra é “a regra de desconto
+mudou” —, são dois componentes disfarçados de um.</p>
+
+<p>Na prática, é assim que um componente cresce sem ninguém decidir: alguém acrescenta um <code>if</code>
+de negócio, depois um ajuste de estilo, depois um texto de marketing. Cada um tinha um motivo legítimo;
+juntos, viraram um lugar onde três departamentos brigam.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sinal no código</th><th>Pergunta que revela</th><th>O que fazer</th></tr>
+<tr><td>o mesmo bloco copiado em 3 lugares</td><td>o que muda entre as cópias?</td><td>extrair com props para o que varia</td></tr>
+<tr><td>função com 80 linhas e 3 assuntos</td><td>quantos motivos de mudança existem?</td><td>um componente por assunto</td></tr>
+<tr><td>seção da tela com nome próprio</td><td>a Ana chama isso de quê?</td><td>componente com esse nome</td></tr>
+<tr><td>cinco booleanos para escolher a aparência</td><td>são quantos casos reais?</td><td>um componente por caso, compondo</td></tr>
+<tr><td>a mesma tela em duas versões quase iguais</td><td>o que é igual e o que não é?</td><td>extrair o igual e receber o resto por slot</td></tr>
+</table>
+</div>
+
+<p>A primeira linha da tabela é a mais comum; a quarta é a que mais dói. Cinco booleanos parecem
+flexibilidade e são, na verdade, cinco casos de uso comprimidos num componente só. Quem lê precisa
+combinar mentalmente as opções para saber o que vai aparecer — e combinações impossíveis acabam
+existindo por acidente.</p>
+
+<h2>6. Sinal 4: quando o arquivo passa da tela</h2>
+
+<p>Existe um limite prático de leitura: um componente que não cabe numa tela do editor, ou que precisa
+de rolagem para ser lido inteiro, já pede divisão. Não porque o computador se importe, mas porque quem
+mantém precisa ver a estrutura de uma vez.</p>
+
+<p>O número varia com o estilo de cada um. Como referência, um componente entre 30 e 80 linhas costuma
+ser confortável; acima de 150, quase sempre há dois assuntos. Abaixo de 10 linhas, vale perguntar se
+aquele componente ganhou alguma coisa ou só mudou de arquivo.</p>
+
+<p>Há um efeito colateral do tamanho que engana: arquivo grande costuma ter muito JSX repetido, e a
+vontade é extrair cada pedaço. Antes disso, procure a repetição de verdade — a que muda pelo mesmo
+motivo. Extrair duas <code>div</code> parecidas em dois componentes diferentes dobra os lugares para
+mexer no mesmo dia em que o CSS mudar.</p>
+
+<p>Nem tudo que sobra é componente. Uma conta de desconto repetida em três lugares é uma função
+pura num arquivo de <code>utils</code>; uma lógica de estado repetida em dois componentes é um hook
+próprio, assunto do Nível 2. Cortar em componente o que não desenha nada só muda o problema de lugar — e
+o componente vira uma casca que existe para chamar uma função.</p>
+
+<h2>7. O componente que pediu sete props</h2>
+
+<p>Chegamos ao sintoma mais claro de corte mal feito: o componente que recebe props demais para dar
+conta de todas as variações. Ele começou com duas — título e preço — e foi ganhando
+<code>antigo</code>, <code>destaque</code>, <code>pequeno</code>, <code>sombra</code> e
+<code>botao</code>. Cada pedido novo de tela virava uma prop nova.</p>
+
+<p>O teste é simples: se você precisa combinar três props para saber o que vai aparecer, o componente
+está tentando ser vários ao mesmo tempo. A saída não é mais props; é mais componentes, cada um com o seu
+caso, compostos a partir do mais simples.</p>
+
+<p>Um log de props mostra a escalada em duas versões do mesmo componente:</p>
+
+<pre class="file" data-file="Cartao.jsx">function Cartao(props) {
+  console.log("Cartao: " + Object.keys(props).join(", "));
+  return (
+    &lt;article&gt;
+      &lt;h2&gt;{props.titulo}&lt;/h2&gt;
+      &lt;p&gt;{props.preco}&lt;/p&gt;
+    &lt;/article&gt;
+  );
+}</pre>
+
+<pre class="term">Cartao: titulo, preco
+Cartao: titulo, preco, antigo, destaque, pequeno, sombra, botao</pre>
+
+<p>A primeira linha é o cartão que funcionava. A segunda é o mesmo componente cinco pedidos depois. Nenhuma
+das props novas está errada sozinha; juntas, elas contam uma história: o componente virou o lugar onde
+cada variação da tela foi parar.</p>
+
+<div class="tryreact" data-goal="conta:article=2;;conta:s=1;;conta:.selo=1;;texto:R$ 8,00">
+  <p class="try-task">O cartão de promoção precisa do preço antigo riscado e de um selo — e o cartão
+  comum não pode ter nenhum dos dois. Em vez de encher o <code>CartaoDePao</code> de booleanos, crie
+  <code>CartaoDePromocao</code>, que usa <code>CartaoDePao</code> por dentro, e mostre os dois cartões no
+  <code>App</code>.</p>
+  <pre class="jsx">function CartaoDePao({ titulo, preco }) {
+  return (
+    &lt;article className="cartao"&gt;
+      &lt;h2&gt;{titulo}&lt;/h2&gt;
+      &lt;p&gt;{preco}&lt;/p&gt;
+    &lt;/article&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;CartaoDePao titulo="Pão francês" preco="R$ 1,20" /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;article class="cartao"&gt;
+    &lt;h2&gt;Pão francês&lt;/h2&gt;
+    &lt;p&gt;R$ 1,20&lt;/p&gt;
+  &lt;/article&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function CartaoDePao({ titulo, preco, children }) {
+  return (
+    &lt;article className="cartao"&gt;
+      &lt;h2&gt;{titulo}&lt;/h2&gt;
+      &lt;p&gt;{preco}&lt;/p&gt;
+      {children}
+    &lt;/article&gt;
+  );
+}
+
+function CartaoDePromocao({ titulo, preco, antigo }) {
+  return (
+    &lt;CartaoDePao titulo={titulo} preco={preco}&gt;
+      &lt;p&gt;
+        &lt;s&gt;{antigo}&lt;/s&gt; &lt;span className="selo"&gt;Promoção&lt;/span&gt;
+      &lt;/p&gt;
+    &lt;/CartaoDePao&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;CartaoDePao titulo="Pão francês" preco="R$ 1,20" /&gt;
+      &lt;CartaoDePromocao titulo="Pão de queijo" preco="R$ 8,00" antigo="R$ 10,00" /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Duas peças em vez de sete props — <a href="composicao.html">composição</a> no lugar de
+configuração. O <code>CartaoDePao</code> cuida do caso comum; o
+<code>CartaoDePromocao</code> é uma especialização que usa o primeiro e acrescenta o que só ele tem. Se
+amanhã aparecer o cartão de assinatura, ele nasce do mesmo jeito, e nenhum dos dois existentes precisa
+saber que ele existe.</p>
+
+<p>O painel mostra dois <code>article</code>: o segundo é o <code>article</code> do
+<code>CartaoDePao</code> usado por dentro da promoção. Esse aninhamento é normal e é o preço de compor.
+Se um dia o cartão de promoção crescer e ficar com estrutura própria, ele deixa de usar o outro e passa a
+ser independente — decisão que você toma quando o caso aparece, não antes.</p>
+
+<h2>8. O corte que virou fiação</h2>
+
+<p>Toda divisão tem um custo, e o custo tem nome: fiação. O que estava junto dentro de uma função passa a
+depender de props para funcionar — o valor que desce e a função que sobe. Esquecer um fio é o erro mais
+comum de quem acabou de quebrar um componente, e ele não dá erro nenhum: simplesmente o clique para de
+funcionar.</p>
+
+<p>Na caixa abaixo o botão foi extraído e o <code>onClick</code> ficou para trás. O componente recebe
+<code>aoClicar</code> e nunca usa. O botão aparece, tem o texto certo, e não faz nada.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Pães no carrinho: 3">
+  <p class="try-task">O <code>BotaoAdicionar</code> recebe <code>aoClicar</code> e não liga no
+  <code>onClick</code>. Ligue o fio dentro do botão e clique em “Adicionar pão”.</p>
+  <pre class="jsx">function BotaoAdicionar({ aoClicar }) {
+  return &lt;button&gt;Adicionar pão&lt;/button&gt;;
+}
+
+function App() {
+  const [quantos, setQuantos] = useState(2);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Pães no carrinho: {quantos}&lt;/p&gt;
+      &lt;BotaoAdicionar aoClicar={() =&gt; setQuantos(quantos + 1)} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Pães no carrinho: 2&lt;/p&gt;
+  &lt;button&gt;Adicionar pão&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function BotaoAdicionar({ aoClicar }) {
+  return &lt;button onClick={aoClicar}&gt;Adicionar pão&lt;/button&gt;;
+}
+
+function App() {
+  const [quantos, setQuantos] = useState(2);
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Pães no carrinho: {quantos}&lt;/p&gt;
+      &lt;BotaoAdicionar aoClicar={() =&gt; setQuantos(quantos + 1)} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Uma linha e o botão volta a funcionar. Vale guardar o ensinamento: ao quebrar, você não move só o
+JSX; move também as ligações. Quanto menor o componente extraído, maior a proporção de fiação — um
+componente de três linhas que recebe cinco props é quase só fiação. É por isso que quebrar demais deixa o
+código mais difícil, não mais fácil.</p>
+
+<p>A tentação seguinte é resolver a fiação com <code>{...props}</code>, repassando tudo para o elemento
+de baixo. Funciona até o dia em que uma prop com nome de evento React chega a um elemento do HTML, e aí o
+React avisa no console:</p>
+
+<pre class="file" data-file="Botao.jsx">function Botao(props) {
+  return &lt;button {...props} /&gt;;
+}</pre>
+
+<pre class="term">Warning: React does not recognize the `aoClicar` prop on a DOM element.</pre>
+
+<p>“O React não reconhece a prop <code>aoClicar</code> num elemento do DOM” — porque <code>aoClicar</code>
+não é um atributo do HTML, é uma convenção sua. O aviso não impede nada, mas é um lembrete: fio se liga
+com nome explícito. Escrever <code>onClick={aoClicar}</code> é mais longo e diz exatamente o que está
+acontecendo.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sintoma</th><th>Causa provável</th><th>Saída</th></tr>
+<tr><td>um arquivo com vários assuntos</td><td>nunca houve corte</td><td>um componente por motivo de mudança</td></tr>
+<tr><td>componente com sete props e cinco booleanos</td><td>vários casos comprimidos em um</td><td>um componente por caso, compondo</td></tr>
+<tr><td>peças de três linhas com cinco props</td><td>quebrou cedo demais</td><td>juntar de novo o que muda pelo mesmo motivo</td></tr>
+<tr><td>clique que não faz nada depois do corte</td><td>fiação esquecida</td><td>ligar a prop no evento do elemento</td></tr>
+<tr><td>o mesmo CSS ajustado em quatro arquivos</td><td>corte por parte visual, não por assunto</td><td>cortar por responsabilidade</td></tr>
+</table>
+</div>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o botão que virou três arquivos</h3>
+<p>A Ana extraiu <code>Botao</code>, <code>IconeDoBotao</code> e <code>TextoDoBotao</code>. Cada um
+recebia três props do anterior, e mudar o texto exigia abrir dois arquivos. Ela voltou atrás: um
+<code>Botao</code> com <code>children</code> e <code>onClick</code>. Voltou a ter menos linhas e passou a
+ser mais fácil de usar — desfazer um corte é uma decisão legítima, não um fracasso.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o formulário que ninguém conseguia ler</h3>
+<p>O formulário de encomenda tinha quarenta campos, validação e resumo, tudo no mesmo componente.
+Separar em três — dados do cliente, itens, resumo — deixou cada parte com um assunto. A regra usada foi
+a pergunta da aula: cada bloco mudava por um motivo diferente, e o resumo mudava quando os itens mudavam,
+não quando o endereço mudava.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: a lista que virou componente antes da hora</h3>
+<p>Com um pão na lista, ela criou um componente <code>LinhaDePao</code> com quatro props. Duas semanas
+depois, a lista tinha um layout diferente e o componente ficou sem uso; apagá-lo custou mais do que
+tê-lo escrito. A lição: espere a segunda cópia de verdade aparecer. Componente não é enfeite de
+arquitetura.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. Qual é o critério central para quebrar um componente?</p>
+<label><input type="radio" name="q1"> o componente passou de 50 linhas</label>
+<label><input type="radio" name="q1"> o componente tem mais de duas props</label>
+<label><input type="radio" name="q1"> a parte tem um motivo de mudança diferente do resto</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">2. O que a regra de três sugere?</p>
+<label><input type="radio" name="q2"> extrair o componente na primeira vez que o bloco aparece</label>
+<label><input type="radio" name="q2"> escrever, copiar na segunda vez e extrair na terceira</label>
+<label><input type="radio" name="q2"> quebrar em três componentes todo arquivo com mais de 30 linhas</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Um componente com sete props e cinco booleanos costuma indicar que…</p>
+<label><input type="radio" name="q3"> vários casos de uso foram comprimidos num componente só</label>
+<label><input type="radio" name="q3"> o componente está bem genérico e pronto para o futuro</label>
+<label><input type="radio" name="q3"> o React vai ficar mais lento naquela tela</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: ligue o fio do corte</h2>
+<p>O <code>BotaoAdicionar</code> recebe a função <code>aoClicar</code> e precisa ligá-la ao clique do
+elemento <code>button</code>. Complete o atributo.</p>
+<div class="ex-code">function BotaoAdicionar({ aoClicar }) { return &lt;button <input aria-label="resposta 1" data-answer="onClick={aoClicar}" placeholder="...">&gt;Adicionar pão&lt;/button&gt;; }</div>
+<p class="ex-dica">Dica: o nome do atributo é o do evento do React (<code>onClick</code>), e o valor é a
+função recebida por prop. Sem isso, o botão aparece e não faz nada.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Quebrar componente é uma decisão sobre mudança, não sobre tamanho. A pergunta que resolve quase tudo é
+“o que faz esta parte mudar?”. Resposta diferente do resto, corte; mesma resposta, barulho. A repetição
+ajuda: na terceira cópia o padrão aparece; antes disso, extrair é adivinhar. E nome próprio é sinal
+confiável: se a seção tem nome na boca de quem pediu a tela, ela pode ter nome no código.</p>
+
+<p>Depois do corte, tem fiação. O que estava junto passa a depender de props, e esquecer um fio produz o
+bug mais silencioso que existe: o botão aparece e não faz nada. Por isso quebrar demais cobra caro — um
+componente de três linhas com cinco props é quase só fiação, e o código fica mais longo sem ficar mais
+claro.</p>
+
+<p>Com esta aula fecha o grupo de composição: você viu como montar com peças, como o dado atravessa
+camadas, como distribuir um valor pela árvore com contexto, onde cada
+<a href="pastas-e-arquivos.html">arquivo mora</a> e como a moldura envolve o miolo. O que vem agora é a interação: formulários, hooks um por um e os padrões que fazem um
+componente se comportar de verdade.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Um componente, um motivo para mudar.</li>
+<li>Regra de três: escreve, copia, extrai — nessa ordem.</li>
+<li>Se você consegue dar nome sem usar “e”, pode extrair.</li>
+<li>Tamanho é sintoma, não critério: 30 a 80 linhas é confortável, 150 pede divisão.</li>
+<li>Sete props e cinco booleanos: são vários componentes comprimidos em um.</li>
+<li>Corte por motivo de mudança, não por pedaço visual.</li>
+<li>Quebrar move JSX e ligações: conferir o <code>onClick</code> depois de extrair.</li>
+<li><code>{...props}</code> esconde a fiação; prefira ligar cada prop pelo nome.</li>
+<li>Desfazer um corte é decisão legítima, não fracasso.</li>
+<li>Não extraia antes do segundo uso: abstração prematura custa mais do que a cópia.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

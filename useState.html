@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O useState | Guia React</title>
+<meta name="description" content="O useState explicado do zero: o par valor e setter, o valor inicial, por que uma variável comum não atualiza a tela e as regras para chamar o hook no lugar certo.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O <span class="hl">useState</span></h1>
+<p class="intro">Até agora a página da Ana só muda quando alguém muda o código. Ela quer clicar em
+"Fechar a loja" e ver a placa virar, sem recarregar nada. O que falta é memória: um lugar onde o
+componente guarde um valor entre um desenho e o outro e avise o React quando esse valor muda. Esse
+lugar tem nome — estado — e a porta de entrada é uma função chamada <code>useState</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é estado e por que uma variável comum não resolve.</li>
+  <li>O que <code>useState</code> devolve: o par <code>[valor, setValor]</code>.</li>
+  <li>Para que serve o valor inicial e quando ele é usado.</li>
+  <li>O que acontece entre chamar o setter e a tela mudar.</li>
+  <li>Por que o estado sobrevive de um desenho para o outro.</li>
+  <li>As regras de onde o hook pode ser chamado — e o que acontece quando você erra.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a placa que não vira</h2>
+
+<p>A placa da porta da padaria tem dois estados: aberto e fechado. No site, ela é um parágrafo com o
+texto "Aberto agora". A Ana quer um botão que vire a placa quando ela clicar. O botão existe, a função
+existe, o texto está lá — e nada acontece.</p>
+
+<p>Ela já sabe por quê. Na aula de renderização condicional, o texto na tela era consequência do valor
+de uma variável: mudou a variável, mudou o JSX. Só que o JSX é montado uma vez, quando o React chama a
+função. Se nada mandar o React chamar a função de novo, a tela continua com o desenho antigo, mesmo que
+a variável tenha mudado no meio do caminho.</p>
+
+<p>O estado resolve exatamente esse buraco. Ele é uma caixinha que o React guarda para o componente,
+fora da função, e que sobrevive a cada chamada. Quando você pede para mudar o que está na caixinha, o
+React anota: "esse componente precisa ser desenhado de novo". Desenhar de novo é chamar a função outra
+vez, com o valor novo já dentro. É esse ciclo — mudar, avisar, desenhar — que faz a tela reagir.</p>
+
+<h2>2. Por que uma variável comum não resolve</h2>
+
+<p>Vamos ver o tropeço com o código na frente. A função <code>virar</code> muda a variável e escreve no
+console, então dá para provar que o valor mudou. Mesmo assim, a placa continua dizendo "Aberto":</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Fechado">
+  <p class="try-task">O botão muda a variável <code>aberto</code>, mas a placa não muda. Troque a
+  variável por um estado com <code>useState</code> e faça o clique virar a placa para "Fechado".</p>
+  <pre class="jsx">function App() {
+  let aberto = true;
+
+  function virar() {
+    aberto = !aberto;
+    console.log("aberto agora é " + aberto);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Placa: {aberto ? "Aberto" : "Fechado"}&lt;/p&gt;
+      &lt;button onClick={virar}&gt;Virar a placa&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Placa: Aberto&lt;/p&gt;
+  &lt;button&gt;Virar a placa&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [aberto, setAberto] = useState(true);
+
+  function virar() {
+    setAberto(!aberto);
+    console.log("aberto agora é " + !aberto);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Placa: {aberto ? "Aberto" : "Fechado"}&lt;/p&gt;
+      &lt;button onClick={virar}&gt;Virar a placa&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Rode o código inicial, clique no botão e abra o console do navegador com <code>F12</code> antes de
+olhar o HTML. É isto que aparece:</p>
+
+<pre class="term">aberto agora é false</pre>
+
+<p>O valor mudou. O console provou. E a tela continuou igual, porque ninguém avisou o React de que
+havia algo novo para desenhar.</p>
+
+<p>Uma explicação sobre onde essa linha aparece: o painel das caixas mostra o que o código escreveu
+durante o desenho do componente. O que é escrito dentro de um manipulador de clique sai depois do
+desenho, no console do navegador — por isso a linha acima é uma transcrição do DevTools, e não do
+painel.</p>
+
+<p>E o valor mudou mesmo? Mudou, mas só dentro daquela execução. <code>aberto</code> é uma variável local: ela nasce do zero cada vez que
+a função roda, morre no fim e não tem contrato nenhum com a tela. Quem tem esse contrato é o estado.</p>
+
+<p>Vale entender a diferença com precisão, porque ela é a base de tudo o que vem depois. Uma variável
+local guarda um valor durante <em>uma</em> execução da função. O estado guarda um valor durante
+<em>todas</em> as execuções, e a mudança dele agenda uma execução nova. Não é que a variável seja
+proibida — ela é ótima para o que não precisa aparecer na tela nem sobreviver ao desenho. Ela só não
+serve para o que muda e precisa ser visto.</p>
+
+<p>Um caminho que parece resolver e não resolve é declarar a variável <em>fora</em> do componente. Aí
+ela sobrevive, é verdade, mas continua sem avisar o React — e ganha dois problemas novos: passa a ser
+compartilhada por todas as instâncias do componente e por todas as pessoas que usarem a página, e volta
+ao valor original quando a página recarrega. Estado não é só "um lugar para guardar": é um lugar que o
+React conhece, acompanha e redesenha. Guardar do lado de fora é esconder o valor do único interessado
+em vê-lo mudar.</p>
+
+<h2>3. O que o useState devolve</h2>
+
+<p><code>useState</code> é um hook: uma função especial do React que você chama no topo do componente.
+Ela recebe o valor inicial e devolve um array de duas posições. A primeira é o valor de agora; a segunda
+é uma função que troca esse valor e pede um novo desenho. A escrita normal usa desestruturação de
+array:</p>
+
+<pre class="file" data-file="Placa.jsx">const [aberto, setAberto] = useState(true);</pre>
+
+<dl class="anatomy">
+<dt>estado</dt>
+<dd>Um valor que o React guarda para o componente entre um desenho e outro, e que dispara um novo
+desenho quando muda.</dd>
+<dt>hook</dt>
+<dd>Uma função do React que só pode ser chamada no topo do componente: <code>useState</code>,
+<code>useEffect</code> e as outras que você vai ver.</dd>
+<dt>setter</dt>
+<dd>A segunda posição do par: a função que troca o valor e agenda o desenho. <code>setAberto</code>,
+<code>setPedidos</code>.</dd>
+<dt>valor inicial</dt>
+<dd>O argumento do <code>useState</code>, usado só no primeiro desenho: <code>useState(true)</code>,
+<code>useState("Pão francês")</code>, <code>useState(0)</code>.</dd>
+<dt>desenho</dt>
+<dd>Cada execução da função do componente. Mudou o estado, o React desenha de novo.</dd>
+</dl>
+
+<p>O nome das duas variáveis é escolha sua, mas a convenção do React é forte e ajuda muito:
+<code>aberto</code> e <code>setAberto</code>, <code>pedidos</code> e <code>setPedidos</code>,
+<code>nome</code> e <code>setNome</code>. Quem lê o código sabe na hora o que é valor e o que é
+setter, sem procurar a declaração. Fuja de nomes como <code>valor</code> e <code>mudaValor</code>
+repetidos em três componentes diferentes.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parte</th><th>O que é</th><th>Como usar</th></tr>
+<tr><td><code>useState(inicial)</code></td><td>a chamada do hook, com o valor do primeiro desenho</td><td>só no topo do componente</td></tr>
+<tr><td><code>aberto</code></td><td>o valor de agora, só para leitura</td><td>mostre no JSX, use em condições</td></tr>
+<tr><td><code>setAberto</code></td><td>a função que troca o valor</td><td>chame dentro de um evento ou efeito</td></tr>
+<tr><td><code>= useState(true)</code></td><td>o valor inicial: booleano, texto, número, array, objeto</td><td>calculado só no primeiro desenho</td></tr>
+</table>
+</div>
+
+<p>O valor devolvido por <code>useState</code> é um array comum, e por isso a desestruturação funciona.
+Se você esquecer os colchetes e escrever <code>const par = useState(true)</code>, nada quebra: você
+recebe o array e usa <code>par[0]</code> e <code>par[1]</code>. Só é mais difícil de ler, e todo mundo
+no React escreve com colchetes.</p>
+
+<h2>4. O valor inicial</h2>
+
+<p>O argumento do <code>useState</code> é o valor do primeiro desenho. Ele é usado uma vez, quando o
+componente aparece pela primeira vez, e depois é ignorado — o estado passa a valer por si. Isso explica
+um comportamento que confunde: mudar o argumento no código e salvar não muda um componente que já está
+na tela; ele já tem o valor dele.</p>
+
+<p>O tipo do valor inicial define o tipo do estado. <code>useState(0)</code> guarda número;
+<code>useState("Pão francês")</code> guarda texto; <code>useState(true)</code> guarda booleano;
+<code>useState([])</code> guarda lista; <code>useState({ nome: "Ana" })</code> guarda objeto. E o estado
+não converte tipo sozinho: se você começar com <code>0</code> e chamar <code>setPedidos("2")</code>,
+passa a valer a string <code>"2"</code>, e aí <code>pedidos + 1</code> vira <code>"21"</code>. É o tipo
+de bug que aparece longe, no cálculo.</p>
+
+<div class="tryreact" data-goal="texto:Pão do dia: Pão francês;;clique:button;;texto:Pão do dia: Broa">
+  <p class="try-task">O estado <code>pao</code> já nasce com "Pão francês", mas o botão não troca nada.
+  Chame <code>setPao</code> com o texto "Broa" dentro do manipulador do clique.</p>
+  <pre class="jsx">function App() {
+  const [pao, setPao] = useState("Pão francês");
+
+  function trocar() {
+    console.log("trocando o pão do dia");
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pão do dia: {pao}&lt;/p&gt;
+      &lt;button onClick={trocar}&gt;Trocar para broa&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Pão do dia: Pão francês&lt;/p&gt;
+  &lt;button&gt;Trocar para broa&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [pao, setPao] = useState("Pão francês");
+
+  function trocar() {
+    setPao("Broa");
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pão do dia: {pao}&lt;/p&gt;
+      &lt;button onClick={trocar}&gt;Trocar para broa&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No painel, o primeiro desenho mostra "Pão do dia: Pão francês". Depois do clique, mostra "Broa". O
+setter recebeu o valor novo direto — não é uma soma, é uma substituição. Essa é a forma mais simples de
+atualizar estado e a que você vai usar na maior parte do tempo: <code>setPao("Broa")</code>,
+<code>setAberto(false)</code>, <code>setNome("Ana")</code>.</p>
+
+<p>Quando o valor novo depende do anterior — somar um, alternar um booleano, acrescentar num array —,
+a conversa muda um pouco. Dá para fazer com o valor atual (<code>setAberto(!aberto)</code>, como no
+exemplo acima), e funciona para um clique por vez. Na aula de atualizar o estado você vai ver o caso em
+que isso falha e a forma de função que resolve. Por enquanto, guarde a regra: o setter recebe o valor
+novo, não um pedaço dele.</p>
+
+<h2>5. O que acontece entre o clique e a tela</h2>
+
+<p>Vale acompanhar o caminho inteiro, porque ele explica quase todos os comportamentos estranhos do
+React. O leitor clica. O navegador dispara o evento. A função <code>virar</code> roda e chama
+<code>setAberto(false)</code>. O React guarda o valor novo e marca aquele componente como "precisa
+desenhar". Terminado o evento, ele chama a função do componente outra vez, agora com
+<code>aberto</code> valendo <code>false</code>, e compara o JSX novo com o anterior. Só a parte que
+mudou é tocada no navegador.</p>
+
+<p>Duas consequências práticas. A primeira: a função do componente roda inteira a cada mudança de
+estado, não só o pedacinho que mudou. Qualquer <code>console.log</code> no corpo dela aparece a cada
+clique — e é por isso que logar dentro do componente é um jeito tão bom de descobrir quantos desenhos
+aconteceram. A segunda: o valor novo não chega para a linha seguinte do mesmo evento. Dentro de
+<code>virar</code>, <code>aberto</code> continua sendo o valor antigo até o próximo desenho. Guarde
+isso; é a origem de metade dos bugs de estado.</p>
+
+<pre class="file" data-file="Placa.jsx">function virar() {
+  setAberto(!aberto);       // pede o novo desenho
+  console.log(aberto);      // ainda imprime o valor antigo
+}</pre>
+
+<p>Esse detalhe explica uma pergunta que todo mundo faz na primeira semana: "por que meu
+<code>console.log</code> mostra o valor antigo se eu acabei de atualizar?". Porque o valor que a função
+enxerga é o do desenho em que ela foi criada — e o desenho em que ela foi criada é o de antes do clique.
+Na aula de atualizar o estado, essa mesma característica vai aparecer como aliada, quando o assunto for
+somar várias vezes de uma vez só.</p>
+
+<p>Se você precisa do valor novo na mesma função, calcule numa variável e use a variável:
+<code>const novo = !aberto;</code>, depois <code>setAberto(novo)</code> e <code>console.log(novo)</code>.
+Simples e sem surpresa.</p>
+
+<h2>6. O estado é memória — e ela é do componente</h2>
+
+<p>O teste definitivo de que o estado guarda memória é clicar duas vezes. Uma variável local voltaria a
+zero em cada desenho; o estado continua de onde parou. O exemplo abaixo é o contador de pedidos da Ana,
+e ele começa com uma variável comum:</p>
+
+<div class="tryreact" data-goal="clique:button;;clique:button;;texto:Pedidos: 2">
+  <p class="try-task">O botão soma na variável, mas o painel continua em "Pedidos: 0". Troque a
+  variável por <code>useState(0)</code> e clique duas vezes: o painel precisa chegar a
+  <strong>Pedidos: 2</strong>.</p>
+  <pre class="jsx">function App() {
+  let pedidos = 0;
+
+  function pedir() {
+    pedidos = pedidos + 1;
+    console.log("pedidos agora: " + pedidos);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pedidos: {pedidos}&lt;/p&gt;
+      &lt;button onClick={pedir}&gt;Pedir pão&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+  &lt;p&gt;Pedidos: 0&lt;/p&gt;
+  &lt;button&gt;Pedir pão&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [pedidos, setPedidos] = useState(0);
+
+  function pedir() {
+    setPedidos(pedidos + 1);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Pedidos: {pedidos}&lt;/p&gt;
+      &lt;button onClick={pedir}&gt;Pedir pão&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No código inicial, dois cliques escrevem duas linhas no console do navegador — e é interessante ver
+que o número cresce lá enquanto a tela fica parada em zero:</p>
+
+<pre class="term">pedidos agora: 1
+pedidos agora: 2</pre>
+
+<p>A variável viveu durante o evento e morreu. No código com estado, o valor 2 está guardado fora da
+função, e por isso o terceiro desenho nasce com ele. Essa memória é o que permite construir carrinho,
+formulário, contador, aba aberta, filtro — tudo o que precisa lembrar de uma interação para a próxima.</p>
+
+<p>Uma sutileza que cedo ou tarde aparece: a memória é <strong>de cada componente</strong>, não do
+programa. Dois <code>&lt;Contador /&gt;</code> na mesma tela têm estados separados, cada um com o seu
+zero. E quando o componente sai da tela e volta — porque uma condição deixou de desenhá-lo —, o estado
+dele é descartado e recomeça do valor inicial. Estado não é banco de dados; é memória de curto prazo
+enquanto o componente está montado.</p>
+
+<h2>7. As regras do hook</h2>
+
+<p><code>useState</code> tem duas regras duras, e as duas existem pelo mesmo motivo: o React identifica
+cada estado pela <em>ordem</em> das chamadas, não pelo nome da variável. No primeiro desenho ele anota
+"primeira chamada é o estado A, segunda é o B". Nos desenhos seguintes, ele entrega os valores nessa
+mesma ordem. Se a ordem mudar, os valores trocam de lugar.</p>
+
+<p>Por isso: chame o hook sempre no <strong>topo do componente</strong>, antes de qualquer
+<code>return</code>, e <strong>nunca</strong> dentro de um <code>if</code>, de um laço ou de uma função
+aninhada. Dentro de um manipulador de evento, então, nem pensar: o manipulador roda no clique, muito
+depois do desenho, e o hook precisa rodar sempre, na mesma ordem, em todo desenho.</p>
+
+<pre class="file" data-file="Errado.jsx">function App({ logado }) {
+  if (logado) {
+    const [nome, setNome] = useState("Ana");   // ERRADO: hook dentro de if
+  }
+
+  function alternar() {
+    const [aberto, setAberto] = useState(false);   // ERRADO: hook dentro de função
+  }
+}</pre>
+
+<p>O certo é declarar tudo no topo e usar as condições no JSX, como você já faz:</p>
+
+<pre class="file" data-file="Certo.jsx">function App({ logado }) {
+  const [nome, setNome] = useState("Ana");
+  const [aberto, setAberto] = useState(false);
+
+  return (
+    &lt;div&gt;
+      {logado &amp;&amp; &lt;p&gt;Olá, {nome}&lt;/p&gt;}
+      &lt;p&gt;Placa: {aberto ? "Aberto" : "Fechado"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde você chamou</th><th>Funciona?</th><th>Por quê</th></tr>
+<tr><td>topo do componente</td><td>sim</td><td>roda em todo desenho, sempre na mesma ordem</td></tr>
+<tr><td>dentro de um <code>if</code></td><td>não</td><td>em um desenho roda, no outro não: a ordem muda</td></tr>
+<tr><td>dentro de um laço</td><td>não</td><td>a quantidade de chamadas muda com o tamanho da lista</td></tr>
+<tr><td>dentro de um manipulador de clique</td><td>não</td><td>o manipulador roda depois do desenho, não durante</td></tr>
+<tr><td>numa função auxiliar comum</td><td>não</td><td>vira um hook próprio, com nome começando por <code>use</code></td></tr>
+</table>
+</div>
+
+<p>Você não precisa decorar a mensagem de erro, mas vale reconhecer o sintoma: quando a ordem dos hooks
+muda entre desenhos, o React reclama de "ordem dos hooks" e a tela pode quebrar. Se um componente seu
+começar a se comportar de forma absurda depois de uma condição nova, procure um hook que entrou para
+dentro de um <code>if</code>.</p>
+
+<h2>8. Quando usar estado (e quando não)</h2>
+
+<p>Estado é para o que muda com o tempo e precisa aparecer na tela: a placa aberta ou fechada, a lista
+de pedidos, o texto digitado, a aba selecionada. Se o valor não muda, é constante — e constante não
+precisa de estado. Se o valor pode ser calculado a partir de outro estado ou das props, também não
+precisa: calcule na hora.</p>
+
+<pre class="file" data-file="Venda.jsx">function Venda({ precoUnitario }) {
+  const [quantidade, setQuantidade] = useState(1);
+
+  const total = quantidade * precoUnitario;   // calculado, não é estado
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Quantidade: {quantidade}&lt;/p&gt;
+      &lt;p&gt;Total: {total.toFixed(2)}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setQuantidade(quantidade + 1)}&gt;+&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Guardar o total num estado seria pior: você teria dois valores para manter sincronizados, e no dia
+em que um mudasse sem o outro, a tela mostraria uma conta errada. Essa ideia — estado só para a fonte da
+verdade, o resto é cálculo — tem uma aula só dela mais adiante. Por ora, a pergunta "isso pode ser
+calculado a partir do que eu já tenho?" resolve a maioria dos casos.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o botão que parece não fazer nada</h3>
+<p>A Ana escreveu <code>setAberto(aberto)</code> em vez de <code>setAberto(!aberto)</code>. O React
+recebeu o mesmo valor e, como o estado não mudou, não redesenhou: a tela ficou igual e o clique pareceu
+morto. Não é bug do React — é economia. Ele só redesenha quando o valor muda de verdade, e comparar
+booleano, número e texto é fácil.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: dois contadores que se mexem juntos</h3>
+<p>Ela colocou um único estado no <code>App</code> e passou o mesmo valor para dois contadores na tela.
+Clicar em um mexia nos dois, porque havia um estado só. Estado pertence ao componente onde foi
+declarado; para ter dois independentes, cada componente declara o seu. Essa diferença vai ficar clara na
+aula do contador, quando o mesmo componente aparecer duas vezes.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o estado que volta a zero</h3>
+<p>Ela clicou três vezes, foi para outra aba do site e voltou: o contador estava em zero. O componente
+tinha sido desmontado ao sair da tela, e o estado foi junto. Isso é o esperado. Quando o valor precisa
+sobreviver à navegação ou ao recarregamento, o lugar é outro — o <code>localStorage</code>, mais adiante
+no guia, ou o servidor.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que <code>useState</code> devolve?</p>
+<label><input type="radio" name="q1"> o valor inicial, convertido em texto</label>
+<label><input type="radio" name="q1"> um par: o valor de agora e a função que o troca</label>
+<label><input type="radio" name="q1"> uma função que desenha o componente de novo</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que mudar uma variável comum não atualiza a tela?</p>
+<label><input type="radio" name="q2"> porque variáveis não podem ser alteradas em React</label>
+<label><input type="radio" name="q2"> porque o React proíbe <code>let</code> dentro de componentes</label>
+<label><input type="radio" name="q2"> porque ninguém avisou o React de que havia algo novo para desenhar</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Onde o <code>useState</code> pode ser chamado?</p>
+<label><input type="radio" name="q3"> no topo do componente, sempre na mesma ordem</label>
+<label><input type="radio" name="q3"> dentro do <code>if</code> que decide se o componente aparece</label>
+<label><input type="radio" name="q3"> dentro do manipulador de clique, quando precisar do valor</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a chamada do hook</h2>
+<p>Complete a declaração de um estado que começa fechado e tem um setter chamado
+<code>setAberto</code>:</p>
+<div class="ex-code">const [aberto, setAberto] = <input aria-label="resposta 1" data-answer="useState" placeholder="...">(false);</div>
+<p class="ex-dica">Dica: é a função do React que cria o par. Ela recebe o valor inicial — e o nome dela
+começa com "use", como todos os hooks que você vai ver neste guia.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Estado é a memória do componente: um valor que sobrevive entre um desenho e outro e que, quando muda,
+pede um desenho novo. <code>useState</code> cria essa memória e devolve um par — o valor de agora e o
+setter. O argumento é o valor do primeiro desenho e só é usado nele. O setter recebe o valor novo, e a
+partir daí a função do componente roda outra vez com o valor atualizado.</p>
+
+<p>Variável comum não substitui estado por dois motivos: ela não avisa o React e ela não sobrevive ao
+fim da função. O console mostrando o valor novo enquanto a tela permanece velha é a assinatura desse
+problema — e uma boa forma de lembrar que "mudar o dado" e "mudar a tela" são dois passos, não um.</p>
+
+<p>As regras são curtas: hook no topo, sempre na mesma ordem, nunca dentro de condição, laço ou
+manipulador. E estado só para o que muda e aparece; o que pode ser calculado, calcule. Com isso, o
+próximo passo é natural: usar o estado para construir um contador de verdade — com mais, menos, zerar e
+um componente que pode aparecer várias vezes na tela, cada um com a sua própria memória.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>const [valor, setValor] = useState(inicial);</code> — par de valor e setter.</li>
+<li>O valor inicial vale só no primeiro desenho; depois o estado manda.</li>
+<li>Variável local não redesenha a tela e não sobrevive ao fim da função.</li>
+<li>Chamar o setter agenda um novo desenho; a tela muda depois, não na linha seguinte.</li>
+<li>Dentro do mesmo evento, o valor lido ainda é o antigo.</li>
+<li>O setter substitui o valor; para somar, passe o resultado da conta.</li>
+<li><code>useState</code> só no topo do componente, nunca dentro de <code>if</code> ou laço.</li>
+<li>Estado é por componente: duas instâncias, duas memórias.</li>
+<li>Componente desmontado perde o estado; ele não é banco de dados.</li>
+<li>O que dá para calcular não vira estado.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

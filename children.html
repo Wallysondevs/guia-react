@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O children | Guia React</title>
+<meta name="description" content="O children do React: o que você escreve entre as tags chega como prop, como renderizar com chaves, texto ou vários elementos e quando usar children em vez de prop.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O <span class="hl">children</span></h1>
+<p class="intro">A Ana precisa do mesmo aviso em três páginas do site, com textos diferentes: na
+inicial, “encomendas até as 17h”; na lista de pães, “sai do forno às 6h”; no contato, “retire na loja até
+as 19h”. O formato da caixa é igual nos três — borda, cor de fundo, um respiro — e só o conteúdo muda.
+Ela já sabe mandar texto por prop, mas o texto do meio de um parágrafo, ou um parágrafo inteiro, não cabe
+bem num atributo. Nesta aula ela descobre que o React já reservou um lugar para isso: tudo o que você
+escreve <strong>entre as tags</strong> chega ao componente como <code>children</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é <code>children</code>: o conteúdo que fica entre a tag de abertura e a de fechamento.</li>
+  <li>Como renderizar esse conteúdo com <code>{children}</code>.</li>
+  <li>Que <code>children</code> é uma prop como as outras, só com nome reservado.</li>
+  <li>O que chega quando há texto, um elemento ou vários elementos.</li>
+  <li>Quando usar <code>children</code> e quando usar uma prop com nome.</li>
+  <li>Como misturar <code>children</code> com as outras props no mesmo componente.</li>
+  <li>Por que esquecer a tag de fechamento quebra o código.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a mesma caixa, três textos</h2>
+
+<p>O aviso da padaria é sempre a mesma caixa: fundo claro, borda fina, texto pequeno. O que muda é o
+recado. Na primeira tentativa, a Ana fez o componente receber o texto por prop:</p>
+
+<pre class="file" data-file="App.jsx">function Aviso({ texto }) {
+  return &lt;div className="aviso"&gt;{texto}&lt;/div&gt;;
+}
+
+function App() {
+  return &lt;Aviso texto="Encomendas até as 17h" /&gt;;
+}</pre>
+
+<p>Funciona para uma frase curta. Mas o recado de verdade tem negrito no meio, um link para o telefone,
+às vezes uma lista de horários. Colocar tudo isso dentro de um atributo é desconfortável: você teria de
+passar pedaços de HTML como texto ou inventar três props — <code>texto</code>, <code>negrito</code>,
+<code>link</code> — e o componente nunca mais seria simples.</p>
+
+<p>O React resolve isso com uma ideia elegante: o conteúdo que fica <strong>entre</strong> a tag de
+abertura e a de fechamento não vira atributo nenhum. Ele é entregue ao componente numa prop especial
+chamada <code>children</code>. Ou seja, a posição já é a informação: o que está dentro é o conteúdo, e o
+componente decide onde encaixar.</p>
+
+<p>Isso muda como você pensa componentes. Um componente deixa de ser só “uma caixa que recebe dados” e
+passa a ser também “uma moldura que recebe conteúdo”. É a diferença entre um cartão com texto fixo e um
+cartão que emoldura o que você quiser pôr dentro.</p>
+
+<h2>2. O conteúdo entre as tags</h2>
+
+<p>Quando você escreve <code>&lt;Caixa&gt;Pão quentinho&lt;/Caixa&gt;</code>, o React monta o objeto de
+props com uma chave chamada <code>children</code> e o valor <code>"Pão quentinho"</code>. Repare que a
+tag agora tem fechamento: sem ele, não há “entre”, e não há children. Uma tag escrita como
+<code>&lt;Caixa /&gt;</code> não tem conteúdo nenhum.</p>
+
+<dl class="anatomy">
+<dt>children</dt>
+<dd>A prop que guarda o conteúdo escrito entre as tags. O nome é reservado pelo React: você não escolhe,
+e não precisa declarar na chamada.</dd>
+<dt>tag de abertura</dt>
+<dd><code>&lt;Caixa&gt;</code>, com o sinal de maior no fim. É onde o conteúdo começa.</dd>
+<dt>tag de fechamento</dt>
+<dd><code>&lt;/Caixa&gt;</code>, com a barra antes do nome. Sem ela, o componente não tem filhos.</dd>
+<dt>conteúdo</dt>
+<dd>O que fica no meio: texto, um elemento, vários elementos, uma expressão com chaves.</dd>
+<dt>moldura</dt>
+<dd>O papel do componente que usa children: dar forma, borda e espaçamento a um conteúdo que ele não
+conhece.</dd>
+</dl>
+
+<p>O nome é emprestado do inglês: <em>children</em> quer dizer “filhos”. Em HTML, os elementos dentro
+de outro são chamados de filhos, e o React manteve a palavra. Não há nada de mágico no conceito — é uma
+chave do objeto de props como <code>nome</code> ou <code>preco</code>; o que ela tem de especial é ser
+preenchida pelo React, a partir da posição do conteúdo, e não por um atributo que você escreve.</p>
+
+<p>Há um detalhe que confunde: children é uma prop, mas você não a escreve como atributo. Escrever
+<code>&lt;Caixa children="Pão" /&gt;</code> funciona, tecnicamente — o React aceita —, mas não é o
+costume e atrapalha quem lê. O jeito natural é o conteúdo entre as tags; o atributo fica reservado para
+os casos raros em que o conteúdo vem de uma variável.</p>
+
+<h2>3. Um espaço para o conteúdo</h2>
+
+<p>Veja o que acontece quando o componente não usa <code>children</code>: o React entrega o conteúdo,
+mas ninguém o coloca na tela. Ele some sem erro nenhum — o mesmo silêncio das props com nome errado.</p>
+
+<div class="tryreact" data-goal="texto:Encomendas até as 17h;;conta:.aviso=1">
+  <p class="try-task">O texto entre as tags não aparece, porque o componente não o renderiza. Coloque
+  <code>{children}</code> dentro do <code>div</code> e clique em Rodar.</p>
+  <pre class="jsx">function Aviso({ titulo }) {
+  return (
+    &lt;div className="aviso"&gt;
+      &lt;strong&gt;{titulo}&lt;/strong&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return &lt;Aviso titulo="Atenção"&gt;Encomendas até as 17h&lt;/Aviso&gt;;
+}</pre>
+  <pre class="out">
+&lt;div class="aviso"&gt;&lt;strong&gt;Atenção&lt;/strong&gt;&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Aviso({ titulo, children }) {
+  return (
+    &lt;div className="aviso"&gt;
+      &lt;strong&gt;{titulo}&lt;/strong&gt;
+      {children}
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return &lt;Aviso titulo="Atenção"&gt;Encomendas até as 17h&lt;/Aviso&gt;;
+}</pre>
+</div>
+
+<p>Duas coisas mudaram na solução: o conteúdo apareceu, e o componente passou a declarar
+<code>children</code> na assinatura. Essa segunda parte é opcional — <code>{props.children}</code>
+funcionaria igual —, mas declarar deixa claro, para quem lê, que aquele componente espera conteúdo. É a
+mesma ideia da <a href="desestruturar-props.html">aula de desestruturar</a>: o que aparece no parâmetro é
+o contrato.</p>
+
+<p>Repare também na ordem: o <code>{children}</code> foi colocado depois do título, e é ali que o texto
+aparece. O componente escolhe o lugar. Se você mover a linha para antes do <code>strong</code>, o conteúdo
+sobe na tela. children não é um bloco fixo no fim do componente: é um valor que você posiciona onde
+quiser.</p>
+
+<h2>4. children é uma prop como as outras</h2>
+
+<p>Chamada diferente, mesma mecânica. O que chega em <code>props.children</code> depende do que você
+escreveu no meio das tags, e o tipo acompanha o conteúdo. A tabela mostra os casos que aparecem no dia a
+dia.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na chamada</th><th>O que chega em <code>children</code></th></tr>
+<tr><td><code>&lt;Caixa&gt;Pão quentinho&lt;/Caixa&gt;</code></td><td>o texto <code>"Pão quentinho"</code></td></tr>
+<tr><td><code>&lt;Caixa&gt;&lt;p&gt;Pão&lt;/p&gt;&lt;/Caixa&gt;</code></td><td>o elemento <code>p</code>, inteiro</td></tr>
+<tr><td><code>&lt;Caixa&gt;&lt;p&gt;a&lt;/p&gt;&lt;p&gt;b&lt;/p&gt;&lt;/Caixa&gt;</code></td><td>uma lista com os dois elementos</td></tr>
+<tr><td><code>&lt;Caixa /&gt;</code></td><td><code>undefined</code> — nada aparece</td></tr>
+<tr><td><code>&lt;Caixa&gt;{nome}&lt;/Caixa&gt;</code></td><td>o valor da variável <code>nome</code></td></tr>
+<tr><td><code>&lt;Caixa&gt;{2 + 1} pães&lt;/Caixa&gt;</code></td><td>o resultado e o texto: <code>3 pães</code></td></tr>
+</table>
+</div>
+
+<p>Para ver o que chegou, imprima. Quando o conteúdo é texto, a linha do console mostra a string
+inteira — é o jeito mais rápido de confirmar que a página mandou alguma coisa:</p>
+
+<pre class="file" data-file="App.jsx">function Aviso({ titulo, children }) {
+  console.log("children: " + children);
+  return &lt;div className="aviso"&gt;{children}&lt;/div&gt;;
+}</pre>
+
+<pre class="term">console: children: Sai às 6h</pre>
+
+<p>Se o conteúdo for um elemento em vez de texto, a concatenação com <code>+</code> não serve: o
+resultado vira <code>[object Object]</code>. Nesse caso, imprima <code>children</code> sozinho, sem
+montar string. É o mesmo cuidado que você viu com objetos na aula de props — e a mesma conclusão: para
+saber o que chegou, olhe o console antes de mexer no componente.</p>
+
+<p>Duas consequências práticas. A primeira: <code>{children}</code> desenha qualquer coisa que o React
+saiba desenhar — texto, elemento, lista de elementos. Você não precisa tratar cada caso. A segunda: se
+não houver conteúdo, <code>{children}</code> vale <code>undefined</code> e simplesmente não desenha
+nada — sem erro, sem espaço sobrando.</p>
+
+<p>Uma diferença em relação às props normais: quando há mais de um filho, o React entrega uma
+<strong>lista</strong>, e não um valor só. Você não precisa se preocupar com isso para renderizar — basta
+<code>{children}</code> —, mas precisa saber que existe, porque percorrer os filhos com
+<code>map</code> é uma técnica real e o tipo do valor muda conforme a chamada.</p>
+
+<h2>5. Texto, elemento ou vários</h2>
+
+<p>A caixa de aviso da Ana às vezes tem um parágrafo, às vezes dois. Como children aceita vários
+elementos, a mesma moldura serve para os dois casos — a página é que decide quantos parágrafos põe
+dentro.</p>
+
+<div class="tryreact" data-goal="conta:.aviso p=2;;texto:Chega às 16h">
+  <p class="try-task">A caixa é uma moldura que já renderiza <code>children</code>, mas a página só passa
+  um parágrafo. Acrescente um segundo parágrafo com o texto <strong>Chega às 16h</strong>.</p>
+  <pre class="jsx">function Aviso({ children }) {
+  return &lt;div className="aviso"&gt;{children}&lt;/div&gt;;
+}
+
+function App() {
+  return (
+    &lt;Aviso&gt;
+      &lt;p&gt;Sai às 6h&lt;/p&gt;
+    &lt;/Aviso&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div class="aviso"&gt;
+  &lt;p&gt;Sai às 6h&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Aviso({ children }) {
+  return &lt;div className="aviso"&gt;{children}&lt;/div&gt;;
+}
+
+function App() {
+  return (
+    &lt;Aviso&gt;
+      &lt;p&gt;Sai às 6h&lt;/p&gt;
+      &lt;p&gt;Chega às 16h&lt;/p&gt;
+    &lt;/Aviso&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel passa a mostrar dois parágrafos dentro do <code>div</code>, e a missão confere a contagem —
+dois <code>p</code> dentro de <code>.aviso</code>. Note que o componente não mudou uma linha. Quem decide
+o conteúdo é quem usa a moldura, e é por isso que children é a ferramenta certa para conteúdo variável:
+o componente não precisa saber quantos parágrafos existem.</p>
+
+<p>Há também uma vantagem de manutenção que não aparece no primeiro dia. Quando o conteúdo está na
+página que usa o componente, mudar o recado não exige tocar no componente — e o contrário é verdadeiro:
+mudar a moldura não exige tocar em nenhuma das páginas. Cada arquivo cuida do que é seu. Isso parece
+pouco com três avisos e passa a valer muito quando são trinta.</p>
+
+<p>Isso tem um limite saudável. Se o componente precisa <em>controlar</em> o conteúdo — mudar a cor de
+cada item, ordenar, numerar —, children não ajuda: ele só entrega o que veio. Nesse caso, o caminho é
+receber uma lista por prop e desenhar item por item, que é o assunto de
+<a href="listas-com-map.html">Listas com map</a>, mais adiante.</p>
+
+<h2>6. children ou prop com nome?</h2>
+
+<p>As duas formas mandam dados para dentro do componente. A diferença não é de poder, é de leitura: o
+que fica entre as tags é conteúdo livre; o que vai em atributo é valor com nome, que o componente pode
+usar em contas e decisões. A tabela resume a escolha.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Melhor caminho</th><th>Por quê</th></tr>
+<tr><td>conteúdo que só quem usa conhece</td><td><code>children</code></td><td>a página manda o que quiser, inclusive links e listas</td></tr>
+<tr><td>título curto e obrigatório</td><td>prop <code>titulo</code></td><td>o componente precisa dele em lugar fixo</td></tr>
+<tr><td>parágrafo longo, com negrito</td><td><code>children</code></td><td>atributo não acomoda marcação</td></tr>
+<tr><td>número usado em conta</td><td>prop <code>preco</code></td><td>o componente calcula com valor, não com texto</td></tr>
+<tr><td>rótulo de botão</td><td>as duas servem</td><td>children se o rótulo pode ter ícone; prop se é sempre texto</td></tr>
+<tr><td>lista de itens</td><td>prop com lista</td><td>o componente precisa percorrer e desenhar cada um</td></tr>
+</table>
+</div>
+
+<p>Há um teste simples para decidir: o componente precisa <em>olhar</em> o conteúdo? Se ele só precisa
+colocar na tela, children. Se precisa comparar, contar, formatar ou decidir com base no valor, prop. Uma
+caixa que emoldura um aviso não olha o aviso; um cartão de preço olha o preço.</p>
+
+<p>Na dúvida, comece com prop. É mais fácil transformar uma prop em children do que o contrário: quando
+o conteúdo passa a ter marcação, você muda a chamada de <code>&lt;Aviso texto="Sai às 6h" /&gt;</code>
+para <code>&lt;Aviso&gt;Sai às 6h&lt;/Aviso&gt;</code> e o componente de <code>{texto}</code> para
+<code>{children}</code>. São duas edições pequenas e localizadas, e a tela continua igual — o que muda é
+o que passa a ser possível.</p>
+
+<h2>7. children junto com as outras props</h2>
+
+<p>O caso mais comum em projeto de verdade é a mistura: um título que o componente posiciona no topo e
+um conteúdo que ele emoldura embaixo. As duas coisas convivem na mesma chamada — os atributos viram
+props, o que está entre as tags vira children.</p>
+
+<div class="tryreact" data-goal="texto:Pão do dia;;conta:.cartao p=1;;texto:Sai quentinho às 6h">
+  <p class="try-task">O título aparece, mas o conteúdo entre as tags não. Mostre os children dentro de
+  um <code>&lt;p className="rodape"&gt;</code>, depois do título.</p>
+  <pre class="jsx">function Cartao({ titulo }) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{titulo}&lt;/h2&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return &lt;Cartao titulo="Pão do dia"&gt;Sai quentinho às 6h&lt;/Cartao&gt;;
+}</pre>
+  <pre class="out">
+&lt;div class="cartao"&gt;
+  &lt;h2&gt;Pão do dia&lt;/h2&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Cartao({ titulo, children }) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{titulo}&lt;/h2&gt;
+      &lt;p className="rodape"&gt;{children}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return &lt;Cartao titulo="Pão do dia"&gt;Sai quentinho às 6h&lt;/Cartao&gt;;
+}</pre>
+</div>
+
+<p>Essa é a forma que você vai usar em quase todo componente de layout: um ou dois valores por prop,
+para o que precisa ficar em lugar certo, e children para o miolo. E note que a chamada fica esquisita de
+ler se você não conhece a regra: <code>titulo="Pão do dia"</code> é atributo, e
+<code>Sai quentinho às 6h</code> é conteúdo. Duas coisas diferentes no mesmo lugar, cada uma com a sua
+porta de entrada.</p>
+
+<p>Um detalhe de estilo: quando o componente recebe children e outras props, a ordem na assinatura não
+importa, mas o costume é deixar <code>children</code> por último — ele é o mais “especial” dos
+parâmetros. E não abrevie para <code>kids</code> ou <code>filhos</code>: o nome <code>children</code> é
+o que o React usa, e renomear só confunde quem lê.</p>
+
+<h2>8. Os tropeços de quem usa children</h2>
+
+<p>Como sempre, os erros são silenciosos ou de sintaxe. O silencioso é entregar conteúdo a um componente
+que não o renderiza; o de sintaxe é esquecer a tag de fechamento ou fechar com o nome errado. A tabela
+junta os dois tipos, com o conserto de cada um.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você escreveu</th><th>O que acontece</th><th>O conserto</th></tr>
+<tr><td>conteúdo entre as tags, sem <code>{children}</code> no componente</td><td>o conteúdo some, sem erro</td><td>renderize <code>{children}</code></td></tr>
+<tr><td><code>&lt;Caixa&gt;</code> sem <code>&lt;/Caixa&gt;</code></td><td>não compila: <em>Unterminated JSX contents</em></td><td>feche a tag</td></tr>
+<tr><td><code>&lt;Caixa&gt;</code> … <code>&lt;/div&gt;</code></td><td>não compila: <em>Expected corresponding JSX closing tag</em></td><td>feche com o mesmo nome</td></tr>
+<tr><td><code>{props.children}</code> com assinatura desestruturada</td><td>nada aparece: <code>props</code> não existe</td><td>use <code>{children}</code></td></tr>
+<tr><td><code>&lt;Caixa /&gt;</code> esperando conteúdo</td><td><code>children</code> é <code>undefined</code></td><td>use a tag com abertura e fechamento</td></tr>
+<tr><td><code>children="Pão"</code> como atributo</td><td>funciona, mas foge do padrão</td><td>escreva o texto entre as tags</td></tr>
+</table>
+</div>
+
+<pre class="term">Expected corresponding JSX closing tag for &lt;Caixa&gt;. (9:4)</pre>
+
+<p>Essa é a mensagem do terceiro caso, e ela é mais útil do que parece: diz qual tag ficou aberta e em
+que linha o compilador desistiu. O compilador do JSX trata as tags como um quebra-cabeça — cada abertura
+precisa de um fechamento com o mesmo nome, na ordem certa. Um <code>&lt;/div&gt;</code> no lugar de
+<code>&lt;/Caixa&gt;</code> não é “quase certo”: é outro fechamento.</p>
+
+<p>Vale reparar no formato: a mensagem mostra a tag entre sinais de menor e maior, do jeito que você
+escreveu no código. É por isso que ela é tão específica — o compilador tem o seu texto na mão e aponta a
+peça que não encaixou.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<p>Depois que a ideia de moldura entra na cabeça, os componentes ficam menores e mais reutilizáveis. Os
+três cenários abaixo são as situações em que a Ana precisou de children de verdade.</p>
+
+<div class="cenario">
+<h3>Cenário 1: a caixa de aviso que servia para um texto só</h3>
+<p>O primeiro <code>Aviso</code> recebia <code>texto</code> por prop e funcionava para uma frase.
+Quando o recado passou a ter um telefone em negrito, ela trocou a prop por children e a chamada virou
+<code>&lt;Aviso&gt;Ligue para &lt;strong&gt;11 5555-1234&lt;/strong&gt;&lt;/Aviso&gt;</code>. O componente
+ficou menor e passou a aceitar qualquer conteúdo.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o conteúdo que sumiu na troca</h3>
+<p>Ela mudou a chamada para usar children e esqueceu de colocar <code>{children}</code> dentro do
+componente. A tela ficou sem o recado, e o console do navegador não reclamou de nada: para o React, o
+componente simplesmente não usou o que recebeu. O conserto é uma linha, e o sintoma — conteúdo que
+desaparece — vale memorizar.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: a tag fechada com o nome errado</h3>
+<p>Com pressa, ela fechou <code>&lt;Caixa&gt;</code> com <code>&lt;/div&gt;</code>. O código não
+compilou, e a mensagem apontou a linha do fechamento errado com o nome da tag que ficou aberta. Conserto:
+<code>&lt;/Caixa&gt;</code>. Em JSX, o nome da tag de fechamento não é decorativo — é verificação.</p>
+</div>
+
+<p>Quando o conteúdo não aparece, a ordem de conferência é curta. Primeiro, o componente renderiza
+<code>{children}</code> em algum lugar? Sem isso, nada chega à tela. Segundo, a chamada usa a tag com
+abertura e fechamento, e não a versão auto-fechada? Terceiro, o conteúdo está entre as tags certas — e
+não depois do fechamento, onde vira irmão do componente e aparece fora da moldura. Quatro em cada cinco
+casos caem no primeiro item.</p>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que é <code>children</code>?</p>
+<label><input type="radio" name="q1"> uma pasta onde ficam os componentes filhos do projeto</label>
+<label><input type="radio" name="q1"> o conteúdo escrito entre a tag de abertura e a de fechamento</label>
+<label><input type="radio" name="q1"> uma prop que só existe em componentes de classe</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O componente recebe
+<code>&lt;Aviso&gt;Sai às 6h&lt;/Aviso&gt;</code> mas não mostra nada. Qual é a causa provável?</p>
+<label><input type="radio" name="q2"> o texto precisa ir num atributo <code>texto</code></label>
+<label><input type="radio" name="q2"> children só funciona com elementos, não com texto</label>
+<label><input type="radio" name="q2"> falta renderizar <code>{children}</code> dentro do componente</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Quando é melhor usar uma prop com nome em vez de
+<code>children</code>?</p>
+<label><input type="radio" name="q3"> quando o componente precisa usar o valor para calcular ou decidir</label>
+<label><input type="radio" name="q3"> sempre, porque children é mais lento</label>
+<label><input type="radio" name="q3"> quando o conteúdo tem mais de uma palavra</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a moldura do recado</h2>
+<p>O componente <code>Moldura</code> recebe <code>children</code> e devolve uma <code>div</code> com a
+classe <code>moldura</code> e o conteúdo dentro. Complete a assinatura e depois responda: qual é o nome da
+prop que guarda o conteúdo entre as tags?</p>
+<div class="ex-code">function Moldura({ <input aria-label="resposta 1" data-answer="children" placeholder="..."> }) { return &lt;div className="moldura"&gt;{children}&lt;/div&gt;; }</div>
+<p class="ex-dica">Dica: é o nome que o React reserva para o que você escreve entre a tag de abertura e a
+de fechamento. Sem ele, o conteúdo não tem como chegar.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Tudo o que você escreve entre as tags de um componente chega numa prop chamada <code>children</code>.
+O componente decide onde colocar — e, se não colocar, o conteúdo some em silêncio. É o que transforma um
+componente em moldura: a forma fica com ele, o conteúdo fica com quem usa.</p>
+
+<p>children aceita texto, elemento, lista de elementos ou o resultado de uma expressão, e vale
+<code>undefined</code> quando não há conteúdo. Use children para o que o componente só precisa exibir; use
+prop com nome para o que ele precisa calcular, comparar ou posicionar com regra. E quando as duas coisas
+aparecem juntas, a chamada fica com atributos e conteúdo — cada um na sua porta.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>children</code> é o conteúdo entre a tag de abertura e a de fechamento.</li>
+<li>Renderize com <code>{children}</code>; o lugar no componente é escolha sua.</li>
+<li>É uma prop como as outras, só com nome reservado e sem atributo.</li>
+<li>Um filho ou vários: <code>{children}</code> desenha os dois casos.</li>
+<li>Sem conteúdo, <code>children</code> é <code>undefined</code> e não aparece nada.</li>
+<li>Componente que não usa <code>{children}</code> descarta o conteúdo, sem erro.</li>
+<li><code>&lt;Caixa /&gt;</code> não tem children; a tag precisa de abertura e fechamento.</li>
+<li>Nome errado no fechamento não compila: <em>Expected corresponding JSX closing tag</em>.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

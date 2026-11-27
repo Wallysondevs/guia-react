@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>As Regras do JSX | Guia React</title>
+<meta name="description" content="As regras do JSX uma por uma: tag sempre fechada, um pai só, fragmento invisível, aspas para texto, chaves para JavaScript, comentário com chaves e as mensagens de erro reais.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>As Regras do <span class="hl">JSX</span></h1>
+
+<p class="intro">O primeiro componente da Ana funcionou, e ela foi comemorar cedo demais: na segunda
+tentativa veio um erro que falava de "conteúdo não terminado", e ela passou vinte minutos olhando um
+parágrafo de duas linhas. O problema não era o parágrafo, era uma tag que não fechava. JSX parece HTML e
+não é: ele é traduzido para JavaScript, e a tradução exige regras. Nesta aula a Ana aprende as cinco
+regras que resolvem quase todo erro de sintaxe — e a ler as mensagens, que são feias mas dizem mais do
+que parecem.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que toda tag precisa fechar, inclusive as vazias como <code>&lt;br&gt;</code>.</li>
+  <li>Por que o componente devolve um pai só e o que o fragmento faz de diferente.</li>
+  <li>Quando usar aspas e quando usar chaves dentro de um atributo.</li>
+  <li>Como se escreve comentário dentro do JSX.</li>
+  <li>Que dentro das chaves cabe valor, não comando.</li>
+  <li>A ler as mensagens reais do compilador e achar a linha do problema.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o erro que não fala do problema</h2>
+
+<p>A Ana queria duas linhas no aviso da padaria. Escreveu o parágrafo com uma quebra no meio, do jeito
+que se faz em HTML há trinta anos:</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  return (
+    &lt;p&gt;Aberto das 6h às 18h&lt;br&gt;aos sábados até 13h&lt;/p&gt;
+  );
+}</pre>
+
+<p>E recebeu isto:</p>
+
+<pre class="term">Erro: não compilou: /App.jsx: Unterminated JSX contents. (3:54)</pre>
+
+<p>"Conteúdo JSX não terminado", na linha 3, coluna 54. A linha 3 é o parágrafo inteiro, e a coluna 54 é
+o fim dele — depois do <code>&lt;/p&gt;</code>. Nada disso aponta para o <code>&lt;br&gt;</code>, que é o
+culpado. A mensagem parece errada e não é: o compilador chegou ao fim do parágrafo ainda esperando o
+fechamento de alguma tag aberta, e o que ele sabia dizer era "não terminou".</p>
+
+<p>É assim que o JSX se comporta quando algo está fora do lugar: o erro aparece onde a leitura
+<em>parou</em>, não onde o problema <em>começou</em>. Saber disso muda a forma de procurar. Em vez de
+procurar na coluna indicada, procure a última tag que você abriu.</p>
+
+<h2>2. Regra 1: toda tag fecha</h2>
+
+<p>Em HTML, <code>&lt;br&gt;</code>, <code>&lt;img&gt;</code> e <code>&lt;input&gt;</code> vivem sem
+fechamento, e o navegador releva. Em JSX não existe relevar: cada tag aberta tem de ser fechada, e as
+que não têm conteúdo se fecham <em>nelas mesmas</em>, com uma barra antes do sinal de maior.</p>
+
+<dl class="anatomy">
+<dt>tag de abertura</dt>
+<dd>O começo de um elemento: <code>&lt;p&gt;</code>. Em JSX ela sempre tem um par.</dd>
+<dt>fechamento</dt>
+<dd>O fim do elemento: <code>&lt;/p&gt;</code>. Precisa combinar com a abertura, com a mesma palavra.</dd>
+<dt>auto-fechada</dt>
+<dd>A tag que já termina fechada: <code>&lt;br /&gt;</code>, <code>&lt;img /&gt;</code>. A barra antes
+do <code>&gt;</code> é obrigatória.</dd>
+<dt>fragmento</dt>
+<dd>Um pai invisível, escrito <code>&lt;&gt;...&lt;/&gt;</code>. Agrupa irmãos sem criar nó no HTML.</dd>
+<dt>expressão</dt>
+<dd>O que vai dentro das chaves: algo que produz um valor, como uma variável, uma conta ou um
+ternário.</dd>
+<dt>atributo</dt>
+<dd>Uma informação na tag: <code>src</code>, <code>alt</code>, <code>className</code>. O valor vem entre
+aspas ou entre chaves.</dd>
+</dl>
+
+<p>Por que tanta rigidez? Porque o HTML é lido por um analisador que foi feito para relevar: ele conhece
+as tags vazias e sabe fechar sozinho o que faltou. O JSX é lido por um tradutor que precisa produzir
+JavaScript válido, e JavaScript não tem esse perdão. Cada tag precisa virar uma chamada com começo e fim
+claros; sem o fechamento, não há como montar a chamada — e o tradutor desiste.</p>
+
+<div class="tryreact" data-goal="conta:br=1;;texto:aos sábados até 13h">
+  <p class="try-task">O aviso precisa de duas linhas, e a tag de quebra está sem fechamento. Escreva do
+  jeito que o JSX aceita — a mesma tag, fechada nela mesma.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;p&gt;Aberto das 6h às 18h&lt;br&gt;aos sábados até 13h&lt;/p&gt;
+  );
+}</pre>
+  <pre class="out">
+Erro: não compilou: /App.jsx: Unterminated JSX contents. (3:54)
+
+  1 | function App() {
+  2 |   return (
+&gt; 3 |     &lt;p&gt;Aberto das 6h às 18h&lt;br&gt;aos sábados até 13h&lt;/p&gt;
+    |                                                       ^
+  4 |   );
+  5 | }
+</pre>
+  <pre class="solucao">function App() {
+  return (
+    &lt;p&gt;Aberto das 6h às 18h&lt;br /&gt;aos sábados até 13h&lt;/p&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois de rodar, o painel mostra o parágrafo com o <code>&lt;br&gt;</code> dentro — e note que no
+painel ele aparece como <code>&lt;br&gt;</code>, sem a barra. É que o painel descreve o DOM, e no DOM a
+tag de quebra é assim mesmo. A barra é uma exigência da escrita JSX, não do resultado.</p>
+
+<p>A mesma regra vale para qualquer tag vazia: <code>&lt;img /&gt;</code>, <code>&lt;input /&gt;</code>,
+<code>&lt;hr /&gt;</code>. E vale para tags com conteúdo também: um <code>&lt;div&gt;</code> aberto
+precisa de um <code>&lt;/div&gt;</code> no lugar certo, e um <code>&lt;h1&gt;</code> fechado com
+<code>&lt;/h2&gt;</code> não é "quase certo" — é erro. O JSX não adivinha onde você queria fechar.</p>
+
+<h2>3. Regra 2: um pai só, e o fragmento como pai invisível</h2>
+
+<p>A segunda regra já apareceu na aula do primeiro componente: o <code>return</code> devolve
+<strong>um</strong> elemento. Dois irmãos soltos não cabem em uma única chamada de função, e o
+compilador avisa com a mensagem que você vai reconhecer de longe:
+<code>Adjacent JSX elements must be wrapped in an enclosing tag</code>.</p>
+
+<p>A solução mais óbvia é embrulhar tudo em uma <code>&lt;div&gt;</code>, e ela funciona — mas cria um
+elemento a mais no HTML. Às vezes isso não importa; às vezes importa muito, como dentro de um
+<code>&lt;table&gt;</code>, onde uma <code>div</code> no meio quebra a tabela. Para esses casos existe o
+<strong>fragmento</strong>: um pai que não vira nó nenhum.</p>
+
+<div class="tryreact" data-goal="conta:#raiz>div=0;;conta:h1=1;;conta:p=1">
+  <p class="try-task">O componente devolve dois elementos soltos e não compila. Embrulhe os dois em um
+  fragmento — <code>&lt;&gt;</code> para abrir e <code>&lt;/&gt;</code> para fechar — e confira no painel
+  que nenhuma <code>div</code> apareceu.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;h1&gt;Promoções&lt;/h1&gt;
+    &lt;p&gt;Pão quentinho saindo do forno&lt;/p&gt;
+  );
+}</pre>
+  <pre class="out">
+Erro: não compilou: /App.jsx: Adjacent JSX elements must be wrapped in an enclosing tag. Did you want a JSX fragment &lt;&gt;...&lt;/&gt;? (4:4)
+
+  2 |   return (
+  3 |     &lt;h1&gt;Promoções&lt;/h1&gt;
+&gt; 4 |     &lt;p&gt;Pão quentinho saindo do forno&lt;/p&gt;
+    |     ^
+  5 |   );
+  6 | }
+</pre>
+  <pre class="solucao">function App() {
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Promoções&lt;/h1&gt;
+      &lt;p&gt;Pão quentinho saindo do forno&lt;/p&gt;
+    &lt;/&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra os dois elementos lado a lado, sem casca:</p>
+
+<pre class="term">&lt;h1&gt;Promoções&lt;/h1&gt;
+&lt;p&gt;Pão quentinho saindo do forno&lt;/p&gt;</pre>
+
+<p>É exatamente o que se quer. O fragmento é um pai para o compilador e um nada para o navegador. Se
+você tivesse usado uma <code>div</code>, o painel mostraria a <code>div</code> em volta, e qualquer CSS
+que contasse filhos ou qualquer leiaute que dependesse da estrutura precisaria de um ajuste a mais.</p>
+
+<p>Existe também a forma escrita por extenso, <code>&lt;Fragment&gt;...&lt;/Fragment&gt;</code>, que faz
+o mesmo. Ela serve quando o fragmento precisa receber a <code>key</code> — assunto de listas — e é a
+única diferença prática entre as duas. No dia a dia, <code>&lt;&gt;...&lt;/&gt;</code> é o que se
+digita.</p>
+
+<h2>4. Regra 3: aspas para texto, chaves para JavaScript</h2>
+
+<p>Dentro de um atributo, existe uma separação rígida. Se o valor é <em>texto fixo</em>, vão aspas. Se
+o valor vem de uma <em>variável ou conta</em>, vão chaves. As duas formas não se misturam: aspas com
+chaves dentro viram texto literal, e é aí que muita gente se perde.</p>
+
+<pre class="file" data-file="App.jsx">const arquivo = "pao.jpg";
+
+&lt;img src="arquivo" /&gt;      // src vira o texto "arquivo"
+&lt;img src={arquivo} /&gt;      // src vira o valor da variável</pre>
+
+<p>A primeira linha é o erro clássico: a imagem não carrega porque o navegador procura um arquivo
+chamado literalmente <code>arquivo</code>. Dá para ver a diferença no painel, que mostra o atributo
+final:</p>
+
+<div class="tryreact" data-goal="attr:img|src=pao.jpg;;attr:img|alt=Pão quentinho">
+  <p class="try-task">A variável <code>arquivo</code> guarda o nome do arquivo da foto, mas o
+  <code>src</code> está com o texto "arquivo". Use chaves para passar o valor da variável.</p>
+  <pre class="jsx">function App() {
+  const arquivo = "pao.jpg";
+  return (
+    &lt;figure&gt;
+      &lt;img src="arquivo" alt="Pão quentinho" /&gt;
+      &lt;figcaption&gt;Pão francês&lt;/figcaption&gt;
+    &lt;/figure&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;figure&gt;
+  &lt;img alt="Pão quentinho" src="arquivo"&gt;
+  &lt;figcaption&gt;Pão francês&lt;/figcaption&gt;
+&lt;/figure&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const arquivo = "pao.jpg";
+  return (
+    &lt;figure&gt;
+      &lt;img src={arquivo} alt="Pão quentinho" /&gt;
+      &lt;figcaption&gt;Pão francês&lt;/figcaption&gt;
+    &lt;/figure&gt;
+  );
+}</pre>
+</div>
+
+<p>Há um caso intermediário que confunde: <code>src={"pao.jpg"}</code> com chaves e o texto entre aspas
+dentro. Também funciona, porque dentro das chaves você está em JavaScript, e uma string é JavaScript
+válido. Na prática, aspas diretas são mais curtas quando o valor é fixo — e chaves são obrigatórias
+quando vem de variável.</p>
+
+<p>Uma nota sobre atributo sem nada: <code>src=pao.jpg</code>, sem aspas e sem chaves, não compila. A
+mensagem é <code>JSX value should be either an expression or a quoted JSX text</code> — "o valor do JSX
+tem de ser uma expressão ou um texto entre aspas". É literal: ou um dos dois, nunca um terceiro.</p>
+
+<h2>5. Regra 4: os nomes não são os do HTML</h2>
+
+<p>Quem vem do HTML escreve <code>class</code>, <code>for</code> e <code>onclick</code>. No JSX esses
+nomes não são os nomes: como o JSX vira JavaScript, os atributos se chamam <code>className</code>,
+<code>htmlFor</code> e <code>onClick</code>. A regra por trás é simples — são <em>propriedades de um
+objeto</em> JavaScript, então usam a convenção do JavaScript, que é a letra maiúscula no meio da
+palavra.</p>
+
+<p>A lista é curta e a próxima aula é só sobre ela, com as conversões e os detalhes. Por enquanto,
+guarde a regra geral: se o nome do atributo tem duas palavras no HTML original, no JSX ele costuma virar
+uma palavra só com maiúscula no meio. E <code>class</code> vira <code>className</code> porque
+<code>class</code> é palavra reservada do JavaScript — o mesmo motivo para <code>for</code> virar
+<code>htmlFor</code>.</p>
+
+<p>Uma consequência que surpreende: o JSX diferencia maiúscula de minúscula também nas tags.
+<code>&lt;div&gt;</code> é a tag do HTML; <code>&lt;Div&gt;</code> é uma função chamada
+<code>Div</code>, que ninguém definiu. O resultado não é um erro na tela: é nada. O React tenta chamar
+uma função que não existe, o desenho falha e o painel mostra que nada foi desenhado.</p>
+
+<h2>6. Regra 5: comentário é chaves com barra e asterisco</h2>
+
+<p>Comentário de HTML, <code>&lt;!-- assim --&gt;</code>, não existe no JSX: dentro do
+<code>return</code> só pode haver elementos e expressões, e o compilador responde com
+<code>Unexpected token</code>. Comentário de JavaScript de barra dupla também não funciona direto,
+porque ele só vai até o fim da linha — e o fim da linha, ali, ainda está dentro do JSX.</p>
+
+<p>A forma correta é um comentário de JavaScript dentro de um par de chaves:
+<code>{/* assim */}</code>. As chaves avisam que ali começa uma expressão; a barra e o asterisco
+avisam que não há nada dentro, só um recado para quem lê.</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  return (
+    &lt;div&gt;
+      {/* o aviso de promoção saiu do ar em março */}
+      &lt;p&gt;Pão quentinho saindo do forno&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>O comentário não aparece na tela e não aparece no painel: ele é apagado na tradução. É uma das poucas
+coisas do JSX que não têm representação nenhuma no HTML gerado.</p>
+
+<p>Existe um jeito alternativo, com barra dupla, mas ele depende de o fechamento ficar na linha
+seguinte — o que só funciona porque a quebra de linha termina o comentário antes da chave. É frágil e
+não vale a pena: use <code>{/* */}</code> sempre. Você vai reconhecer essa forma em todo código React do
+mundo, inclusive nos que comentam uma linha inteira para testar alguma coisa.</p>
+
+<p>Para comentar um bloco inteiro de elementos, a mesma forma serve: abra as chaves antes do primeiro
+elemento e feche depois do último. O compilador trata tudo o que está lá dentro como um recado, e o bloco
+desaparece do HTML gerado — o que é ótimo para testar uma hipótese ("será que o problema é este pedaço?")
+sem apagar nada. Só lembre de que comentar não é o mesmo que esconder: se o elemento aparece na tela, ele
+não está comentado.</p>
+
+<h2>7. Dentro das chaves cabe valor, não comando</h2>
+
+<p>As chaves abrem uma porta para o JavaScript, e essa porta tem uma limitação que confunde: ali dentro
+cabe uma <strong>expressão</strong> — algo que produz um valor — e não um <strong>comando</strong>.
+Parece preciosismo e não é: <code>{if (x) ...}</code> e <code>{for (...) ...}</code> não compilam,
+enquanto <code>{x ? "sim" : "não"}</code> e <code>{x &amp;&amp; "sim"}</code> compilam.</p>
+
+<p>A diferença é a de sempre em JavaScript: um comando manda fazer algo e não vale como valor; uma
+expressão vale. <code>if</code> não vale nada; o ternário vale. O JSX espera um valor para colocar no
+lugar, então só aceita expressões.</p>
+
+<p>Na prática você não vai sentir falta de <code>if</code>. Para escolher entre duas coisas, o ternário
+resolve; para mostrar ou não, o <code>&amp;&amp;</code> resolve; para decidir antes do
+<code>return</code>, você usa <code>if</code> fora do JSX, na parte em JavaScript do componente. Cada
+uma dessas formas tem sua aula mais adiante — aqui basta saber qual porta dá erro e qual não dá.</p>
+
+<h2>8. As mensagens reais, traduzidas</h2>
+
+<p>Estas são as mensagens que o compilador realmente devolve, copiadas do motor do guia. Elas são em
+inglês e falam de coisas que você não escreveu, mas cada uma aponta para um problema bem específico:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem</th><th>O que aconteceu</th><th>Como consertar</th></tr>
+<tr><td><code>Unterminated JSX contents</code></td><td>alguma tag ficou aberta</td><td>feche a última tag que você abriu, mesmo as vazias (<code>&lt;br /&gt;</code>)</td></tr>
+<tr><td><code>Adjacent JSX elements must be wrapped in an enclosing tag</code></td><td>dois irmãos soltos no <code>return</code></td><td>envolva em <code>&lt;div&gt;</code> ou em <code>&lt;&gt;...&lt;/&gt;</code></td></tr>
+<tr><td><code>JSX value should be either an expression or a quoted JSX text</code></td><td>atributo sem aspas e sem chaves</td><td><code>src="pao.jpg"</code> ou <code>src={arquivo}</code></td></tr>
+<tr><td><code>Unexpected token</code></td><td>comentário de HTML, barra dupla na mesma linha, <code>if</code> dentro das chaves</td><td>use <code>{/* */}</code> e expressões no lugar de comandos</td></tr>
+</table>
+</div>
+
+<p>Repare que a primeira mensagem cobre vários casos: tag vazia sem barra, <code>div</code> sem fechar,
+fechamento trocado. O compilador não tenta adivinhar qual dos três você fez — ele só sabe que chegou ao
+fim esperando algo. Por isso a leitura certa é "procure a última tag aberta", e não "conserte a coluna
+indicada".</p>
+
+<p>Além da mensagem, o painel mostra um pedaço do seu arquivo com um sinal embaixo da linha problemática.
+Esse desenho se chama moldura de código, e é o que mais ajuda quando a mensagem é genérica: o sinal aponta
+a coluna exata em que a leitura parou. Nas caixas do guia ele aparece sempre abaixo do
+<code>Erro: não compilou</code>, com a linha numerada à esquerda. Vale olhar a moldura antes de reler o
+código inteiro: em três de cada quatro casos, o problema está na linha anterior à marcada.</p>
+
+<p>Há ainda as mensagens que aparecem no console do navegador, e não no painel. Elas nascem na hora de
+desenhar, não na tradução: um atributo com nome estranho, uma lista sem identificação, um texto que
+deveria ser número. Nesse caso o código compila, o componente roda e o React reclama de um detalhe
+específico. Aqui nas caixas o painel mostra o HTML gerado mesmo assim, e é nele que você percebe o que
+saiu errado.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Regra</th><th>Não compila</th><th>Compila</th></tr>
+<tr><td>toda tag fecha</td><td><code>&lt;br&gt;</code></td><td><code>&lt;br /&gt;</code></td></tr>
+<tr><td>um pai só</td><td>dois elementos soltos no <code>return</code></td><td><code>&lt;&gt;...&lt;/&gt;</code> em volta</td></tr>
+<tr><td>valor de atributo</td><td><code>src=arquivo</code></td><td><code>src="arquivo"</code> ou <code>src={arquivo}</code></td></tr>
+<tr><td>comentário</td><td><code>&lt;!-- --&gt;</code> e <code>{// }</code> na mesma linha</td><td><code>{/* */}</code></td></tr>
+<tr><td>conteúdo das chaves</td><td><code>{if (x) "a"}</code></td><td><code>{x ? "a" : "b"}</code></td></tr>
+<tr><td>maiúscula importa</td><td><code>&lt;Div&gt;</code> sem definir <code>Div</code></td><td><code>&lt;div&gt;</code> ou o componente definido</td></tr>
+</table>
+</div>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o erro aponta para a linha errada</h3>
+<p>A Ana tinha três tags na linha 8 e o erro falava da linha 12. O compilador só percebe o problema
+quando chega ao fim do bloco, então a linha citada é quase sempre depois do culpado. O método que
+funciona: apague metade do JSX e rode. Se compilar, o problema estava na metade apagada. Repita até
+sobrar uma linha. É força bruta e é mais rápido do que reler trinta linhas.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: fragmento ou div?</h3>
+<p>Use fragmento por padrão e div quando precisar de um lugar para pôr classe ou estilo. A div existe no
+DOM e serve de caixa; o fragmento não existe e serve só de pai para o compilador. O caso em que isso
+deixa de ser preferência: dentro de <code>&lt;table&gt;</code>, <code>&lt;ul&gt;</code> e de qualquer pai
+que só aceite filhos específicos, uma div no meio é um erro de estrutura — ali o fragmento é obrigatório.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: colou HTML de outro lugar e nada funciona</h3>
+<p>HTML copiado de um site traz <code>class</code>, <code>style="..."</code> e comentários
+<code>&lt;!-- --&gt;</code>. Os três quebram ou falham silenciosamente no JSX. A conversão é mecânica:
+<code>class</code> vira <code>className</code>, <code>style</code> vira um objeto entre chaves, e
+comentário vira <code>{/* */}</code>. Depois disso, boa parte do HTML colado roda sem mais nenhum
+ajuste — o resto é a próxima aula.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="1"><p class="mc-q">1. O que fazer com <code>&lt;br&gt;</code> dentro do
+JSX?</p>
+<label><input type="radio" name="q1"> fechar nele mesmo: <code>&lt;br /&gt;</code></label>
+<label><input type="radio" name="q1"> deixar como está: o navegador entende</label>
+<label><input type="radio" name="q1"> trocar por <code>&lt;br&gt;&lt;/br&gt;</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que o fragmento <code>&lt;&gt;...&lt;/&gt;</code>
+deixa no HTML gerado?</p>
+<label><input type="radio" name="q2"> uma <code>div</code> sem classe</label>
+<label><input type="radio" name="q2"> um comentário indicando o agrupamento</label>
+<label><input type="radio" name="q2"> nada: ele só serve de pai para o compilador</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. Como se escreve um comentário dentro do JSX?</p>
+<label><input type="radio" name="q3"> <code>&lt;!-- assim --&gt;</code></label>
+<label><input type="radio" name="q3"> <code>{/* assim */}</code></label>
+<label><input type="radio" name="q3"> <code>// assim</code> na mesma linha, antes do fechamento</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o valor que vem da variável</h2>
+<p>A variável <code>nome</code> guarda o nome da padaria. Complete o atributo para que ele use a
+variável, e não o texto fixo:</p>
+<div class="ex-code">&lt;h1 title=<input aria-label="resposta 1" data-answer="{nome}" placeholder="...">&gt;Padaria da Ana&lt;/h1&gt;</div>
+<p class="ex-dica">Dica: são chaves em volta do nome da variável. Com aspas, o título viraria a palavra
+"nome" em vez do valor guardado nela.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>JSX parece HTML, mas é traduzido para JavaScript, e por isso tem regras mais rígidas. Toda tag fecha;
+as vazias se fecham nelas mesmas com uma barra. O <code>return</code> devolve um pai só, e quando você
+não quer criar nó nenhum, o fragmento <code>&lt;&gt;...&lt;/&gt;</code> serve de pai invisível. Em
+atributo, aspas são para texto fixo e chaves são para valores de JavaScript.</p>
+
+<p>Os nomes dos atributos seguem a convenção do JavaScript — <code>className</code>,
+<code>htmlFor</code>, <code>onClick</code> —, e a maiúscula também separa tag de componente:
+<code>&lt;div&gt;</code> é HTML, <code>&lt;Div&gt;</code> é uma função que você precisa ter definido.
+Comentário só existe como <code>{/* */}</code>, e dentro das chaves cabe expressão, não comando.</p>
+
+<p>E a habilidade que vale mais do que decorar as regras: ler a mensagem. <code>Unterminated JSX
+contents</code> quer dizer "tem tag aberta"; <code>Adjacent JSX elements</code> quer dizer "dois irmãos
+sem pai"; <code>JSX value should be either an expression or a quoted JSX text</code> quer dizer
+"faltaram as aspas ou as chaves". A linha indicada é onde a leitura parou, não onde o problema está.</p>
+
+<p>Com essas cinco regras você escreve JSX sem tropeçar no básico. A próxima aula é sobre o que vai
+dentro das chaves — os valores, as contas e as escolhas que fazem a tela mudar de conteúdo sem mudar de
+estrutura.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Toda tag fecha; as vazias terminam com <code>/&gt;</code>.</li>
+<li>Um pai só por <code>return</code>; o fragmento não cria nó.</li>
+<li>Aspas para texto, chaves para variável ou conta.</li>
+<li>Atributo é camelCase: <code>className</code>, <code>htmlFor</code>, <code>onClick</code>.</li>
+<li>Maiúscula no começo do nome = componente seu.</li>
+<li>Comentário é <code>{/* */}</code>, nunca <code>&lt;!-- --&gt;</code>.</li>
+<li>Nas chaves cabe expressão; <code>if</code> e <code>for</code> ficam fora do JSX.</li>
+<li>A linha do erro é onde a leitura parou: procure a tag aberta antes dela.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

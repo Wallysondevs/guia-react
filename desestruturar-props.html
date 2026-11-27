@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Desestruturar Props | Guia React</title>
+<meta name="description" content="Desestruturar props no React: trocar props.nome por { nome } no parâmetro, desestruturar objeto aninhado, renomear com dois-pontos e os tropeços de nome.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Desestruturar</span> Props</h1>
+<p class="intro">O cartão da Ana já recebe um objeto com nome, preço, descrição e peso. Funciona, mas o
+componente ficou cheio de <code>props.pao.nome</code>, <code>props.pao.preco</code>,
+<code>props.pao.descricao</code> — a palavra <code>props</code> aparece em toda linha e o olho não
+encontra mais o que importa. Nesta aula ela aprende o atalho que o JavaScript oferece: pegar as chaves do
+objeto de uma vez, no próprio parâmetro da função, e usar só os nomes nus dentro do componente. É menos
+letra, mesma tela.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é desestruturar um objeto, com um exemplo fora do React.</li>
+  <li>Como fazer isso no parâmetro: <code>function Cartao({ nome, preco })</code>.</li>
+  <li>Por que o contrato com quem chama continua igual.</li>
+  <li>Como desestruturar um nível mais fundo: <code>{ pao: { nome } }</code>.</li>
+  <li>Como renomear uma prop na entrada: <code>{ nome: titulo }</code>.</li>
+  <li>Quando desestruturar no corpo da função, em vez do parâmetro.</li>
+  <li>Os tropeços de quem mistura <code>props</code> com os nomes nus.</li>
+</ul>
+</div>
+
+<h2>1. A cena: a palavra props em toda linha</h2>
+
+<p>Este é o componente da Ana depois da aula de objetos. Ele funciona perfeitamente, e é cansativo de
+ler:</p>
+
+<pre class="file" data-file="App.jsx">function Cartao(props) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{props.pao.nome}&lt;/h2&gt;
+      &lt;p&gt;{props.pao.descricao}&lt;/p&gt;
+      &lt;p&gt;{props.pao.peso} · {props.pao.preco}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Conte as vezes em que <code>props.pao</code> aparece: quatro. Agora imagine o cartão de um produto de
+verdade, com doze campos. A palavra se repete doze vezes, e cada repetição é uma chance de errar uma
+letra. Pior: o que muda de um campo para outro — <code>nome</code>, <code>descricao</code>,
+<code>peso</code> — fica escondido no meio do caminho.</p>
+
+<p>Há também um custo que não aparece na tela: reler. Semana que vem, quando o cartão tiver um campo
+novo, você vai passar os olhos por essas linhas procurando onde mexer. Cada <code>props.pao.</code> no
+meio do caminho é ruído igual, e o cérebro gasta energia para ignorá-lo. Código que se lê rápido é código
+que se corrige rápido — e essa economia vale mais do que parece quando o projeto cresce.</p>
+
+<p>O JavaScript tem um recurso feito exatamente para isso, e ele não é do React: chama-se
+<strong>desestruturação</strong>. A ideia é pegar um objeto e “abrir” as chaves em variáveis, de uma vez
+só. Em vez de escrever o caminho completo a cada uso, você declara uma vez quais campos quer e usa os
+nomes direto. O componente fica mais curto e mais fácil de ler.</p>
+
+<p>E tem um efeito colateral bom: quando as props aparecem no começo da função, quem lê o componente
+sabe imediatamente o que ele espera receber. É a documentação que não desatualiza, porque está no lugar
+onde o código roda.</p>
+
+<h2>2. Desestruturar, sem React no meio</h2>
+
+<p>Antes de aplicar no componente, veja o mecanismo sozinho. Um objeto com dois campos:</p>
+
+<pre class="file" data-file="exemplo.js">const pao = { nome: "Pão francês", preco: "R$ 1,20" };
+
+const { nome, preco } = pao;
+console.log(nome);   // Pão francês
+console.log(preco);  // R$ 1,20</pre>
+
+<p>A linha <code>const { nome, preco } = pao;</code> diz: “crie duas variáveis, <code>nome</code> e
+<code>preco</code>, e preencha cada uma com o valor da chave de mesmo nome dentro de <code>pao</code>”.
+As chaves da esquerda não são um objeto sendo criado — são uma lista de nomes sendo declarada. É por isso
+que não há dois-pontos nem vírgula depois do último nome.</p>
+
+<dl class="anatomy">
+<dt>desestruturar</dt>
+<dd>Abrir um objeto (ou lista) em variáveis. <code>const { nome } = pao</code> cria a variável
+<code>nome</code> com o valor de <code>pao.nome</code>.</dd>
+<dt>lista de nomes</dt>
+<dd>O que vai entre as chaves: <code>{ nome, preco }</code>. Cada nome vira uma variável, na ordem que
+você quiser.</dd>
+<dt>renomear</dt>
+<dd>Usar dois-pontos para dar outro nome à variável: <code>{ nome: titulo }</code> lê a chave
+<code>nome</code> e guarda em <code>titulo</code>.</dd>
+<dt>aninhado</dt>
+<dd>Desestruturar dentro de outro objeto: <code>{ pao: { nome } }</code> pega
+<code>props.pao.nome</code> direto em <code>nome</code>.</dd>
+<dt>parâmetro</dt>
+<dd>O que a função recebe. No React, o parâmetro é o objeto de props — e pode ser desestruturado ali
+mesmo.</dd>
+</dl>
+
+<p>Três detalhes de comportamento que evitam dúvida. A ordem dos nomes não importa:
+<code>{ preco, nome }</code> produz as mesmas duas variáveis. Chave que sobra no objeto é simplesmente
+ignorada — desestruturar <code>{ nome }</code> de um objeto com dez campos não dá erro nenhum. E você
+pode declarar só o que vai usar: não é preciso listar tudo. A desestruturação não valida nada; ela só
+copia, por nome, o que você pediu.</p>
+
+<p>Uma consequência que vale guardar: a desestruturação procura a chave pelo nome. Se o objeto não tem
+aquela chave, a variável existe e vale <code>undefined</code> — não dá erro. É o mesmo comportamento que
+você já viu com <code>props.nome</code>, e é a origem de metade dos cartões em branco desta aula.</p>
+
+<h2>3. Desestruturar no parâmetro</h2>
+
+<p>O parâmetro da função é um objeto, então pode ser desestruturado como qualquer outro. A escrita é a
+mesma: chaves no lugar do nome do parâmetro. E aqui aparece o primeiro tropeço de quem faz a troca pela
+metade — a assinatura muda, o corpo continua falando de <code>props</code>.</p>
+
+<div class="tryreact" data-goal="texto:Pão francês;;html:&lt;h2&gt;Pão francês&lt;/h2&gt;">
+  <p class="try-task">A assinatura já desestrutura <code>nome</code>, mas o corpo ainda usa
+  <code>props.nome</code>, que não existe mais. Use o nome nu dentro do JSX.</p>
+  <pre class="jsx">function Cartao({ nome }) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{props.nome}&lt;/h2&gt;
+      &lt;p&gt;R$ 1,20&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return &lt;Cartao nome="Pão francês" /&gt;;
+}</pre>
+  <pre class="out">
+(o React não desenhou nada: o componente devolveu null?)
+</pre>
+  <pre class="solucao">function Cartao({ nome }) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{nome}&lt;/h2&gt;
+      &lt;p&gt;R$ 1,20&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return &lt;Cartao nome="Pão francês" /&gt;;
+}</pre>
+</div>
+
+<p>Antes da correção, o painel avisa que o React não desenhou nada — é o sintoma de um erro que
+aconteceu antes do <code>return</code>. E não é por causa da desestruturação: é porque <code>props</code>
+deixou de existir. Quando o parâmetro é <code>{ nome }</code>, não há nenhuma variável chamada
+<code>props</code> dentro da função — só <code>nome</code>. O React não sabe que você quis dizer “as
+props”; o JavaScript procura uma variável com esse nome, não encontra e para a execução. No navegador, o
+console do DevTools mostra a mensagem exata: <em>props is not defined</em>.</p>
+
+<p>Essa é a diferença entre os dois estilos, em uma frase: com <code>props</code>, você percorre o objeto
+com pontos; com <code>{ nome }</code>, você já tem os valores soltos. Os dois mostram a mesma coisa na
+tela. O segundo é mais curto e é o que você vai encontrar em quase todo código React moderno.</p>
+
+<p>Se você está convertendo um componente agora, faça em dois passos e rode depois de cada um. Primeiro
+troque a assinatura; o painel vai ficar vazio, e isso é esperado. Depois troque os usos dentro do JSX.
+Dois passos pequenos com uma conferência no meio acham o erro mais rápido do que uma edição grande com
+três mudanças de uma vez.</p>
+
+<h2>4. O contrato com quem chama não mudou</h2>
+
+<p>Talvez a parte mais importante desta aula: desestruturar <strong>não muda</strong> a forma de chamar o
+componente. A página continua escrevendo <code>nome="Pão francês"</code>, e a chave continua se chamando
+<code>nome</code>. O que mudou foi só como o componente lê o que chegou.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na chamada</th><th>Na assinatura</th><th>No JSX</th></tr>
+<tr><td><code>nome="Pão"</code></td><td><code>function Cartao({ nome })</code></td><td><code>{nome}</code></td></tr>
+<tr><td><code>nome="Pão" preco="R$ 1"</code></td><td><code>function Cartao({ nome, preco })</code></td><td><code>{nome}</code> e <code>{preco}</code></td></tr>
+<tr><td><code>pao={{ nome: "Pão" }}</code></td><td><code>function Cartao({ pao })</code></td><td><code>{pao.nome}</code></td></tr>
+<tr><td><code>pao={{ nome: "Pão" }}</code></td><td><code>function Cartao({ pao: { nome } })</code></td><td><code>{nome}</code></td></tr>
+<tr><td><code>nome="Pão"</code></td><td><code>function Cartao({ nome: titulo })</code></td><td><code>{titulo}</code></td></tr>
+<tr><td>nada</td><td><code>function Cartao({ nome })</code></td><td><code>{nome}</code> vale <code>undefined</code></td></tr>
+</table>
+</div>
+
+<p>A tabela é a ponte entre as duas aulas anteriores e esta. A coluna do meio é a única que muda; as
+outras duas continuam iguais. Guarde a leitura: o nome à esquerda dos dois-pontos é sempre a chave que
+existe no objeto, e o nome à direita é a variável que você vai usar no código.</p>
+
+<p>Vale notar que a escolha é local, por componente. O mesmo objeto de props pode ser lido com pontos
+num componente e desestruturado no outro, na mesma página. Não existe um “jeito certo” global: existe o
+jeito que deixa aquele componente legível. Em código de equipe, o mais comum é padronizar — e o padrão
+moderno é desestruturar no parâmetro quando o componente usa poucas props.</p>
+
+<p>É por isso que a desestruturação é segura de adotar aos poucos. Você pode converter um componente hoje
+e deixar o vizinho do jeito antigo — os dois funcionam na mesma página, porque a chamada não muda. E se
+um dia cansar, dá para voltar: é só trocar a assinatura por <code>props</code> e os nomes nus por
+<code>props.nome</code>.</p>
+
+<h2>5. Um nível mais fundo</h2>
+
+<p>Quando a prop é um objeto, a desestruturação pode descer junto. Em vez de receber
+<code>pao</code> e depois andar com pontos, você declara o caminho inteiro de uma vez. É o caso mais
+comum em projeto de verdade, porque quase todo dado chega agrupado.</p>
+
+<div class="tryreact" data-goal="texto:Pão francês;;html:&lt;h2&gt;Pão francês&lt;/h2&gt;">
+  <p class="try-task">A página passa <code>pao={{ nome: "Pão francês" }}</code>, mas a assinatura procura
+  uma prop <code>nome</code> que não existe. Desestruture um nível: <code>{ pao: { nome } }</code>.</p>
+  <pre class="jsx">function Cartao({ nome }) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{nome}&lt;/h2&gt;
+      &lt;p&gt;R$ 1,20&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return &lt;Cartao pao={{ nome: "Pão francês" }} /&gt;;
+}</pre>
+  <pre class="out">
+&lt;div class="cartao"&gt;
+  &lt;h2&gt;&lt;/h2&gt;
+  &lt;p&gt;R$ 1,20&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Cartao({ pao: { nome } }) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{nome}&lt;/h2&gt;
+      &lt;p&gt;R$ 1,20&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return &lt;Cartao pao={{ nome: "Pão francês" }} /&gt;;
+}</pre>
+</div>
+
+<p>Leia a assinatura em voz alta: “recebo um objeto; dele, quero a chave <code>pao</code>; dentro dela,
+quero a chave <code>nome</code>; guarde em <code>nome</code>”. O dois-pontos aqui não renomeia — ele
+<em>entra</em> no objeto. É a mesma ideia do caminho com pontos, escrita de uma vez só.</p>
+
+<p>Vale saber o risco: se a prop <code>pao</code> não vier, a desestruturação de dentro quebra, porque
+não há objeto para abrir. O sintoma é o mesmo de sempre — tela vazia, sem mensagem clara no painel. Nas
+primeiras semanas, prefira desestruturar um nível (<code>{ pao }</code> e <code>{pao.nome}</code>) e
+desça mais só quando o componente já estiver funcionando. Menos elegante, mais fácil de consertar.</p>
+
+<h2>6. Renomear com dois-pontos</h2>
+
+<p>Às vezes a chave tem um nome que não serve dentro do componente. Pode ser um nome reservado, um nome
+comprido ou simplesmente um nome que colide com outra variável. A desestruturação permite ler a chave e
+guardar com outro nome — e é aí que o dois-pontos aparece com o segundo significado dele.</p>
+
+<div class="tryreact" data-goal="attr:span|class=etiqueta amber;;texto:Novo">
+  <p class="try-task">A chamada passa <code>fundo="amber"</code>, mas a assinatura procura <code>cor</code>
+  com o nome <code>fundo</code>. Alinhe a assinatura com a chamada, mantendo o uso de
+  <code>fundo</code>.</p>
+  <pre class="jsx">function Etiqueta({ texto, cor: fundo }) {
+  return &lt;span className={"etiqueta " + fundo}&gt;{texto}&lt;/span&gt;;
+}
+
+function App() {
+  return &lt;Etiqueta texto="Novo" fundo="amber" /&gt;;
+}</pre>
+  <pre class="out">
+&lt;span class="etiqueta undefined"&gt;Novo&lt;/span&gt;
+</pre>
+  <pre class="solucao">function Etiqueta({ texto, fundo }) {
+  return &lt;span className={"etiqueta " + fundo}&gt;{texto}&lt;/span&gt;;
+}
+
+function App() {
+  return &lt;Etiqueta texto="Novo" fundo="amber" /&gt;;
+}</pre>
+</div>
+
+<p>Antes, a classe saía como <code>etiqueta undefined</code>, porque <code>cor</code> não existia no
+objeto e <code>fundo</code> ficava sem valor. A missão confere o atributo <code>class</code> do
+<code>span</code>, e não só o texto: é o jeito de provar que o valor chegou de verdade.</p>
+
+<p>Repare que a missão podia ser resolvida dos dois lados: mudando a assinatura para <code>{ fundo }</code>
+ou mudando a chamada para <code>cor="amber"</code>. As duas funcionam. O que não funciona é deixar um lado
+com <code>cor</code> e o outro com <code>fundo</code> — e é exatamente esse desencontro que a variante
+<code>cor: fundo</code> produz quando a chave não existe: a variável é criada, mas vazia.</p>
+
+<p>Quando renomear ajuda? Quando a prop se chama <code>className</code> e você quer usar
+<code>classe</code>; quando o dado se chama <code>nome</code> e dentro do cartão você quer
+<code>titulo</code>; quando duas props trariam variáveis de mesmo nome. A regra de leitura é uma só: à
+esquerda, a chave que veio; à direita, o nome local. Se os dois nomes forem iguais, não precisa de
+dois-pontos.</p>
+
+<h2>7. No parâmetro ou no corpo?</h2>
+
+<p>Há duas formas de desestruturar, e as duas são válidas. No parâmetro, como você viu:</p>
+
+<pre class="file" data-file="App.jsx">function Cartao({ nome, preco }) {
+  return &lt;h2&gt;{nome}&lt;/h2&gt;;
+}</pre>
+
+<p>E no corpo da função, logo depois da abertura:</p>
+
+<pre class="file" data-file="App.jsx">function Cartao(props) {
+  const { nome, preco } = props;
+  return &lt;h2&gt;{nome}&lt;/h2&gt;;
+}</pre>
+
+<p>A diferença prática é o que fica disponível. No parâmetro, você perde a referência ao objeto
+<code>props</code> inteiro — o que quase nunca faz falta, mas faz quando você precisa repassar todas as
+props para outro componente. No corpo, o objeto continua ali: dá para desestruturar algumas chaves, usar
+<code>Object.keys(props)</code> para conferir o que chegou e repassar o resto adiante.</p>
+
+<p>O segundo estilo tem uma vantagem prática que o primeiro não tem: depois de pegar as chaves que
+interessam, você ainda pode guardar o resto. Os três pontos, do lado esquerdo da desestruturação, fazem o
+papel inverso do espalhamento da aula anterior — juntam o que sobrou num objeto novo. É útil quando o
+componente repassa as props para um filho sem saber quais são.</p>
+
+<pre class="file" data-file="App.jsx">function Cartao({ nome, ...resto }) {
+  console.log("resto: " + JSON.stringify(resto));
+  return &lt;h2&gt;{nome}&lt;/h2&gt;;
+}</pre>
+
+<p>Numa chamada com três props, o nome sai separado e o resto vira um objeto com as duas que sobraram:
+<code>resto</code> vale <code>{"preco":"R$ 1,20","peso":"80 g"}</code>. É a prova de que a
+desestruturação não perde nada — o que você não pediu continua disponível, agrupado. Essa é a base dos
+componentes que repassam props: pegam o que precisam e espalham <code>{...resto}</code> no filho.</p>
+
+<pre class="term">console: nome: Pão francês, preco: R$ 1,20</pre>
+
+<p>A linha acima veio de um componente que recebeu <code>props</code> e desestruturou no corpo:
+<code>const { nome, preco } = props;</code> seguido de um <code>console.log</code> com os dois valores.
+É o mesmo resultado de desestruturar no parâmetro — a diferença é que aqui a função ainda tem acesso ao
+objeto inteiro, caso precise conferir ou repassar.</p>
+
+<p>Escolha pelo tamanho. Componente pequeno, que só usa duas ou três props: no parâmetro, e o código
+começa mais limpo. Componente que precisa inspecionar o objeto, repassar tudo ou aplicar valores padrão
+mais elaborados: no corpo, com a desestruturação na primeira linha. E não misture os dois no mesmo
+componente sem motivo — é a receita para ler <code>props.nome</code> num lugar onde a variável se chama
+<code>nome</code>.</p>
+
+<h2>8. Os tropeços de quem desestrutura</h2>
+
+<p>Quase todos os problemas desta aula vêm de uma confusão só: o que existe dentro da função depois da
+assinatura. Com <code>props</code>, existe o objeto; com <code>{ nome }</code>, existem as variáveis
+soltas e mais nada. Trocar a assinatura sem trocar o corpo é o erro número um.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você escreveu</th><th>O que acontece</th><th>O conserto</th></tr>
+<tr><td>assinatura <code>{ nome }</code> e corpo <code>{props.nome}</code></td><td>tela vazia: <code>props</code> não existe</td><td>use <code>{nome}</code></td></tr>
+<tr><td>assinatura <code>{ titulo }</code> e chamada <code>nome=</code></td><td><code>titulo</code> vale <code>undefined</code></td><td>case os nomes, ou renomeie</td></tr>
+<tr><td><code>function Cartao(nome)</code></td><td><code>nome</code> é o objeto inteiro, não o texto</td><td><code>{ nome }</code> com chaves</td></tr>
+<tr><td><code>{ pao: { nome } }</code> sem a prop <code>pao</code></td><td>quebra ao abrir o objeto de dentro</td><td>destruture um nível ou garanta a prop</td></tr>
+<tr><td><code>{ nome }</code> e corpo <code>{nome}</code> com chave errada</td><td>nada aparece, sem erro</td><td>confira com o console</td></tr>
+<tr><td><code>{ nome, }</code> com vírgula sobrando</td><td>funciona: vírgula no fim é permitida</td><td>nada a fazer</td></tr>
+</table>
+</div>
+
+<pre class="term">console: titulo: undefined</pre>
+
+<p>Essa linha é o retrato do segundo caso. O componente imprimiu <code>titulo</code>, que existe como
+variável, mas o objeto não tinha a chave com esse nome — a chamada usou <code>nome</code>. O valor é
+<code>undefined</code>, e o JSX desenha nada. Repare que o React não reclamou: para ele, faltou uma prop,
+e prop que falta é permitida. Quem avisa é você, com um <code>console.log</code> no lugar certo.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<p>Os três cenários abaixo são a mesma história contada de três jeitos: a assinatura e a chamada
+precisam combinar. Quando não combinam, a tela fica vazia e o console fica limpo — o pior par
+possível.</p>
+
+<div class="cenario">
+<h3>Cenário 1: a assinatura mudou e o corpo não</h3>
+<p>A Ana trocou <code>function Cartao(props)</code> por <code>function Cartao({ nome })</code> e esqueceu
+o <code>{props.nome}</code> da linha seguinte. A tela ficou em branco. O conserto foi apagar o
+<code>props.</code> — depois disso, o componente passou a mostrar o nome e ficou três letras mais curto
+em cada linha.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o cartão que esperava dois níveis</h3>
+<p>Ela aprendeu a desestruturar e fez <code>{ pao: { nome, preco } }</code> num componente que recebia as
+props soltas, sem <code>pao</code>. O React não reclamou de nada, mas a tela ficou vazia e o console do
+navegador apontou o erro ao abrir o objeto. O conserto foi voltar para <code>{ nome, preco }</code>.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o nome que não casava</h3>
+<p>A chamada passava <code>fundo="amber"</code> e a assinatura pedia <code>cor</code>, renomeando para
+<code>fundo</code>. Resultado: a classe saiu como <code>etiqueta undefined</code> e a etiqueta ficou sem
+cor. O conserto foi um dos dois: mudar a chamada para <code>cor="amber"</code> ou a assinatura para
+<code>{ fundo }</code>. O importante é que os dois lados usem a mesma palavra.</p>
+</div>
+
+<p>Um roteiro para quando o componente desestruturado não mostra nada. Primeiro, confira se a chamada
+passa a chave que a assinatura pede — é o caso mais comum. Segundo, imprima o valor com
+<code>console.log</code>; se sair <code>undefined</code>, o nome está diferente em algum lugar. Terceiro,
+reduza: volte a assinatura para <code>props</code> e leia com pontos. Se funcionar assim, o problema é só
+de nomes; se não funcionar, o problema nunca foi a desestruturação. Esse último passo evita horas
+perdidas com a suspeita errada.</p>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="1"><p class="mc-q">1. O que
+<code>function Cartao({ nome, preco })</code> faz com o objeto de props?</p>
+<label><input type="radio" name="q1"> cria as variáveis <code>nome</code> e <code>preco</code> com os valores das chaves de mesmo nome</label>
+<label><input type="radio" name="q1"> cria um novo objeto com as duas chaves</label>
+<label><input type="radio" name="q1"> junta as duas props numa lista</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Como pegar <code>props.pao.nome</code> direto na
+assinatura?</p>
+<label><input type="radio" name="q2"> <code>function Cartao({ pao.nome })</code></label>
+<label><input type="radio" name="q2"> <code>function Cartao({ props.pao.nome })</code></label>
+<label><input type="radio" name="q2"> <code>function Cartao({ pao: { nome } })</code></label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. O componente recebe <code>nome="Pão"</code> e a
+assinatura é <code>{ nome: titulo }</code>. Como mostrar o valor?</p>
+<label><input type="radio" name="q3"> <code>{nome}</code></label>
+<label><input type="radio" name="q3"> <code>{titulo}</code></label>
+<label><input type="radio" name="q3"> <code>{props.titulo}</code></label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o preço do dia</h2>
+<p>O componente recebe as props <code>nome</code> e <code>preco</code>. Complete a assinatura
+desestruturada e depois responda: qual variável guarda o preço dentro da função?</p>
+<div class="ex-code">function Cartao({ nome, <input aria-label="resposta 1" data-answer="preco" placeholder="..."> }) { return &lt;p&gt;{nome} por {preco}&lt;/p&gt;; }</div>
+<p class="ex-dica">Dica: o nome dentro das chaves é o mesmo da chave que chega. Se você escrever
+<code>valor</code>, a variável existe, mas vale <code>undefined</code>.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Desestruturar é abrir um objeto em variáveis. No React, o objeto é sempre o de props, e o lugar mais
+comum de abrir é o parâmetro: <code>function Cartao({ nome, preco })</code>. Dentro do componente, você
+usa <code>nome</code> e <code>preco</code> direto, sem <code>props.</code> na frente — e sem a variável
+<code>props</code>, que deixa de existir.</p>
+
+<p>Para descer um nível, <code>{ pao: { nome } }</code>. Para renomear, <code>{ nome: titulo }</code>. A
+chamada do componente não muda em nada: o contrato é o mesmo, só a leitura ficou mais curta. Quem está
+começando deve desestruturar um nível por vez e conferir a tela a cada passo.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li><code>function Cartao({ nome })</code> abre a prop <code>nome</code> em variável.</li>
+<li>Com a assinatura desestruturada não existe <code>props</code> dentro da função.</li>
+<li>Chamada igual, leitura mais curta: o contrato não muda.</li>
+<li>Nível a mais: <code>{ pao: { nome } }</code>.</li>
+<li>Renomear: <code>{ nome: titulo }</code> — esquerda é a chave, direita é a variável.</li>
+<li>Chave que não veio vale <code>undefined</code>: aparece como nada, sem erro.</li>
+<li>Também dá para desestruturar no corpo: <code>const { nome } = props;</code>.</li>
+<li>Assinatura muda, corpo tem de mudar junto.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

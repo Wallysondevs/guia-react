@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atualizações em Lote | Guia React</title>
+<meta name="description" content="Atualizações em lote no React: a fila de setters, um render por evento, por que a tela não mostra o meio, onde o lote vale e como contar desenhos.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Atualizações em <span class="hl">Lote</span></h1>
+<p class="intro">A Ana montou o painel do fim do dia: um botão fecha o caixa, zera a quantidade e marca o
+horário. Ela queria ver o painel passando por "fechando…" antes de chegar em "fechado" — e o painel salta
+direto para o fim. O mesmo acontece com os <code>console.log</code>: dentro do clique, os valores ainda
+são os antigos. Nesta aula a Ana entende o <strong>lote</strong>: as atualizações de um evento entram numa
+fila e viram um desenho só.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um lote e por que o React junta atualizações.</li>
+  <li>Como a fila é aplicada: em ordem, e o último pedido vence.</li>
+  <li>Por que a tela nunca mostra um estado intermediário.</li>
+  <li>Como fazer o React desenhar o meio, quando você realmente quer.</li>
+  <li>Onde o lote acontece: evento, promise, <code>setTimeout</code>.</li>
+  <li>Como contar desenhos e o que esse número revela.</li>
+  <li>Quando o React descarta uma atualização sem desenhar.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o painel que pula para o fim</h2>
+
+<p>Na aula de <a href="atualizar-estado.html">atualizar o estado</a>, a Ana aprendeu que dois setters
+iguais somam um, e que a variável do estado continua valendo o valor antigo até o próximo desenho. Ficou
+uma pergunta sem resposta: se cada setter pede um desenho, por que ela nunca vê a tela parar no meio?</p>
+
+<p>O painel dela tem três informações: o status do caixa, a quantidade de pães do dia e a hora do
+fechamento. O clique de fechar faz três coisas de uma vez: muda o status para "fechado", zera a
+quantidade e grava a hora. O que ela esperava era ver, por um instante, o status "fechando" e os outros
+dois valores ainda antigos. O que ela vê é o retrato final, direto.</p>
+
+<p>Não é falta de sorte nem de tempo de tela. O React não desenha entre um setter e outro porque não
+precisa: enquanto o seu código está rodando, ninguém está olhando o DOM. Ele recolhe os pedidos, deixa o
+seu handler terminar e só então aplica tudo de uma vez. Esse recolhimento é o que se chama de
+<strong>lote</strong>.</p>
+
+<p>Entender o lote muda o jeito de depurar. Metade das perguntas do tipo "por que meu log mostrou o valor
+antigo?" e "por que meu indicador de carregando nunca aparece?" tem a mesma resposta: porque as duas
+coisas aconteceram dentro da mesma tarefa, e o React desenhou uma vez só, no fim.</p>
+
+<h2>2. O lote: uma fila e um render</h2>
+
+<p>Quando você chama um setter, o React não redesenha na hora. Ele anota o pedido numa fila. Terminado o
+handler, ele aplica a fila inteira, calcula o estado final e desenha o componente uma única vez. Se você
+chamou cinco setters, houve um desenho — não cinco.</p>
+
+<dl class="anatomy">
+<dt>lote</dt>
+<dd>O conjunto de atualizações recolhidas durante uma mesma tarefa, aplicadas juntas num render só.</dd>
+<dt>fila</dt>
+<dd>A lista ordenada dos pedidos feitos pelos setters. É aplicada na ordem em que você chamou, do
+primeiro ao último.</dd>
+<dt>tarefa</dt>
+<dd>Um pedaço de trabalho do navegador: o tratamento de um clique, um <code>setTimeout</code> que
+disparou, o trecho depois de um <code>await</code>. Cada tarefa tem o seu lote.</dd>
+<dt>render (desenho)</dt>
+<dd>A execução do componente para produzir a nova tela. Um lote termina em um desenho.</dd>
+<dt>flushSync</dt>
+<dd>Uma função do React que aplica a fila na hora e desenha imediatamente, quebrando o lote. Serve para
+casos raros, como medir um elemento logo depois de mudá-lo.</dd>
+</dl>
+
+<p>Há duas razões para o React trabalhar assim. A primeira é velocidade: um clique que mexe em quatro
+estados custa um desenho, e não quatro. A segunda é coerência: a tela nunca mostra uma combinação
+impossível, como o nome do cliente novo com o telefone do antigo. Ou tudo de um clique aparece, ou nada
+aparece.</p>
+
+<p>Vale desfazer uma confusão comum: o lote não é um atraso, e o setter não é "assíncrono" no sentido de
+esperar a vez. O desenho acontece no mesmo evento, imediatamente depois do handler — antes de a pessoa ver
+qualquer coisa, porque o navegador ainda nem pintou a tela. O que o lote adia é só a repetição: em vez de
+desenhar cinco vezes enquanto o seu código roda, ele desenha uma vez quando o código termina.</p>
+
+<p>E o que acontece com a variável durante o handler? Ela continua sendo o retrato do começo do desenho,
+como a aula anterior mostrou. O lote é o outro lado da mesma moeda: o retrato só é trocado quando a fila
+inteira é aplicada.</p>
+
+<h2>3. A fila é aplicada em ordem</h2>
+
+<p>Como a fila é aplicada em ordem, dois setters do mesmo estado se resolvem como uma sequência de
+substituições. O último pedido é o que fica na tela. Isso explica um bug comum de quem está começando:
+um valor "aparece" no código e some na tela, porque uma linha posterior o desfez.</p>
+
+<div class="tryreact" data-goal="clique:button;;attr:input|value=Bia;;texto:Cliente: Bia">
+  <p class="try-task">O botão preenche o nome com "Bia", mas uma linha antiga do código limpa o campo
+  logo depois — e o lote aplica as duas. Faça o nome ficar preenchido. A missão clica em Preencher e
+  confere o campo e o parágrafo.</p>
+  <pre class="jsx">function App() {
+  const [nome, setNome] = useState("");
+
+  function preencher() {
+    setNome("Bia");
+    setNome("");
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={preencher}&gt;Preencher&lt;/button&gt;
+      &lt;input value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+      &lt;p&gt;Cliente: {nome || "vazio"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Preencher&lt;/button&gt;
+  &lt;input value=""&gt;
+  &lt;p&gt;Cliente: vazio&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nome, setNome] = useState("");
+
+  function preencher() {
+    setNome("Bia");
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={preencher}&gt;Preencher&lt;/button&gt;
+      &lt;input value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+      &lt;p&gt;Cliente: {nome || "vazio"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Se o React desenhasse a cada setter, você veria "Bia" por um instante e depois o campo vazio — um
+piscar sem utilidade. Com o lote, o único valor que chega à tela é o último: vazio. Apagar a linha
+esquecida é o conserto; entender por que ela vencia é o aprendizado.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você chamou no mesmo handler</th><th>O que chega à tela</th><th>Quantos desenhos</th></tr>
+<tr><td><code>setNome("Bia"); setNome("")</code></td><td>vazio: o último vence</td><td>um</td></tr>
+<tr><td><code>setStatus("salvando"); setStatus("pronto")</code></td><td>pronto: "salvando" nunca aparece</td><td>um</td></tr>
+<tr><td><code>setPaes(0); setCafes(0); setAberto(false)</code></td><td>os três valores novos juntos</td><td>um</td></tr>
+<tr><td><code>flushSync(() =&gt; setN(1)); setN(2)</code></td><td>1 e depois 2: dois desenhos</td><td>dois</td></tr>
+</table>
+</div>
+
+<h2>4. Por que a tela não mostra o meio</h2>
+
+<p>Agora o painel da Ana. Ela queria que o status passasse por "salvando" antes de "pronto". Com as duas
+chamadas no mesmo handler, a fila tem dois pedidos, o último é "pronto" — e o "salvando" não chega a
+existir na tela.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Status: salvando">
+  <p class="try-task">O botão grava e volta ao status "pronto" no mesmo instante, então o "salvando" nunca
+  aparece. Faça a volta acontecer meio segundo depois, em outra tarefa. A missão clica em Salvar e
+  confere "Status: salvando".</p>
+  <pre class="jsx">function App() {
+  const [status, setStatus] = useState("pronto");
+
+  function salvar() {
+    setStatus("salvando");
+    setStatus("pronto");
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={salvar}&gt;Salvar&lt;/button&gt;
+      &lt;p&gt;Status: {status}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Salvar&lt;/button&gt;
+  &lt;p&gt;Status: pronto&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [status, setStatus] = useState("pronto");
+
+  function salvar() {
+    setStatus("salvando");
+    setTimeout(() =&gt; setStatus("pronto"), 500);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={salvar}&gt;Salvar&lt;/button&gt;
+      &lt;p&gt;Status: {status}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O <code>setTimeout</code> cria uma tarefa nova. O primeiro lote (o do clique) desenha "salvando"; meio
+segundo depois, o segundo lote (o do temporizador) desenha "pronto". Duas tarefas, dois desenhos, e o
+estado intermediário existe na tela pelo tempo que você pediu.</p>
+
+<p>É a regra que vale para qualquer indicador: um valor que existe apenas durante um trabalho síncrono
+não tem como ser visto. Para mostrar "carregando", o trabalho precisa acontecer em outra tarefa — uma
+requisição de rede, um temporizador —, e não no mesmo handler que liga e desliga o indicador.</p>
+
+<p>Cuidado com o exagero oposto: encher o código de <code>setTimeout</code> só para ver estados
+intermediários deixa a tela mais lenta e imprevisível. Pergunte se o cliente precisa mesmo ver aquele
+passo. Na maioria das vezes, o certo é não mostrar nada e trocar o conteúdo no fim.</p>
+
+<h2>5. Quando o valor novo depende do anterior</h2>
+
+<p>Dentro de um lote, todos os pedidos de valor fixo partem do mesmo retrato e o último vence. Quando o
+valor novo depende do valor anterior — somar, dobrar, acrescentar numa lista —, o valor fixo não serve,
+porque ele ignora a fila. A solução já apareceu na aula anterior e vale repetir em uma linha: entregue
+uma instrução em vez de um valor.</p>
+
+<pre class="file" data-file="App.jsx">setPaes(paes + 1);          // valor calculado agora: os dois pedidos usam o mesmo paes
+setPaes((atual) =&gt; atual + 1);   // instrução: cada pedido recebe o valor pendente da fila</pre>
+
+<p>O lote é o motivo pelo qual a diferença importa. Sem lote, a segunda chamada já encontraria o estado
+novo e o problema não existiria. Com lote, as duas chamadas trabalham sobre o mesmo retrato, e quem quiser
+conversar com a fila tem de usar a forma de função. É por isso que ela é o padrão em contadores, em
+listas e em qualquer acumulador.</p>
+
+<p>E, quando você precisa do valor novo também fora do setter — num log, num histórico, numa segunda
+conta —, calcule antes numa variável e passe a variável. A fila não devolve valor nenhum: os setters
+retornam <code>undefined</code>.</p>
+
+<h2>6. Onde o lote acontece</h2>
+
+<p>Desde o React 18, o lote não é privilégio dos eventos do React. Qualquer atualização feita dentro da
+mesma tarefa é agrupada — inclusive depois de uma resposta da rede ou de um temporizador.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde você chamou o setter</th><th>É agrupado?</th><th>Quantas tarefas</th></tr>
+<tr><td>Handler de evento (<code>onClick</code>, <code>onChange</code>)</td><td>sim</td><td>uma: o evento</td></tr>
+<tr><td>Depois de uma promise (<code>.then</code>, <code>await</code>)</td><td>sim</td><td>uma: o retorno da promise</td></tr>
+<tr><td>Dentro de <code>setTimeout</code> ou <code>setInterval</code></td><td>sim</td><td>uma por disparo</td></tr>
+<tr><td>Listener nativo (<code>addEventListener</code>)</td><td>sim</td><td>uma: o evento</td></tr>
+<tr><td>Dentro de <code>flushSync</code></td><td>não</td><td>o desenho acontece na hora</td></tr>
+</table>
+</div>
+
+<p>Duas chamadas em tarefas diferentes são dois lotes, logo dois desenhos. É o que o
+<code>setTimeout</code> da seção 4 aproveitou: separar em tarefas é justamente o jeito de fazer o React
+desenhar no meio. E é também por isso que dois cliques seguidos são dois desenhos, mesmo que rápidos: cada
+clique é um evento, e cada evento é uma tarefa.</p>
+
+<p>O <code>flushSync</code> existe para o caso de você precisar ler o DOM imediatamente depois de mudar o
+estado — medir a altura de um elemento que acabou de aparecer, por exemplo. Ele desenha na hora e por isso
+aparece nas listas de "quase nunca use": quebra a coerência do lote e deixa a tela mais lenta. Se você se
+pegar querendo desligar o lote para "ver o valor no meio", a resposta é separar em tarefas.</p>
+
+<h2>7. Contando desenhos</h2>
+
+<p>Como saber quantos desenhos aconteceram? Duas formas. A primeira é um <code>console.log</code> no corpo
+do componente, antes do <code>return</code>: ele roda uma vez por desenho. A segunda é contar numa
+variável de fora do componente e mostrar o número na tela — útil quando você quer ver o efeito de um
+clique sem abrir o console.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:Desenhos: 2">
+  <p class="try-task">O botão soma o pão no clique e o café num temporizador: duas tarefas, dois desenhos.
+  Junte as duas atualizações no mesmo lugar — uma tarefa, um desenho. A missão clica em Pedir e confere
+  "Desenhos: 2".</p>
+  <pre class="jsx">let desenhos = 0;
+
+function App() {
+  desenhos = desenhos + 1;
+  const [paes, setPaes] = useState(0);
+  const [cafes, setCafes] = useState(0);
+
+  function pedir() {
+    setPaes(paes + 1);
+    setTimeout(() =&gt; setCafes(cafes + 1), 0);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={pedir}&gt;Pedir&lt;/button&gt;
+      &lt;p&gt;Desenhos: {desenhos}&lt;/p&gt;
+      &lt;p&gt;{paes} pães e {cafes} cafés&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Pedir&lt;/button&gt;
+  &lt;p&gt;Desenhos: 1&lt;/p&gt;
+  &lt;p&gt;0 pães e 0 cafés&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">let desenhos = 0;
+
+function App() {
+  desenhos = desenhos + 1;
+  const [paes, setPaes] = useState(0);
+  const [cafes, setCafes] = useState(0);
+
+  function pedir() {
+    setPaes(paes + 1);
+    setCafes(cafes + 1);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={pedir}&gt;Pedir&lt;/button&gt;
+      &lt;p&gt;Desenhos: {desenhos}&lt;/p&gt;
+      &lt;p&gt;{paes} pães e {cafes} cafés&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>A variável <code>desenhos</code> fica fora do componente de propósito: ela precisa sobreviver entre um
+desenho e outro, e um estado não serviria — mudar o estado causaria outro desenho, e a contagem viraria
+perseguição. É um instrumento de medida, não um dado da tela.</p>
+
+<pre class="term">render — paes: 0, cafes: 0
+render — paes: 1, cafes: 1</pre>
+
+<p>Duas linhas para o componente inteiro: a montagem e o clique. Na versão que espalha as atualizações
+por duas tarefas, aparece uma linha intermediária com <code>paes: 1, cafes: 0</code> — e é exatamente
+essa linha que mostra que houve dois desenhos em vez de um. Contar desenhos é o teste mais direto para
+saber se algo está fora do lote.</p>
+
+<h2>8. Os tropeços do lote</h2>
+
+<p><strong>O setter com o mesmo valor não desenha.</strong> Se o estado já vale 5 e você chama
+<code>setN(5)</code>, o React compara, vê que nada muda e descarta a atualização. Nenhum desenho, nenhum
+log. É o que acontece com o status do painel da Ana quando as duas chamadas terminam no valor atual: a
+fila é aplicada e o resultado é igual ao que já estava lá.</p>
+
+<pre class="term">clique com valor novo:    console: desenhou
+clique com o mesmo valor: (nada no console)</pre>
+
+<p><strong>Um setter dentro de um efeito gera um desenho extra.</strong> Se um efeito observa um estado e
+chama outro setter para "acompanhar", você tem dois lotes: o do evento e o do efeito. O componente desenha
+duas vezes, a tela pisca o valor antigo e o número de desenhos dobra. A aula de
+<a href="estado-derivado.html">estado derivado</a> mostra por que quase sempre dá para calcular em vez de
+sincronizar.</p>
+
+<p><strong>O lote não é uma transação.</strong> Ele junta as atualizações de uma tarefa, mas não desfaz
+nada se uma delas falhar no meio: um erro no meio do handler deixa a fila com o que já foi pedido. Se a
+ordem das operações importa para o cliente — cobrar e depois reservar, por exemplo —, a garantia tem de
+vir do seu código, não do lote.</p>
+
+<p><strong>O lote não substitui a forma de função.</strong> Juntar atualizações num desenho não faz a
+segunda enxergar o resultado da primeira. Quem quer a fila como ponto de partida usa
+<code>(atual) =&gt; ...</code>; quem quer o valor final usa um valor calculado antes. São ferramentas
+diferentes para perguntas diferentes.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o indicador que aparece e some no mesmo piscar</h3>
+<p>Ao enviar um formulário, ela ligava <code>carregando</code> e desligava no fim da mesma função. Como as
+duas chamadas caem no mesmo lote, o indicador nunca chegou à tela. A correção não é CSS: é colocar o
+trabalho numa tarefa que demore de verdade — a chamada de rede — e desligar o indicador quando ela
+responder.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: três desenhos para um clique</h3>
+<p>O contador de desenhos marcou 3 quando a Ana esperava 2. Havia um efeito que copiava o estado para
+outro estado a cada mudança: um desenho do clique e mais um do efeito. Medir desenhos é o jeito mais
+rápido de encontrar esse tipo de vazamento — e a solução costuma ser apagar o estado espelho, não
+otimizar.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o campo que "voltava" ao valor anterior</h3>
+<p>Ela preencheu o formulário e, ao clicar em salvar, o campo voltou ao texto de antes. Não era o lote
+desfazendo: era um setter posterior, escondido num trecho copiado, que reescrevia o mesmo estado. Como o
+último pedido vence, a tela mostrou o valor antigo como se o clique não tivesse funcionado.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que é o lote do React?</p>
+<label><input type="radio" name="q1"> um atraso proposital antes de cada desenho</label>
+<label><input type="radio" name="q1"> as atualizações de uma tarefa aplicadas num desenho só</label>
+<label><input type="radio" name="q1"> um grupo de componentes que desenham juntos</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Quantos desenhos um clique que chama três setters provoca?</p>
+<label><input type="radio" name="q2"> três, um para cada setter</label>
+<label><input type="radio" name="q2"> nenhum: o React espera o próximo clique</label>
+<label><input type="radio" name="q2"> um, com os três valores finais juntos</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Como fazer o painel mostrar "salvando" antes de "pronto"?</p>
+<label><input type="radio" name="q3"> colocar a volta para "pronto" numa tarefa separada, como um <code>setTimeout</code></label>
+<label><input type="radio" name="q3"> chamar <code>setStatus("salvando")</code> duas vezes antes</label>
+<label><input type="radio" name="q3"> trocar o <code>useState</code> por uma variável comum</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a fila e o último pedido</h2>
+<p>Complete a instrução que faz o segundo pedido somar mais um sobre a fila — e responda qual é o valor
+final das duas chamadas seguintes.</p>
+<div class="ex-code">setPaes((atual) =&gt; atual + 1);
+setPaes(<input aria-label="resposta 1" data-answer="(atual) =&gt; atual + 1|atual =&gt; atual + 1" placeholder="...">);
+
+setPaes(10);
+setPaes(3);
+// valor final na tela: <input aria-label="resposta 2" data-answer="3" placeholder="..."></div>
+<p class="ex-dica">Dica: no primeiro espaço, a instrução recebe o valor pendente da fila. No segundo, lembre
+que a fila é aplicada em ordem e o último pedido vence.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O React não desenha a cada setter: ele recolhe os pedidos numa fila, deixa a tarefa terminar e aplica
+tudo num desenho só. Esse é o lote. A fila é aplicada em ordem, então o último pedido de valor fixo vence
+— e é por isso que um <code>setStatus("pronto")</code> logo depois de <code>"salvando"</code> apaga o
+intermediário antes que ele exista.</p>
+
+<p>Para ver um estado intermediário, separe o trabalho em outra tarefa: um <code>setTimeout</code>, uma
+resposta de rede, um evento. Para conversar com a fila, use a forma de função
+<code>(atual) =&gt; atual + 1</code>, que recebe o valor pendente em vez do retrato do começo. E lembre
+que o React descarta atualizações que não mudam nada: nenhum desenho, nenhum log.</p>
+
+<p>Contar desenhos é o exame mais simples para descobrir vazamentos: um <code>console.log</code> no corpo
+do componente ou uma variável fora dele mostram quantas vezes o componente rodou. Um número maior do que o
+esperado costuma apontar para um efeito que chama setter. Com o lote entendido, a Ana fecha o grupo de
+estado — e as aulas de efeitos começam exatamente por esse personagem: o efeito que roda depois do
+desenho.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>As atualizações de uma tarefa viram uma fila e um desenho só.</li>
+<li>A fila é aplicada em ordem: o último pedido vence.</li>
+<li>Um estado intermediário que só existe dentro do handler não chega à tela.</li>
+<li>Para mostrar o meio, separe em tarefas: <code>setTimeout</code>, promise, evento.</li>
+<li>Valor novo que depende do anterior: <code>setX((atual) =&gt; atual + 1)</code>.</li>
+<li>React 18 em diante agrupa também em promises, <code>setTimeout</code> e listeners nativos.</li>
+<li><code>flushSync</code> quebra o lote e só serve para casos raros.</li>
+<li>Setter com o mesmo valor não desenha nada.</li>
+<li>Efeito que chama setter gera um desenho extra: conte desenhos para achar o culpado.</li>
+<li>Dois cliques, dois eventos, dois desenhos.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

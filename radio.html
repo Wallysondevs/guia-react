@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radio | Guia React</title>
+<meta name="description" content="O radio controlado no React: um grupo com o mesmo name, checked comparando com o estado, o value como texto, opções geradas por map e o grupo que começa sem escolha.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1><span class="hl">Radio</span></h1>
+<p class="intro">Na encomenda da padaria, o cliente escolhe como quer receber: retirar no balcão ou
+receber em casa. São duas opções visíveis, e só uma pode valer — se ele pudesse marcar as duas, o pedido
+não faria sentido. O <code>radio</code> existe exatamente para isso: um grupo em que marcar uma opção
+desmarca as outras. Nesta aula a Ana monta o primeiro grupo controlado, aprende por que o
+<code>name</code> é obrigatório, gera as opções a partir de uma lista e faz o grupo começar sem
+escolha.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que diferencia um <code>radio</code> de um <code>checkbox</code>.</li>
+  <li>Por que todas as opções do grupo precisam do mesmo <code>name</code>.</li>
+  <li>Como marcar a opção certa com <code>checked={forma === "entrega"}</code>.</li>
+  <li>Como ler o valor escolhido com <code>e.target.value</code>.</li>
+  <li>Como gerar um grupo a partir de uma lista com <code>map</code>.</li>
+  <li>Como deixar o grupo sem nenhuma opção marcada.</li>
+  <li>Quando usar <code>radio</code> e quando usar <code>select</code>.</li>
+</ul>
+</div>
+
+<h2>1. A cena: uma escolha só, entre opções visíveis</h2>
+
+<p>A padaria entrega de bicicleta e atende no balcão. No formulário, o cliente precisa escolher uma das
+duas coisas — e a escolha muda o resto do pedido: no balcão não tem frete, na entrega tem. A Ana poderia
+usar um <code>select</code>, mas com duas opções a lista fechada esconde uma delas e obriga um clique a
+mais. O <code>radio</code> mostra as duas na tela, com uma bolinha ao lado de cada uma, e deixa claro que
+só uma pode ser escolhida.</p>
+
+<p>O nome vem do rádio antigo do carro: você aperta um botão e o anterior se solta. No HTML é a mesma
+ideia. Um grupo de <code>radio</code> com o mesmo <code>name</code> se comporta como um botão de rádio: ao
+marcar a segunda opção, a primeira desmarca sozinha. Quem faz esse trabalho é o navegador, não o React. O
+React cuida de manter o estado em sincronia com a bolinha marcada.</p>
+
+<p>A diferença em relação ao <code>checkbox</code> é essa: a caixa de marcar guarda um booleano por item e
+permite várias marcações; o <code>radio</code> guarda <strong>o valor da escolhida</strong> e permite uma
+só. Se você entender isso, o código fica óbvio: um estado com o valor escolhido, e cada opção marcada
+quando o valor dela é igual ao estado.</p>
+
+<h2>2. O grupo e o name</h2>
+
+<p>Um <code>radio</code> sozinho é só uma bolinha. O que transforma várias bolinhas num grupo é o
+<code>name</code>: opções com o mesmo nome pertencem ao mesmo grupo, e o navegador desmarca as outras
+quando uma é escolhida. Sem <code>name</code> igual, cada bolinha é um grupo de um item só, e o cliente
+consegue marcar todas — o que quase sempre é um bug.</p>
+
+<dl class="anatomy">
+<dt><code>radio</code></dt>
+<dd>O tipo de campo de escolha única. Escreve-se <code>&lt;input type="radio"&gt;</code>, sem tag de
+fechamento.</dd>
+<dt><code>name</code></dt>
+<dd>O nome do grupo. Todas as opções que podem ser escolhidas entre si usam exatamente o mesmo
+<code>name</code>.</dd>
+<dt><code>value</code></dt>
+<dd>O texto que vai para o estado quando aquela opção é escolhida. Diferente do checkbox, aqui o
+<code>value</code> é o dado principal.</dd>
+<dt><code>checked</code></dt>
+<dd>Diz se aquela opção é a marcada. No JSX controlado, recebe uma comparação:
+<code>checked={forma === "entrega"}</code>.</dd>
+<dt>grupo controlado</dt>
+<dd>Um estado só para o grupo inteiro, com uma comparação por opção. Marcar uma desmarca as outras porque
+o estado muda.</dd>
+</dl>
+
+<p>A última linha é a chave do assunto. No grupo controlado, você não guarda "qual bolinha está marcada"
+em cada opção; você guarda <strong>o valor escolhido</strong> num estado só, e cada opção pergunta "eu sou
+o escolhido?". Quando o estado muda, a opção anterior deixa de bater com a comparação e desmarca; a nova
+passa a bater e marca. O navegador nem precisa entrar na conta.</p>
+
+<p>É por isso que o <code>name</code> continua importante mesmo com o controle no estado. Ele mantém o
+grupo coerente para o navegador, para o teclado (as setas pulam de opção em opção dentro do grupo) e para
+o envio de formulário. Um grupo sem <code>name</code> controlado até parece funcionar na tela, mas quebra
+a navegação por teclado e o envio.</p>
+
+<h2>3. O primeiro grupo controlado</h2>
+
+<p>O componente abaixo tem o grupo pronto e o parágrafo fixo em "retirada". A missão é criar o estado,
+comparar em cada opção e mostrar o valor escolhido. Repare que a comparação aparece duas vezes, uma por
+opção:</p>
+
+<div class="tryreact" data-goal="clique:input[value=entrega];;texto:Você escolheu: entrega">
+  <p class="try-task">O grupo não está ligado ao estado e o parágrafo nunca muda. Crie
+  <code>forma</code> começando em <code>"retirada"</code>, use
+  <code>checked={forma === "..."}</code> em cada opção e mostre <code>Você escolheu: {forma}</code>.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Como você quer receber?&lt;/p&gt;
+      &lt;label&gt;
+        &lt;input type="radio" name="recebimento" value="retirada" defaultChecked /&gt;
+        Retirar no balcão
+      &lt;/label&gt;
+      &lt;label&gt;
+        &lt;input type="radio" name="recebimento" value="entrega" /&gt;
+        Entrega em casa
+      &lt;/label&gt;
+      &lt;p&gt;Você escolheu: retirada&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Como você quer receber?&lt;/p&gt;
+  &lt;label&gt;
+    &lt;input type="radio" value="retirada" checked="" name="recebimento"&gt;
+    Retirar no balcão
+  &lt;/label&gt;
+  &lt;label&gt;
+    &lt;input type="radio" value="entrega" name="recebimento"&gt;
+    Entrega em casa
+  &lt;/label&gt;
+  &lt;p&gt;Você escolheu: retirada&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [forma, setForma] = useState("retirada");
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Como você quer receber?&lt;/p&gt;
+      &lt;label&gt;
+        &lt;input
+          type="radio"
+          name="recebimento"
+          value="retirada"
+          checked={forma === "retirada"}
+          onChange={(e) =&gt; setForma(e.target.value)}
+        /&gt;
+        Retirar no balcão
+      &lt;/label&gt;
+      &lt;label&gt;
+        &lt;input
+          type="radio"
+          name="recebimento"
+          value="entrega"
+          checked={forma === "entrega"}
+          onChange={(e) =&gt; setForma(e.target.value)}
+        /&gt;
+        Entrega em casa
+      &lt;/label&gt;
+      &lt;p&gt;Você escolheu: {forma}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em "Entrega em casa": a bolinha muda, a outra desmarca e o parágrafo passa a dizer "Você
+escolheu: entrega". O <code>onChange</code> é o mesmo nas duas opções, porque <code>e.target.value</code>
+já diz qual foi escolhida — não é preciso uma função por opção. Esse é um dos motivos de o
+<code>value</code> ser obrigatório no grupo controlado: sem ele, o evento chegaria com valor vazio.</p>
+
+<p>O <code>defaultChecked</code> do código inicial funcionou para a primeira renderização, mas não
+acompanha mudanças: ele é a versão não controlada de <code>checked</code>. Assim que o estado entra em
+cena, o <code>defaultChecked</code> sai. Misturar os dois é uma fonte comum de confusão: a bolinha aparece
+marcada, você clica em outra, e a primeira volta na próxima renderização.</p>
+
+<p>Os tropeços do grupo controlado são poucos e sempre os mesmos. A tabela serve de diagnóstico rápido
+quando alguma bolinha se recusa a obedecer:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você escreveu</th><th>O que acontece</th><th>O conserto</th></tr>
+<tr><td><code>checked={true}</code></td><td>a opção fica sempre marcada e não desmarca</td><td>comparar com o estado: <code>checked={forma === "entrega"}</code></td></tr>
+<tr><td><code>checked="entrega"</code></td><td>qualquer texto é verdadeiro, então marca sempre</td><td>usar chaves e uma comparação</td></tr>
+<tr><td>opções sem o mesmo <code>name</code></td><td>dá para marcar todas ao mesmo tempo</td><td>repetir o mesmo <code>name</code> em cada opção</td></tr>
+<tr><td><code>defaultChecked</code> junto com <code>checked</code></td><td>a marcação volta ao valor antigo</td><td>ficar com <code>checked</code> e o estado</td></tr>
+<tr><td><code>onChange</code> lendo <code>e.target.checked</code></td><td>o estado guarda <code>true</code> e perde o valor</td><td>ler <code>e.target.value</code></td></tr>
+</table>
+</div>
+
+<h2>4. O checked compara, o value guarda</h2>
+
+<p>No <code>radio</code> controlado, os dois atributos têm papéis bem separados:
+<code>value</code> é o dado da opção e <code>checked</code> é a pergunta "é esta?". A tabela mostra os
+três estados possíveis do grupo, com o que aparece na tela:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Estado <code>forma</code></th><th>Opção marcada</th><th>O que o resumo mostra</th></tr>
+<tr><td><code>"retirada"</code></td><td>Retirar no balcão</td><td>Você escolheu: retirada</td></tr>
+<tr><td><code>"entrega"</code></td><td>Entrega em casa</td><td>Você escolheu: entrega</td></tr>
+<tr><td><code>""</code></td><td>nenhuma</td><td>Escolha como receber</td></tr>
+</table>
+</div>
+
+<p>A terceira linha é a que muita gente esquece. Um estado vazio é uma situação legítima: é assim que o
+grupo começa antes de o cliente decidir. Com <code>checked={forma === "retirada"}</code> e
+<code>forma</code> valendo <code>""</code>, nenhuma opção bate e nenhuma aparece marcada. Não é
+necessário um estado "nenhum"; string vazia já diz isso.</p>
+
+<p>E o valor guardado é sempre texto, mesmo que a opção pareça um número. Um grupo de tamanhos P, M e G
+guarda <code>"P"</code>; um grupo de porções guarda <code>"2"</code>, não <code>2</code>. Se você precisa
+do número para calcular, converta com <code>Number()</code>, como fez no campo numérico. A regra do
+formulário não muda de elemento para elemento.</p>
+
+<p>No console, o evento de um radio mostra o nome do grupo, o valor da opção e se ela ficou marcada:</p>
+
+<pre class="term">e.target.name: "recebimento"
+e.target.value: "entrega"
+e.target.checked: true</pre>
+
+<p>Essas três linhas explicam por que o <code>onChange</code> pode ser o mesmo em todas as opções: quem
+dispara é sempre o radio clicado, e ele carrega o próprio valor. O <code>checked</code> vem
+<code>true</code> porque a opção clicada é a que acabou de ser marcada.</p>
+
+<h2>5. Um grupo gerado por uma lista</h2>
+
+<p>Com duas opções, escrever cada <code>label</code> na mão é razoável. Com três formas de pagamento — e
+com a chance de a padaria aceitar vale-refeição no mês que vem —, vale gerar o grupo a partir de uma
+lista. Cada item vira um <code>label</code> com o seu <code>input</code>, e o estado continua sendo um
+só.</p>
+
+<div class="tryreact" data-goal="conta:input[type=radio]=3;;clique:input[value=dinheiro];;texto:Leve troco, por favor">
+  <p class="try-task">A lista <code>formas</code> tem três itens, mas só dois viraram opção. Gere os três
+  com <code>map</code>, marque cada um quando <code>pagamento</code> for o id dele e mostre o
+  <code>detalhe</code> da forma escolhida.</p>
+  <pre class="jsx">const formas = [
+  { id: "pix", rotulo: "Pix", detalhe: "5% de desconto" },
+  { id: "cartao", rotulo: "Cartão", detalhe: "Maquininha na entrega" },
+  { id: "dinheiro", rotulo: "Dinheiro", detalhe: "Leve troco, por favor" },
+];
+
+function App() {
+  const [pagamento, setPagamento] = useState("pix");
+  const escolhida = formas.find((f) =&gt; f.id === pagamento);
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Forma de pagamento:&lt;/p&gt;
+      &lt;label&gt;
+        &lt;input type="radio" name="pagamento" value="pix" /&gt;
+        Pix
+      &lt;/label&gt;
+      &lt;label&gt;
+        &lt;input type="radio" name="pagamento" value="cartao" /&gt;
+        Cartão
+      &lt;/label&gt;
+      &lt;p&gt;{escolhida.detalhe}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Forma de pagamento:&lt;/p&gt;
+  &lt;label&gt;
+    &lt;input type="radio" value="pix" name="pagamento"&gt;
+    Pix
+  &lt;/label&gt;
+  &lt;label&gt;
+    &lt;input type="radio" value="cartao" name="pagamento"&gt;
+    Cartão
+  &lt;/label&gt;
+  &lt;p&gt;5% de desconto&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const formas = [
+  { id: "pix", rotulo: "Pix", detalhe: "5% de desconto" },
+  { id: "cartao", rotulo: "Cartão", detalhe: "Maquininha na entrega" },
+  { id: "dinheiro", rotulo: "Dinheiro", detalhe: "Leve troco, por favor" },
+];
+
+function App() {
+  const [pagamento, setPagamento] = useState("pix");
+  const escolhida = formas.find((f) =&gt; f.id === pagamento);
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Forma de pagamento:&lt;/p&gt;
+      {formas.map((f) =&gt; (
+        &lt;label key={f.id}&gt;
+          &lt;input
+            type="radio"
+            name="pagamento"
+            value={f.id}
+            checked={pagamento === f.id}
+            onChange={(e) =&gt; setPagamento(e.target.value)}
+          /&gt;
+          {f.rotulo}
+        &lt;/label&gt;
+      ))}
+      &lt;p&gt;{escolhida.detalhe}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Clique em "Dinheiro" e o detalhe muda para "Leve troco, por favor". O <code>find</code> procura na
+lista o objeto cujo <code>id</code> é igual ao estado; o detalhe vem daí. Se o estado tivesse um valor que
+não existe na lista, o <code>find</code> devolveria <code>undefined</code> e o acesso a
+<code>.detalhe</code> quebraria o componente — por isso é bom começar com um valor que existe, como
+<code>"pix"</code>.</p>
+
+<p>Repare na diferença entre o valor guardado e o rótulo: o estado guarda <code>"dinheiro"</code>, o
+usuário lê "Dinheiro". O <code>id</code> é minúsculo e estável; o rótulo pode virar "Dinheiro em espécie"
+sem quebrar nada. Essa separação é a mesma que você viu no <code>select</code>, e vale para toda lista de
+opções.</p>
+
+<p>No console, a lista e o estado contam a mesma história:</p>
+
+<pre class="term">formas.length: 3
+pagamento: "dinheiro"
+escolhida.rotulo: "Dinheiro"</pre>
+
+<p>Sobre o <code>key</code>: ele fica no elemento que o <code>map</code> devolve — aqui, o
+<code>label</code> que envolve o input. O React usa a chave para saber qual item é qual quando a lista
+muda; sem ela, o console avisa em desenvolvimento e a ordem pode se confundir em listas que mudam. Como o
+<code>id</code> é único, ele é a chave natural.</p>
+
+<h2>6. O grupo que começa sem escolha</h2>
+
+<p>Nem todo grupo pode começar com uma opção marcada. O tamanho da camiseta da padaria é um exemplo: se o
+site já vem com "P" selecionado, metade dos clientes recebe o tamanho errado por não reparar. O certo é
+começar sem escolha e pedir que a pessoa decida — e o jeito de fazer isso é o estado inicial vazio, que
+você já viu na tabela da seção 4.</p>
+
+<div class="tryreact" data-goal="conta:input:checked=0;;texto:Escolha o tamanho;;clique:input[value=G];;conta:input:checked=1;;texto:Tamanho: G">
+  <p class="try-task">O grupo já vem com "P" marcado. Faça o estado começar vazio, mostre
+  <code>Escolha o tamanho</code> enquanto ninguém escolheu e <code>Tamanho: G</code> depois de marcar o
+  G.</p>
+  <pre class="jsx">const tamanhos = ["P", "M", "G"];
+
+function App() {
+  const [tamanho, setTamanho] = useState("P");
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Tamanho da camiseta:&lt;/p&gt;
+      {tamanhos.map((t) =&gt; (
+        &lt;label key={t}&gt;
+          &lt;input type="radio" name="tamanho" value={t} defaultChecked={t === "P"} /&gt;
+          {t}
+        &lt;/label&gt;
+      ))}
+      &lt;p&gt;Tamanho: {tamanho}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Tamanho da camiseta:&lt;/p&gt;
+  &lt;label&gt;
+    &lt;input type="radio" value="P" checked="" name="tamanho"&gt;
+    P
+  &lt;/label&gt;
+  &lt;label&gt;
+    &lt;input type="radio" value="M" name="tamanho"&gt;
+    M
+  &lt;/label&gt;
+  &lt;label&gt;
+    &lt;input type="radio" value="G" name="tamanho"&gt;
+    G
+  &lt;/label&gt;
+  &lt;p&gt;Tamanho: P&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">const tamanhos = ["P", "M", "G"];
+
+function App() {
+  const [tamanho, setTamanho] = useState("");
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Tamanho da camiseta:&lt;/p&gt;
+      {tamanhos.map((t) =&gt; (
+        &lt;label key={t}&gt;
+          &lt;input
+            type="radio"
+            name="tamanho"
+            value={t}
+            checked={tamanho === t}
+            onChange={(e) =&gt; setTamanho(e.target.value)}
+          /&gt;
+          {t}
+        &lt;/label&gt;
+      ))}
+      &lt;p&gt;{tamanho === "" ? "Escolha o tamanho" : "Tamanho: " + tamanho}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>No começo, nenhuma bolinha está marcada e o texto pede a escolha. Ao clicar em G, só ela marca, o texto
+vira "Tamanho: G" e as outras continuam vazias. O <code>conta:input:checked=0</code> da missão confere
+justamente isso: zero caixas marcadas no início. Se o seu grupo marcar sozinho, procure um
+<code>defaultChecked</code> esquecido ou um <code>checked</code> que não compara com nada.</p>
+
+<p>O passo seguinte, num formulário de verdade, é impedir o envio enquanto o tamanho estiver vazio. Isso é
+validação, e tem aula própria logo depois desta. Por enquanto, o par estado vazio + comparação já resolve
+a tela: o cliente vê que precisa escolher e o código sabe que ninguém escolheu.</p>
+
+<h2>7. Radio, select ou checkbox?</h2>
+
+<p>Os três elementos parecem intercambiáveis quando o assunto é "escolher", mas cada um resolve um caso.
+O critério tem duas perguntas: quantas opções existem e quantas podem valer ao mesmo tempo?</p>
+
+<p>Se só uma pode valer e são poucas opções, todas importantes para a decisão, use <code>radio</code> —
+o cliente vê todas sem abrir nada. Se só uma pode valer e são muitas (estados, cidades, sabores), use
+<a href="select.html"><code>select</code></a>: uma lista aberta com trinta bolinhas é ruim de ler e empurra o resto da página para
+baixo. Se mais de uma pode valer, use <a href="checkbox.html"><code>checkbox</code></a>, um por item.</p>
+
+<p>Há também o caso de "nenhuma das opções" ou "outra", que exige uma opção extra. Num grupo de
+<code>radio</code>, essa opção é só mais um item — com <code>value="outra"</code> —, e o campo de texto
+que a acompanha aparece condicionalmente, como o cartão do presente na aula do checkbox. Num
+<code>select</code>, ela é uma <code>option</code> comum. O padrão é o mesmo: o estado guarda a escolha e
+o resto da tela deriva dela.</p>
+
+<p>Uma última diferença prática: o <code>radio</code> ocupa mais espaço vertical, porque cada opção é uma
+linha. Em tela de celular, isso é bom para o toque — alvos grandes e separados — e ruim para formulários
+longos. O <code>select</code> economiza espaço e cobra um toque a mais. Não existe resposta certa universal;
+existe o caso da sua tela.</p>
+
+<h2>8. Acessibilidade do grupo</h2>
+
+<p>Um grupo de <code>radio</code> precisa de um rótulo para o grupo inteiro, não só para cada opção. A
+pergunta "Como você quer receber?" não pertence a nenhuma bolinha específica; ela pertence ao conjunto. A
+forma de amarrar isso é o <code>fieldset</code> com um <code>legend</code> — elementos que você já pode
+usar hoje, sem hook nenhum:</p>
+
+<pre class="file" data-file="Recebimento.jsx">function Recebimento() {
+  const [forma, setForma] = useState("retirada");
+
+  return (
+    &lt;fieldset&gt;
+      &lt;legend&gt;Como você quer receber?&lt;/legend&gt;
+      &lt;label&gt;
+        &lt;input
+          type="radio"
+          name="recebimento"
+          value="retirada"
+          checked={forma === "retirada"}
+          onChange={(e) =&gt; setForma(e.target.value)}
+        /&gt;
+        Retirar no balcão
+      &lt;/label&gt;
+      &lt;label&gt;
+        &lt;input
+          type="radio"
+          name="recebimento"
+          value="entrega"
+          checked={forma === "entrega"}
+          onChange={(e) =&gt; setForma(e.target.value)}
+        /&gt;
+        Entrega em casa
+      &lt;/label&gt;
+    &lt;/fieldset&gt;
+  );
+}</pre>
+
+<p>Com o <code>fieldset</code>, o leitor de tela anuncia a pergunta junto com cada opção, e o teclado
+entende que as bolinhas formam um conjunto. Clicar no texto do <code>label</code> também marca a opção,
+como no checkbox. E as setas do teclado pulam de uma opção para outra dentro do grupo, o que é o
+comportamento nativo de rádio e não precisa de código.</p>
+
+<p>Se o layout não permite o <code>fieldset</code>, dá para usar <code>role="radiogroup"</code> e
+<code>aria-labelledby</code> apontando para um título. É mais verboso e mais fácil de errar; o
+<code>fieldset</code> resolve de graça. A aula de formulário acessível entra nos detalhes, mas o hábito de
+envolver o grupo com um rótulo vale desde o primeiro formulário.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: dá para marcar as duas opções</h3>
+<p>A Ana esqueceu o <code>name</code> em uma das opções e o cliente conseguiu marcar retirada e entrega ao
+mesmo tempo. Sem o mesmo <code>name</code>, o navegador trata cada bolinha como um grupo separado. O
+conserto é igualar o nome — letra por letra, incluindo maiúsculas — em todas as opções que disputam a
+mesma escolha. O estado controlado até disfarça o problema, mas o teclado e o envio ficam errados.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a bolinha não fica marcada</h3>
+<p>Ela trocou <code>checked</code> por <code>value</code> na comparação e a bolinha voltou ao estado
+anterior a cada clique. No grupo controlado, <code>checked</code> recebe uma expressão booleana:
+<code>checked={forma === "entrega"}</code>. Se a comparação estiver sempre falsa — valor com maiúscula
+diferente, por exemplo —, nenhuma opção marca. Conferir o valor do estado no console resolve em
+segundos.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o grupo começa marcado sem o cliente escolher</h3>
+<p>Ela usou <code>defaultChecked</code> na primeira opção para "dar um exemplo" e metade dos pedidos saiu
+com a forma errada. O valor inicial de um grupo deve vir do <code>useState</code>, e a decisão de começar
+vazio é de produto, não de código. Se o campo é obrigatório, comece vazio e valide no envio; se tem um
+padrão aceitável, comece com ele e deixe claro na tela.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que mantém várias opções no mesmo grupo?</p>
+<label><input type="radio" name="q1"> o mesmo <code>value</code> em todas</label>
+<label><input type="radio" name="q1"> o mesmo <code>name</code> em todas</label>
+<label><input type="radio" name="q1"> estarem dentro do mesmo <code>div</code></label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. O que vai para o estado quando o cliente escolhe uma opção?</p>
+<label><input type="radio" name="q2"> o texto do rótulo, como "Entrega em casa"</label>
+<label><input type="radio" name="q2"> <code>true</code>, como no checkbox</label>
+<label><input type="radio" name="q2"> o <code>value</code> daquela opção, como texto</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que escrever em <code>checked</code> de cada opção?</p>
+<label><input type="radio" name="q3"> uma comparação com o estado: <code>checked={forma === "entrega"}</code></label>
+<label><input type="radio" name="q3"> <code>checked={true}</code> na opção que quer marcar</label>
+<label><input type="radio" name="q3"> <code>checked="entrega"</code>, com o valor entre aspas</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o nome do grupo</h2>
+<p>As duas opções abaixo precisam formar um grupo: marcar uma deve desmarcar a outra. Complete o atributo
+que falta na segunda opção, escrevendo só o nome do atributo:</p>
+<div class="ex-code">&lt;input type="radio" <input aria-label="resposta 1" data-answer="name" placeholder="...">="recebimento" value="entrega" checked={forma === "entrega"} onChange={(e) =&gt; setForma(e.target.value)} /&gt;</div>
+<p class="ex-dica">Dica: é o atributo que agrupa os radios, com o mesmo valor nas duas opções. Se você
+escrever <code>id</code>, cada opção fica num grupo próprio e o cliente marca as duas.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>O <code>radio</code> é a escolha única entre opções visíveis. O grupo é definido pelo <code>name</code>
+igual em todas as opções, e o estado guarda o <code>value</code> da escolhida. No JSX controlado,
+<code>checked</code> recebe uma comparação — <code>checked={forma === "entrega"}</code> — e
+<code>onChange</code> lê <code>e.target.value</code> com a mesma função em todas as opções.</p>
+
+<p>Para gerar o grupo a partir de uma lista, use <code>map</code> com uma <code>key</code> estável e
+guarde o id do item, não o rótulo. Para começar sem escolha, use estado vazio e mostre uma mensagem
+pedindo a decisão; nenhuma opção marcada é um estado legítimo. E envolver o grupo num
+<code>fieldset</code> com <code>legend</code> dá o rótulo do conjunto que o leitor de tela precisa.</p>
+
+<p>Com isso, os quatro campos do formulário estão cobertos: texto curto, texto longo, escolha em lista,
+sim ou não e escolha única. O que falta é a parte que decide se o pedido pode seguir — nome vazio,
+telefone curto, e-mail sem arroba. A próxima aula é a <a href="validacao.html">validação</a>, e ela junta tudo o que você viu até aqui
+num lugar só: o estado guarda o valor, a tela mostra o erro e o botão só deixa passar quando está
+tudo certo.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Grupo de radio: mesmo <code>name</code> em todas as opções.</li>
+<li>Um estado só para o grupo; <code>checked={valor === opcao}</code> em cada uma.</li>
+<li><code>onChange</code> igual em todas: <code>setForma(e.target.value)</code>.</li>
+<li>O estado guarda o <code>value</code> da escolhida, sempre texto.</li>
+<li><code>defaultChecked</code> é do mundo não controlado; não misture com <code>checked</code>.</li>
+<li>Estado vazio = nenhuma opção marcada; use para pedir a escolha.</li>
+<li><code>map</code> + <code>key</code> geram o grupo a partir de uma lista.</li>
+<li>Guarde o id, não o rótulo: o texto pode mudar sem quebrar o código.</li>
+<li><code>fieldset</code> com <code>legend</code> dá nome ao grupo inteiro.</li>
+<li>Uma escolha entre muitas opções pede <code>select</code>, não trinta radios.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

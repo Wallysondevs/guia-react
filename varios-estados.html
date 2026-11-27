@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vários Estados | Guia React</title>
+<meta name="description" content="Vários estados num componente React: um useState por dado independente, a ordem das chamadas, tipos diferentes e o critério para juntar tudo num objeto.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Vários <span class="hl">Estados</span></h1>
+<p class="intro">O pedido da Ana cresceu. Era só o nome do cliente; agora ela precisa do telefone, da
+quantidade de pães e do horário de retirada — quatro informações que mudam em momentos diferentes. Com
+um <code>useState</code> só, o segundo campo apaga o primeiro: ela digita o telefone e o nome do cliente
+vira número. Nesta aula a Ana aprende a ter <strong>vários estados</strong> no mesmo componente, cada um
+cuidando da sua pergunta.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Quantos <code>useState</code> um componente pode ter — e como decidir.</li>
+  <li>Como declarar, ler e atualizar vários estados no mesmo componente.</li>
+  <li>Por que alguns estados deveriam ser um só.</li>
+  <li>Como guardar números, textos e booleanos, cada um no seu estado.</li>
+  <li>Por que um campo numérico entrega texto, e como converter.</li>
+  <li>O critério para separar estados ou juntar tudo num objeto.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o pedido que cresceu</h2>
+
+<p>Na aula de <a href="entrada-controlada.html">entrada controlada</a>, a Ana resolveu o nome do cliente
+com um estado e um campo amarrado a ele. Funcionou tão bem que ela quis o resto do pedido na mesma tela:
+o telefone para avisar quando o pão sair, a quantidade de pães e o horário de retirada.</p>
+
+<p>O jeito mais rápido de acrescentar um campo é copiar o que já funciona. Ela copiou o
+<code>input</code> e mudou só o rótulo. O resultado foi o desastre silencioso: ao digitar o telefone, o
+nome do cliente desapareceu. Os dois campos estavam ligados ao mesmo estado — a cópia levou junto o
+<code>value={nome}</code> e o <code>onChange</code> que escreve em <code>nome</code>. Um estado, dois
+campos, um valor só.</p>
+
+<p>A tentação seguinte é criar um estado para o texto e outro para "tudo o mais", ou guardar os quatro
+dados numa frase separada por barras. As duas ideias dão trabalho depois: mostrar cada dado exige
+desmontar a frase, e atualizar um campo mexe no texto inteiro. O React tem uma resposta mais simples:
+<strong>um estado para cada dado que muda por conta própria</strong>. Quatro informações independentes,
+quatro estados.</p>
+
+<p>Isso não é gambiarra nem desperdício. Um componente com cinco ou seis <code>useState</code> é comum e
+saudável — cada linha responde a uma pergunta clara, e qualquer pessoa que abrir o arquivo entende o que
+aquele componente guarda. O que não pode é um estado fazer o papel de dois.</p>
+
+<h2>2. Um estado por pergunta</h2>
+
+<p>Cada chamada de <code>useState</code> cria um par: um valor e uma função para trocá-lo. Várias
+chamadas criam vários pares, e eles são independentes: mudar um não mexe no outro. A leitura no JSX é
+direta, pelo nome de cada variável.</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [quantidade, setQuantidade] = useState(1);
+  const [retirada, setRetirada] = useState("18:00");
+
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Cliente: {nome || "ninguém"}&lt;/p&gt;
+      &lt;p&gt;Telefone: {telefone || "sem contato"}&lt;/p&gt;
+      &lt;p&gt;{quantidade} pão(ões) às {retirada}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setQuantidade(quantidade + 1)}&gt;Mais um&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Repare que o componente guarda quatro valores, mas continua sendo uma função só. O React chama essa
+função a cada mudança de estado e, entre uma chamada e outra, guarda os quatro valores em algum lugar
+dele. Para você, é como se fossem quatro caixinhas com etiqueta — e a chave de cada caixinha é o setter
+que veio junto com ela.</p>
+
+<h2>3. Acrescentar um estado é barato</h2>
+
+<p>Quando a tela ganha um dado novo, o trabalho é sempre o mesmo, em três passos: criar o estado, dar o
+<code>value</code> ao campo e escrever o <code>onChange</code> que guarda o que foi digitado. O tropeço
+da Ana foi fazer o passo 1 e esquecer de trocar o par no passo 2 e 3.</p>
+
+<div class="tryreact" data-goal="digite:input#nome=Ana;;digite:input#tel=11 99999-0000;;attr:input#nome|value=Ana;;attr:input#tel|value=11 99999-0000">
+  <p class="try-task">Os dois campos mostram o mesmo texto, porque dividem o mesmo estado. Dê ao telefone
+  um estado próprio. A missão digita <strong>Ana</strong> no nome e <strong>11 99999-0000</strong> no
+  telefone, e confere que cada campo ficou com o seu valor.</p>
+  <pre class="jsx">function App() {
+  const [nome, setNome] = useState("");
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Cliente&lt;/label&gt;
+      &lt;input id="nome" value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+
+      &lt;label htmlFor="tel"&gt;Telefone&lt;/label&gt;
+      &lt;input id="tel" value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+
+      &lt;p&gt;Contato: {nome || "vazio"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="nome"&gt;Cliente&lt;/label&gt;
+  &lt;input id="nome" value=""&gt;
+  &lt;label for="tel"&gt;Telefone&lt;/label&gt;
+  &lt;input id="tel" value=""&gt;
+  &lt;p&gt;Contato: vazio&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="nome"&gt;Cliente&lt;/label&gt;
+      &lt;input id="nome" value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+
+      &lt;label htmlFor="tel"&gt;Telefone&lt;/label&gt;
+      &lt;input id="tel" value={telefone} onChange={(e) =&gt; setTelefone(e.target.value)} /&gt;
+
+      &lt;p&gt;Contato: {nome || "vazio"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Vale ler a solução procurando os três pares: <code>nome</code>/<code>setNome</code>,
+<code>telefone</code>/<code>setTelefone</code>. O primeiro campo usa o primeiro par, o segundo campo usa o
+segundo. Se você trocar o par de um campo, os dois passam a compartilhar o mesmo valor — exatamente o que
+a Ana fez sem perceber.</p>
+
+<p>Depois desse passo, o resumo "Contato" continua lendo só o nome. Tudo bem: cada estado é lido onde for
+útil, e não precisa ser lido em todos os lugares. O que não pode é dois campos escreverem no mesmo
+estado.</p>
+
+<h2>4. Nomes que não mentem</h2>
+
+<p>Com um estado só, o nome da variável era quase decorativo. Com quatro, ele vira documentação. A
+convenção do React é <code>[coisa, setCoisa]</code>: o valor no singular e a função com o prefixo
+<code>set</code>. Nada obriga, mas seguir isso faz o código ser lido em voz alta sem tropeço.</p>
+
+<dl class="anatomy">
+<dt>nome / setNome</dt>
+<dd>Texto digitado pelo cliente. O par mais comum de todos.</dd>
+<dt>quantidade / setQuantidade</dt>
+<dd>Um número. O nome diz o tipo e o significado ao mesmo tempo.</dd>
+<dt>pago / setPago</dt>
+<dd>Um booleano (<code>true</code> ou <code>false</code>). O nome parece uma pergunta de sim ou não, e
+isso é bom: <code>if (pago)</code> lê como uma frase.</dd>
+<dt>pedidos / setPedidos</dt>
+<dd>Uma lista. No plural o valor, porque tem vários; no singular o setter, porque ele troca a lista
+inteira de uma vez.</dd>
+<dt>carregando / setCarregando</dt>
+<dd>Outro booleano, o mais comum das telas que buscam dados. A aula de <a href="carregando-e-erro.html">carregando e erro</a>
+usa este par.</dd>
+</dl>
+
+<p>Os nomes a evitar são os genéricos: <code>valor</code>, <code>dados</code>, <code>info</code>,
+<code>aux</code>. Eles funcionam hoje e atrapalham amanhã, quando o componente tiver três "valores"
+diferentes e você precisar lembrar qual é qual. Um nome bom responde "que pergunta este estado
+responde?".</p>
+
+<p>Outro hábito que economiza tempo: mantenha as declarações de estado juntas, no topo do componente,
+antes de qualquer cálculo. Assim dá para ver de longe o que o componente guarda, e a regra do
+<a href="useState.html">useState</a> — hooks no topo, sempre na mesma ordem — é obedecida sem
+esforço.</p>
+
+<h2>5. Um estado de cada tipo</h2>
+
+<p>Texto, número e booleano convivem no mesmo componente. A diferença aparece na hora de atualizar: o
+valor que sai de um campo de formulário é <strong>sempre texto</strong>, mesmo quando o campo é declarado
+como numérico. Se o estado deve guardar um número, a conversão é sua.</p>
+
+<div class="tryreact" data-goal="digite:input=3;;texto:Com mais um: 4">
+  <p class="try-task">Digite <strong>3</strong> no campo: o total deveria ser 4, mas aparece 31. O estado
+  está guardando o texto "3" e somando texto com número. Converta o valor antes de guardar.</p>
+  <pre class="jsx">function App() {
+  const [quantidade, setQuantidade] = useState(1);
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="qtd"&gt;Pães&lt;/label&gt;
+      &lt;input
+        id="qtd"
+        type="number"
+        value={quantidade}
+        onChange={(e) =&gt; setQuantidade(e.target.value)}
+      /&gt;
+      &lt;p&gt;Com mais um: {quantidade + 1}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label for="qtd"&gt;Pães&lt;/label&gt;
+  &lt;input id="qtd" type="number" value="1"&gt;
+  &lt;p&gt;Com mais um: 2&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [quantidade, setQuantidade] = useState(1);
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="qtd"&gt;Pães&lt;/label&gt;
+      &lt;input
+        id="qtd"
+        type="number"
+        value={quantidade}
+        onChange={(e) =&gt; setQuantidade(Number(e.target.value))}
+      /&gt;
+      &lt;p&gt;Com mais um: {quantidade + 1}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O sinal do problema é o total "31": o JavaScript viu uma string, então colou o número 1 no fim do
+texto, em vez de somar. <code>Number("3")</code> vira 3 de verdade, e a soma passa a dar 4. Esse tipo de
+bug é traiçoeiro porque funciona com alguns valores e falha com outros — com 1 e 2 a concatenação parece
+soma até alguém digitar 10.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O dado</th><th>Estado</th><th>O cuidado</th></tr>
+<tr><td>Texto</td><td><code>useState("")</code></td><td><code>e.target.value</code> já vem pronto, é string</td></tr>
+<tr><td>Número</td><td><code>useState(0)</code></td><td><code>Number(e.target.value)</code> no <code>onChange</code></td></tr>
+<tr><td>Booleano</td><td><code>useState(false)</code></td><td>não vem de campo de texto: um botão alterna com <code>setPago(!pago)</code></td></tr>
+<tr><td>Lista</td><td><code>useState([])</code></td><td>nunca <code>push</code>: troca-se a lista inteira (aula de <a href="estado-com-array.html">estado com array</a>)</td></tr>
+<tr><td>Objeto</td><td><code>useState({ nome: "", tel: "" })</code></td><td>troca-se o objeto inteiro (aula de <a href="estado-com-objeto.html">estado com objeto</a>)</td></tr>
+</table>
+</div>
+
+<p>O campo vazio merece aviso: <code>Number("")</code> é <code>0</code>, não é "nada". Se o cliente
+apagar o conteúdo, a quantidade salta para zero silenciosamente. Quando zero não for uma resposta
+aceitável, guarde o texto e converta só na hora de mostrar, ou trate o caso vazio explicitamente.</p>
+
+<h2>6. Dois booleanos que se contradizem</h2>
+
+<p>Com vários estados, aparece um problema que nenhum deles tem sozinho: dois estados que podem dizer
+coisas incompatíveis. A tela de encomendas da Ana precisa mostrar quatro situações — buscando, lista
+vazia, erro e lista pronta — e ela começou com dois booleanos: <code>carregando</code> e
+<code>erro</code>.</p>
+
+<p>Enquanto o código é novo, tudo funciona. Depois de duas semanas, uma função esqueceu de desligar
+<code>carregando</code> quando deu erro, e a tela passou a mostrar o "Buscando…" e a mensagem de falha ao
+mesmo tempo. Dois estados independentes sempre podem formar combinações que você não planejou — e o
+JSX tem de decidir o que fazer com cada uma.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>carregando</th><th>erro</th><th>Que tela é essa?</th></tr>
+<tr><td><code>true</code></td><td><code>false</code></td><td>buscando — a única combinação boa com carregando</td></tr>
+<tr><td><code>false</code></td><td><code>true</code></td><td>deu erro</td></tr>
+<tr><td><code>false</code></td><td><code>false</code></td><td>lista pronta (vazia ou com itens)</td></tr>
+<tr><td><code>true</code></td><td><code>true</code></td><td>impossível — e é justamente a que apareceu na tela</td></tr>
+</table>
+</div>
+
+<p>A saída é trocar os dois booleanos por <strong>um estado só</strong>, que guarda a situação atual como
+texto: <code>useState("inicial")</code> e os valores <code>"inicial"</code>, <code>"buscando"</code>,
+<code>"pronto"</code> e <code>"erro"</code>. Um estado não consegue valer duas coisas ao mesmo tempo, e o
+JSX escolhe o que desenhar com um <code>if</code> ou um objeto de mensagens.</p>
+
+<p>O console da caixa mostra o problema sem disfarce quando os dois são independentes:</p>
+
+<pre class="term">console: carregando=true erro=true
+console: a tela mostra "Buscando..." e "Não foi possível carregar" juntos</pre>
+
+<p>O critério geral: <strong>dois estados só valem a pena quando as combinações fazem sentido</strong>.
+Nome e telefone podem ser preenchidos em qualquer ordem, então são dois. Já "buscando" e "com erro" são
+etapas de um mesmo caminho — só uma pode estar valendo —, então são um. Quando você se pegar escrevendo
+uma condição do tipo <code>if (carregando &amp;&amp; !erro)</code>, é sinal de que dois estados deveriam
+ser um.</p>
+
+<h2>7. Estados independentes de verdade</h2>
+
+<p>Um estado só muda quando o setter dele é chamado. Nenhum outro setter mexe nele, nenhum outro render o
+apaga. Isso parece óbvio e é a razão pela qual vários estados funcionam tão bem — e também a razão pela
+qual um <code>set</code> a mais, copiado por engano, estraga a tela.</p>
+
+<div class="tryreact" data-goal="digite:input#hora=18:00;;texto:Retirada às 18:00;;clique:button;;texto:3 pães;;texto:Retirada às 18:00">
+  <p class="try-task">O botão "Mais um pão" deveria só aumentar a quantidade, mas ele apaga o horário de
+  retirada. Tire a linha que limpa o horário. A missão digita <strong>18:00</strong>, clica no botão e
+  confere que o horário continua lá.</p>
+  <pre class="jsx">function App() {
+  const [nome, setNome] = useState("Ana");
+  const [quantidade, setQuantidade] = useState(2);
+  const [retirada, setRetirada] = useState("18:00");
+
+  return (
+    &lt;div&gt;
+      &lt;input id="nome" value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+      &lt;input id="hora" value={retirada} onChange={(e) =&gt; setRetirada(e.target.value)} /&gt;
+      &lt;button onClick={() =&gt; { setQuantidade(quantidade + 1); setRetirada(""); }}&gt;
+        Mais um pão
+      &lt;/button&gt;
+      &lt;p&gt;{quantidade} pães&lt;/p&gt;
+      &lt;p&gt;Retirada às {retirada}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input id="nome" value="Ana"&gt;
+  &lt;input id="hora" value="18:00"&gt;
+  &lt;button&gt;Mais um pão&lt;/button&gt;
+  &lt;p&gt;2 pães&lt;/p&gt;
+  &lt;p&gt;Retirada às 18:00&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nome, setNome] = useState("Ana");
+  const [quantidade, setQuantidade] = useState(2);
+  const [retirada, setRetirada] = useState("18:00");
+
+  return (
+    &lt;div&gt;
+      &lt;input id="nome" value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+      &lt;input id="hora" value={retirada} onChange={(e) =&gt; setRetirada(e.target.value)} /&gt;
+      &lt;button onClick={() =&gt; setQuantidade(quantidade + 1)}&gt;
+        Mais um pão
+      &lt;/button&gt;
+      &lt;p&gt;{quantidade} pães&lt;/p&gt;
+      &lt;p&gt;Retirada às {retirada}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Três estados, um botão que mexe em um deles. O nome e o horário continuam onde estavam porque ninguém
+chamou os setters deles. Esse é o comportamento normal: cada caixinha só se abre com a sua chave.</p>
+
+<p>Note também que a função do <code>onClick</code> pode chamar mais de um setter — o código inicial
+chama dois de propósito. Isso é permitido e às vezes necessário. Só cuidado com a ordem e com o fato de
+que o valor novo não aparece na variável antiga dentro do mesmo handler; esse é o assunto da aula de
+<a href="batching.html">atualizações em lote</a>.</p>
+
+<p>Para conferir o retrato completo do componente, um <code>console.log</code> com os três valores logo
+antes do <code>return</code> mostra o que a tela vai desenhar:</p>
+
+<pre class="term">nome: Ana
+quantidade: 3
+retirada: 18:00</pre>
+
+<p>Três linhas por render. Se você clicar no botão e aparecer um bloco de três linhas com
+<code>quantidade: 3</code>, o estado mudou e o componente foi redesenhado. É o jeito mais simples de
+acompanhar vários estados ao mesmo tempo.</p>
+
+<h2>8. Quando os dados andam juntos</h2>
+
+<p>Vários estados é o padrão. Mas existe um caso em que eles atrapalham: quando dois ou três valores
+<strong>sempre</strong> mudam na mesma hora, são salvos juntos e lidos juntos. Aí eles não são perguntas
+separadas — são um dado só, com partes.</p>
+
+<p>O exemplo clássico é o endereço. Rua, número, bairro e CEP nunca mudam separadamente: quando o cliente
+muda de endereço, muda tudo. Guardar quatro estados e quatro setters obriga você a lembrar de atualizar
+os quatro em cada lugar que mexe no endereço; esquecer um produz um endereço meio novo, meio velho. Um
+objeto só mantém as partes juntas por construção.</p>
+
+<p>O critério, então, é uma pergunta: <em>estes valores podem mudar separadamente?</em> Se sim — nome do
+cliente e quantidade de pães —, um estado para cada. Se não — rua, número, bairro e CEP de um endereço
+—, um estado só, com um objeto dentro. E o formato mais comum de um pedido é misto: dados do cliente
+num objeto, lista de itens num array, e um booleano solto dizendo se a compra foi paga.</p>
+
+<p>O objeto traz uma complicação na hora de atualizar: não basta trocar um campo, é preciso entregar ao
+setter um objeto novo, com o campo alterado e os outros copiados. Essa mecânica é a aula seguinte, e ela
+tem uma pegadinha famosa — a mutação que não redesenha a tela. Guarde o critério, que é o que importa
+aqui.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o valor que aparece e nunca muda</h3>
+<p>A Ana trocou o <code>useState</code> por uma variável comum, <code>let nome = ""</code>, e usou
+<code>value={nome}</code>. A tela apareceu com o campo vazio e assim ficou: digitar não mudava nada,
+porque ninguém avisava o React de que algo mudou. Variável comum é recriada a cada render; estado
+sobrevive entre um render e outro. Se a tela precisa mudar, o dado precisa estar num estado.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a tela que mostrava "buscando" e erro juntos</h3>
+<p>A Ana tinha <code>carregando</code> e <code>erro</code> como dois estados e atualizava os dois em
+lugares diferentes. Numa resposta lenta, a tela exibiu o indicador e a mensagem de falha ao mesmo tempo.
+Trocar os dois por um <code>situacao</code> de texto resolveu de vez: cada valor desenha uma tela, e
+nenhuma combinação impossível existe.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o campo vazio que virou zero</h3>
+<p>Com <code>Number(e.target.value)</code>, apagar o campo de quantidade faz o estado virar 0 e o resumo
+anunciar "0 pães". A conversão está certa; o problema é que zero não é uma resposta aceitável para
+"quantos pães". A saída é guardar o texto no estado e converter só na hora de calcular, tratando o vazio:
+<code>const n = quantidade === "" ? 1 : Number(quantidade)</code>.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="3"><p class="mc-q">1. Quantos <code>useState</code> um componente pode ter?</p>
+<label><input type="radio" name="q1"> no máximo três, por regra do React</label>
+<label><input type="radio" name="q1"> um só; os outros dados vão em variáveis comuns</label>
+<label><input type="radio" name="q1"> quantos precisar: um para cada dado que muda por conta própria</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Quando dois estados deveriam ser um só?</p>
+<label><input type="radio" name="q2"> sempre; quanto menos estados, melhor</label>
+<label><input type="radio" name="q2"> nunca; cada informação merece o seu <code>useState</code></label>
+<label><input type="radio" name="q2"> quando as combinações possíveis não fazem sentido, como "buscando" e "com erro"</label>
+</div>
+
+<div class="mc" data-answer="2"><p class="mc-q">3. O que chega ao estado quando o cliente digita 3 num campo numérico?</p>
+<label><input type="radio" name="q3"> o número 3, porque o campo é <code>type="number"</code></label>
+<label><input type="radio" name="q3"> a string "3", que precisa de <code>Number(...)</code> para somar</label>
+<label><input type="radio" name="q3"> um objeto com o valor e a posição do cursor</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: três estados, três tipos</h2>
+<p>Complete as declarações do componente de pedido: um estado de texto para o nome, um de número para a
+quantidade (começando em zero) e um booleano dizendo se o pedido foi pago (começando em falso).</p>
+<div class="ex-code">const [nome, setNome] = useState("");
+const [<input aria-label="resposta 1" data-answer="quantidade" placeholder="...">, <input aria-label="resposta 2" data-answer="setQuantidade" placeholder="...">] = useState(0);
+const [pago, setPago] = useState(<input aria-label="resposta 3" data-answer="false" placeholder="...">);</div>
+<p class="ex-dica">Dica: o valor fica no plural ou no singular conforme o dado, e a função sempre começa
+com <code>set</code> seguido do mesmo nome, com a primeira letra maiúscula.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Um componente pode ter quantos estados precisar, e o critério é simples: um estado para cada dado que
+muda por conta própria. Nome do cliente, telefone, quantidade e horário são quatro perguntas
+independentes, logo quatro pares <code>[valor, setValor]</code>. Cada setter mexe apenas no seu estado, e
+um componente com cinco ou seis declarações no topo é normal.</p>
+
+<p>Um estado não deve fazer o papel de dois, mas dois estados também não devem contar a mesma história.
+Quando as combinações possíveis se contradizem — "buscando" e "com erro" ao mesmo tempo —, o certo é um
+estado só, com a situação atual em texto. O critério é sempre o mesmo: cada estado tem a sua pergunta, e
+as respostas de todas precisam poder conviver.</p>
+
+<p>Tipos diferentes pedem cuidados diferentes: texto vem pronto do <code>e.target.value</code>, número
+precisa de <code>Number(...)</code> porque o campo entrega string, booleano se alterna com
+<code>setPago(!pago)</code>. E quando dois ou três valores sempre mudam juntos, o caminho deixa de ser
+"mais um estado" e passa a ser um estado só com um objeto dentro — que é exatamente o que a próxima aula
+mostra em detalhe.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Um estado por dado independente; não há limite de quantidade.</li>
+<li>Cada par é <code>[coisa, setCoisa]</code> e vive no topo do componente.</li>
+<li>Um setter só mexe no seu próprio estado.</li>
+<li>Copiar um campo sem trocar o par faz dois campos dividirem um valor.</li>
+<li>Dois estados só valem quando as combinações entre eles fazem sentido.</li>
+<li>Flags que se excluem (buscando, com erro) viram um estado de situação.</li>
+<li>Campo de formulário entrega string; para número, <code>Number(e.target.value)</code>.</li>
+<li><code>Number("")</code> é 0: trate o campo vazio se zero não fizer sentido.</li>
+<li>Booleano se alterna com <code>setPago(!pago)</code>.</li>
+<li>Se os valores sempre mudam juntos, use um objeto — a próxima aula.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

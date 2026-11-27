@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Props Drilling | Guia React</title>
+<meta name="description" content="Props drilling em React: quando um dado atravessa componentes que não o usam, como reconhecer esse encanamento e quais são as saídas antes de partir para o contexto.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Props <span class="hl">Drilling</span></h1>
+<p class="intro">O desconto da padaria depende de quem está comprando. A Ana guarda o nome do cliente
+lá no topo da tela, no <code>App</code>, mas o preço com desconto é desenhado três níveis abaixo, dentro
+de um cartão. Para o dado chegar até lá, cada componente do caminho precisa receber a prop e repassar —
+mesmo os que não fazem ideia do que seja um cliente. Nesta aula ela entende esse encanamento, vê o preço
+que ele cobra e conhece as saídas.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é props drilling, com nome e sobrenome.</li>
+  <li>Por que o dado desce e nunca sobe por props.</li>
+  <li>O custo real: cada nível do caminho precisa repassar a prop.</li>
+  <li>Por que o componente do meio vira um repassador sem assunto.</li>
+  <li>A primeira saída: montar a peça onde o dado existe e passar por <code>children</code>.</li>
+  <li>As outras duas saídas, e quando cada uma é a certa.</li>
+  <li>Como provar no painel que o valor chegou (ou não) ao fim da linha.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o desconto mora no topo</h2>
+
+<p>A tela do dia na padaria é uma árvore de três andares. No topo, o <code>App</code> sabe quem está
+comprando: hoje é a Ana, cliente cadastrada desde 2019. No meio, o <code>PainelDoDia</code> organiza o
+assunto do dia. Embaixo, o <code>CartaoDePao</code> mostra um pão, e dentro dele o
+<code>Preco</code> escreve o valor. O desconto é uma regra do preço: cliente cadastrado paga menos.</p>
+
+<p>Só que o <code>Preco</code> não tem como saber quem é o cliente. Componente não enxerga a variável do
+vizinho, muito menos a do avô. A única forma de um dado descer a árvore é por props: quem tem o valor
+passa para o filho, o filho passa para o neto. É exatamente isso que a Ana fez — e o resultado é uma
+prop <code>cliente</code> que aparece em três assinaturas de função, sendo que só a última usa o
+valor.</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const cliente = "Ana";
+  return &lt;PainelDoDia cliente={cliente} /&gt;;
+}
+
+function PainelDoDia({ cliente }) {
+  return &lt;CartaoDePao cliente={cliente} titulo="Pão do dia" preco="10,00" /&gt;;
+}
+
+function CartaoDePao({ cliente, titulo, preco }) {
+  return (
+    &lt;article&gt;
+      &lt;h2&gt;{titulo}&lt;/h2&gt;
+      &lt;Preco cliente={cliente} preco={preco} /&gt;
+    &lt;/article&gt;
+  );
+}
+
+function Preco({ cliente, preco }) {
+  return &lt;p&gt;R$ {preco} para {cliente}&lt;/p&gt;;
+}</pre>
+
+<p>Funciona. E é importante dizer isso antes de criticar: passar props é o jeito normal e correto de
+mover dados em React. O problema não é o mecanismo, é o volume. O <code>PainelDoDia</code> e o
+<code>CartaoDePao</code> recebem uma prop que não usam para nada — só seguram a porta para o dado passar.
+Quando esse trecho se repete em dez componentes, qualquer mudança no nome ou no formato do dado vira uma
+caçada.</p>
+
+<h2>2. O encanamento tem nome</h2>
+
+<p>Esse repasse em cadeia se chama <strong>props drilling</strong> — em português, algo como
+“perfuração por props”. O nome é feio de propósito: descreve o cano que você abre atravessando camadas
+que não têm nada a ver com o assunto. A água chega, mas o cano passa no meio da sala.</p>
+
+<dl class="anatomy">
+<dt>props drilling</dt>
+<dd>Passar um dado de um componente para outro através de componentes intermediários que não usam esse
+dado.</dd>
+<dt>repassador</dt>
+<dd>O componente do meio, que recebe a prop só para entregar ao filho. Não lê o valor, não decide nada
+com ele.</dd>
+<dt>dado de tela</dt>
+<dd>Um valor que pertence a uma tela inteira, não a uma peça: quem está logado, o tema, a moeda, o
+carrinho.</dd>
+<dt>fluxo de cima para baixo</dt>
+<dd>Em React, dados descem por props e eventos sobem por funções. Não existe prop que volta para o
+pai.</dd>
+<dt>profundidade</dt>
+<dd>Quantos níveis o dado atravessa até ser usado. Dois é confortável; cinco é sinal de que algo pode
+morar mais perto.</dd>
+</dl>
+
+<p>Uma calibragem importante, para não sair por aí com medo de prop: passar um dado para o filho
+direto é normal e continua sendo o jeito preferido do React. Dois níveis de repasse, com um componente
+que realmente usa o valor no meio, não é drilling — é a arquitetura funcionando. O nome feio só entra
+quando o intermediário não tem nada a ver com o dado e passa a existir para carregá-lo.</p>
+
+<p>Vale entender por que o dado não sobe. Se o <code>Preco</code> pudesse escrever direto na variável do
+<code>App</code>, qualquer peça da tela poderia mudar qualquer coisa, e descobrir quem mudou viraria
+arqueologia. O React fecha essa porta de propósito: quem manda no valor é o dono do estado, e o filho
+só avisa por uma função. O preço dessa escolha é o encanamento que você está vendo.</p>
+
+<h2>3. O dado desce: uma prop, quatro componentes</h2>
+
+<p>Na caixa abaixo, a cadeia inteira já está montada. O <code>App</code> tem o
+<code>cliente</code>, o <code>PainelDoDia</code> repassa, o <code>CartaoDePao</code> repassa e o
+<code>Preco</code> usa. Falta só o primeiro passo: o <code>App</code> não passa nada para o painel, e
+por isso o cliente chega vazio no fim da linha.</p>
+
+<div class="tryreact" data-goal="texto:Cliente: Ana;;texto:R$ 10,00 para Ana">
+  <p class="try-task">O <code>App</code> tem a variável <code>cliente</code>, mas chama
+  <code>&lt;PainelDoDia /&gt;</code> sem passar nada. Passe <code>cliente={cliente}</code> e clique em
+  Rodar.</p>
+  <pre class="jsx">function Preco({ preco, cliente }) {
+  return &lt;p&gt;R$ {preco} para {cliente}&lt;/p&gt;;
+}
+
+function CartaoDePao({ titulo, preco, cliente }) {
+  return (
+    &lt;article className="cartao"&gt;
+      &lt;h2&gt;{titulo}&lt;/h2&gt;
+      &lt;Preco preco={preco} cliente={cliente} /&gt;
+    &lt;/article&gt;
+  );
+}
+
+function PainelDoDia({ cliente }) {
+  return (
+    &lt;section className="painel"&gt;
+      &lt;p&gt;Cliente: {cliente}&lt;/p&gt;
+      &lt;CartaoDePao titulo="Pão do dia" preco="10,00" cliente={cliente} /&gt;
+    &lt;/section&gt;
+  );
+}
+
+function App() {
+  const cliente = "Ana";
+  return &lt;PainelDoDia /&gt;;
+}</pre>
+  <pre class="out">
+&lt;section class="painel"&gt;
+  &lt;p&gt;Cliente:&lt;/p&gt;
+  &lt;article class="cartao"&gt;
+    &lt;h2&gt;Pão do dia&lt;/h2&gt;
+    &lt;p&gt;R$ 10,00 para&lt;/p&gt;
+  &lt;/article&gt;
+&lt;/section&gt;
+</pre>
+  <pre class="solucao">function Preco({ preco, cliente }) {
+  return &lt;p&gt;R$ {preco} para {cliente}&lt;/p&gt;;
+}
+
+function CartaoDePao({ titulo, preco, cliente }) {
+  return (
+    &lt;article className="cartao"&gt;
+      &lt;h2&gt;{titulo}&lt;/h2&gt;
+      &lt;Preco preco={preco} cliente={cliente} /&gt;
+    &lt;/article&gt;
+  );
+}
+
+function PainelDoDia({ cliente }) {
+  return (
+    &lt;section className="painel"&gt;
+      &lt;p&gt;Cliente: {cliente}&lt;/p&gt;
+      &lt;CartaoDePao titulo="Pão do dia" preco="10,00" cliente={cliente} /&gt;
+    &lt;/section&gt;
+  );
+}
+
+function App() {
+  const cliente = "Ana";
+  return &lt;PainelDoDia cliente={cliente} /&gt;;
+}</pre>
+</div>
+
+<p>Uma linha resolveu a cadeia inteira, porque o meio já estava preparado para repassar. E aqui está a
+observação mais importante da aula: o dado estava errado antes do conserto, mas a tela não quebrou. Ela
+mostrou <code>R$ 10,00 para</code>, com um buraco no lugar do nome. Props ausentes viram
+<code>undefined</code>, e o React desenha o que der. O sintoma é sempre uma tela quase certa.</p>
+
+<p>Outro detalhe que passa batido: o desconto não é calculado no <code>Preco</code>. O
+<code>App</code> sabe quem é o cliente, mas o valor “10,00” está escrito à mão no JSX do painel. Se a
+regra mudar, muda no meio. Não é o assunto desta aula, mas vale reparar: prop é dado, não regra de
+negócio escondida.</p>
+
+<h2>4. O custo está no componente do meio</h2>
+
+<p>Agora o tropeço que dá nome ao problema. O <code>CartaoDePao</code> até recebe o
+<code>cliente</code>, mas esqueceu de repassar para o <code>Preco</code>. O preço aparece, o selo de
+cliente não. E o cartão não usa o valor para nada — ele só deveria entregar. É esse tipo de edição,
+feita num componente que não tem interesse no dado, que se multiplica pela árvore.</p>
+
+<div class="tryreact" data-goal="clique:button;;texto:cliente Beatriz">
+  <p class="try-task">O botão troca o cliente no topo, mas o selo lá embaixo continua dizendo
+  “visitante”: falta o <code>Cartao</code> repassar o <code>cliente</code> para o <code>Preco</code>.
+  Conserte o repasse e clique em “Trocar cliente”.</p>
+  <pre class="jsx">function Selo({ cliente }) {
+  return &lt;span className="selo"&gt;{cliente ? "cliente " + cliente : "visitante"}&lt;/span&gt;;
+}
+
+function Preco({ preco, cliente }) {
+  return (
+    &lt;p&gt;R$ {preco} &lt;Selo cliente={cliente} /&gt;&lt;/p&gt;
+  );
+}
+
+function Cartao({ titulo, preco, cliente }) {
+  return (
+    &lt;article className="cartao"&gt;
+      &lt;h2&gt;{titulo}&lt;/h2&gt;
+      &lt;Preco preco={preco} /&gt;
+    &lt;/article&gt;
+  );
+}
+
+function App() {
+  const [cliente, setCliente] = useState("Ana");
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={() =&gt; setCliente(cliente === "Ana" ? "Beatriz" : "Ana")}&gt;
+        Trocar cliente
+      &lt;/button&gt;
+      &lt;Cartao titulo="Baguete" preco="9,00" cliente={cliente} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button&gt;Trocar cliente&lt;/button&gt;
+  &lt;article class="cartao"&gt;
+    &lt;h2&gt;Baguete&lt;/h2&gt;
+    &lt;p&gt;R$ 9,00 &lt;span class="selo"&gt;visitante&lt;/span&gt;&lt;/p&gt;
+  &lt;/article&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Selo({ cliente }) {
+  return &lt;span className="selo"&gt;{cliente ? "cliente " + cliente : "visitante"}&lt;/span&gt;;
+}
+
+function Preco({ preco, cliente }) {
+  return (
+    &lt;p&gt;R$ {preco} &lt;Selo cliente={cliente} /&gt;&lt;/p&gt;
+  );
+}
+
+function Cartao({ titulo, preco, cliente }) {
+  return (
+    &lt;article className="cartao"&gt;
+      &lt;h2&gt;{titulo}&lt;/h2&gt;
+      &lt;Preco preco={preco} cliente={cliente} /&gt;
+    &lt;/article&gt;
+  );
+}
+
+function App() {
+  const [cliente, setCliente] = useState("Ana");
+
+  return (
+    &lt;div&gt;
+      &lt;button onClick={() =&gt; setCliente(cliente === "Ana" ? "Beatriz" : "Ana")}&gt;
+        Trocar cliente
+      &lt;/button&gt;
+      &lt;Cartao titulo="Baguete" preco="9,00" cliente={cliente} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O clique mostra as duas metades da verdade. Primeiro: o fluxo funciona — o estado mudou no
+<code>App</code>, a prop desceu e o selo mudou de nome sem nenhum código extra. Segundo: para isso
+acontecer, cada componente do caminho teve de estar com a porta aberta. Um esquecimento no meio e o
+valor para de descer, mesmo que o topo esteja perfeito.</p>
+
+<p>É por isso que o drilling cansa. Não é escrever a prop uma vez; é lembrar dela em cada andar, em cada
+arquivo, cada vez que a árvore ganha um nível novo. E o nome da prop precisa ser o mesmo em todos, senão
+o dado some silenciosamente.</p>
+
+<h2>5. O que o console mostra em cada nível</h2>
+
+<p>Quando o valor não chega, o console é o melhor detetive. Coloque uma linha de log no componente do
+meio e imprima o objeto de props inteiro:</p>
+
+<pre class="file" data-file="Cartao.jsx">function Cartao(props) {
+  console.log("Cartao recebeu: " + JSON.stringify(props));
+  return &lt;article&gt;&lt;Preco preco={props.preco} /&gt;&lt;/article&gt;;
+}</pre>
+
+<p>Com o repasse faltando, o log mostra o cartão sem a prop que o preço espera. Com o repasse no lugar,
+a mesma linha mostra tudo:</p>
+
+<pre class="term">Cartao recebeu: {"titulo":"Baguete","preco":"9,00"}
+Cartao recebeu: {"titulo":"Baguete","preco":"9,00","cliente":"Beatriz"}</pre>
+
+<p>Repare que o componente não reclama de receber <code>cliente</code> sem usar. Props a mais são
+ignoradas; props a menos viram <code>undefined</code>. Nenhum dos dois casos é erro para o React — e é
+justamente por isso que o encanamento quebrado passa despercebido. O console não aponta o culpado; ele
+mostra o que cada andar recebeu, e você compara.</p>
+
+<p>Um hábito que economiza horas: logar no componente que <em>usa</em> o dado, não no que repassa. Se o
+<code>Preco</code> imprime <code>undefined</code>, o problema está acima dele. Se imprime o valor certo
+mas a tela não muda, o problema está no JSX abaixo do log.</p>
+
+<h2>6. A saída mais simples: montar onde o dado está</h2>
+
+<p>Antes de qualquer ferramenta nova, existe uma saída que resolve boa parte dos casos e não pede nada
+além de composição. Se o <code>App</code> já tem o cliente, por que não monta ele mesmo a peça que
+precisa do cliente e entrega a peça pronta para o painel? O painel continua posicionando o conteúdo,
+mas não precisa saber o que é um cliente.</p>
+
+<div class="tryreact" data-goal="texto:R$ 10,00 para Ana;;conta:h2=1">
+  <p class="try-task">O <code>PainelDoDia</code> recebe <code>cliente</code> e não usa: ele não tem
+  como repassar. Tire essa prop e passe o preço pronto como filho:
+  <code>&lt;PrecoComDesconto preco="10,00" cliente={cliente} /&gt;</code> dentro do painel.</p>
+  <pre class="jsx">function PrecoComDesconto({ preco, cliente }) {
+  return &lt;p className="preco"&gt;R$ {preco} para {cliente}&lt;/p&gt;;
+}
+
+function PainelDoDia({ titulo, children }) {
+  return (
+    &lt;section className="painel"&gt;
+      &lt;h2&gt;{titulo}&lt;/h2&gt;
+      {children}
+    &lt;/section&gt;
+  );
+}
+
+function App() {
+  const cliente = "Ana";
+
+  return (
+    &lt;PainelDoDia titulo="Pão do dia" cliente={cliente}&gt;
+      &lt;p&gt;Sai quentinho às 7h&lt;/p&gt;
+    &lt;/PainelDoDia&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;section class="painel"&gt;
+  &lt;h2&gt;Pão do dia&lt;/h2&gt;
+  &lt;p&gt;Sai quentinho às 7h&lt;/p&gt;
+&lt;/section&gt;
+</pre>
+  <pre class="solucao">function PrecoComDesconto({ preco, cliente }) {
+  return &lt;p className="preco"&gt;R$ {preco} para {cliente}&lt;/p&gt;;
+}
+
+function PainelDoDia({ titulo, children }) {
+  return (
+    &lt;section className="painel"&gt;
+      &lt;h2&gt;{titulo}&lt;/h2&gt;
+      {children}
+    &lt;/section&gt;
+  );
+}
+
+function App() {
+  const cliente = "Ana";
+
+  return (
+    &lt;PainelDoDia titulo="Pão do dia"&gt;
+      &lt;PrecoComDesconto preco="10,00" cliente={cliente} /&gt;
+      &lt;p&gt;Sai quentinho às 7h&lt;/p&gt;
+    &lt;/PainelDoDia&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel FICOU mais simples: ele recebe um título e um miolo, e não tem prop <code>cliente</code>
+nenhuma. Quem tem o dado montou a peça. Isso é <a href="composicao.html">composição</a> aplicada ao problema do drilling — e é a
+primeira coisa a tentar, porque não cria conceito novo, não precisa de import e não muda o fluxo dos
+dados.</p>
+
+<p>Existe uma razão a mais para essa saída ser a preferida: ela deixa a dependência visível na
+assinatura. O <code>PainelDoDia</code> declara <code>titulo</code> e <code>children</code> e nada mais;
+lendo essas duas palavras, você sabe exatamente do que ele depende. Com o repasse, a assinatura ganha
+uma prop que o corpo nunca menciona — uma promessa que o componente não cumpre. Código em que a
+assinatura mente sobre o conteúdo envelhece mal.</p>
+
+<p>Nem sempre dá. Se o dado precisa ser lido em dez pontos distantes da árvore, montar dez peças no topo
+deixa o <code>App</code> gigante e cheio de detalhe que não é dele. Aí vale outra ferramenta. Mas
+repare: a decisão não é “drilling ou contexto”. É “esse dado pertence a esta tela e a poucos lugares, ou
+pertence ao aplicativo inteiro?”. Só a segunda resposta pede contexto.</p>
+
+<h2>7. Como reconhecer que o encanamento passou do ponto</h2>
+
+<p>Ninguém acorda e decide fazer drilling. Ele aparece aos poucos, um nível por vez, sempre parecendo
+razoável. Estes são os sinais de que o cano ficou longo demais:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sinal</th><th>O que ele quer dizer</th><th>Primeiro remédio</th></tr>
+<tr><td>a mesma prop em 3 assinaturas, usada em 1</td><td>dois repassadores sem assunto</td><td>montar a peça onde o dado está</td></tr>
+<tr><td>componente recebe prop e não usa</td><td>ele virou cano</td><td>compor com <code>children</code></td></tr>
+<tr><td>nome da prop muda no meio do caminho</td><td>o dado some em silêncio</td><td>padronizar o nome ou parar de passar</td></tr>
+<tr><td>a prop é o mesmo dado em 8 telas</td><td>é dado do aplicativo, não da tela</td><td>contexto</td></tr>
+<tr><td>a árvore tem 6 níveis</td><td>o problema é a estrutura, não a prop</td><td>achatar a árvore</td></tr>
+</table>
+</div>
+
+<p>A última linha merece atenção. Muita dor de drilling é sintoma de uma árvore funda demais: um
+componente que só embrulha outro, que embrulha outro. Antes de instalar uma solução de dados, vale
+perguntar se aqueles três níveis precisam existir. Cortar um nível resolve mais do que passar o valor
+adiante com mais elegância.</p>
+
+<h2>8. As três saídas, em ordem de custo</h2>
+
+<p>Existem três caminhos, e eles não são equivalentes. Comece sempre pelo mais barato. O contexto —
+aula seguinte — é o mais poderoso e o mais fácil de usar errado.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Saída</th><th>Custo</th><th>Combine quando</th></tr>
+<tr><td>compor com <code>children</code></td><td>nenhum conceito novo</td><td>poucos consumidores, perto de quem tem o dado</td></tr>
+<tr><td>mover o estado para mais perto</td><td>reorganizar a tela</td><td>o dado só serve a um galho da árvore</td></tr>
+<tr><td>contexto</td><td>um provider e um consumidor</td><td>o dado vale para a aplicação inteira e é lido em muitos pontos</td></tr>
+</table>
+</div>
+
+<p>O contexto não é um elevador de props. Ele serve para um dado que a árvore inteira compartilha,
+como quem está logado, o tema claro ou escuro, a moeda da loja. Usar contexto para o preço de um pão
+específico é trocar um cano visível por um cano escondido: o componente passa a depender de algo que
+não aparece na assinatura nem no JSX de quem o chama. A regra prática é simples — se o dado muda de tela
+para tela, ele não é contexto.</p>
+
+<p>Há também uma saída que não é saída: passar <code>{...props}</code> em todo componente do caminho.
+É rápido de escrever e péssimo de ler, porque o componente passa a aceitar tudo sem declarar nada. O
+leitor não descobre quais dados a peça usa olhando a assinatura; precisa caçar no JSX. Se o objetivo é
+encurtar o encanamento, o spread só esconde o cano.</p>
+
+<pre class="term">Preco recebeu: undefined
+Preco recebeu: "Ana"</pre>
+
+<p>As duas linhas acima são o mesmo componente antes e depois de um repasse consertado. É o teste mais
+rápido que existe: se o valor chega <code>undefined</code>, o problema está acima; se chega certo e a
+tela não muda, o problema está no seu JSX.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o selo que nunca aparecia</h3>
+<p>A Ana passou <code>cliente</code> do <code>App</code> para o <code>Painel</code>, do
+<code>Painel</code> para o <code>Cartao</code> e esqueceu o último salto, do <code>Cartao</code> para o
+<code>Preco</code>. O selo dizia “visitante” para uma cliente de cinco anos. Nenhum erro no console, só
+uma tela quase certa — o sintoma clássico de prop que parou no meio do caminho.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: renomear virou um dia de trabalho</h3>
+<p>Ela decidiu que <code>cliente</code> era um nome ruim e trocou por <code>comprador</code>. Em vez de
+três arquivos, teve de mexer em nove, porque a prop atravessava componentes que não tinham nada a ver
+com a compra. Depois disso, ela passou a montar a peça no topo sempre que o dado era usado em um lugar
+só.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o dado que não era da tela</h3>
+<p>O nome do cliente começou a ser necessário em cinco telas diferentes do site: carrinho, perfil,
+encomendas, histórico e nota fiscal. Aí não era mais drilling de uma tela, era dado do aplicativo. Nesse
+caso, o contexto resolve — e é o assunto da próxima aula. A pista foi a palavra “cinco telas”, não o
+número de níveis.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que é props drilling?</p>
+<label><input type="radio" name="q1"> passar a mesma prop duas vezes para o mesmo componente</label>
+<label><input type="radio" name="q1"> passar um dado por componentes intermediários que não o usam</label>
+<label><input type="radio" name="q1"> criar uma prop nova para cada nível da árvore</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Qual é o custo principal do drilling?</p>
+<label><input type="radio" name="q2"> o React fica mais lento a cada nível</label>
+<label><input type="radio" name="q2"> o dado muda de valor no caminho</label>
+<label><input type="radio" name="q2"> cada nível do caminho precisa repassar a prop, e um esquecimento corta o dado</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. Qual é a saída mais barata, antes de pensar em contexto?</p>
+<label><input type="radio" name="q3"> montar a peça onde o dado existe e passá-la por <code>children</code></label>
+<label><input type="radio" name="q3"> repetir o dado em cada componente como constante</label>
+<label><input type="radio" name="q3"> passar <code>{...props}</code> em todos os componentes do caminho</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: abra a última porta</h2>
+<p>O <code>Cartao</code> recebe <code>cliente</code> e precisa entregá-lo ao <code>Preco</code>.
+Complete a linha que faz o repasse.</p>
+<div class="ex-code">&lt;Preco preco={preco} <input aria-label="resposta 1" data-answer="cliente={cliente}|cliente={ cliente }"> /&gt;</div>
+<p class="ex-dica">Dica: o nome da prop é o mesmo dos dois lados. Se você escrever
+<code>nome={cliente}</code>, o <code>Preco</code> continua recebendo <code>undefined</code> em
+<code>cliente</code> — e o selo não aparece.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Props drilling é o nome honesto de uma coisa comum: um dado que desce a árvore atravessando
+componentes que não o usam. O mecanismo está certo — em React, dados descem por props e quem manda no
+valor é quem o guarda. O que incomoda é o volume de portas que precisam ficar abertas.</p>
+
+<p>Antes de trocar de ferramenta, tente o barato. Monte a peça que precisa do dado lá em cima, onde o
+valor existe, e entregue a peça pronta por <code>children</code>: o componente do meio posiciona sem
+saber de nada. Se o dado só serve a um galho da árvore, mova o estado para mais perto desse galho. Se
+o dado vale para a aplicação inteira e é lido em muitos pontos distantes, aí sim vale um contexto — que
+é exatamente a <a href="contexto-introducao.html">próxima aula</a>.</p>
+
+<p>E guarde o detetive: quando uma tela aparece quase certa, com um buraco onde deveria ter texto, o
+suspeito número um é uma prop que parou no meio do caminho. Um <code>console.log</code> no componente
+que usa o dado resolve em trinta segundos a dúvida entre “não chegou” e “chegou e eu desenhei errado”.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Props drilling: dado atravessando níveis que não o usam.</li>
+<li>Props descem; eventos sobem por funções. Nada volta sozinho.</li>
+<li>Prop ausente vira <code>undefined</code> e a tela mostra um buraco, sem erro.</li>
+<li>O componente do meio que só repassa é um cano: ele não tem assunto.</li>
+<li>Saída 1: montar a peça onde o dado está e passar por <code>children</code>.</li>
+<li>Saída 2: mover o estado para mais perto de quem usa.</li>
+<li>Saída 3: contexto, quando o dado é do aplicativo inteiro.</li>
+<li>O nome da prop precisa ser igual em todos os níveis; diferente, o dado some.</li>
+<li><code>{...props}</code> esconde o cano em vez de encurtá-lo.</li>
+<li>Para achar o culpado, logue no componente que usa: <code>undefined</code> aponta para cima.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

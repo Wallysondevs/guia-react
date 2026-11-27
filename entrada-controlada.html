@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entrada Controlada | Guia React</title>
+<meta name="description" content="Entrada controlada no React: o par value e onChange, de onde vem o texto digitado, por que o campo trava sem onChange e como o estado manda no input.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Entrada <span class="hl">Controlada</span></h1>
+<p class="intro">A Ana recebe encomendas por telefone e anota o nome do cliente num campo do site. O texto
+aparece na tela, ela vê a letra surgir, e mesmo assim o site não sabe quem é o cliente: o parágrafo
+logo abaixo continua vazio e o botão de fechar o pedido reclama que falta o nome. O problema não é o
+teclado nem o navegador — é que ninguém contou ao estado do React o que foi digitado. Nesta aula ela
+liga o campo ao estado e escreve a sua primeira <strong>entrada controlada</strong>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um campo controlado e que problema ele resolve.</li>
+  <li>O par <code>value</code> e <code>onChange</code>, e por que um sem o outro não funciona.</li>
+  <li>De onde vem o texto digitado: <code>e.target.value</code>.</li>
+  <li>O ciclo completo de uma tecla: evento, estado, nova tela.</li>
+  <li>Por que <code>value</code> sozinho congela o campo (e o aviso que o React deixa no console).</li>
+  <li>Como limpar um campo com um botão sem tocar no DOM na mão.</li>
+  <li>Os três tropeços mais comuns de quem está começando com formulários.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o nome que a tela esquece</h2>
+
+<p>Na aula de <a href="eventos-onclick.html">eventos</a>, a Ana aprendeu a reagir a um clique. Agora ela
+quer o contrário: reagir ao que o cliente <em>digita</em>. A página tem um campo de texto e um parágrafo
+que deveria mostrar o resumo do pedido. Ela escreveu o campo do jeito que aprendeu no HTML puro:</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  return (
+    &lt;div&gt;
+      &lt;input placeholder="Nome do cliente" /&gt;
+      &lt;p&gt;Cliente: ...&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Ela clica no campo, digita <em>Maria</em> e vê a letra aparecer. Só que o parágrafo continua
+"Cliente: ...". Nada aconteceu do lado do React, porque nada foi avisado: o texto está guardado dentro
+do próprio elemento <code>input</code>, que é uma peça do navegador, e não dentro do componente. São
+dois mundos que não se falam.</p>
+
+<p>Isso vira problema de verdade quando a Ana tenta usar o nome: o botão "Fechar pedido" monta a
+mensagem com uma variável que está vazia; o resumo mostra um traço; a validação acha que o cliente não
+digitou nada e libera o pedido em branco. O campo parece funcionar — e é justamente essa a armadilha.
+Funcionar na tela não é o mesmo que funcionar no programa.</p>
+
+<p>Repare que a Ana não errou a sintaxe. O código roda, a página aparece, o campo aceita letras. O erro é
+de <strong>arquitetura</strong>: existem duas cópias do mesmo dado, uma na tela e outra no código, e
+ninguém as mantém iguais. Toda a aula de hoje é sobre juntar essas duas cópias em uma só.</p>
+
+<h2>2. Dois donos para o mesmo dado</h2>
+
+<p>Um campo de texto pode ser escrito de duas maneiras em React, e a diferença é quem guarda o valor.
+No primeiro jeito, o campo <strong>não controlado</strong>, o navegador é o dono: ele guarda o texto,
+cuida do cursor, apaga quando você apaga. O componente só descobre o que tem ali se for lá ler — e,
+enquanto ninguém lê, o React não tem motivo nenhum para redesenhar a tela. Foi o que a Ana escreveu
+sem querer.</p>
+
+<p>No segundo jeito, o campo <strong>controlado</strong>, o dono é o estado do componente. O elemento
+<code>input</code> deixa de ter memória: ele mostra o que o estado manda e avisa cada tecla para que o
+estado se atualize. A tela passa a ser um reflexo do estado — a mesma ideia que sustenta o contador
+das aulas anteriores, agora aplicada a uma caixa de texto.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pergunta</th><th>Campo não controlado</th><th>Campo controlado</th></tr>
+<tr><td>Quem guarda o texto</td><td>o navegador, dentro do elemento</td><td>o estado do componente</td></tr>
+<tr><td>O que o React sabe</td><td>nada, até alguém ir lá ler</td><td>tudo: ele é avisado a cada tecla</td></tr>
+<tr><td>Como se escreve</td><td><code>&lt;input /&gt;</code></td><td><code>&lt;input value={nome} onChange={...} /&gt;</code></td></tr>
+<tr><td>Limpar com um botão</td><td>precisa mexer no DOM na mão</td><td><code>setNome("")</code> e o campo obedece</td></tr>
+<tr><td>Validar enquanto digita</td><td>difícil: não há aviso de mudança</td><td>natural: cada tecla passa pelo estado</td></tr>
+</table>
+</div>
+
+<p>Essa tabela resume a decisão de projeto: <strong>um dado, um dono</strong>. Quando a tela e o código
+guardam a mesma informação, mais cedo ou mais tarde eles discordam — e o bug aparece longe de onde
+nasceu. Quando só o estado guarda, não existe discordância possível.</p>
+
+<h2>3. O par que faz o campo obedecer</h2>
+
+<p>Controlar um campo é dar duas instruções a ele. A primeira diz o que mostrar:
+<code>value={nome}</code>. A segunda diz o que fazer quando o cliente digita:
+<code>onChange={(e) =&gt; setNome(e.target.value)}</code>. As duas juntas fecham um ciclo, e o ciclo é a
+aula inteira.</p>
+
+<div class="tryreact" data-goal="digite:input=Maria;;texto:Cliente: Maria">
+  <p class="try-task">O campo aceita o nome, mas o parágrafo não muda. Ligue o campo ao estado: dê a ele
+  <code>value={nome}</code> e um <code>onChange</code> que guarde o que foi digitado. A missão digita
+  <strong>Maria</strong> no campo e confere se aparece "Cliente: Maria".</p>
+  <pre class="jsx">function App() {
+  const [nome, setNome] = useState("");
+
+  return (
+    &lt;div&gt;
+      &lt;label&gt;Cliente&lt;/label&gt;
+      &lt;input placeholder="Nome do cliente" /&gt;
+      &lt;p&gt;Cliente: ...&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;label&gt;Cliente&lt;/label&gt;
+  &lt;input placeholder="Nome do cliente"&gt;
+  &lt;p&gt;Cliente: ...&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nome, setNome] = useState("");
+
+  return (
+    &lt;div&gt;
+      &lt;label&gt;Cliente&lt;/label&gt;
+      &lt;input
+        placeholder="Nome do cliente"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;p&gt;Cliente: {nome}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Leia o código da solução de baixo para cima, porque é assim que ele funciona. O estado
+<code>nome</code> começa vazio. O <code>input</code> recebe <code>value={nome}</code>, então o campo
+começa vazio — e continuaria vazio para sempre se ninguém mudasse o estado. Quem muda é o
+<code>onChange</code>: cada vez que o cliente aperta uma tecla, o React chama a função, ela pega o texto
+atual do campo e entrega ao <code>setNome</code>. O estado muda, o componente roda de novo, e agora
+<code>value={nome}</code> vale a letra nova. O parágrafo, que lê o mesmo estado, aparece junto.</p>
+
+<p>O detalhe que engana: o campo <strong>nunca</strong> guarda o texto. Ele recebe o texto, a cada
+render, do estado. Se você pensar no <code>input</code> como um espelho e no estado como a pessoa na
+frente dele, tudo fica mais fácil. É por isso que se chama entrada controlada: quem controla é o estado,
+não o navegador.</p>
+
+<h2>4. De onde vem o texto digitado: e.target.value</h2>
+
+<p>Falta entender aquele <code>e</code>. Quando o cliente digita, o navegador dispara um evento, e o
+React chama a função que você entregou ao <code>onChange</code> passando um objeto que descreve o que
+aconteceu. Esse objeto é o <code>e</code> — de <em>event</em>, evento. Na aula de
+<a href="eventos-onclick.html">eventos</a> ele serviu para descobrir qual botão foi clicado; num campo de
+texto, serve para descobrir o que foi digitado, e o caminho disso é <code>e.target.value</code>.</p>
+
+<dl class="anatomy">
+<dt>e</dt>
+<dd>O objeto do evento: tudo o que se sabe sobre aquele acontecimento (que tipo de evento foi, quando,
+em qual elemento). É o primeiro parâmetro da função do <code>onChange</code>.</dd>
+<dt>e.target</dt>
+<dd>O elemento que disparou o evento. Num campo de texto, é o próprio <code>input</code> — o elemento
+do DOM, com todos os atributos dele.</dd>
+<dt>e.target.value</dt>
+<dd>O texto que está dentro do campo naquele instante, já com a letra recém-digitada. Sempre uma
+string, mesmo em campos numéricos.</dd>
+<dt>setNome</dt>
+<dd>A função que vem do <code>useState</code>. Ela não muda a variável <code>nome</code> na hora: pede
+ao React para renderizar o componente de novo com o valor novo.</dd>
+<dt>entrada controlada</dt>
+<dd>Um campo cujo valor vem do estado (<code>value</code>) e cujas mudanças voltam para o estado
+(<code>onChange</code>). O dado mora num lugar só.</dd>
+</dl>
+
+<p>O tropeço aqui é escrever <code>e</code> em vez de <code>e.target.value</code>. O estado passa a
+guardar o objeto do evento inteiro; na tela, o campo mostra a conversão para texto desse objeto. Nada
+quebra de imediato, e é isso que torna o erro chato: o programa continua rodando com um dado errado
+dentro dele.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você escreveu</th><th>O que vai para o estado</th><th>Sintoma na tela</th></tr>
+<tr><td><code>setNome(e.target.value)</code></td><td>a string digitada</td><td>tudo certo</td></tr>
+<tr><td><code>setNome(e)</code></td><td>o objeto do evento</td><td>o campo mostra <code>[object Object]</code></td></tr>
+<tr><td><code>setNome(e.target)</code></td><td>o elemento do input</td><td>o mesmo problema, com outro objeto</td></tr>
+<tr><td><code>setNome(e.value)</code></td><td><code>undefined</code></td><td>o campo fica vazio para sempre</td></tr>
+</table>
+</div>
+
+<p>Agora um caso mais sutil, e muito comum: o <code>onChange</code> existe, mas ignora o que foi
+digitado.</p>
+
+<div class="tryreact" data-goal="digite:input=Bruno;;texto:Bom dia, Bruno">
+  <p class="try-task">Digite qualquer nome no campo e veja: ele volta a ser "Ana". O
+  <code>onChange</code> está escrevendo um valor fixo em vez de guardar o que foi digitado. Conserte a
+  função para que o cumprimento acompanhe o nome. A missão digita <strong>Bruno</strong> e confere
+  "Bom dia, Bruno".</p>
+  <pre class="jsx">function App() {
+  const [nome, setNome] = useState("");
+
+  return (
+    &lt;div&gt;
+      &lt;input value={nome} onChange={() =&gt; setNome("Ana")} /&gt;
+      &lt;p&gt;Bom dia, {nome || "..."}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input value=""&gt;
+  &lt;p&gt;Bom dia, ...&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nome, setNome] = useState("");
+
+  return (
+    &lt;div&gt;
+      &lt;input value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+      &lt;p&gt;Bom dia, {nome || "..."}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Aqui está a prova de quem manda no campo. A Ana digitou "Bruno", mas o <code>onChange</code> disse ao
+estado que o nome era "Ana". O React redesenhou o componente com o estado errado, e o
+<code>input</code> obedeceu: mostrou "Ana". O texto digitado não foi perdido por acaso — ele foi
+<strong>substituído</strong>, porque o campo exibe o estado e não a própria memória.</p>
+
+<p>Guardar isso resolve metade dos bugs de formulário: se o campo mostra algo que você não esperava, não
+brigue com o campo. Olhe o estado. O campo é só o espelho.</p>
+
+<h2>5. O ciclo completo, uma tecla por vez</h2>
+
+<p>Vale acompanhar uma tecla do começo ao fim, porque todos os conceitos da aula aparecem nessa
+sequência. A Ana digitou <em>M</em> no campo vazio:</p>
+
+<p>1) O navegador registra a tecla e dispara um evento de entrada. 2) O React chama a função do
+<code>onChange</code> com o objeto do evento. 3) A função lê <code>e.target.value</code> e encontra
+"M". 4) <code>setNome("M")</code> avisa o React que o estado mudou. 5) O React roda o componente
+<code>App</code> de novo, agora com <code>nome</code> valendo "M". 6) O JSX produz um
+<code>input</code> com <code>value="M"</code> e um parágrafo com "Cliente: M". 7) O React compara com a
+tela anterior e atualiza só o que mudou. A letra aparece — mas ela apareceu porque o estado mudou, não
+porque o teclado escreveu na tela.</p>
+
+<p>Para ver esse ciclo acontecendo, coloque um <code>console.log</code> dentro do componente, antes do
+<code>return</code>. Ele roda uma vez por render, então cada linha corresponde a uma tecla:</p>
+
+<pre class="term">digitou: M
+digitou: Ma
+digitou: Mar
+digitou: Mari
+digitou: Maria</pre>
+
+<p>Cinco teclas, cinco linhas, cinco renders. Esse número vai importar mais adiante, na aula de
+<a href="batching.html">atualizações em lote</a>: o React não redesenha a tela a cada tecla por gula,
+ele redesenha porque o estado mudou. Se o estado não mudasse, nada seria redesenhado.</p>
+
+<p>Duas consequências práticas caem daqui. A primeira: como o valor passa obrigatoriamente pelo estado,
+você pode transformá-lo no caminho — gravar sempre em maiúsculas, cortar o excesso de espaços, impedir
+letras num campo de telefone. A segunda: <code>e.target.value</code> é sempre texto. Se o cliente digita
+<code>3</code> num campo de quantidade, o estado recebe a string <code>"3"</code>, e não o número 3. Para
+somar, você precisa converter com <code>Number(...)</code>. Essa conversão é o primeiro assunto da próxima
+aula.</p>
+
+<h2>6. O mesmo dado em três lugares da tela</h2>
+
+<p>Com o campo controlado, mostrar o nome em outros pontos da página fica trivial: todos leem o mesmo
+estado. É o que a Ana precisa na etiqueta do pedido, que sai em maiúsculas, e no botão que só deve
+liberar quando houver um nome.</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  const [nome, setNome] = useState("");
+
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor="cliente"&gt;Cliente&lt;/label&gt;
+      &lt;input
+        id="cliente"
+        value={nome}
+        onChange={(e) =&gt; setNome(e.target.value)}
+      /&gt;
+      &lt;p&gt;Cliente: {nome || "ninguém ainda"}&lt;/p&gt;
+      &lt;p&gt;Etiqueta: {nome.toUpperCase()}&lt;/p&gt;
+      &lt;button disabled={nome.length === 0}&gt;Fechar pedido&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Três leituras, um estado. O parágrafo mostra o nome como ele foi digitado; a etiqueta mostra o mesmo
+nome em maiúsculas; o botão fica desabilitado enquanto o texto estiver vazio. Nenhuma dessas três coisas
+é um estado novo — são cálculos feitos na hora de desenhar, a partir do estado que já existe.</p>
+
+<p>Esse ponto merece atenção porque é onde muita gente se perde: é tentador criar
+<code>const [etiqueta, setEtiqueta] = useState("")</code> e atualizar as duas variáveis a cada tecla. Não
+faça. Duas variáveis para o mesmo dado voltam ao problema da seção 2, só que agora dentro do componente.
+O maiúsculo da etiqueta é uma <em>consequência</em> do nome, e consequência se calcula, não se guarda.
+A aula de <a href="estado-derivado.html">estado derivado</a> é dedicada a esse critério.</p>
+
+<p>O <code>htmlFor</code> ali também tem história: no HTML ele se chama <code>for</code>, mas
+<code>for</code> é palavra reservada do JavaScript, então o React usa <code>htmlFor</code> no JSX e
+converte para <code>for</code> no HTML gerado. É o mesmo caso do <code>className</code>. Clicar na
+palavra "Cliente" leva o cursor para o campo, o que ajuda bastante no celular.</p>
+
+<h2>7. O campo que trava: value sem onChange</h2>
+
+<p>Agora o erro mais instrutivo da aula. Se você der <code>value</code> e esquecer o
+<code>onChange</code>, o campo vira uma vitrine: mostra o texto, mas não aceita nenhuma letra. A tecla é
+pressionada, o navegador até tenta escrever, o React redesenha com o valor antigo — e a letra
+desaparece. O React ainda avisa no console:</p>
+
+<pre class="term">Warning: You provided a `value` prop to a form field without an `onChange` handler. This will render a read-only field. If the field should be mutable use `defaultValue`. Otherwise, set either `onChange` or `readOnly`.</pre>
+
+<p>A mensagem diz exatamente o que está acontecendo e oferece as duas saídas. A primeira:
+<code>defaultValue</code> em vez de <code>value</code>, quando você quer um valor inicial mas não quer
+controlar o campo — o navegador assume a partir dali. A segunda: <code>readOnly</code>, quando o campo
+deve mesmo ser só de leitura e você quer deixar isso explícito no código.</p>
+
+<p>Vale reparar que esse é um caso raro em React: o aviso aparece <em>antes</em> de você perceber o
+sintoma. Um campo que não aceita digitação tem duas causas possíveis, e a mensagem distingue as duas. Se
+o console estiver limpo e o campo não aceitar texto, o problema é outro: pode ser CSS
+(<code>pointer-events: none</code>), pode ser o campo estar coberto por outro elemento, pode ser um
+<code>disabled</code> esquecido.</p>
+
+<p>Um detalhe que confunde: o valor inicial de um campo controlado não se escreve no
+<code>input</code>, e sim no <code>useState</code>. Quer que o campo comece com "Balcão"? Escreva
+<code>useState("Balcão")</code>. Escrever <code>value="Balcão"</code> direto no JSX cria justamente o
+campo travado desta seção — o estado continua vazio e o campo nunca muda.</p>
+
+<h2>8. Quem manda é o estado: limpar com um botão</h2>
+
+<p>A prova final de que o estado é o dono do campo: um botão que limpa. A Ana quer um "Limpar" ao lado do
+nome, para quando o cliente desistir no meio da frase. Nada de procurar o elemento na página e apagar o
+texto dele — basta mandar o estado ficar vazio.</p>
+
+<div class="tryreact" data-goal="digite:input=Pão;;texto:Pedido de Pão;;clique:button;;texto:Nenhum nome ainda">
+  <p class="try-task">O botão Limpar não faz nada. Faça ele esvaziar o nome, para o resumo voltar a
+  dizer "Nenhum nome ainda". A missão digita <strong>Pão</strong>, confere o resumo e depois clica em
+  Limpar.</p>
+  <pre class="jsx">function App() {
+  const [nome, setNome] = useState("Pão de queijo");
+
+  return (
+    &lt;div&gt;
+      &lt;input value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+      &lt;button onClick={() =&gt; {}}&gt;Limpar&lt;/button&gt;
+      &lt;p&gt;{nome ? "Pedido de " + nome : "Nenhum nome ainda"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;input value="Pão de queijo"&gt;
+  &lt;button&gt;Limpar&lt;/button&gt;
+  &lt;p&gt;Pedido de Pão de queijo&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const [nome, setNome] = useState("Pão de queijo");
+
+  return (
+    &lt;div&gt;
+      &lt;input value={nome} onChange={(e) =&gt; setNome(e.target.value)} /&gt;
+      &lt;button onClick={() =&gt; setNome("")}&gt;Limpar&lt;/button&gt;
+      &lt;p&gt;{nome ? "Pedido de " + nome : "Nenhum nome ainda"}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O botão não toca no campo. Ele chama <code>setNome("")</code>; o estado fica vazio; o componente roda
+de novo; o <code>input</code> recebe <code>value=""</code> e se esvazia. Se você fizer o mesmo por fora
+do estado, escrevendo <code>document.querySelector("input").value = ""</code>, a tela esvazia por um
+instante e o nome volta no próximo render, porque o estado continua com o texto antigo. Esse é o tipo de
+código que parece funcionar até a página redesenhar por qualquer outro motivo.</p>
+
+<p>O <code>{nome ? "Pedido de " + nome : "Nenhum nome ainda"}</code> mostra outra vantagem do campo
+controlado: como o estado é sempre uma string, dá para testar se está vazio e trocar a mensagem. Com um
+campo não controlado, essa decisão só poderia ser tomada no instante do envio, quando o código vai lá ler
+o elemento.</p>
+
+<p>E se a Ana quisesse que o nome ficasse sempre em maiúsculas enquanto digita? Bastaria
+<code>setNome(e.target.value.toUpperCase())</code>. O campo mostraria a letra maiúscula no mesmo instante,
+porque ele reflete o estado transformado. É assim que se fazem máscaras de telefone, de CPF e de moeda:
+transformando o texto no caminho entre o evento e o estado.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: as letras saem dobradas</h3>
+<p>A Ana copiou um exemplo e escreveu <code>setNome(nome + e.target.value)</code>. Ao digitar "Maria",
+o campo passou a mostrar "MMaarriiaa". A razão é que <code>e.target.value</code> já contém o texto
+inteiro do campo, incluindo a letra nova — somar <code>nome</code> duplica tudo. Em um campo controlado,
+o <code>onChange</code> recebe o valor completo, nunca só a tecla. A regra é simples:
+<code>setNome(e.target.value)</code>, sem concatenação.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o botão que limpa só a tela</h3>
+<p>Para esvaziar o campo, ela escreveu uma função que vai ao DOM e zera o <code>value</code>. O campo
+esvaziou na hora e, três segundos depois, o nome voltou sozinho — bastou o estado mudar por outro motivo
+para o React redesenhar e reimpor o valor que ele conhece. Quando a tela discorda do estado, o estado
+ganha. A correção é uma linha: <code>setNome("")</code>.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o telefone aparece com o nome do cliente</h3>
+<p>Ao acrescentar o campo de telefone, ela copiou o de nome e esqueceu de trocar o estado: os dois
+ficaram com <code>value={nome}</code>. Digitando o telefone, o nome mudava junto, e os dois campos
+mostravam o mesmo texto. Um estado só pode alimentar um campo só; dois campos pedem dois estados. É
+exatamente o assunto da aula de <a href="varios-estados.html">vários estados</a>.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que faz um campo de texto ser controlado?</p>
+<label><input type="radio" name="q1"> o <code>placeholder</code>, que indica o que digitar</label>
+<label><input type="radio" name="q1"> o <code>value</code> e o <code>onChange</code> amarrados ao estado</label>
+<label><input type="radio" name="q1"> o <code>type="text"</code>, que só aceita letras</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Em <code>onChange={(e) =&gt; setNome(e.target.value)}</code>, o que é <code>e.target</code>?</p>
+<label><input type="radio" name="q2"> o estado anterior do componente</label>
+<label><input type="radio" name="q2"> a função que veio do <code>useState</code></label>
+<label><input type="radio" name="q2"> o elemento que disparou o evento: o próprio input</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que acontece com <code>&lt;input value={nome} /&gt;</code>, sem <code>onChange</code>?</p>
+<label><input type="radio" name="q3"> o campo fica travado e o React avisa no console</label>
+<label><input type="radio" name="q3"> o campo funciona normalmente, só sem placeholder</label>
+<label><input type="radio" name="q3"> o React apaga o estado e mostra um erro na tela</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: fechar o par do campo</h2>
+<p>Complete o campo abaixo para que ele fique controlado pelo estado <code>nome</code>: falta o valor que
+ele exibe e a função que guarda o que foi digitado. Escreva como se estivesse dentro do JSX.</p>
+<div class="ex-code">&lt;input
+  value=<input aria-label="resposta 1" data-answer="{nome}" placeholder="...">
+  onChange=<input aria-label="resposta 2" data-answer="(e) =&gt; setNome(e.target.value)|(e)=&gt;setNome(e.target.value)|e =&gt; setNome(e.target.value)" placeholder="...">
+/&gt;</div>
+<p class="ex-dica">Dica: no <code>value</code> vai o estado entre chaves; no <code>onChange</code> vai uma
+função que recebe o evento e chama <code>setNome</code> com <code>e.target.value</code>.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Um campo de texto em React tem dois jeitos de existir. Sem <code>value</code>, ele é do navegador: o
+texto mora dentro do elemento e o componente não fica sabendo de nada. Com <code>value</code> e
+<code>onChange</code> ligados ao estado, ele é do componente: o campo exibe o estado e avisa cada tecla,
+e o estado — o único dono do dado — decide o que aparece.</p>
+
+<p>O ciclo é curto e vale decorar: o cliente digita, o React chama a função do <code>onChange</code> com
+o objeto do evento, você lê <code>e.target.value</code> e entrega ao <code>setNome</code>, o estado muda,
+o componente roda de novo, o campo recebe o valor novo. O <code>input</code> não guarda nada; ele reflete.
+Por isso um <code>onChange</code> que grava um valor fixo faz o campo "voltar sozinho", e por isso um
+botão de limpar se escreve com <code>setNome("")</code> e não com manipulação do DOM.</p>
+
+<p>Duas armadilhas merecem espaço na memória. A primeira: <code>value</code> sem
+<code>onChange</code> congela o campo e o React avisa no console, sugerindo <code>defaultValue</code> ou
+<code>readOnly</code>. A segunda: <code>e.target.value</code> é sempre texto; se o dado é número, a
+conversão é sua responsabilidade. E lembre que o valor inicial de um campo controlado se escreve no
+<code>useState</code>, não no atributo <code>value</code>.</p>
+
+<p>Com o campo controlado no lugar, o próximo problema da Ana é de quantidade: ela já tem o nome, agora
+quer o número de pães e o horário de retirada, cada um com o seu próprio estado, sem que um apague o
+outro. É o assunto da aula seguinte.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Campo controlado = <code>value</code> vindo do estado + <code>onChange</code> devolvendo para o estado.</li>
+<li>Um dado, um dono: se a tela e o estado guardam o mesmo valor, um dia eles discordam.</li>
+<li><code>e</code> é o objeto do evento; <code>e.target</code> é o elemento; <code>e.target.value</code> é o texto.</li>
+<li><code>setNome(e.target.value)</code> — nunca <code>setNome(e)</code> nem concatenação.</li>
+<li>Um <code>onChange</code> que ignora o texto faz o campo voltar sozinho: quem manda é o estado.</li>
+<li><code>value</code> sem <code>onChange</code> trava o campo e gera aviso no console.</li>
+<li><code>defaultValue</code> é para valor inicial sem controle; <code>readOnly</code> para campo só de leitura.</li>
+<li>O valor inicial de um campo controlado se escreve no <code>useState</code>.</li>
+<li><code>e.target.value</code> é sempre string: converta com <code>Number(...)</code> quando for número.</li>
+<li>Para limpar: <code>setNome("")</code>. Nada de mexer no DOM na mão.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

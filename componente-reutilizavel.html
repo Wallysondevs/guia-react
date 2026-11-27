@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Componente Reutilizável | Guia React</title>
+<meta name="description" content="Como transformar três blocos copiados em um componente reutilizável: a API de props, as variantes por prop, o children como slot e o limite de generalizar sem uso.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Componente <span class="hl">Reutilizável</span></h1>
+<p class="intro">A padaria da Ana tem três cartões de pão no site, e os três foram copiados à mão. Quando
+ela mudou o preço do francês, esqueceu os outros dois; quando mudou a espessura da borda, fez a mesma
+coisa em três lugares e errou em um. Nesta aula ela extrai os três cartões para um componente único, dá
+a ele uma lista pequena de props, cria variantes para o botão e aprende onde parar de generalizar.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A reconhecer repetição no JSX e transformá-la em um componente.</li>
+  <li>O que é a API de um componente: as props que ele aceita e o que promete devolver.</li>
+  <li>Como escolher nomes e quantas props bastam.</li>
+  <li>Variantes com uma prop de texto, em vez de cinco booleanos.</li>
+  <li>Quando usar <code>children</code> em vez de inventar props para o conteúdo.</li>
+  <li>O limite: por que não vale generalizar antes do terceiro uso.</li>
+  <li>Os erros que aparecem na hora de extrair: <code>key</code>, nomes vagos, estado no lugar errado.</li>
+</ul>
+</div>
+
+<h2>1. A cena: três cartões iguais e três lugares para errar</h2>
+
+<p>A página de pães da Ana tem um bloco para cada produto: o nome, o preço, uma frase curta e a classe
+<code>cartao</code> que dá a borda e o espaçamento. Ela escreveu o primeiro, copiou duas vezes e trocou o
+texto. Funcionou por um mês. Neste mês, o cartão ganhou o preço em negrito, e ela esqueceu de aplicar no
+croissant. O site ficou com dois cartões em negrito e um sem.</p>
+
+<p>Esse é o problema que o React existe para resolver, e a solução é sempre a mesma: escrever o desenho
+<strong>uma vez</strong>, como um componente, e passar os dados que mudam como props. O cartão deixa de
+ser um pedaço de HTML repetido e passa a ser uma função que recebe nome e preço e devolve o cartão
+pronto. Mudou o desenho? Uma função. Preço novo? Uma prop.</p>
+
+<p>A ideia parece óbvia quando está escrita assim, e mesmo assim quase todo mundo começa copiando. O
+motivo é que copiar é mais rápido no minuto seguinte e mais caro no mês seguinte. A conta fica clara
+quando você soma: três cartões, cinco mudanças de layout por mês, três lugares para cada uma. São quinze
+edições onde deveriam ser cinco — e três oportunidades de esquecer uma.</p>
+
+<p>Vale um aviso antes de começar: reutilizável não quer dizer genérico. Um componente bom é pequeno,
+tem poucas props e faz uma coisa. Um componente que tenta servir para tudo vira um monstro com doze
+props e um emaranhado de condições, e aí você trocou três cópias por um problema pior. A aula trata dos
+dois lados: como extrair bem e onde parar.</p>
+
+<h2>2. O que torna um componente reutilizável</h2>
+
+<p>Um componente é reutilizável quando o que muda entre um uso e outro entra por prop, e o que fica
+igual está no corpo da função. No cartão, o nome e o preço mudam; a estrutura, a classe e a ordem dos
+elementos ficam. Essa separação é a API do componente — o mesmo conceito de biblioteca, aplicado a uma
+função do seu próprio site.</p>
+
+<dl class="anatomy">
+<dt>API do componente</dt>
+<dd>O conjunto de props que ele aceita e o que ele devolve na tela. É o contrato com quem usa.</dd>
+<dt>prop obrigatória</dt>
+<dd>Aquela sem a qual o componente mostra algo quebrado: o preço de um cartão de preço.</dd>
+<dt>valor padrão</dt>
+<dd>O que a prop assume quando ninguém passa nada: <code>variante = "primario"</code>.</dd>
+<dt>variante</dt>
+<dd>Uma prop de texto que escolhe entre desenhos prontos: <code>variante="destaque"</code>.</dd>
+<dt>children</dt>
+<dd>O conteúdo que fica entre a abertura e o fechamento da tag: <code>&lt;Cartao&gt;…&lt;/Cartao&gt;</code>.</dd>
+</dl>
+
+<p>Há uma diferença prática entre as props de <strong>dado</strong> e as props de
+<strong>aparência</strong>. Dado é o que o cartão mostra: nome, preço, descrição. Aparência é como ele
+se mostra: destaque, tamanho, cor. Misturar as duas em uma lista única de props é o começo da confusão —
+e é a razão pela qual componentes grandes acabam com nomes como <code>tipo</code>,
+<code>variante</code>, <code>tamanho</code> e <code>cor</code> separados dos dados de verdade.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que muda entre um uso e outro</th><th>Vira o quê</th><th>Exemplo</th></tr>
+<tr><td>o texto e os números</td><td>prop de dado</td><td><code>nome="Croissant" preco={14}</code></td></tr>
+<tr><td>o jeito de aparecer</td><td>prop de variante, com valor padrão</td><td><code>variante="destaque"</code></td></tr>
+<tr><td>a estrutura de dentro</td><td><code>children</code></td><td><code>&lt;Cartao&gt;…&lt;/Cartao&gt;</code></td></tr>
+<tr><td>cor, borda, espaçamento fixos</td><td>classe, na folha de CSS</td><td><code>className="cartao"</code></td></tr>
+</table>
+</div>
+
+<p>Essa tabela é o roteiro da aula inteira. Cada seção a seguir pega uma linha e mostra o componente
+pronto: primeiro o dado, depois a variante, depois o slot. A quarta linha já foi resolvida nas aulas de
+<code>className</code> e <code>style</code> e volta aqui só para lembrar que nem toda diferença precisa
+chegar ao JavaScript.</p>
+
+<h2>3. Extraindo o primeiro componente</h2>
+
+<p>O primeiro passo é o mais mecânico e o mais útil. Copie o bloco repetido para uma função com nome
+maiúsculo, troque os valores que mudam por props e, no lugar dos três blocos, chame o componente três
+vezes. A Ana fez isso e, de quebra, colocou o preço em negrito — que era a mudança pendente.</p>
+
+<div class="tryreact" data-goal="conta:.cartao=3;;conta:strong=3;;texto:Croissant">
+  <p class="try-task">Os três cartões estão copiados à mão. Crie um componente <code>Cartao</code> que
+  recebe <code>nome</code> e <code>preco</code>, use três vezes e mostre o preço em negrito, dentro de
+  um <code>strong</code>, no formato <code>R$ 12,00</code>.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;div&gt;
+      &lt;div className="cartao"&gt;
+        &lt;h2&gt;Pão francês&lt;/h2&gt;
+        &lt;p&gt;R$ 12,00&lt;/p&gt;
+      &lt;/div&gt;
+      &lt;div className="cartao"&gt;
+        &lt;h2&gt;Pão de queijo&lt;/h2&gt;
+        &lt;p&gt;R$ 8,00&lt;/p&gt;
+      &lt;/div&gt;
+      &lt;div className="cartao"&gt;
+        &lt;h2&gt;Croissant&lt;/h2&gt;
+        &lt;p&gt;R$ 14,00&lt;/p&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;div class="cartao"&gt;
+    &lt;h2&gt;Pão francês&lt;/h2&gt;
+    &lt;p&gt;R$ 12,00&lt;/p&gt;
+  &lt;/div&gt;
+  &lt;div class="cartao"&gt;
+    &lt;h2&gt;Pão de queijo&lt;/h2&gt;
+    &lt;p&gt;R$ 8,00&lt;/p&gt;
+  &lt;/div&gt;
+  &lt;div class="cartao"&gt;
+    &lt;h2&gt;Croissant&lt;/h2&gt;
+    &lt;p&gt;R$ 14,00&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Cartao({ nome, preco }) {
+  return (
+    &lt;div className="cartao"&gt;
+      &lt;h2&gt;{nome}&lt;/h2&gt;
+      &lt;p&gt;&lt;strong&gt;{"R$ " + preco + ",00"}&lt;/strong&gt;&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Cartao nome="Pão francês" preco={12} /&gt;
+      &lt;Cartao nome="Pão de queijo" preco={8} /&gt;
+      &lt;Cartao nome="Croissant" preco={14} /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel depois da solução mostra os três cartões iguais, com o preço em <code>strong</code> — o
+mesmo HTML que a Ana escreveria à mão, três vezes. A diferença não está no resultado, está no que
+acontece na próxima mudança: ela mexe no <code>Cartao</code> e os três acompanham. Isso é o
+reaproveitamento de verdade: uma definição, vários usos.</p>
+
+<p>Repare no <code>{"R$ " + preco + ",00"}</code>. As chaves precisam envolver a conta inteira, senão o
+JSX não consegue montar o texto. E o preço é número (<code>preco={12}</code>), não texto: assim o
+componente pode somar, comparar e formatar mais tarde. Passar <code>preco="12"</code> também funciona na
+tela, mas limita quem recebe. Regra prática: número é número, texto é texto, e a formatação para
+português acontece na hora de mostrar.</p>
+
+<p>Se você escrevesse <code>&lt;Cartao /&gt;</code> sem props, o React chamaria a função com um objeto
+vazio, <code>nome</code> e <code>preco</code> viriam <code>undefined</code>, e o cartão mostraria
+"undefined" no lugar do nome. Props que o componente não sobrevive sem são obrigatórias de fato, e a
+maneira de deixar isso claro é o nome — ou um valor padrão que faça sentido.</p>
+
+<h2>4. A API do componente</h2>
+
+<p>Com o cartão extraído, a pergunta seguinte é sempre a mesma: quantas props ele deve ter? A resposta
+curta é "as que mudam entre um uso e outro, e nada além". A resposta longa é uma decisão de projeto, e
+ela fica mais fácil quando você olha os usos antes de olhar o componente.</p>
+
+<pre class="file" data-file="App.jsx">// três usos, três combinações de dado
+&lt;Cartao nome="Pão francês" preco={12} /&gt;
+&lt;Cartao nome="Pão de queijo" preco={8} /&gt;
+&lt;Cartao nome="Croissant" preco={14} /&gt;</pre>
+
+<p>Esses usos mostram que <code>nome</code> e <code>preco</code> são dados, sempre presentes. Se um
+cartão precisasse de uma frase de apoio só às vezes, essa seria uma prop opcional, com valor padrão
+vazio. Se todos os cartões têm a mesma borda, a borda não é prop: é classe, no CSS. Passar
+<code>borda="1px solid #ccc"</code> como prop seria transformar CSS em configuração de componente, e
+isso envelhece mal.</p>
+
+<p>Dentro do componente, as props chegam como um único objeto. Ver esse objeto é o jeito mais rápido de
+entender o que o componente recebeu, e o painel das caixas mostra o resultado de um
+<code>console.log(props)</code>:</p>
+
+<pre class="term">console: renderizou: Pão de queijo
+console: {"nome":"Pão de queijo","preco":8}</pre>
+
+<p>Duas linhas, duas lições. A primeira mostra que o componente roda <strong>uma vez por uso</strong>:
+três cartões são três chamadas da função, com objetos diferentes. A segunda mostra que as props são
+dados comuns — texto, número, objeto, função — e que o componente pode fazer o que quiser com eles. O
+que ele não pode é alterá-los: props são somente leitura.</p>
+
+<p>Há um estilo de escrita que vale conhecer agora, porque aparece em todo código React:
+<code>function Cartao({ nome, preco })</code>. As chaves no parâmetro desestruturam o objeto de props,
+e você usa <code>nome</code> e <code>preco</code> direto, sem <code>props.</code> na frente. O efeito é
+o mesmo; a leitura fica mais curta e a lista de props fica visível na primeira linha da função, o que é
+uma vantagem enorme quando o componente cresce.</p>
+
+<h2>5. Variantes: uma prop que escolhe o desenho</h2>
+
+<p>Nem toda diferença é de dado. O botão "Comprar pão" e o botão "Ver a lista" mostram textos diferentes
+e têm a mesma função, mas o primeiro é escuro e o segundo é claro com borda. Isso não é dado, é
+aparência — e o jeito ingênuo de resolver é uma prop booleana para cada estado:
+<code>escuro</code>, <code>grande</code>, <code>comBorda</code>, <code>arredondado</code>. Quatro
+booleanos dão dezesseis combinações, das quais três fazem sentido.</p>
+
+<p>O jeito que envelhece bem é uma prop de texto com um conjunto pequeno de valores permitidos, cada um
+mapeado para uma classe. A Ana chamou a prop de <code>variante</code>, e a CSS que já existe tem
+<code>.botao--primario</code> e <code>.botao--secundario</code>:</p>
+
+<pre class="term">.botao { padding: 8px 16px; border-radius: 6px; border: 1px solid transparent; }
+.botao--primario { background: #7a3e1d; color: #fff; }
+.botao--secundario { background: #fff; color: #7a3e1d; border-color: #7a3e1d; }</pre>
+
+<p>Com as classes prontas, o componente só precisa montar o nome. A variante entra como texto na classe
+e o valor padrão cobre o caso mais comum — quem chama não é obrigado a repetir
+<code>variante="primario"</code> em todos os botões.</p>
+
+<div class="tryreact" data-goal="conta:button.botao--primario=1;;conta:button.botao--secundario=1;;texto:Ver a lista">
+  <p class="try-task">Os dois botões têm só a classe <code>botao</code>. Crie um componente
+  <code>Botao</code> com as props <code>rotulo</code> e <code>variante</code> (padrão
+  <code>"primario"</code>), e faça a classe virar <code>botao botao--primario</code> ou
+  <code>botao botao--secundario</code>.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;div&gt;
+      &lt;button className="botao"&gt;Comprar pão&lt;/button&gt;
+      &lt;button className="botao"&gt;Ver a lista&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;button class="botao"&gt;Comprar pão&lt;/button&gt;
+  &lt;button class="botao"&gt;Ver a lista&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Botao({ rotulo, variante = "primario" }) {
+  return &lt;button className={"botao botao--" + variante}&gt;{rotulo}&lt;/button&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Botao rotulo="Comprar pão" /&gt;
+      &lt;Botao rotulo="Ver a lista" variante="secundario" /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Depois da solução, o painel mostra um botão com <code>class="botao botao--primario"</code> e outro
+com <code>class="botao botao--secundario"</code>. O primeiro nem precisou da prop: o valor padrão entrou
+sozinho. E se alguém escrever <code>variante="gigante"</code>, a classe vira
+<code>botao botao--gigante</code>, que não existe no CSS — o botão fica com o estilo base e ninguém vê
+erro. É o preço de usar texto livre em vez de uma lista fechada.</p>
+
+<p>Para evitar o erro silencioso, o componente pode escolher a classe em um mapa e cair no padrão quando
+o valor não existe:</p>
+
+<pre class="file" data-file="App.jsx">function Botao({ rotulo, variante = "primario" }) {
+  const estilos = {
+    primario: "botao botao--primario",
+    secundario: "botao botao--secundario"
+  };
+  const classes = estilos[variante] || estilos.primario;
+
+  return &lt;button className={classes}&gt;{rotulo}&lt;/button&gt;;
+}</pre>
+
+<p>Esse mapa é a forma mais simples de "lista fechada de variantes" sem nenhuma biblioteca. Ele tem uma
+vantagem extra: a lista fica visível em um lugar só, e quem for adicionar uma variante nova sabe
+exatamente onde mexer. Quando o projeto crescer, ferramentas de tipagem fazem esse trabalho — mas a
+ideia é a mesma.</p>
+
+<h2>6. O slot: children para o conteúdo que muda</h2>
+
+<p>Há um caso em que a diferença não é dado nem aparência: é <strong>estrutura</strong>. O cartão dos
+pães tem título e contagem; o dos bolos também, mas com outro texto; o de encomendas tem um parágrafo e
+um botão. Se você tentar cobrir isso com props, acaba com <code>temBotao</code>,
+<code>textoDoBotao</code>, <code>mostraContagem</code> — e o componente vira uma máquina de adivinhar o
+que desenhar.</p>
+
+<p>A solução do React é a prop especial <code>children</code>: o que fica entre a abertura e o
+fechamento do componente vai parar ali. O <code>Cartao</code> deixa de saber o que tem dentro e passa a
+só embrulhar com a classe e o espaçamento. Quem chama decide o conteúdo, e o componente continua
+reutilizável sem precisar de uma prop nova.</p>
+
+<div class="tryreact" data-goal="conta:section.cartao=2;;conta:section.cartao h2=2;;texto:12 tipos">
+  <p class="try-task">Os dois blocos repetem a <code>div</code> com a classe <code>cartao</code>. Crie
+  um componente <code>Cartao</code> que devolve um <code>section</code> com essa classe e o
+  <code>children</code> dentro. Use-o nas duas seções.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;div&gt;
+      &lt;div className="cartao"&gt;
+        &lt;h2&gt;Pães&lt;/h2&gt;
+        &lt;p&gt;12 tipos&lt;/p&gt;
+      &lt;/div&gt;
+      &lt;div className="cartao"&gt;
+        &lt;h2&gt;Bolos&lt;/h2&gt;
+        &lt;p&gt;8 tipos&lt;/p&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;div class="cartao"&gt;
+    &lt;h2&gt;Pães&lt;/h2&gt;
+    &lt;p&gt;12 tipos&lt;/p&gt;
+  &lt;/div&gt;
+  &lt;div class="cartao"&gt;
+    &lt;h2&gt;Bolos&lt;/h2&gt;
+    &lt;p&gt;8 tipos&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Cartao({ children }) {
+  return &lt;section className="cartao"&gt;{children}&lt;/section&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Cartao&gt;
+        &lt;h2&gt;Pães&lt;/h2&gt;
+        &lt;p&gt;12 tipos&lt;/p&gt;
+      &lt;/Cartao&gt;
+      &lt;Cartao&gt;
+        &lt;h2&gt;Bolos&lt;/h2&gt;
+        &lt;p&gt;8 tipos&lt;/p&gt;
+      &lt;/Cartao&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra dois <code>section</code> com a classe <code>cartao</code>, cada um com o seu
+conteúdo dentro. O componente não sabe quantos elementos recebeu: pode ser um título, cinco parágrafos
+ou nada. É a mesma ideia da prop, com o conteúdo no lugar do dado.</p>
+
+<p>Duas observações práticas. A primeira: <code>children</code> pode ser qualquer coisa que o React
+desenhe — texto, elementos, outros componentes, uma lista. A segunda: quando o componente precisa de
+algum pedaço do conteúdo em um lugar específico (um título no topo, um botão no rodapé), o
+<code>children</code> sozinho não resolve; aí entram props de elemento ou componentes compostos, que é
+assunto de outra aula. Para o caso comum, o slot basta.</p>
+
+<h2>7. Onde parar de generalizar</h2>
+
+<p>Depois do primeiro componente extraído, vem a tentação: extrair tudo. A Ana passou uma tarde criando
+um <code>CartaoGenerico</code> com props para título, subtítulo, imagem, rodapé, cor, borda, botão e
+contagem. No fim, o componente tinha doze props, sete delas opcionais, e cada uso passava nove. O código
+ficou maior do que as três cópias originais.</p>
+
+<p>A regra que evita esse destino é simples: <strong>espere o terceiro uso</strong>. Duas ocorrências
+parecidas podem ser coincidência; três indicam um padrão. Antes disso, copiar duas vezes custa menos do
+que manter uma abstração errada — e abstração errada é mais difícil de desfazer do que duplicação.</p>
+
+<p>Sinais de que o componente passou do ponto: props booleanas que só fazem sentido juntas; nomes como
+<code>tipo</code>, <code>modo</code> ou <code>opcoes</code> que escondem três componentes diferentes;
+condições dentro do JSX que devolvem estruturas completamente distintas; e a sensação de que qualquer
+mudança no visual exige uma prop nova. Quando isso acontece, o caminho é dividir: dois ou três
+componentes pequenos, cada um com uma responsabilidade, em vez de um grande com doze interruptores.</p>
+
+<p>Também vale desconfiar de props que são "só para o CSS": <code>corDaBorda</code>,
+<code>tamanhoDaFonte</code>, <code>espacamento</code>. Elas obrigam o componente a repassar estilo e
+amarram o desenho ao JavaScript. Se o cartão pode ter três tamanhos, uma prop <code>tamanho</code> com
+três valores e três classes resolve; se ele pode ter qualquer tamanho, o lugar é a classe, escolhida por
+quem usa.</p>
+
+<h2>8. Os tropeços na hora de extrair</h2>
+
+<p>Extrair um componente parece mecânico e tem suas armadilhas. Quatro delas aparecem sempre, e todas
+têm sintoma visível no painel ou no console.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que aconteceu</th><th>Por quê</th><th>O conserto</th></tr>
+<tr><td>a lista avisa que falta <code>key</code></td><td>o componente foi para dentro de um <code>map</code> e a <code>key</code> ficou no <code>div</code> de fora</td><td><code>&lt;Cartao key={p.id} … /&gt;</code></td></tr>
+<tr><td>o cartão mostra "undefined"</td><td>prop com nome diferente do que o componente lê</td><td>conferir a lista de props na primeira linha da função</td></tr>
+<tr><td>mudar um cartão mudou todos</td><td>o estado foi para dentro do componente, e cada uso tem o seu</td><td>subir o estado para o pai quando os cartões precisam concordar</td></tr>
+<tr><td>o componente devolve coisas muito diferentes</td><td>são dois componentes disfarçados de um</td><td>dividir em dois, cada um com as suas props</td></tr>
+</table>
+</div>
+
+<p>O primeiro é o mais comum e o mais fácil de consertar. Quando o cartão era uma <code>div</code>
+escrita dentro do <code>map</code>, a <code>key</code> ia nela. Depois da extração, a
+<code>key</code> precisa ir no componente: o React usa a chave para identificar cada item da lista, e
+ela não é passada como prop — é consumida pelo próprio React.</p>
+
+<p>O terceiro merece atenção porque é conceitual. Estado dentro de um componente é privado: dois
+<code>Cartao</code> têm dois estados, e um não sabe do outro. Se o botão "+" de um cartão precisa mudar
+o total que aparece no rodapé da página, o estado sai do cartão e sobe para o pai, que passa o valor e a
+função de mudar por prop. É o mesmo raciocínio de elevar estado, aplicado ao componente que você acabou
+de criar.</p>
+
+<p>E o segundo, o "undefined" na tela, é o erro de digitação que mais aparece: <code>titulo</code> em um
+lugar, <code>name</code> no outro. Com desestruturação na assinatura, a lista de props fica na primeira
+linha da função, e a comparação com o uso é de dois segundos. Sem ela, você procura no corpo inteiro.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o preço novo em dois cartões de três</h3>
+<p>A Ana mudou o preço do pão francês no cartão escrito à mão e esqueceu os outros. Com um componente
+único, o preço vem por prop e não existe "outro cartão" para esquecer — mas o dado ainda pode estar em
+três lugares no <code>App</code>. Quando os dados passam de props simples para uma lista, vale guardar a
+lista em um estado e renderizar com <code>map</code>: um lugar de verdade, três usos.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: o botão que ficou gigante em uma tela</h3>
+<p>Ela passou <code>tamanho="grande"</code> em um botão e o componente não conhecia esse valor: a classe
+virou <code>botao--grande</code>, que não existe no CSS. Nada quebrou e nada mudou. Com o mapa de
+variantes da seção 5, o valor desconhecido cai no padrão e o botão continua utilizável — e a lista de
+variantes válidas fica escrita em um lugar só.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: o cartão que só servia para pão</h3>
+<p>Ao extrair, ela deixou dentro do componente a frase "assado hoje às 5h", que só valia para o pão
+francês. Os outros dois cartões passaram a mentir. A correção foi mover a frase para uma prop opcional
+com valor padrão vazio, e não criar uma prop <code>mostrarFrase</code>: quem tem a informação decide se
+passa. Componente reutilizável não deve saber de qual produto se trata.</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. Quando um pedaço de JSX vale virar componente?</p>
+<label><input type="radio" name="q1"> sempre que tiver mais de duas linhas</label>
+<label><input type="radio" name="q1"> quando o mesmo bloco se repete e só os dados mudam</label>
+<label><input type="radio" name="q1"> só quando o projeto usa Vite</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que uma prop <code>variante</code> é melhor que quatro props booleanas?</p>
+<label><input type="radio" name="q2"> porque booleanos não funcionam em JSX</label>
+<label><input type="radio" name="q2"> porque ocupa menos memória</label>
+<label><input type="radio" name="q2"> porque fecha as combinações possíveis em uma lista pequena e legível</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O cartão precisa receber conteúdo diferente em cada uso. O que usar?</p>
+<label><input type="radio" name="q3"> <code>children</code>, o conteúdo entre as tags do componente</label>
+<label><input type="radio" name="q3"> uma prop <code>texto</code> com todo o HTML dentro</label>
+<label><input type="radio" name="q3"> um <code>useEffect</code> que monta o conteúdo depois</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: a API do cartão</h2>
+<p>Complete o componente. Na primeira lacuna, o conteúdo que chega entre as tags; na segunda, o valor
+padrão da prop <code>variante</code>, que deve ser "primario" quando ninguém passar nada:</p>
+<div class="ex-code">function Cartao({ <input aria-label="resposta 1" data-answer="children" placeholder="...">, variante = <input aria-label="resposta 2" data-answer="&quot;primario&quot;|'primario'" placeholder="..."> }) {
+  return &lt;section className={"cartao cartao--" + variante}&gt;{children}&lt;/section&gt;;
+}</div>
+<p class="ex-dica">Dica: a primeira é o nome especial que o React usa para o conteúdo entre as tags. A
+segunda é um texto — o valor padrão entra no lugar do <code>undefined</code> quando a prop não é
+passada, e precisa de aspas, porque é uma string.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Componente reutilizável nasce de repetição: o mesmo bloco escrito duas ou três vezes, com valores
+diferentes. A extração é mecânica — copiar para uma função com nome maiúsculo, trocar o que muda por
+props, chamar em todos os lugares. O que exige decisão é a API: quais props existem, com que nomes, e o
+que fica fixo no corpo. Regra prática: dado entra por prop, aparência entra por variante, conteúdo entra
+por <code>children</code>, e CSS fica no CSS.</p>
+
+<p>Variantes com uma prop de texto e um mapa de classes custam pouco e evitam a explosão de booleanos.
+Um valor padrão cobre o caso mais comum e deixa os usos curtos. E o limite é o terceiro uso: generalizar
+antes disso produz abstração errada, que é mais cara de manter do que a duplicação. Se o componente
+precisa de doze props para servir a três telas, ele provavelmente são três componentes.</p>
+
+<p>Vale reparar no que a Ana ganhou além das linhas economizadas. O cartão virou um lugar de
+conversa: quando ela quer mudar a borda, sabe onde; quando o preço muda, sabe de onde vem; quando um
+cartão aparece diferente, sabe que é prop. Um componente bem desenhado é documentação do site — e é por
+isso que o esforço de extrair compensa mesmo quando o HTML final é idêntico ao copiado.</p>
+
+<p>O próximo passo natural é juntar vários componentes sem criar <code>div</code> inútil no caminho. O
+React tem uma ferramenta só para isso, e é o assunto da próxima aula.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Repetição com dados diferentes é o sinal de que falta um componente.</li>
+<li>A API do componente é a lista de props: pequena, com nomes claros.</li>
+<li>Dado por prop; aparência por variante; conteúdo por <code>children</code>.</li>
+<li><code>variante = "primario"</code> no parâmetro é o valor padrão.</li>
+<li><code>children</code> é o que fica entre as tags do componente.</li>
+<li>Espere o terceiro uso antes de generalizar.</li>
+<li><code>key</code> vai no componente, dentro do <code>map</code>, não na <code>div</code> de fora.</li>
+<li>Estado dentro do componente é privado; se os usos precisam concordar, o estado sobe.</li>
+<li>Componente não deve saber de qual produto se trata: isso é prop.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
