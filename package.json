@@ -1,0 +1,15 @@
+{
+  "name": "guia-react",
+  "private": true,
+  "description": "Guia React — aulas com o React de verdade rodando no navegador",
+  "scripts": {
+    "empacotar": "node tools/empacotar.js --gerar",
+    "testar": "node tools/testar-missoes.js --todas --completo -q && node tools/verificar-saidas.js --todas -q && node tools/testar-navegador.js --todas"
+  },
+  "devDependencies": {
+    "@babel/standalone": "7.28.5",
+    "esbuild": "^0.25.10",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  }
+}

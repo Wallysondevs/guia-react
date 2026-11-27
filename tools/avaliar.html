@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>banco de provas — Guia React</title>
+</head>
+<body>
+<script src="../assets/reactsim.js"></script>
+<script>
+  /* o reactsim avisa que montou; o compilar.js espera este sinal */
+  (function () {
+    if (window.__reactPronto) { window.__avaliadorPronto = true; return; }
+    var t = setInterval(function () {
+      if (window.__reactPronto) { clearInterval(t); window.__avaliadorPronto = true; }
+    }, 20);
+  })();
+</script>
+</body>
+</html>

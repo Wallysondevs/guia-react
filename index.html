@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guia React — do primeiro componente ao app no ar | Guia React</title>
+<meta name="description" content="Curso de React 19 para quem nunca programou: 144 aulas em português, com o seu componente rodando de verdade e o HTML gerado aparecendo na tela.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>Guia <span class="hl">React</span></h1>
+
+<p class="intro">A Ana tem a padaria, o site de três páginas e um problema que cresce: o mesmo
+cabeçalho copiado em todo lugar, a lista de pães escrita à mão, e cada mudança de horário vira uma
+tarde de copiar e colar. Este guia ensina React do começo — o que é um componente, como o JSX vira
+HTML, como guardar dados que mudam, como buscar na rede — até o dia em que a página dela se monta
+sozinha e ela não repete mais nada. Escrito em português, <strong>para quem nunca programou</strong>.</p>
+
+<div class="note">
+<strong>Como este guia funciona</strong>
+<ul>
+  <li><strong>144 aulas</strong>, uma ideia por aula, na ordem em que se aprende de verdade.</li>
+  <li>Toda caixa "Experimente" <strong>roda o seu componente com o React 19 de verdade</strong> (o pacote oficial, empacotado para o navegador) e mostra o HTML que ele gerou.</li>
+  <li>O JSX é transformado pelo Babel no seu navegador — o mesmo caminho de um projeto com Vite, só que na hora.</li>
+  <li>Não precisa instalar nada para começar: as caixas já trazem React e o transformador.</li>
+</ul>
+</div>
+
+<h2>1. Para quem é</h2>
+
+<p>Para quem nunca escreveu uma linha de código e quer uma página que se atualize sozinha: contador que
+conta, lista que filtra, formulário que responde. O guia não supõe que você saiba JavaScript, HTML ou
+React: cada peça aparece quando é necessária, explicada na hora. Se você já programa, o Nível 1 vai
+parecer devagar — é de propósito. A leitora que este guia atende é a Ana, e a Ana ainda confunde
+"devolver" com "mostrar".</p>
+
+<p>Se você já mexeu com React antes, comece pela <em>Referência</em>: são doze páginas de consulta, com
+tabelas de hooks, props, eventos e as mensagens de erro mais comuns, cada uma com o que fazer.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Nível</th><th>O que você aprende</th><th>Aulas</th></tr>
+<tr><td>1 · Fundamentos</td><td>componente, JSX, props, estado, efeitos e composição</td><td>44</td></tr>
+<tr><td>2 · Componentes e Interação</td><td>formulários, os hooks um por um, padrões, listas e dados da rede</td><td>48</td></tr>
+<tr><td>3 · React de Verdade</td><td>npm e Vite, rotas, desempenho, React 19 e qualidade</td><td>30</td></tr>
+<tr><td>Projetos</td><td>dez aplicações inteiras, da lista de tarefas à busca com filtros</td><td>10</td></tr>
+<tr><td>Referência</td><td>JSX, props, estado, hooks, formulários, erros e glossário</td><td>12</td></tr>
+</table>
+</div>
+
+<h2>2. O primeiro componente, agora</h2>
+
+<p>Este é o mesmo componente que a primeira aula monta. Leia o código, clique em Rodar e veja o HTML
+que o React gerou. O React que roda esta caixa é o pacote oficial, versão 19 — o mesmo que você vai
+usar no seu projeto.</p>
+
+<div class="tryreact" data-goal="texto:Padaria da Ana;;conta:h1=1;;conta:p=1">
+<p class="try-task"><strong>Missão:</strong> o componente devolve um título com "Oi" e nada mais. Faça
+ele devolver um <code>h1</code> com <strong>Padaria da Ana</strong> e um <code>p</code> com
+<strong>Aberto das 6h às 18h</strong>, dentro de uma <code>div</code>.</p>
+<pre class="jsx">function App() {
+  return &lt;h1&gt;Oi&lt;/h1&gt;;
+}</pre>
+<pre class="out">
+&lt;h1&gt;Oi&lt;/h1&gt;
+</pre>
+<pre class="solucao">function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra o resultado: uma <code>div</code> com um <code>h1</code> e um <code>p</code>. Não é
+uma imagem, nem uma promessa — é o HTML que o React montou a partir do seu JSX, lido do navegador
+depois de rodar. É assim que o guia confere tudo: pelo resultado, não pela aparência do código.</p>
+
+<h2>3. O que você vai construir</h2>
+
+<p>No fim do Nível 1, a Ana tem a página da padaria feita de componentes: um cabeçalho que recebe o
+nome por prop, uma lista de pães gerada com <code>map</code> e um contador de pedidos que funciona de
+verdade. No Nível 2, a página vira aplicação: formulário de encomenda com validação, tabela de pedidos
+que filtra e ordena, dados que vêm da rede com estado de carregando e de erro, e os hooks usados com
+critério — cada um com o problema que resolve.</p>
+
+<p>No Nível 3, o assunto deixa de ser "fazer funcionar" e vira "fazer durar": criar o projeto com
+npm e Vite, entender o que cada script do <code>package.json</code> faz, organizar pastas, colocar
+rotas, publicar, medir o que está lento e usar o que há de novo no React 19 — <code>actions</code>,
+<code>useActionState</code>, <code>useOptimistic</code>.</p>
+
+<h2>4. Como estudar</h2>
+
+<p>Uma aula por vez, na ordem, com o editor aberto. Ler sobre componente não ensina componente: editar
+a caixa e ver o painel mudar, sim. Depois de cada aula, refaça o exercício no seu próprio arquivo e
+olhe o resultado no navegador com <code>F12</code> → <em>Elements</em>. O painel do guia mostra o mesmo
+que o inspetor mostra, só que sem você precisar procurar.</p>
+
+<div class="tip">
+<strong>Não adivinhe: leia o HTML gerado</strong>
+<p>Quem começa tenta descobrir o resultado relendo o JSX. O caminho certo é o contrário: rodar e ler o
+que o React produziu. Se o painel mostra um elemento a mais, é porque o seu componente devolveu um
+elemento a mais — e é ali que está a lição.</p>
+</div>
+
+<h2>5. O que este guia não é</h2>
+
+<p>Não é a documentação oficial: para a lista completa de APIs existe o site do React, e a Referência
+aponta o caminho. Não é um curso de JavaScript avançado: o que aparece de linguagem é explicado na
+hora. E não é um curso de servidor: quando o assunto é backend, o guia usa uma API de exemplo e diz
+com todas as letras que aquele pedaço não é React.</p>
+
+<h2>6. Resumo</h2>
+
+<ul>
+<li>144 aulas em cinco níveis, do primeiro componente ao app publicado.</li>
+<li>Toda caixa roda o componente com o React 19 de verdade e mostra o HTML gerado.</li>
+<li>O caminho é sempre: escrever o componente, rodar, ler o painel, ajustar.</li>
+<li>Nada de instalar para começar: as caixas já trazem React e Babel.</li>
+<li>Um projeto por nível, com a página da padaria crescendo junto com você.</li>
+</ul>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

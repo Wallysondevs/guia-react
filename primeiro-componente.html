@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O Primeiro Componente | Guia React</title>
+<meta name="description" content="O primeiro componente React na prática: uma função que devolve JSX, o HTML que o React gera, um elemento pai só e um componente chamando o outro.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script>(function(){try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+<div class="pager"></div>
+
+<h1>O Primeiro <span class="hl">Componente</span></h1>
+<p class="intro">A Ana tem um site de três páginas feito à mão, em HTML puro. Cada página repete o
+mesmo cabeçalho, a mesma lista de pães, o mesmo rodapé — e quando ela muda o horário de funcionamento,
+precisa editar três arquivos e rezar para não esquecer nenhum. Nesta aula ela escreve o primeiro
+componente React: uma função que devolve pedaços de tela, e que ela vai reaproveitar em todo lugar.
+Sem instalar nada, sem configuração: o componente roda aqui na caixa, com o React de verdade.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um componente: uma função que devolve a tela.</li>
+  <li>Como se escreve a primeira função componente e o que o React faz com ela.</li>
+  <li>A ler o painel: o HTML que o React gerou a partir do seu JSX.</li>
+  <li>Por que um componente devolve <strong>um</strong> elemento só, e o que fazer quando precisa de vários.</li>
+  <li>Como chamar um componente dentro de outro.</li>
+  <li>Como o componente recebe dados de fora (as props), só para reconhecer o assunto.</li>
+  <li>Como usar <code>console.log</code> para espiar o que está acontecendo.</li>
+</ul>
+</div>
+
+<h2>1. A cena: o mesmo cabeçalho em três arquivos</h2>
+
+<p>A padaria da Ana tem três páginas: a inicial, a lista de pães e o contato. Em cada uma delas, o
+topo da página é igual: o nome da padaria, o horário e um aviso. Ela copiou e colou esse topo três
+vezes, e é isso que dói. Mudou o horário de sábado? Três arquivos. Errou uma letra? Agora as páginas
+mostram coisas diferentes.</p>
+
+<p>A ideia do React é simples e vale a aula inteira: em vez de escrever o topo em três lugares,
+escreva <strong>uma função</strong> que devolve o topo — e mande as três páginas chamarem essa
+função. Essa função que devolve um pedaço de tela se chama <strong>componente</strong>. Não é uma
+classe, não é um arquivo especial, não tem palavra mágica: é uma função.</p>
+
+<p>Você talvez tenha visto React por aí com arquivos terminando em <code>.jsx</code>, com
+<code>import</code> e <code>export default</code>. Isso é o React num projeto de verdade, com
+ferramentas de build. Aqui na caixa, o componente é só a função — o resto chega no Nível 3, quando o
+assunto for montar o projeto. Por enquanto, o importante é entender o mecanismo.</p>
+
+<h2>2. O que é um componente, na prática</h2>
+
+<p>Um componente é uma função que <strong>devolve</strong> alguma coisa que o React sabe desenhar.
+Essa coisa é escrita numa linguagem chamada JSX, que parece HTML mas não é bem HTML — é uma forma mais
+curta de escrever "crie este elemento". Quando a função roda, o React pega o que ela devolveu e
+transforma em elementos de verdade na página.</p>
+
+<dl class="anatomy">
+<dt>componente</dt>
+<dd>Uma função JavaScript que começa com letra maiúscula e devolve JSX. <code>App</code>,
+<code>Cabecalho</code>, <code>ListaDePaes</code>.</dd>
+<dt>JSX</dt>
+<dd>A escrita parecida com HTML que o React entende: <code>&lt;h1&gt;Pão&lt;/h1&gt;</code> dentro do
+código JavaScript.</dd>
+<dt>elemento</dt>
+<dd>O que o JSX representa: uma peça da tela, com o nome da tag, os atributos e os filhos.</dd>
+<dt>renderizar</dt>
+<dd>O ato de o React pegar o que o componente devolveu e colocar na página de verdade.</dd>
+</dl>
+
+<p>Uma nota sobre a história, porque ela aparece em código antigo: até 2019, componente em React
+também podia ser escrito com <code>class</code> e um método <code>render()</code>. Hoje a forma normal é
+a função, e é só ela que você vai ver neste guia. Se cair num código com <code>class extends
+React.Component</code>, não se assuste: aquilo é um componente também, só escrito no estilo antigo.</p>
+
+<p>Duas regras de ouro, que valem dor de cabeça se esquecidas. Primeira: o nome do componente começa
+com <strong>letra maiúscula</strong>. O React usa essa diferença para saber se
+<code>&lt;Cabecalho /&gt;</code> é um componente seu ou uma tag comum como <code>&lt;div&gt;</code>.
+Segunda: a função devolve <strong>uma coisa só</strong>. Um elemento, que pode ter vários filhos dentro
+— mas um na raiz.</p>
+
+<h2>3. O primeiro componente</h2>
+
+<p>Vamos ao menor componente possível. A função se chama <code>App</code> e devolve um título:</p>
+
+<div class="tryreact" data-goal="texto:Pão quentinho">
+  <p class="try-task">O título está escrito "Oi". Troque o texto para <strong>Pão quentinho</strong> e
+  clique em Rodar.</p>
+  <pre class="jsx">function App() {
+  return &lt;h1&gt;Oi&lt;/h1&gt;;
+}</pre>
+  <pre class="out">
+&lt;h1&gt;Oi&lt;/h1&gt;
+</pre>
+  <pre class="solucao">function App() {
+  return &lt;h1&gt;Pão quentinho&lt;/h1&gt;;
+}</pre>
+</div>
+
+<p>Repare no painel: ele mostra <code>&lt;h1&gt;Pão quentinho&lt;/h1&gt;</code>. Isso é o HTML que o
+React <em>gerou</em>. O seu código nunca escreveu esse HTML à mão — escreveu JSX, o React transformou
+em chamadas de função, rodou a função <code>App</code> e montou o elemento na página. Ver esse HTML é
+a melhor forma de entender o que está acontecendo: o JSX é a receita, o HTML é o bolo.</p>
+
+<p>Uma coisa que confunde no começo: o <code>return</code> está numa linha e o JSX na outra, mas os
+dois são a mesma frase. Se você quebrar a linha logo depois de <code>return</code>, o JavaScript
+entende que a função terminou ali e devolve <code>undefined</code> — e aí nada aparece. Por isso a
+convenção de colocar o JSX entre parênteses quando ele ocupa várias linhas.</p>
+
+<h2>4. Lendo o painel (e o console)</h2>
+
+<p>O painel tem dois tipos de linha. As linhas de tags são o HTML gerado; as linhas que começam com
+<code>console:</code> são o que o seu código escreveu com <code>console.log</code>. O console é o
+jeito mais antigo e mais confiável de espiar o que está acontecendo: valores, cálculos, o que veio de
+um clique.</p>
+
+<div class="tryreact" data-goal="console:total de pães: 3;;texto:Pão quentinho">
+  <p class="try-task">Dentro do componente, calcule <code>2 + 1</code> e escreva no console
+  <code>total de pães: 3</code>. O texto do título continua o mesmo.</p>
+  <pre class="jsx">function App() {
+  const total = 2 + 1;
+  return &lt;h1&gt;Pão quentinho&lt;/h1&gt;;
+}</pre>
+  <pre class="out">
+&lt;h1&gt;Pão quentinho&lt;/h1&gt;
+</pre>
+  <pre class="solucao">function App() {
+  const total = 2 + 1;
+  console.log("total de pães: " + total);
+  return &lt;h1&gt;Pão quentinho&lt;/h1&gt;;
+}</pre>
+</div>
+
+<p>Aqui o componente faz duas coisas: calcula e mostra. Rodar código antes do <code>return</code> é
+normal e é o que permite preparar os dados que a tela vai usar. O que não pode é esquecer o
+<code>return</code>: sem ele, a função devolve <code>undefined</code> e o React reclama que um
+componente precisa devolver algo.</p>
+
+<p>No navegador de verdade esse console é a aba <em>Console</em> do DevTools, aberta com
+<code>F12</code>. Aqui ele aparece no painel, com o mesmo conteúdo e na mesma ordem:</p>
+
+<pre class="term">total de pães: 3
+Pão quentinho</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No JSX</th><th>No HTML gerado</th><th>Por quê</th></tr>
+<tr><td><code>className="preco"</code></td><td><code>class="preco"</code></td><td><code>class</code> é palavra reservada do JavaScript</td></tr>
+<tr><td><code>htmlFor="nome"</code></td><td><code>for="nome"</code></td><td>mesma razão: <code>for</code> também é do JavaScript</td></tr>
+<tr><td><code>{total}</code></td><td>o valor da variável</td><td>chaves abrem um espaço para JavaScript</td></tr>
+<tr><td><code>{nome}</code> dentro de <code>&lt;h1&gt;</code></td><td>o texto vira nó de texto</td><td>o React escapa o texto por você</td></tr>
+</table>
+</div>
+
+<p>Essa tabela é o começo do assunto da próxima aula, mas já vale para ler o painel sem susto: o que
+sai do outro lado é HTML comum. As chaves <code>{ }</code> são a porta entre os dois mundos.</p>
+
+<h2>5. Um elemento pai só</h2>
+
+<p>Agora o tropeço clássico. A Ana quer que o topo tenha o nome da padaria e o horário. Ela escreve
+os dois lado a lado, no mesmo <code>return</code>:</p>
+
+<pre class="file" data-file="App.jsx">function App() {
+  return (
+    &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+    &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+  );
+}</pre>
+
+<p>Isso não compila, e a mensagem do React fala em "adjacent JSX elements" — elementos JSX
+adjacentes, um do lado do outro. A razão é que o JSX é traduzido para uma chamada de função que cria
+<strong>um</strong> elemento; dois elementos soltos não cabem em um. A solução é embrulhar os dois em
+alguma coisa: uma <code>&lt;div&gt;</code> (que cria um nó de verdade) ou um <code>Fragment</code>
+(que não cria nó nenhum).</p>
+
+<div class="tryreact" data-goal="conta:h1=1;;conta:p=1;;texto:Aberto das 6h às 18h">
+  <p class="try-task">O componente devolve dois elementos soltos e não compila. Coloque os dois dentro
+  de uma <code>&lt;div&gt;</code> para a página aparecer com o título e o horário.</p>
+  <pre class="jsx">function App() {
+  return (
+    &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+    &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+  );
+}</pre>
+  <pre class="out">
+Erro: não compilou: /App.jsx: Adjacent JSX elements must be wrapped in an enclosing tag. Did you want a JSX fragment &lt;&gt;...&lt;/&gt;? (4:4)
+
+  2 |   return (
+  3 |     &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+&gt; 4 |     &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    |     ^
+  5 |   );
+  6 | }
+</pre>
+  <pre class="solucao">function App() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>Note também que a mensagem aponta a linha <code>3:4</code> — linha 3, coluna 4 — e sugere a
+saída: envolver os elementos num fragmento <code>&lt;&gt;...&lt;/&gt;</code>, que é uma casca invisível.
+As duas soluções funcionam; a diferença é que a <code>div</code> aparece no HTML final e o fragmento não.
+Voltamos a isso na aula de composição.</p>
+
+<p>Rodar o código quebrado de propósito é uma boa ideia: você vê a mensagem de verdade, com a linha
+onde o problema está, em vez de decorar um nome de erro. E note que o painel aceitou o erro sem
+quebrar a página — o React reclama, mas o resto do guia continua funcionando.</p>
+
+<h2>6. Um componente dentro do outro</h2>
+
+<p>Agora o motivo de tudo. A Ana separa o topo num componente chamado <code>Cabecalho</code> e usa
+esse componente dentro do <code>App</code>. JSX aceita componentes como se fossem tags: a diferença é
+a primeira letra maiúscula.</p>
+
+<div class="tryreact" data-goal="conta:h1=1;;texto:Padaria da Ana;;texto:Aberto das 6h">
+  <p class="try-task">A função <code>Cabecalho</code> já existe, mas o <code>App</code> não a usa: só
+  mostra a lista de pães. Chame <code>&lt;Cabecalho /&gt;</code> dentro do <code>App</code>.</p>
+  <pre class="jsx">function Cabecalho() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;p&gt;Pão saindo do forno&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  <pre class="out">
+&lt;div&gt;
+  &lt;p&gt;Pão saindo do forno&lt;/p&gt;
+&lt;/div&gt;
+</pre>
+  <pre class="solucao">function Cabecalho() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Padaria da Ana&lt;/h1&gt;
+      &lt;p&gt;Aberto das 6h às 18h&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Cabecalho /&gt;
+      &lt;p&gt;Pão saindo do forno&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<p>O painel mostra o resultado final: o <code>div</code> do <code>App</code> com o <code>div</code> do
+<code>Cabecalho</code> dentro, e o texto do topo. O React não "salva" o componente em lugar nenhum: ele
+chama a função <code>Cabecalho</code> na hora de montar a tela. Componente é função — chamou, apareceu.
+E é por isso que o reaproveitamento funciona: as três páginas do site da Ana podem chamar o mesmo
+<code>Cabecalho</code>, e mudar o horário passa a ser mudar uma linha.</p>
+
+<h2>7. O componente recebe dados: props</h2>
+
+<p>Um cabeçalho que só serve para a Ana não resolve muito. O mesmo componente precisa mostrar "Padaria
+da Ana" na padaria e "Livraria da Ana" na loja ao lado. A forma de mandar dados para dentro de um
+componente é por <strong>props</strong> — os atributos que você escreve na hora de chamar:</p>
+
+<pre class="file" data-file="App.jsx">function Cabecalho(props) {
+  return &lt;h1&gt;{props.nome}&lt;/h1&gt;;
+}
+
+function App() {
+  return (
+    &lt;div&gt;
+      &lt;Cabecalho nome="Padaria da Ana" /&gt;
+      &lt;Cabecalho nome="Livraria da Ana" /&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+
+<p>Props são <strong>somente leitura</strong>. O componente recebe os dados e usa, mas não os altera —
+quem manda no valor é quem chama. Essa restrição parece chata e é uma das melhores ideias do React: se
+cada componente pudesse mexer nas props dos outros, rastrear um bug viraria arqueologia. Quem precisa
+mudar dados ao longo do tempo usa estado, que é o assunto das próximas aulas.</p>
+
+<p>Três detalhes que a aula de props vai destrinchar, mas que já aparecem aqui: o componente recebe um
+objeto chamado <code>props</code>; as chaves <code>{ }</code> mostram um valor dentro do JSX; e um
+componente pode ser usado quantas vezes quiser, cada vez com props diferentes. O React chama a função
+uma vez por uso — dois <code>&lt;Cabecalho /&gt;</code> são duas chamadas.</p>
+
+<h2>8. Os tropeços de leitura do JSX</h2>
+
+<p>Quase todo erro de quem começa está em uma destas quatro linhas. Vale ler com calma, porque o
+sintoma de todos é parecido: a tela não mostra o que você esperava.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que você escreveu</th><th>O que acontece</th><th>O conserto</th></tr>
+<tr><td><code>function cabecalho()</code></td><td>vira tag desconhecida; tela vazia, sem erro</td><td>letra maiúscula: <code>Cabecalho</code></td></tr>
+<tr><td><code>class="preco"</code></td><td>o React avisa no console e ignora</td><td><code>className="preco"</code></td></tr>
+<tr><td><code>&lt;div&gt;&lt;/div&gt;&lt;p&gt;&lt;/p&gt;</code></td><td>não compila: "adjacent JSX elements"</td><td>embrulhar em <code>&lt;div&gt;</code> ou <code>&lt;&gt;...&lt;/&gt;</code></td></tr>
+<tr><td><code>return</code> e o JSX na linha de baixo</td><td>devolve <code>undefined</code>; erro de componente</td><td><code>return (</code> … <code>);</code></td></tr>
+</table>
+</div>
+
+<p>Há um jeito infalível de descobrir qual caso você tem em mãos: rode o código e leia o painel. Se
+aparecer <code>Erro: não compilou:</code>, é sintaxe — o componente nem chegou a rodar. Se o painel
+mostrar um HTML diferente do que você esperava, o componente rodou e devolveu outra coisa: aí o problema
+está no que você escreveu dentro do JSX, não na estrutura.</p>
+
+<p>O terceiro caso é o mais confuso, porque o erro fala de "elementos adjacentes" e o arquivo parece
+certo. A causa é a tradução que o React faz: cada elemento do JSX vira uma chamada
+<code>React.createElement</code>, e uma função não pode devolver duas chamadas soltas. Embrulhar é dar
+à função <em>uma</em> coisa para devolver.</p>
+
+<p>Já o primeiro caso engana por não reclamar. Um componente com nome minúsculo é lido como tag HTML —
+e o navegador aceita qualquer tag, mesmo inventada. Ele cria um elemento vazio e segue em frente. Na
+dúvida entre "meu componente não aparece" e "meu componente está errado", conferir a maiúscula resolve
+metade dos casos.</p>
+
+<pre class="term">Adjacent JSX elements must be wrapped in an enclosing tag.
+Warning: Invalid DOM property `class`. Did you mean `className`?</pre>
+
+<p>A primeira linha é do compilador, e impede a página de rodar: é um erro de sintaxe. A segunda é um
+aviso do React, e a página roda mesmo com ele — só o atributo não é aplicado. Guardar a diferença
+entre erro e aviso economiza tempo: erro impede, aviso reclama.</p>
+
+<h2>9. Cenários do dia a dia</h2>
+
+<div class="cenario">
+<h3>Cenário 1: o componente aparece duas vezes e o texto é o mesmo</h3>
+<p>A Ana chamou <code>&lt;Cabecalho /&gt;</code> duas vezes e viu o mesmo texto nas duas. É o esperado:
+sem props, o componente devolve sempre a mesma coisa. O que muda de uma cópia para outra é o que você
+manda por atributo. E se o texto ficar grande demais para a tela, é CSS — o React não interfere no
+estilo, só nos elementos.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 2: a função não aparece na tela</h3>
+<p>Ela escreveu <code>function cabecalho()</code> com letra minúscula e usou
+<code>&lt;cabecalho /&gt;</code>. O React entendeu que era uma tag HTML desconhecida e desenhou um
+elemento vazio. Letra maiúscula no nome do componente não é estilo, é regra: é assim que o React separa
+componente de tag. O sintoma é uma tela em branco sem erro nenhum.</p>
+</div>
+
+<div class="cenario">
+<h3>Cenário 3: esqueceu o return</h3>
+<p>O componente calculava, escrevia no console e terminava. Sem <code>return</code>, a função devolve
+<code>undefined</code>, e o React avisa que nada foi devolvido. É um dos erros mais comuns de quem está
+começando, e o console do navegador aponta o componente. Na dúvida, olhe a última linha da função: tem
+um <code>return</code> com JSX?</p>
+</div>
+
+<h2>10. Fixando o que ficou</h2>
+
+<div class="mc" data-answer="2"><p class="mc-q">1. O que é um componente React?</p>
+<label><input type="radio" name="q1"> um arquivo com extensão <code>.jsx</code></label>
+<label><input type="radio" name="q1"> uma função que devolve JSX</label>
+<label><input type="radio" name="q1"> uma tag especial do HTML</label>
+</div>
+
+<div class="mc" data-answer="3"><p class="mc-q">2. Por que o nome precisa começar com maiúscula?</p>
+<label><input type="radio" name="q2"> porque o JavaScript exige maiúscula em funções</label>
+<label><input type="radio" name="q2"> para o componente ficar mais bonito no código</label>
+<label><input type="radio" name="q2"> é assim que o React sabe que aquilo é um componente e não uma tag</label>
+</div>
+
+<div class="mc" data-answer="1"><p class="mc-q">3. O que o painel da caixa mostra?</p>
+<label><input type="radio" name="q3"> o HTML que o React gerou para <code>#raiz</code>, mais o console</label>
+<label><input type="radio" name="q3"> o seu código JSX, copiado</label>
+<label><input type="radio" name="q3"> a lista de erros do navegador</label>
+</div>
+
+<div class="exercise">
+<h2>Exercício: o rodapé da padaria</h2>
+<p>Crie um componente <code>Rodape</code> que devolve um parágrafo com o texto
+"Padaria da Ana — desde 1998" e chame esse componente dentro do <code>App</code>. Depois responda: qual é
+o nome da função que você criou?</p>
+<div class="ex-code">function <input aria-label="resposta 1" data-answer="Rodape" placeholder="...">() { return &lt;p&gt;Padaria da Ana — desde 1998&lt;/p&gt;; }</div>
+<p class="ex-dica">Dica: o nome começa com maiúscula, porque é um componente. Se você escrever
+<code>rodape</code>, o React trata como tag e nada aparece.</p>
+</div>
+
+<h2>11. Resumo</h2>
+
+<p>Componente é uma função com nome maiúsculo que devolve JSX. O React chama essa função, transforma o
+JSX em elementos e monta a página — e o painel das caixas mostra exatamente esse resultado, o HTML
+gerado. Um componente devolve <strong>um</strong> elemento na raiz; para mostrar várias coisas lado a
+lado, embrulhe em uma <code>div</code> ou em um <code>Fragment</code>. E componentes chamam componentes:
+<code>&lt;Cabecalho /&gt;</code> dentro do <code>App</code> é o começo de qualquer aplicação React.</p>
+
+<p>Vale reparar no que este guia está fazendo quando você clica em Rodar: o JSX é transformado em
+JavaScript pelo Babel, esse JavaScript roda com o React 19 dentro de um quadro isolado, e o painel lê o
+resultado. É o mesmo caminho de um projeto de verdade — a diferença é que lá o passo de transformar
+acontece antes de a página ir para o servidor, e aqui acontece no seu navegador, na hora. Entender isso
+agora evita a pergunta "onde está o HTML?" mais adiante.</p>
+
+<p>E um último conselho prático: quando um componente pequeno não aparece, reduza. Apague tudo e
+deixe só <code>return &lt;p&gt;oi&lt;/p&gt;</code>. Se aparecer, o problema está no que você apagou; se
+não aparecer, o problema está no nome do componente, no <code>return</code> ou na chamada. Reduzir até o
+osso acha o culpado mais rápido do que reler quarenta linhas.</p>
+
+<p>Guardar esse desenho mental — função entra, JSX sai, React monta — resolve a maior parte da
+confusão inicial. As props entram nesse desenho como os dados que chegam de fora, e o estado (a próxima
+parada do nível) como os dados que nascem dentro do componente e mudam com o tempo.</p>
+
+<div class="note">
+<h3>Para lembrar</h3>
+<ul>
+<li>Componente é função; o nome começa com letra maiúscula.</li>
+<li>A função devolve JSX, e o React transforma o JSX em HTML de verdade.</li>
+<li>Um componente devolve um elemento raiz só; os filhos ficam dentro dele.</li>
+<li>Para vários irmãos sem criar nó: <code>Fragment</code> ou <code>&lt;&gt;...&lt;/&gt;</code>.</li>
+<li><code>&lt;Componente /&gt;</code> chama a função; quantas vezes aparecer, quantas vezes roda.</li>
+<li>Props são os atributos que chegam ao componente: <code>&lt;Cabecalho nome="Ana" /&gt;</code>.</li>
+<li><code>className</code> vira <code>class</code> e <code>htmlFor</code> vira <code>for</code>.</li>
+<li><code>{ }</code> abre espaço para JavaScript dentro do JSX.</li>
+<li>Sem <code>return</code> não há tela: a função devolve <code>undefined</code>.</li>
+<li><code>console.log</code> aparece no painel, prefixado com <code>console:</code>.</li>
+</ul>
+</div>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
